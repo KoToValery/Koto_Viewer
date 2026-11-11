@@ -9,6 +9,19 @@ class AppLocalizationsBg extends AppLocalizations {
   AppLocalizationsBg([String locale = 'bg']) : super(locale);
 
   @override
+  String get architectWallAxisSpacing => 'Между осите';
+
+  @override
+  String get architectWallAxisRadius => 'Радиус по ос';
+
+  @override
+  String get architectWallAxisSetback => 'Отстъп по ос';
+
+  @override
+  String get architectWallOperationAxisHelp =>
+      'Командите за стени използват осите на ядрата независимо от водещата линия за чертане. Светлите размери се измерват между готовите лица.';
+
+  @override
   String get architectWallAngleLocked => 'Заключен ъгъл';
 
   @override
@@ -8173,7 +8186,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get bimOffsetHelp =>
-      'Въведи разстояние и посочи страна. Копие създава успоредни елементи; без отметката променя избраните. Свързаните отсечки се срещат в общи ъгли. Отворите в затворени контури се запазват. Копие на цяла група създава нова група; при редактиране на група копията остават в нея. За разклонени вериги или групи с текстове и символи избери приложимите отсечки без разклонение чрез Редактирай групата.';
+      'Въведи разстояние и посочи страна. Копие създава успоредни елементи; без отметката променя избраните. Свързаните отсечки се срещат в общи ъгли. Отворите в затворени контури се запазват. Копие на цяла група създава нова група; при редактиране на група копията остават в нея. За разклонени вериги или групи с текстове и символи избери приложимите отсечки без разклонение чрез Редактирай групата. За стени разстоянието е между осите на ядрата независимо от водещата линия за чертане.';
 
   @override
   String get architectToolFloorDrain => 'Сифон';
@@ -11837,7 +11850,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectChamferFilletInvalid =>
-      'Разстоянието или радиусът е твърде голям за този ъгъл';
+      'Ъгълът не може да се оформи. Проверете разстоянието или радиуса, типовете стени и отворите.';
 
   @override
   String get architectLayers => 'Слоеве';

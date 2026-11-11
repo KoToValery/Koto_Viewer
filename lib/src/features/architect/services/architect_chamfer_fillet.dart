@@ -9,13 +9,21 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_elements.dart';
 import '../models/architect_wall.dart';
+import 'architect_wall_operation_axis.dart';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
 
 class ArchitectChamferFillet {
   // === SECTION: 1. MATH HELPERS ===
 
   static Offset? lineIntersection(Offset a1, Offset b1, Offset a2, Offset b2) {
-    return BimLineGeometry.intersection(a1, b1, a2, b2, firstFinite: false, secondFinite: false);
+    return BimLineGeometry.intersection(
+      a1,
+      b1,
+      a2,
+      b2,
+      firstFinite: false,
+      secondFinite: false,
+    );
   }
 
   // === SECTION: 2. POLYGON CHAMFER & FILLET ===
@@ -177,138 +185,112 @@ class ArchitectChamferFillet {
 
   // === SECTION: 3. WALL PAIR CHAMFER & FILLET ===
 
-  /// Applies chamfer to two intersecting walls, returning the modified walls and a straight connecting wall.
+  /// Chamfer setbacks and fillet radii are measured on the core axes.
   static ({ArchitectWall wallA, ArchitectWall wallB, ArchitectWall connector})?
-      wallPairChamfer(
+  wallPairChamfer(
     ArchitectWall wallA,
     ArchitectWall wallB, {
     required double distance,
-  }) {
-    final v = lineIntersection(
-      wallA.startPoint,
-      wallA.endPoint,
-      wallB.startPoint,
-      wallB.endPoint,
-    );
-    if (v == null || distance <= 1e-6) return null;
+  }) => _wallPair(wallA, wallB, distance, fillet: false);
 
-    final (aNearStart, aFar) = (wallA.startPoint - v).distance < (wallA.endPoint - v).distance
-        ? (true, wallA.endPoint)
-        : (false, wallA.startPoint);
-    final (bNearStart, bFar) = (wallB.startPoint - v).distance < (wallB.endPoint - v).distance
-        ? (true, wallB.endPoint)
-        : (false, wallB.startPoint);
-
-    final uA = (aFar - v) / (aFar - v).distance;
-    final uB = (bFar - v) / (bFar - v).distance;
-
-    final cA = math.min(distance, (aFar - v).distance * 0.49);
-    final cB = math.min(distance, (bFar - v).distance * 0.49);
-
-    final pA = v + uA * cA;
-    final pB = v + uB * cB;
-
-    final newWallA = aNearStart
-        ? wallA.copyWith(startPoint: pA)
-        : wallA.copyWith(endPoint: pA);
-    final newWallB = bNearStart
-        ? wallB.copyWith(startPoint: pB)
-        : wallB.copyWith(endPoint: pB);
-
-    final connector = ArchitectWall(
-      id: 'chamfer_wall_${DateTime.now().microsecondsSinceEpoch}',
-      startPoint: pA,
-      endPoint: pB,
-      thickness: wallA.thickness,
-      layers: wallA.layers,
-      wallTypeId: wallA.wallTypeId,
-    );
-
-    return (wallA: newWallA, wallB: newWallB, connector: connector);
-  }
-
-  /// Applies fillet to two intersecting walls, returning the modified walls and a curved connecting wall.
   static ({ArchitectWall wallA, ArchitectWall wallB, ArchitectWall connector})?
-      wallPairFillet(
+  wallPairFillet(
     ArchitectWall wallA,
     ArchitectWall wallB, {
     required double radius,
+  }) => _wallPair(wallA, wallB, radius, fillet: true);
+
+  static ({ArchitectWall wallA, ArchitectWall wallB, ArchitectWall connector})?
+  _wallPair(
+    ArchitectWall wallA,
+    ArchitectWall wallB,
+    double value, {
+    required bool fillet,
   }) {
+    if (wallA.isCurved || wallB.isCurved || !value.isFinite || value <= 1e-6) {
+      return null;
+    }
+    final a = ArchitectWallOperationAxis.core(wallA);
+    final b = ArchitectWallOperationAxis.core(wallB);
     final v = lineIntersection(
-      wallA.startPoint,
-      wallA.endPoint,
-      wallB.startPoint,
-      wallB.endPoint,
+      a.startPoint,
+      a.endPoint,
+      b.startPoint,
+      b.endPoint,
     );
-    if (v == null || radius <= 1e-6) return null;
-
-    final (aNearStart, aFar) = (wallA.startPoint - v).distance < (wallA.endPoint - v).distance
-        ? (true, wallA.endPoint)
-        : (false, wallA.startPoint);
-    final (bNearStart, bFar) = (wallB.startPoint - v).distance < (wallB.endPoint - v).distance
-        ? (true, wallB.endPoint)
-        : (false, wallB.startPoint);
-
-    final lenA = (aFar - v).distance;
-    final lenB = (bFar - v).distance;
-    if (lenA < 1e-5 || lenB < 1e-5) return null;
-
-    final uA = (aFar - v) / lenA;
-    final uB = (bFar - v) / lenB;
-
-    final cosTheta = (uA.dx * uB.dx + uA.dy * uB.dy).clamp(-1.0, 1.0);
-    if (cosTheta.abs() > 0.9999) return null;
-
-    final theta = math.acos(cosTheta);
-    final alpha = theta / 2;
-    final tanAlpha = math.tan(alpha);
-    if (tanAlpha.abs() < 1e-6) return null;
-
-    final idealT = radius / tanAlpha;
-    final maxT = math.min(lenA, lenB) * 0.49;
-    final tEff = math.min(idealT, maxT);
-    final rEff = tEff * tanAlpha;
-
-    final tA = v + uA * tEff;
-    final tB = v + uB * tEff;
-
-    final newWallA = aNearStart
-        ? wallA.copyWith(startPoint: tA)
-        : wallA.copyWith(endPoint: tA);
-    final newWallB = bNearStart
-        ? wallB.copyWith(startPoint: tB)
-        : wallB.copyWith(endPoint: tB);
-
-    final bisector = uA + uB;
-    final bLen = bisector.distance;
-    if (bLen < 1e-6) return null;
-    final uBis = bisector / bLen;
-    final center = v + uBis * (rEff / math.sin(alpha));
-
-    // Calculate arc bulge from tA to tB
-    final phiA = math.atan2(tA.dy - center.dy, tA.dx - center.dx);
-    final phiB = math.atan2(tB.dy - center.dy, tB.dx - center.dx);
-    var sweep = phiB - phiA;
-    while (sweep > math.pi) {
-      sweep -= 2 * math.pi;
+    if (v == null) return null;
+    final aNearStart = (a.startPoint - v).distance < (a.endPoint - v).distance;
+    final bNearStart = (b.startPoint - v).distance < (b.endPoint - v).distance;
+    final aFar = aNearStart ? a.endPoint : a.startPoint;
+    final bFar = bNearStart ? b.endPoint : b.startPoint;
+    final lenA = (aFar - v).distance, lenB = (bFar - v).distance;
+    if (lenA < .001 || lenB < .001) return null;
+    final uA = (aFar - v) / lenA, uB = (bFar - v) / lenB;
+    final cosine = (uA.dx * uB.dx + uA.dy * uB.dy).clamp(-1.0, 1.0);
+    if (cosine.abs() > .9999) return null;
+    final alpha = math.acos(cosine) / 2;
+    final setback = fillet ? value / math.tan(alpha) : value;
+    // Never silently substitute a smaller radius/distance than the typed value.
+    if (setback >= lenA - .001 || setback >= lenB - .001) return null;
+    final pA = v + uA * setback, pB = v + uB * setback;
+    var bulge = 0.0;
+    if (fillet) {
+      final bisector = uA + uB;
+      final center =
+          v + bisector / bisector.distance * (value / math.sin(alpha));
+      final phiA = math.atan2(pA.dy - center.dy, pA.dx - center.dx);
+      final phiB = math.atan2(pB.dy - center.dy, pB.dx - center.dx);
+      var sweep = phiB - phiA;
+      while (sweep > math.pi) {
+        sweep -= 2 * math.pi;
+      }
+      while (sweep < -math.pi) {
+        sweep += 2 * math.pi;
+      }
+      bulge = math.tan(sweep / 4);
     }
-    while (sweep < -math.pi) {
-      sweep += 2 * math.pi;
+    try {
+      final nextA = ArchitectWallOperationAxis.restore(
+        wallA,
+        a.copyWith(
+          startPoint: aNearStart ? pA : null,
+          endPoint: aNearStart ? null : pA,
+        ),
+        keepOpeningPositions: true,
+      );
+      final nextB = ArchitectWallOperationAxis.restore(
+        wallB,
+        b.copyWith(
+          startPoint: bNearStart ? pB : null,
+          endPoint: bNearStart ? null : pB,
+        ),
+        keepOpeningPositions: true,
+      );
+      // The connector runs from A towards B. Keep A's physical material side
+      // even when the stored direction of A runs outwards from the corner.
+      final reverseSide =
+          wallA.unitVector.dx * -uA.dx + wallA.unitVector.dy * -uA.dy < 0;
+      final connector = wallA.copyWith(
+        id: '${fillet ? 'fillet' : 'chamfer'}_wall_${DateTime.now().microsecondsSinceEpoch}',
+        startPoint: pA,
+        endPoint: pB,
+        arcBulge: bulge,
+        referenceLine: WallReferenceLine.center,
+        exteriorSide: reverseSide
+            ? (wallA.exteriorSide == WallExteriorSide.left
+                  ? WallExteriorSide.right
+                  : WallExteriorSide.left)
+            : wallA.exteriorSide,
+        connectStart: true,
+        connectEnd: true,
+        doors: const [],
+        windows: const [],
+      );
+      connector.validateGeometry();
+      return (wallA: nextA, wallB: nextB, connector: connector);
+    } on ArgumentError {
+      return null;
     }
-
-    final bulge = math.tan(sweep / 4);
-
-    final connector = ArchitectWall(
-      id: 'fillet_wall_${DateTime.now().microsecondsSinceEpoch}',
-      startPoint: tA,
-      endPoint: tB,
-      arcBulge: bulge,
-      thickness: wallA.thickness,
-      layers: wallA.layers,
-      wallTypeId: wallA.wallTypeId,
-    );
-
-    return (wallA: newWallA, wallB: newWallB, connector: connector);
   }
 
   // === SECTION: 4. CAD LINE PAIR CHAMFER & FILLET ===
@@ -318,7 +300,8 @@ class ArchitectChamferFillet {
     ArchitectCadPrimitive lineA,
     ArchitectCadPrimitive lineB,
     ArchitectCadPrimitive connector,
-  })? linePairChamfer(
+  })?
+  linePairChamfer(
     ArchitectCadPrimitive lineA,
     ArchitectCadPrimitive lineB, {
     required double distance,
@@ -331,10 +314,16 @@ class ArchitectChamferFillet {
     );
     if (v == null || distance <= 1e-6) return null;
 
-    final (aNearStart, aFar) = (lineA.startPoint - v).distance < (lineA.endPoint - v).distance
+    final (
+      aNearStart,
+      aFar,
+    ) = (lineA.startPoint - v).distance < (lineA.endPoint - v).distance
         ? (true, lineA.endPoint)
         : (false, lineA.startPoint);
-    final (bNearStart, bFar) = (lineB.startPoint - v).distance < (lineB.endPoint - v).distance
+    final (
+      bNearStart,
+      bFar,
+    ) = (lineB.startPoint - v).distance < (lineB.endPoint - v).distance
         ? (true, lineB.endPoint)
         : (false, lineB.startPoint);
 
@@ -369,7 +358,8 @@ class ArchitectChamferFillet {
     ArchitectCadPrimitive lineA,
     ArchitectCadPrimitive lineB,
     ArchitectCadPrimitive connector,
-  })? linePairFillet(
+  })?
+  linePairFillet(
     ArchitectCadPrimitive lineA,
     ArchitectCadPrimitive lineB, {
     required double radius,
@@ -382,10 +372,16 @@ class ArchitectChamferFillet {
     );
     if (v == null || radius <= 1e-6) return null;
 
-    final (aNearStart, aFar) = (lineA.startPoint - v).distance < (lineA.endPoint - v).distance
+    final (
+      aNearStart,
+      aFar,
+    ) = (lineA.startPoint - v).distance < (lineA.endPoint - v).distance
         ? (true, lineA.endPoint)
         : (false, lineA.startPoint);
-    final (bNearStart, bFar) = (lineB.startPoint - v).distance < (lineB.endPoint - v).distance
+    final (
+      bNearStart,
+      bFar,
+    ) = (lineB.startPoint - v).distance < (lineB.endPoint - v).distance
         ? (true, lineB.endPoint)
         : (false, lineB.startPoint);
 

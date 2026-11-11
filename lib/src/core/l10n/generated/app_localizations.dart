@@ -98,6 +98,30 @@ abstract class AppLocalizations {
     Locale('en'),
   ];
 
+  /// No description provided for @architectWallAxisSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Between axes'**
+  String get architectWallAxisSpacing;
+
+  /// No description provided for @architectWallAxisRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Axis radius'**
+  String get architectWallAxisRadius;
+
+  /// No description provided for @architectWallAxisSetback.
+  ///
+  /// In en, this message translates to:
+  /// **'Axis setback'**
+  String get architectWallAxisSetback;
+
+  /// No description provided for @architectWallOperationAxisHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall operations use the core axes, independently of the drawing reference. Clear dimensions are measured between finished faces.'**
+  String get architectWallOperationAxisHelp;
+
   /// No description provided for @architectWallAngleLocked.
   ///
   /// In en, this message translates to:
@@ -14606,7 +14630,7 @@ abstract class AppLocalizations {
   /// No description provided for @bimOffsetHelp.
   ///
   /// In en, this message translates to:
-  /// **'Enter a distance and pick a side. Copy creates parallel elements; uncheck it to change the selection. Connected segments meet at shared corners. Openings in closed contours stay in place. Copying a whole group creates a new group; copies made while editing a group stay in it. For branched chains or groups containing text and symbols, use Edit group to select applicable segments without branches.'**
+  /// **'Enter a distance and pick a side. Copy creates parallel elements; uncheck it to change the selection. Connected segments meet at shared corners. Openings in closed contours stay in place. Copying a whole group creates a new group; copies made while editing a group stay in it. For branched chains or groups containing text and symbols, use Edit group to select applicable segments without branches. For walls, the distance is measured between core axes, independently of the drawing reference.'**
   String get bimOffsetHelp;
 
   /// Floor drain tool: wet-area floor with falls to a drain
@@ -21495,7 +21519,7 @@ abstract class AppLocalizations {
   /// Error when chamfer or fillet exceeds segment length
   ///
   /// In en, this message translates to:
-  /// **'Distance or radius is too large for this corner'**
+  /// **'Cannot form this corner. Check the distance or radius, wall types and openings.'**
   String get architectChamferFilletInvalid;
 
   /// Layers management title

@@ -5,6 +5,7 @@ import '../models/architect_contour.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
+import 'architect_wall_operation_axis.dart';
 
 /// Native offsets in model metres. Groups are selection metadata, never a
 /// replacement boundary: connected axes join; separate contours stay separate.
@@ -24,41 +25,76 @@ class ArchitectOffset {
       ids.isNotEmpty && supportedIds(s).containsAll(ids);
 
   /// Nearest selected boundary is the visual origin of the direction arrow.
-  static Offset directionAnchor(ArchitectStorey s, Set<String> ids, Offset side) {
+  static Offset directionAnchor(
+    ArchitectStorey s,
+    Set<String> ids,
+    Offset side,
+  ) {
     var best = double.infinity;
     var anchor = side;
     void consider(Offset point) {
       final distance = (point - side).distanceSquared;
-      if (distance < best) { best = distance; anchor = point; }
+      if (distance < best) {
+        best = distance;
+        anchor = point;
+      }
     }
+
     void ring(List<Offset> points, {bool closed = true}) {
       for (var i = 0; i < points.length - (closed ? 0 : 1); i++) {
         final a = points[i], d = points[(i + 1) % points.length] - a;
         if (d.distanceSquared < 1e-12) continue;
-        final t = (BimPolygonGeometry.dot(side - a, d) / d.distanceSquared).clamp(0.0, 1.0);
+        final t = (BimPolygonGeometry.dot(side - a, d) / d.distanceSquared)
+            .clamp(0.0, 1.0);
         consider(a + d * t);
       }
     }
+
     for (final e in _axes(s, ids)) {
       consider(e.referencePointAt(e.projectPoint(side).$1.clamp(0.0, 1.0)));
     }
-    for (final e in s.slabs.where((e) => ids.contains(e.id))) { ring(e.polygon); }
-    for (final e in s.roofs.where((e) => ids.contains(e.id))) { ring(e.points); }
-    for (final e in s.openings.where((e) => ids.contains(e.id))) { ring(e.boundary); }
-    for (final e in s.zones.where((e) => ids.contains(e.id))) { ring(e.polygon); }
+    for (final e in s.slabs.where((e) => ids.contains(e.id))) {
+      ring(e.polygon);
+    }
+    for (final e in s.roofs.where((e) => ids.contains(e.id))) {
+      ring(e.points);
+    }
+    for (final e in s.openings.where((e) => ids.contains(e.id))) {
+      ring(e.boundary);
+    }
+    for (final e in s.zones.where((e) => ids.contains(e.id))) {
+      ring(e.polygon);
+    }
     for (final e in s.cadPrimitives.where((e) => ids.contains(e.id))) {
       if (e.isPolygon) ring(e.polygonCorners);
-      if (e.type == CadPrimitiveType.polyline) ring(e.linePoints, closed: false);
+      if (e.type == CadPrimitiveType.polyline) {
+        ring(e.linePoints, closed: false);
+      }
       if (e.type == CadPrimitiveType.circle) {
         final d = side - e.startPoint;
-        if (d.distance > 1e-12) consider(e.startPoint + d / d.distance * (e.endPoint - e.startPoint).distance);
+        if (d.distance > 1e-12) {
+          consider(
+            e.startPoint +
+                d / d.distance * (e.endPoint - e.startPoint).distance,
+          );
+        }
       }
     }
     return anchor;
   }
 
-  static List<ArchitectWall> _axes(ArchitectStorey s, Set<String> ids) => [
-    ...s.walls.where((e) => ids.contains(e.id)),
+  static List<ArchitectWall> _axes(
+    ArchitectStorey s,
+    Set<String> ids, {
+    bool joinWalls = false,
+  }) => [
+    ...joinWalls
+        ? ArchitectWallOperationAxis.joinedCores(
+            s.walls.where((e) => ids.contains(e.id)).toList(),
+          )
+        : s.walls
+              .where((e) => ids.contains(e.id))
+              .map(ArchitectWallOperationAxis.core),
     for (final e in s.beams.where((e) => ids.contains(e.id)))
       ArchitectWall(id: e.id, startPoint: e.startPoint, endPoint: e.endPoint),
     for (final e in s.stairs.where((e) => ids.contains(e.id)))
@@ -70,7 +106,7 @@ class ArchitectOffset {
   ];
 
   /// New IDs are supplied by the command, keeping repeated previews stable.
-  /// Openings stay fixed in world coordinates when a host perimeter is offset.
+  /// Openings follow the transverse offset without sliding along their host.
   static ArchitectStorey apply(
     ArchitectStorey s,
     Set<String> ids, {
@@ -95,7 +131,7 @@ class ArchitectOffset {
       throw ArgumentError('Incomplete offset ID map');
     }
     String id(String source) => idMap[source] ?? source;
-    final axes = _axes(s, ids);
+    final axes = _axes(s, ids, joinWalls: true);
     final shifted = <String, ArchitectWall>{};
     final shifts = <String, double>{};
     // Different native kinds do not acquire artificial axis junctions.
@@ -109,6 +145,8 @@ class ArchitectOffset {
       final remaining = axes.where((e) => kinds[e.id] == kind).toList();
       for (final path in _chains(remaining)) {
         final closed =
+            path.first.connectStart &&
+            path.last.connectEnd &&
             (path.last.endPoint - path.first.startPoint).distance < 1e-7;
         final samples = _samples(path);
         _validatePath(path, closed);
@@ -218,9 +256,10 @@ class ArchitectOffset {
 
     double openingRatio(ArchitectWall old, ArchitectWall next, double ratio) {
       final d = shifts[old.id]!;
+      final core = ArchitectWallOperationAxis.core(old);
       final p =
-          old.arc?.pointAt(ratio, leftOffset: d) ??
-          old.referencePointAt(ratio) + old.normalVector * d;
+          core.arc?.pointAt(ratio, leftOffset: d) ??
+          core.referencePointAt(ratio) + core.normalVector * d;
       return next.projectPoint(p).$1;
     }
 
@@ -230,11 +269,12 @@ class ArchitectOffset {
       for (final e in s.walls.where((e) => ids.contains(e.id)))
         (() {
           final axis = shifted[e.id]!;
-          final next = e.copyWith(
+          final geometry = ArchitectWallOperationAxis.restore(
+            e.copyWith(doors: const [], windows: const []),
+            axis,
+          );
+          final next = geometry.copyWith(
             id: id(e.id),
-            startPoint: axis.startPoint,
-            endPoint: axis.endPoint,
-            arcBulge: axis.arcBulge,
             doors: [
               for (final d in e.doors)
                 d.copyWith(
@@ -344,19 +384,36 @@ class ArchitectOffset {
             if (e.type == CadPrimitiveType.polyline) {
               // Reuse the same open-chain miter geometry as connected lines.
               final points = e.linePoints;
-              final segments = [for (var i = 1; i < points.length; i++)
-                ArchitectCadPrimitive(id: '$i', type: CadPrimitiveType.line,
-                  startPoint: points[i - 1], endPoint: points[i])];
+              final segments = [
+                for (var i = 1; i < points.length; i++)
+                  ArchitectCadPrimitive(
+                    id: '$i',
+                    type: CadPrimitiveType.line,
+                    startPoint: points[i - 1],
+                    endPoint: points[i],
+                  ),
+              ];
               final shifted = apply(
-                ArchitectStorey(id: s.id, name: s.name, cadPrimitives: segments),
+                ArchitectStorey(
+                  id: s.id,
+                  name: s.name,
+                  cadPrimitives: segments,
+                ),
                 segments.map((p) => p.id).toSet(),
-                distance: distance, side: side,
+                distance: distance,
+                side: side,
               ).cadPrimitives;
-              final result = [shifted.first.startPoint,
-                for (final p in shifted) p.endPoint];
+              final result = [
+                shifted.first.startPoint,
+                for (final p in shifted) p.endPoint,
+              ];
               ArchitectCadPrimitive.validatePolyline(result);
-              return e.copyWith(id: id(e.id), polygon: result,
-                startPoint: result.first, endPoint: result.last);
+              return e.copyWith(
+                id: id(e.id),
+                polygon: result,
+                startPoint: result.first,
+                endPoint: result.last,
+              );
             }
             if (e.type == CadPrimitiveType.line) {
               return e.copyWith(
@@ -543,11 +600,11 @@ class ArchitectOffset {
   /// Walk an unbranched chain, independent of stored segment direction/order.
   static List<List<ArchitectWall>> _chains(List<ArchitectWall> axes) {
     bool near(Offset a, Offset b) => (a - b).distance < 1e-7;
-    int degree(Offset p) => axes.fold(
-      0,
-      (n, e) =>
-          n + (near(p, e.startPoint) ? 1 : 0) + (near(p, e.endPoint) ? 1 : 0),
-    );
+    bool connects(ArchitectWall e, Offset p) =>
+        (near(p, e.startPoint) && e.connectStart) ||
+        (near(p, e.endPoint) && e.connectEnd);
+    int degree(Offset p) =>
+        axes.fold(0, (n, e) => n + (connects(e, p) ? 1 : 0));
     if (axes.any(
       (e) =>
           e.length < .001 || degree(e.startPoint) > 2 || degree(e.endPoint) > 2,
@@ -566,8 +623,13 @@ class ArchitectOffset {
       var point = endpoint;
       final chain = <ArchitectWall>[];
       while (true) {
+        if (chain.isNotEmpty && !chain.last.connectEnd) break;
         final e = remaining
-            .where((e) => near(e.startPoint, point) || near(e.endPoint, point))
+            .where(
+              (e) => chain.isEmpty
+                  ? near(e.startPoint, point) || near(e.endPoint, point)
+                  : connects(e, point),
+            )
             .firstOrNull;
         if (e == null) break;
         remaining.remove(e);
@@ -577,6 +639,8 @@ class ArchitectOffset {
                 startPoint: e.endPoint,
                 endPoint: e.startPoint,
                 arcBulge: -e.arcBulge,
+                connectStart: e.connectEnd,
+                connectEnd: e.connectStart,
                 doors: [],
                 windows: [],
               );
@@ -588,6 +652,8 @@ class ArchitectOffset {
             endPoint: oriented.endPoint,
             arcBulge: oriented.arcBulge,
             thickness: .001,
+            connectStart: oriented.connectStart,
+            connectEnd: oriented.connectEnd,
           ),
         );
         point = oriented.endPoint;

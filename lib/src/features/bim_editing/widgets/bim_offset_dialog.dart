@@ -19,6 +19,7 @@ Future<BimElementOffsetOptions?> showBimElementOffsetDialog(
   required String unitSymbol,
   double? initialDistance,
   bool? initialCopy,
+  bool wallAxes = false,
 }) => showDialog<BimElementOffsetOptions>(
   context: context,
   builder: (_) => _ElementOffsetDialog(
@@ -26,6 +27,7 @@ Future<BimElementOffsetOptions?> showBimElementOffsetDialog(
     unitSymbol: unitSymbol,
     initialDistance: initialDistance,
     initialCopy: initialCopy,
+    wallAxes: wallAxes,
   ),
 );
 
@@ -34,11 +36,13 @@ class _ElementOffsetDialog extends StatefulWidget {
   final String unitSymbol;
   final double? initialDistance;
   final bool? initialCopy;
+  final bool wallAxes;
   const _ElementOffsetDialog({
     required this.unitToMeters,
     required this.unitSymbol,
     this.initialDistance,
     this.initialCopy,
+    required this.wallAxes,
   });
   @override
   State<_ElementOffsetDialog> createState() => _ElementOffsetDialogState();
@@ -63,6 +67,7 @@ class _ElementOffsetDialogState extends State<_ElementOffsetDialog> {
       copy = widget.initialCopy!;
     }
   }
+
   @override
   void dispose() {
     controller.dispose();
@@ -105,7 +110,9 @@ class _ElementOffsetDialogState extends State<_ElementOffsetDialog> {
               keyboardType: TextInputType.none,
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
-                labelText: l.bimOffsetDistance,
+                labelText: widget.wallAxes
+                    ? l.architectWallAxisSpacing
+                    : l.bimOffsetDistance,
                 suffixText: widget.unitSymbol,
               ),
               onChanged: (_) => setState(() {}),

@@ -9,6 +9,19 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get architectWallAxisSpacing => 'Between axes';
+
+  @override
+  String get architectWallAxisRadius => 'Axis radius';
+
+  @override
+  String get architectWallAxisSetback => 'Axis setback';
+
+  @override
+  String get architectWallOperationAxisHelp =>
+      'Wall operations use the core axes, independently of the drawing reference. Clear dimensions are measured between finished faces.';
+
+  @override
   String get architectWallAngleLocked => 'Angle locked';
 
   @override
@@ -8143,7 +8156,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bimOffsetHelp =>
-      'Enter a distance and pick a side. Copy creates parallel elements; uncheck it to change the selection. Connected segments meet at shared corners. Openings in closed contours stay in place. Copying a whole group creates a new group; copies made while editing a group stay in it. For branched chains or groups containing text and symbols, use Edit group to select applicable segments without branches.';
+      'Enter a distance and pick a side. Copy creates parallel elements; uncheck it to change the selection. Connected segments meet at shared corners. Openings in closed contours stay in place. Copying a whole group creates a new group; copies made while editing a group stay in it. For branched chains or groups containing text and symbols, use Edit group to select applicable segments without branches. For walls, the distance is measured between core axes, independently of the drawing reference.';
 
   @override
   String get architectToolFloorDrain => 'Drain';
@@ -11793,7 +11806,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectChamferFilletInvalid =>
-      'Distance or radius is too large for this corner';
+      'Cannot form this corner. Check the distance or radius, wall types and openings.';
 
   @override
   String get architectLayers => 'Layers';

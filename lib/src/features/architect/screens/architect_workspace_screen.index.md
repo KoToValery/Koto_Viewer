@@ -28,6 +28,7 @@
 | [TAG:ZONE_LOGIC] | Zone mutations, area updates, and schedules |
 | [TAG:WALL_DRAFT] | Wall drafting and chained wall placement |
 | [TAG:WALL_ENDPOINT_ANGLE] | Straight-wall endpoint angle constraint and compact unlock control |
+| [TAG:WALL_OPERATION_AXES] | Fillet/Chamfer core-axis geometry; wall-specific axis dimensions for corner edits and Offset |
 | [TAG:ARC_EXACT_PLACEMENT] | Shared wall/line/arc sequence: exact chord, shaping, exact rise, commit |
 | [TAG:WALL_SPLIT] | Wall splitting and cut sessions |
 | [TAG:FENEST_RADIAL] | Door/window placement and radial context actions |
@@ -73,6 +74,23 @@ While active, drafting/selection/context-hold controls and the bottom palette
 are hidden. The palette retains its state and returns after confirm/cancel;
 the canvas expands before the base-point pick and stays stable during movement.
 Regression coverage: test/features/architect/architect_drag_tool_ui_regression_test.dart.
+
+### Wall operation axes
+
+`[TAG:WALL_OPERATION_AXES]`: `ArchitectWallOperationAxis.core` derives the
+calculation line/arc from the physical core. `restore` converts the result back
+to the wall's saved placement reference, including concentric arc radii.
+`ArchitectChamferFillet.wallPairChamfer` / `wallPairFillet` share this conversion,
+keep hosted opening positions, and refuse clipped openings or an impossible
+typed radius/setback. Both the second-wall pick and two-wall dialog paths use
+the same pure geometry, then the existing atomic commit/Undo/save path.
+`ArchitectOffset` normalizes connected core-axis endpoints, offsets the chains,
+and restores each wall's own reference and opening stations. Detached ends stay
+independent. CAD/polygon operations retain their native geometry. Short ARB
+axis labels are passed only for wall selections; clear dimensions still use
+physical faces. Pointer routing, hold timers and pan locks remain unchanged.
+Coverage: `architect_wall_operation_axis_test.dart` and
+`architect_wall_core_operations_phone_test.dart` in `test/features/architect/`.
 
 ### Lightweight command controls and hints
 

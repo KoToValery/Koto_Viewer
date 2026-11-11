@@ -24,6 +24,7 @@ Future<ArchitectChamferFilletOptions?> showArchitectChamferFilletDialog(
   required String unitSymbol,
   bool initialIsFillet = false,
   bool canApplyToAll = false,
+  bool wallAxes = false,
 }) => showDialog<ArchitectChamferFilletOptions>(
   context: context,
   builder: (_) => _ChamferFilletDialog(
@@ -31,6 +32,7 @@ Future<ArchitectChamferFilletOptions?> showArchitectChamferFilletDialog(
     unitSymbol: unitSymbol,
     initialIsFillet: initialIsFillet,
     canApplyToAll: canApplyToAll,
+    wallAxes: wallAxes,
   ),
 );
 
@@ -39,12 +41,14 @@ class _ChamferFilletDialog extends StatefulWidget {
   final String unitSymbol;
   final bool initialIsFillet;
   final bool canApplyToAll;
+  final bool wallAxes;
 
   const _ChamferFilletDialog({
     required this.unitToMeters,
     required this.unitSymbol,
     required this.initialIsFillet,
     required this.canApplyToAll,
+    required this.wallAxes,
   });
 
   @override
@@ -135,9 +139,19 @@ class _ChamferFilletDialogState extends State<_ChamferFilletDialog> {
               keyboardType: TextInputType.none,
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
-                labelText: isFillet
-                    ? l.architectFilletRadius
-                    : l.architectChamferDistance,
+                labelText: widget.wallAxes
+                    ? (isFillet
+                          ? l.architectWallAxisRadius
+                          : l.architectWallAxisSetback)
+                    : (isFillet
+                          ? l.architectFilletRadius
+                          : l.architectChamferDistance),
+                suffixIcon: widget.wallAxes
+                    ? Tooltip(
+                        message: l.architectWallOperationAxisHelp,
+                        child: const AppIcon(AppIconId.help, size: 18),
+                      )
+                    : null,
                 suffixText: widget.unitSymbol,
                 border: const OutlineInputBorder(),
                 isDense: true,

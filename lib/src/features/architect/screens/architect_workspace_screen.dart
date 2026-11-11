@@ -368,6 +368,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-09-SELECT]  [TAG:SELECTION_BAR] Selection HUD, Action Bars & Layer Modals
 //   ↳ [SUB]        [TAG:MIRROR_WORKFLOW] Mirror axis picking, preview and commit
 //   ↳ [SUB]        [TAG:FENESTRATION_SELECTION_UPDATES] Live Door & Window Parameter Mutators
+//   ↳ [SUB]        [TAG:WALL_OPERATION_AXES] Core-axis corner edits and saved placement references
 // [SEC-10-GRIDS]   [TAG:GRID_AXIS] Grid Axes Alignments, Offsets & Numbering
 // [SEC-11-LAYOUT]  [TAG:BUILD_LAYOUT] Scaffold, Top/Bottom Bars & Sheet Panels
 // [SEC-12-LOGS]    [TAG:LOGGER_UI] Diagnostic Logger Dialog Modal
@@ -25196,6 +25197,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Widget _buildChamferFilletFloatingOverlay() {
     final l = context.l10n;
+    final wallAxes = _project.activeStorey.walls
+        .any((w) => w.id == _chamferFilletSourceId);
     final isFillet = _chamferFilletOptions?.isFillet ?? false;
     final anchor = _chamferFilletPointer ??
         (_linearEditWalls.where((w) => w.id == _chamferFilletSourceId).firstOrNull?.referencePointAt(0.5) ??
@@ -25223,7 +25226,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           GestureDetector(
             onTap: () async {
               final newVal = await _showNumericInputDialog(
-                title: isFillet ? l.architectFilletRadius : l.architectChamferDistance,
+                title: wallAxes
+                    ? (isFillet ? l.architectWallAxisRadius : l.architectWallAxisSetback)
+                    : (isFillet ? l.architectFilletRadius : l.architectChamferDistance),
                 initialValue: curVal,
               );
               if (newVal != null && newVal > 0 && mounted) {
@@ -25752,6 +25757,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   unitSymbol: _project.units.symbol,
                   initialDistance: options.distance,
                   initialCopy: options.copy,
+                  wallAxes: _offsetIds.isNotEmpty && _offsetIds.every((id) =>
+                      _project.activeStorey.walls.any((w) => w.id == id)),
                 );
                 if (res != null && mounted) {
                   setState(() {
@@ -27110,6 +27117,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final options = await showBimElementOffsetDialog(context,
 
       unitToMeters: source.units.scaleToMeters, unitSymbol: source.units.symbol,
+      wallAxes: ids.every((id) => source.activeStorey.walls.any((w) => w.id == id)),
     );
 
     if (!mounted) return;
@@ -28127,6 +28135,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return null;
   }
 
+  // --- SUBSECTION: [TAG:WALL_OPERATION_AXES] Core-axis corner edits and saved placement references ---
   void _triggerChamfer() => _startChamferFilletSession(isFillet: false);
   void _triggerFillet() => _startChamferFilletSession(isFillet: true);
 
@@ -28167,6 +28176,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       unitSymbol: _project.units.symbol,
       initialIsFillet: isFillet,
       canApplyToAll: canApplyToAll,
+      wallAxes: ids.isNotEmpty &&
+          ids.every((id) => storey.walls.any((w) => w.id == id)),
     );
     if (options == null) return;
 
@@ -28407,6 +28418,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }).toList()..add(res.connector);
         storey = storey.copyWith(walls: nextWalls);
         changed = true;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(context.l10n.architectChamferFilletInvalid),
+        ));
+        return;
       }
     }
 
