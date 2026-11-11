@@ -12392,7 +12392,7 @@ abstract class AppLocalizations {
   /// No description provided for @wallArcSagittaHelp.
   ///
   /// In en, this message translates to:
-  /// **'Distance from the chord midpoint to the arc midpoint along the reference line.'**
+  /// **'Distance from the chord midpoint to the arc midpoint along the reference line. Enter 0 to straighten.'**
   String get wallArcSagittaHelp;
 
   /// No description provided for @wallArcDimensionHelp.

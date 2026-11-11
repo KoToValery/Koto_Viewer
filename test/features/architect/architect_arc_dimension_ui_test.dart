@@ -212,6 +212,7 @@ void main() {
       await button(tester, 'architect-wall-arc-mode');
       await workspace.wallTap(tester, const Offset(-2, -2));
       await workspace.wallTap(tester, const Offset(2, -2));
+      await button(tester, 'wall-end');
       final before = tester
           .widget<ArchitectWallArcDimensionOverlay>(
             find.byType(ArchitectWallArcDimensionOverlay),
@@ -255,6 +256,11 @@ void main() {
           );
           await workspace.wallTap(tester, const Offset(2, 0));
           await tester.pumpAndSettle();
+          await screenshot(
+            tester,
+            'distance_${language}_${size.width.toInt()}',
+          );
+          await button(tester, 'wall-end');
           final dimension = tester.widget<ArchitectWallArcDimensionOverlay>(
             find.byType(ArchitectWallArcDimensionOverlay),
           );
@@ -365,13 +371,26 @@ void main() {
         final save = tester.widget<FilledButton>(
           find.byKey(const ValueKey('wall-arc-dimension-save')),
         );
-        expect(save.onPressed, isNull);
+        expect(save.onPressed, isNotNull);
         expect(model.canUndo, isFalse);
         final l = AppLocalizations.of(
           tester.element(find.byType(ArchitectWallArcDimensionDialog)),
         )!;
+        expect(find.text(l.wallArcInvalidDimension), findsNothing);
+        await tester.tap(find.text(l.architectRadius));
+        await tester.pumpAndSettle();
+        await enter(tester, '0');
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('wall-arc-dimension-save')),
+              )
+              .onPressed,
+          isNull,
+        );
         expect(find.text(l.wallArcInvalidDimension), findsOneWidget);
-        await button(tester, 'arc-key-⌫');
+        await tester.tap(find.text(l.wallArcSagitta));
+        await tester.pumpAndSettle();
         // Physical comma input uses the same parser and never opens a native keyboard.
         for (final key in [
           LogicalKeyboardKey.digit1,

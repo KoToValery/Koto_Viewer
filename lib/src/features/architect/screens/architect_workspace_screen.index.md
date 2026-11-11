@@ -27,6 +27,7 @@
 | [TAG:TOUCH_UP] | Pointer-up dispatch and commits |
 | [TAG:ZONE_LOGIC] | Zone mutations, area updates, and schedules |
 | [TAG:WALL_DRAFT] | Wall drafting and chained wall placement |
+| [TAG:ARC_EXACT_PLACEMENT] | Shared wall/line/arc sequence: exact chord, shaping, exact rise, commit |
 | [TAG:WALL_SPLIT] | Wall splitting and cut sessions |
 | [TAG:FENEST_RADIAL] | Door/window placement and radial context actions |
 | [TAG:SELECTION_BAR] | Selection HUD, action bars, and layer dialogs |
@@ -118,3 +119,20 @@ Model reflection details and associations live in
 6. Use ARB localization for new user-facing text and follow the nearest equivalent control's mobile behavior.
 7. For a small presentation, localization, copy, or layout-only change, use a targeted comparison rather than tracing the full interaction lifecycle.
 8. If requirements justify a meaningful deviation, implement it coherently and explain the reason in the change summary.
+
+### Exact curved placement
+
+`[TAG:ARC_EXACT_PLACEMENT]`: `_curvedDraftTool` shares wall, curved CAD line /
+polyline, and CAD arc placement. The second canvas pick locks `_draftEnd` and
+opens `BimDistanceDraftingPanel`; its Apply calls `_beginDraftArcShaping`
+without committing. The third pick opens `_editWallArcDimension(commitDraft:
+true)` in sagitta mode. Cancel restores the draft; Apply calls `_commitWallArc`
+through the existing draft command/history and save path. The numeric editor
+also remains available from the dimension badge without auto-commit.
+`_draftArcExactBulge` preserves a typed value across hover. Sagitta 0 is a
+straight wall/line (CAD arcs change primitive type to line). Active curved
+placement locks single-pointer panning through the viewport callback; existing
+context-hold guards reject active drafts before underlay hit testing. The shared
+panel uses a centered bottom position on phones, with bounded scrolling for
+short viewports. `ArchitectWallArcDimensionDialog` shares the numeric keypad
+and permits zero for sagitta while radius still requires a finite positive value.

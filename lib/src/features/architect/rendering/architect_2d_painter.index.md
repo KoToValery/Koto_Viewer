@@ -51,3 +51,11 @@
 - Document & viewport: `_project`, `_visibleProject`, `project`, `viewport`, `layer`, `paintGrid`, `palette`, `l10n`, `drawingViewKey`, `publicationWallLayers`
 - Active tool & drafting state: `activeTool`, `activeOpeningType`, `activeCadLineStyle`, `activeWallLayers`, `activeWallArcEnd`, `activeWallArcBulge`, `activeWallCurved`, `activeDraftStart`, `activeDraftEnd`, `stairPreview`, `activeWallThickness`, `activeWallReference`, `activeWallTypeId`, `activeWallRailing`, `activeWallHeight`, `activeWallExteriorSide`, `activeWallInsulation`, `activeOvershoot`
 - Selection & interactive tool controllers: `selectedElementIds`, `selectionPreviewActive`, `activeSnapLabel`, `selectedElementId`, `selectedZoneId`, `activeZoneCategory`, `selectedAxisId`, `selectedZoneTableId`, `isZoneTableSelected`, `underlayLayerVisibility`, `activeHatchPattern`, `activeHatchColorValue`, `roofTool`, `landscapeTool`, `dragController`, `localizeSnap`
+
+### Exact arc placement preview
+
+`_drawActiveDrafting` (`[TAG:ARCH_PAINTER_DRAW_ACTIVE]`) renders a straight CAD
+primitive whenever the draft bulge is zero, including the CAD arc tool's chord
+stage and sagitta-0 previews. Only a nonzero bulge uses arc tessellation; a
+zero-bulge circle has no finite radius. Input and commit ownership remain in
+`[TAG:ARC_EXACT_PLACEMENT]` in the workspace screen.

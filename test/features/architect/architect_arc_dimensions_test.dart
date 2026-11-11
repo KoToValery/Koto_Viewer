@@ -61,12 +61,14 @@ void main() {
     },
   );
 
-  test('Non-finite, zero, negative and impossible dimensions are rejected', () {
+  test('Invalid dimensions are rejected and zero rise straightens', () {
     const arc = ArchitectWallArc(Offset.zero, Offset(4, 0), -.5);
-    for (final value in [double.nan, double.infinity, -1.0, 0.0]) {
+    for (final value in [double.nan, double.infinity, -1.0]) {
       expect(() => arc.withSagitta(value), throwsArgumentError);
       expect(() => arc.withRadius(value), throwsArgumentError);
     }
+    expect(arc.withSagitta(0).bulge, 0);
+    expect(() => arc.withRadius(0), throwsArgumentError);
     expect(() => arc.withRadius(1.99), throwsArgumentError);
     expect(
       () => const ArchitectWallArc(Offset.zero, Offset.zero, 1).withSagitta(1),
@@ -157,6 +159,14 @@ void main() {
         () => ArchitectWallArcEditing.withDimension(
           original,
           ArchitectArcDimension.sagitta,
+          0,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => ArchitectWallArcEditing.withDimension(
+          original,
+          ArchitectArcDimension.sagitta,
           .05,
         ),
         throwsArgumentError,
@@ -181,6 +191,16 @@ void main() {
         .05,
       );
       expect(next.windows.map((w) => w.offsetRatio), [.4, .6]);
+      final straight = ArchitectWallArcEditing.withDimension(
+        stacked,
+        ArchitectArcDimension.sagitta,
+        0,
+      );
+      expect(straight.isCurved, isFalse);
+      expect(straight.startPoint, stacked.startPoint);
+      expect(straight.endPoint, stacked.endPoint);
+      expect(straight.windows, stacked.windows);
+      expect(ArchitectWall.fromJson(straight.toJson()).arcBulge, 0);
     },
   );
 }

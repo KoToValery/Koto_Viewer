@@ -51,19 +51,19 @@ import 'architect_railing_geometry.dart';
 // ============================================================================
 // MASTER ARCHITECT 2D PAINTER LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
-// COMPANION MAP: See 'architect_2d_painter.index.md' for full method & class directory.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// COMPANION MAP: See 'architect_2d_painter.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
 //
-// [SEC-01-ENUMS] [TAG:ARCH_PAINTER_ENUMS] Declarations: `ArchitectPaintLayer`, `ArchitectTool`, `WallDraftingM
-// [SEC-02-STATE] [TAG:ARCH_PAINTER_STATE] `Architect2dPainter` state fields (111 fields: `_project`, `_visible
-// [SEC-03-PAINT] [TAG:ARCH_PAINTER_PAINT_RENDER] Canvas Painting & Geometry Rendering: `_paint`, `paint` (2 methods)
-// [SEC-04-CORE] [TAG:ARCH_PAINTER_CORE_LOGIC] Core Operations & Helpers: `_filterElements` (1 methods)
-// [SEC-05-PAINT] [TAG:ARCH_PAINTER_DRAW_SELECTED] Canvas Painting & Geometry Rendering: `_drawSelectedElement`, `_draw
-// [SEC-06-WALLS] [TAG:ARCH_PAINTER_WALL_OPS] Wall Drafting, Splitting & Joints: `_drawPolygonEditing`, `_drawNewP
-// [SEC-07-GRIDS] [TAG:ARCH_PAINTER_GRID_AXES] Grid Axes, Alignment & Snapping: `_drawDraftingGrid`, `_drawGridAxes
-// [SEC-08-WALLS] [TAG:ARCH_PAINTER_DRAW_WALLS] Wall Drafting, Splitting & Joints: `_drawWalls`, `_drawWallLayers` (
-// [SEC-09-PAINT] [TAG:ARCH_PAINTER_DRAW_ACTIVE] Canvas Painting & Geometry Rendering: `_drawActiveDrafting`, `_drawD
-// [SEC-10-CORE] [TAG:ARCH_PAINTER_SHOULD_REPAINT] Core Operations & Helpers: `shouldRepaint` (1 methods)
+// [SEC-01-ENUMS]   [TAG:ARCH_PAINTER_ENUMS] Declarations: `ArchitectPaintLayer`, `ArchitectTool`, `WallDrafti
+// [SEC-02-STATE]   [TAG:ARCH_PAINTER_STATE] `Architect2dPainter` state fields (111 fields: `_project`, `_visi
+// [SEC-03-PAINT]   [TAG:ARCH_PAINTER_PAINT_RENDER] Canvas Painting & Geometry Rendering: `_paint`, `paint` (2 method
+// [SEC-04-CORE]    [TAG:ARCH_PAINTER_CORE_LOGIC] Core Operations & Helpers: `_filterElements` (1 methods)
+// [SEC-05-PAINT]   [TAG:ARCH_PAINTER_DRAW_SELECTED] Canvas Painting & Geometry Rendering: `_drawSelectedElement`, `_d
+// [SEC-06-WALLS]   [TAG:ARCH_PAINTER_WALL_OPS] Wall Drafting, Splitting & Joints: `_drawPolygonEditing`, `_drawN
+// [SEC-07-GRIDS]   [TAG:ARCH_PAINTER_GRID_AXES] Grid Axes, Alignment & Snapping: `_drawDraftingGrid`, `_drawGridA
+// [SEC-08-WALLS]   [TAG:ARCH_PAINTER_DRAW_WALLS] Wall Drafting, Splitting & Joints: `_drawWalls`, `_drawWallLayers
+// [SEC-09-PAINT]   [TAG:ARCH_PAINTER_DRAW_ACTIVE] Canvas Painting & Geometry Rendering: `_drawActiveDrafting`, `_dr
+// [SEC-10-CORE]    [TAG:ARCH_PAINTER_SHOULD_REPAINT] Core Operations & Helpers: `shouldRepaint` (1 methods)
 // ============================================================================
 
 
@@ -2191,7 +2191,7 @@ class Architect2dPainter extends CustomPainter {
             : activeWallArcBulge ?? ArchitectWallArc.through(p1, p2, activeDraftEnd!);
         final prim = ArchitectCadPrimitive(
           id: 'cad-preview',
-          type: (activeTool == ArchitectTool.cadArc || bulge.abs() > 1e-6)
+          type: bulge.abs() > 1e-6
               ? CadPrimitiveType.arc
               : CadPrimitiveType.line,
           startPoint: p1,

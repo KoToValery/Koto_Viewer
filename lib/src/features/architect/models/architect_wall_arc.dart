@@ -20,7 +20,7 @@ class ArchitectWallArc {
   }
 
   ArchitectWallArc withSagitta(double value) {
-    if (!value.isFinite || value <= 0 || chordLength < .001) {
+    if (!value.isFinite || value < 0 || chordLength < .001) {
       throw ArgumentError('Invalid arc sagitta');
     }
     return ArchitectWallArc(

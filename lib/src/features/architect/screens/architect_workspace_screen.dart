@@ -347,6 +347,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 //   ↳ [SUB]        [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG CONTROLLER
 //   ↳ [SUB]        [TAG:UNDERLAY_DRAG] UNDERLAY 2-POINT SNAP DRAG & SELECTION
 //   ↳ [SUB]        [TAG:CAD_INSERTION] CAD UNDERLAY INTERACTIVE PLACEMENT
+//   ↳ [SUB]        [TAG:ARC_EXACT_PLACEMENT] Chord input, shaping, exact rise, commit
 //   ↳ [SUB]        [TAG:STATE_LIFECYCLE] Lifecycle: initState & dispose
 // [SEC-03-XFORM]   [TAG:XFORM_COORDS] Screen <-> Model Space & Snapping
 // [SEC-04-TOUCH]   [TAG:TOUCH_DOWN] _onPointerDown Input Dispatch
@@ -358,8 +359,8 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-08-FENEST]  [TAG:FENEST_RADIAL] Door/Window Placement & Radial Context Menus
 //   ↳ [SUB]        [TAG:FLOATING_HUD] Contextual Floating Command Overlays & Interactive Edge Curving
 //   ↳ [SUB]        [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG METHODS
-//   ↳ [SUB]        [TAG:MIRROR_WORKFLOW] Mirror axis picking, preview and commit
 // [SEC-09-SELECT]  [TAG:SELECTION_BAR] Selection HUD, Action Bars & Layer Modals
+//   ↳ [SUB]        [TAG:MIRROR_WORKFLOW] Mirror axis picking, preview and commit
 //   ↳ [SUB]        [TAG:FENESTRATION_SELECTION_UPDATES] Live Door & Window Parameter Mutators
 // [SEC-10-GRIDS]   [TAG:GRID_AXIS] Grid Axes Alignments, Offsets & Numbering
 // [SEC-11-LAYOUT]  [TAG:BUILD_LAYOUT] Scaffold, Top/Bottom Bars & Sheet Panels
@@ -5825,11 +5826,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  // --- SUBSECTION: [TAG:ARC_EXACT_PLACEMENT] Chord input, shaping, exact rise, commit ---
+  bool get _curvedDraftTool =>
+      (_activeTool == ArchitectTool.wall && _wallCurved) ||
+      (_activeTool == ArchitectTool.cadLine &&
+          (_cadPolylineMode ? _polylineArcSegmentMode : _wallCurved)) ||
+      _activeTool == ArchitectTool.cadArc;
+
+  void _beginDraftArcShaping() {
+    if (_draftStart == null || _draftEnd == null) return;
+    setState(() {
+      _wallArcEnd = _draftEnd;
+      final chord = _wallArcEnd! - _draftStart!;
+      final normal = Offset(-chord.dy, chord.dx) / chord.distance;
+      _draftEnd = (_draftStart! + _wallArcEnd!) / 2 +
+          normal * (chord.distance * .2);
+      _draftArcExactBulge = null;
+      _arcDimension = ArchitectArcDimension.sagitta;
+      _wallDirectionLocked = false;
+      _wallPanelAnchor = null;
+    });
+    _repaintPreview();
+  }
+
   bool _wallCurved = false;
 
   Offset? _wallArcEnd;
   double? _draftArcExactBulge;
-  double _lastDraftArcBulge = -.4;
   ArchitectArcDimension _arcDimension = ArchitectArcDimension.sagitta;
   bool _arcEditorOpen = false;
 
@@ -5845,10 +5868,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _commitLineArc() {
     if (_wallArcEnd == null || _draftStart == null) return;
     final bulge = _draftArcBulge;
-    if (bulge.abs() < 1e-6) {
-      _operationError();
-      return;
-    }
     if (_activeTool == ArchitectTool.cadArc) {
       final id = ArchitectElementId.next('arc');
       _placeDraftSegment(
@@ -5856,7 +5875,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           storeyId: _project.activeStoreyId,
           primitive: ArchitectCadPrimitive(
             id: id,
-            type: CadPrimitiveType.arc,
+            type: bulge.abs() > 1e-6
+                ? CadPrimitiveType.arc
+                : CadPrimitiveType.line,
             startPoint: _draftStart!,
             endPoint: _wallArcEnd!,
             arcBulge: bulge,
@@ -5876,6 +5897,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     setState(() {
       _wallArcEnd = null;
+      _draftArcExactBulge = null;
       if (!_cadPolylineMode) {
         _draftStart = null;
         _draftEnd = null;
@@ -5895,8 +5917,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final bulge = _draftArcBulge;
 
     try {
-
-      if (bulge.abs() < 1e-6) throw ArgumentError('Collinear arc');
 
       ArchitectWall(
 
@@ -5945,10 +5965,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   ArchitectWall? get _draftArcWall {
-    final isWallArc = _activeTool == ArchitectTool.wall && _wallCurved;
-    final isLineArc = ((_activeTool == ArchitectTool.cadLine && _wallCurved) ||
-        _activeTool == ArchitectTool.cadArc);
-    if ((!isWallArc && !isLineArc) ||
+    if (!_curvedDraftTool ||
         _draftStart == null ||
         _wallArcEnd == null ||
         _draftEnd == null) {
@@ -5972,7 +5989,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
-  Future<void> _editWallArcDimension({ArchitectArcDimension? dimension}) async {
+  Future<void> _editWallArcDimension({
+    ArchitectArcDimension? dimension,
+    bool commitDraft = false,
+  }) async {
     if (_arcEditorOpen) return;
     final draft = _draftArcWall;
     final original =
@@ -5981,9 +6001,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _cancelActiveDrags();
     final source = _project, start = _draftStart, end = _wallArcEnd;
     final oldPoint = _draftEnd, oldExact = _draftArcExactBulge;
-    final wall = original.isCurved
-        ? original
-        : original.copyWith(arcBulge: (_lastDraftArcBulge.abs() > 1e-4 ? _lastDraftArcBulge : 0.2));
+    final wall = original;
     if (dimension != null) _arcDimension = dimension;
     _arcEditorOpen = true;
     bool current() =>
@@ -6038,7 +6056,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             if (!current()) return;
             setState(() {
               if (draft != null) {
-                _draftEnd = candidate.arc!.midpoint;
+                _draftEnd = candidate.arc?.midpoint ??
+                    (candidate.startPoint + candidate.endPoint) / 2;
                 _draftArcExactBulge = candidate.arcBulge;
               } else {
                 _elementMovePreview = command(candidate).apply(source);
@@ -6054,13 +6073,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         setState(() {
           _elementMovePreview = null;
           if (current() && draft != null) {
-            _draftEnd = result?.arc?.midpoint ?? oldPoint;
+            _draftEnd = result == null
+                ? oldPoint
+                : result.arc?.midpoint ?? (result.startPoint + result.endPoint) / 2;
             _draftArcExactBulge = result?.arcBulge ?? oldExact;
-            if (result != null) _lastDraftArcBulge = result.arcBulge;
           }
         });
         _repaintPreview();
       }
+    }
+    if (current() && draft != null && result != null && commitDraft) {
+      _commitWallArc();
+      return;
     }
     if (current() &&
         draft == null &&
@@ -11957,15 +11981,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_linearDraftTool && _draftStart != null) {
 
-      if ((_activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine || _activeTool == ArchitectTool.cadArc) &&
-
-          (_wallCurved || _activeTool == ArchitectTool.cadArc) &&
-
-          _wallArcEnd != null) {
+      if (_curvedDraftTool && _wallArcEnd != null) {
 
         if (_draftArcExactBulge == null && !_arcEditorOpen) {
           _draftEnd = _snapElement(rawModel).point;
-          if (_draftArcBulge.abs() > 1e-8) _lastDraftArcBulge = _draftArcBulge;
         }
 
         _repaintPreview();
@@ -14786,15 +14805,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_linearDraftTool) {
 
-      if ((_activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine || _activeTool == ArchitectTool.cadArc) &&
-
-          (_wallCurved || _activeTool == ArchitectTool.cadArc) &&
-
-          _wallArcEnd != null) {
+      if (_curvedDraftTool && _wallArcEnd != null) {
 
         _draftEnd = _snapElement(rawModel).point;
 
-        _commitWallArc();
+        unawaited(_editWallArcDimension(
+          dimension: ArchitectArcDimension.sagitta,
+          commitDraft: true,
+        ));
 
         return;
 
@@ -14827,32 +14845,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         final snap = _snapWall(rawModel, anchor: _draftStart);
 
         _orientWallReference(snap.point);
-
-        if ((_activeTool == ArchitectTool.wall || _activeTool == ArchitectTool.cadLine || _activeTool == ArchitectTool.cadArc) &&
-
-            (_wallCurved || _activeTool == ArchitectTool.cadArc) &&
-
-            (snap.point - _draftStart!).distance >= .001) {
-
-          setState(() {
-
-            _wallArcEnd = snap.point;
-
-            final chord = snap.point - _draftStart!,
-
-                normal = Offset(-chord.dy, chord.dx) / chord.distance;
-
-            _draftEnd =
-
-                (_draftStart! + snap.point) / 2 +
-
-                normal * (chord.distance * .2);
-
-          });
-
-          return;
-
-        }
 
         if ((snap.point - _draftStart!).distance >= .001 &&
             !_viewMarkerTool) {
@@ -16622,7 +16614,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _draftEnd = null;
     _wallArcEnd = null;
     _draftArcExactBulge = null;
-    _lastDraftArcBulge = -.4;
     _wallStartAttachment = null;
     _wallDirectionLocked = false;
     _wallPanelAnchor = null;
@@ -25033,7 +25024,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           setState(() => _curvingDimensionMode = dim);
         },
         validate: (candidate) {
-          if (candidate.arc == null || !candidate.isCurved) {
+          if (!candidate.arcBulge.isFinite) {
             throw ArgumentError('Invalid arc');
           }
         },
@@ -32742,7 +32733,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ? null
             : (position) => _selectPolygonEdge(_screenToModel(position)),
 
-        isDraggingHandle: () => _selectionBoxDown != null || _newPointTargetId != null || _isActivelyDraggingHandle,
+        isDraggingHandle: () => _selectionBoxDown != null ||
+            _newPointTargetId != null || _isActivelyDraggingHandle ||
+            (_curvedDraftTool && _draftStart != null),
 
         onToolDown: _onPointerDown,
 
@@ -33010,7 +33003,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       final isArcDrafting = _wallArcEnd != null &&
                           _draftStart != null &&
-                          (_wallCurved || _activeTool == ArchitectTool.cadArc);
+                          _curvedDraftTool;
                       final liveDim = isArcDrafting
                           ? 'h=${_project.formatLength((_wallArcEnd! - _draftStart!).distance * _draftArcBulge.abs() / 2)}'
                           : (lastAnchor != null && (target - lastAnchor).distance > 0.01
@@ -34144,7 +34137,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   padding: const EdgeInsets.symmetric(horizontal: 8),
 
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [Row(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    LayoutBuilder(builder: (context, constraints) =>
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: _activeTool == ArchitectTool.wall ? constraints.maxWidth : null,
+                          child: Row(
 
                     mainAxisSize: MainAxisSize.min,
 
@@ -34379,7 +34378,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           tooltip: context.l10n.applyAction,
 
-                          onPressed: _commitWallArc,
+                          onPressed: () {
+                            if (_draftArcExactBulge == null) {
+                              unawaited(_editWallArcDimension(
+                                dimension: ArchitectArcDimension.sagitta,
+                                commitDraft: true,
+                              ));
+                            } else {
+                              _commitWallArc();
+                            }
+                          },
 
                           icon: const AppIcon(
                                 AppIconId.confirm,
@@ -34471,9 +34479,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ],
 
                   ),
+                        ),
+                      ),
+                    ),
 
                   if (_activeTool == ArchitectTool.cadLine)
-                    Theme(data: ThemeData.dark(), child: Row(children: [
+                    Theme(data: ThemeData.dark(), child: Wrap(children: [
                       ChoiceChip(key: const ValueKey('architect-line-mode-line'),
                         label: Text(context.l10n.architectToolCadLine),
                         selected: !_cadPolylineMode,
@@ -34648,9 +34659,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 );
 
-                final width = math.min(250.0, constraints.maxWidth - 16);
+                final width = math.min(264.0, constraints.maxWidth - 16);
 
-                final left = (point.dx + 20).clamp(
+                final phone = constraints.maxWidth < 600;
+                final left = phone ? (constraints.maxWidth - width) / 2 : (point.dx + 20).clamp(
 
                   8.0,
 
@@ -34662,7 +34674,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   8.0,
 
-                  math.max(8.0, constraints.maxHeight - 320),
+                  math.max(8.0, constraints.maxHeight - 390),
 
                 );
 
@@ -34674,11 +34686,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       left: left.toDouble(),
 
-                      top: top.toDouble(),
+                      top: phone ? null : top.toDouble(),
+                      bottom: phone ? 8 : null,
 
                       width: width,
 
-                      child: ArchitectWallDraftingPanel(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: math.max(0, constraints.maxHeight - 16),
+                        ),
+                        child: SingleChildScrollView(
+                          child: ArchitectWallDraftingPanel(
 
                         key: ValueKey((_draftStart, _wallDirectionLocked)),
 
@@ -34693,6 +34711,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         decimals: _project.distanceDecimals,
 
                         minimumLength: _project.units.toUnit(.001),
+                        keypadInitiallyOpen: _curvedDraftTool,
+                        showContinue: !_curvedDraftTool,
+                        title: _curvedDraftTool ? context.l10n.architectEdgeDistance : null,
+                        endLabel: _curvedDraftTool ? context.l10n.applyAction : null,
 
                         extraControls: _activeTool == ArchitectTool.wall
                             ? SizedBox(
@@ -34734,6 +34756,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         },
 
                         onEnd: () {
+                          if (_curvedDraftTool) {
+                            _beginDraftArcShaping();
+                            return;
+                          }
                           if (_activeTool == ArchitectTool.hatch) {
                             final pt = _draftEnd!;
                             setState(() {
@@ -34758,6 +34784,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         },
 
                         onContinue: () {
+                          if (_curvedDraftTool) {
+                            _beginDraftArcShaping();
+                            return;
+                          }
                           if (_activeTool == ArchitectTool.hatch) {
                             final pt = _draftEnd!;
                             setState(() {
@@ -34797,6 +34827,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           _finishChainedWall();
                         },
 
+                          ),
+                        ),
                       ),
 
                     ),

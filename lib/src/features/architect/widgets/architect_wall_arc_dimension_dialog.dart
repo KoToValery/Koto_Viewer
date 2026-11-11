@@ -41,9 +41,10 @@ class _ArcDimensionState extends State<ArchitectWallArcDimensionDialog> {
   String? _input;
   bool _invalid = false;
   int get _decimals => math.max(4, widget.project.distanceDecimals);
-  double get _value => _dimension == ArchitectArcDimension.sagitta
-      ? _wall.arc!.sagitta
-      : _wall.arc!.radius;
+  ArchitectWallArc get _arc =>
+      ArchitectWallArc(_wall.startPoint, _wall.endPoint, _wall.arcBulge);
+  double get _value =>
+      _dimension == ArchitectArcDimension.sagitta ? _arc.sagitta : _arc.radius;
 
   @override
   void initState() {
@@ -53,6 +54,9 @@ class _ArcDimensionState extends State<ArchitectWallArcDimensionDialog> {
 
   void _validateCurrent() {
     try {
+      if (_dimension == ArchitectArcDimension.radius && !_wall.isCurved) {
+        throw ArgumentError('A straight line has no finite radius');
+      }
       widget.validate(_wall);
       _invalid = false;
     } on ArgumentError {
@@ -99,7 +103,7 @@ class _ArcDimensionState extends State<ArchitectWallArcDimensionDialog> {
   void _select(ArchitectArcDimension dimension) {
     setState(() {
       _dimension = dimension;
-      _inputBasis = _wall;
+      if (_wall.isCurved) _inputBasis = _wall;
       _input = null;
       _validateCurrent();
     });
@@ -112,17 +116,28 @@ class _ArcDimensionState extends State<ArchitectWallArcDimensionDialog> {
     final colors = Theme.of(context).colorScheme;
     final displayed =
         _input ??
-        widget.project.units
-            .toUnit(_value)
-            .toStringAsFixed(_decimals)
-            .replaceFirst(RegExp(r'\.?0+$'), '');
+        (_value.isFinite
+            ? widget.project.units
+                  .toUnit(_value)
+                  .toStringAsFixed(_decimals)
+                  .replaceFirst(RegExp(r'\.?0+$'), '')
+            : '—');
     return Dialog(
-      insetPadding: const EdgeInsets.all(16),
+      insetPadding: const EdgeInsets.all(12),
+      backgroundColor: colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.outlineVariant),
+      ),
       child: Focus(
         autofocus: true,
         onKeyEvent: (_, event) {
           if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
             return KeyEventResult.ignored;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.enter && !_invalid) {
+            Navigator.pop(context, _wall);
+            return KeyEventResult.handled;
           }
           final character = event.character;
           if (character != null && RegExp(r'^[0-9.,-]$').hasMatch(character)) {
@@ -137,16 +152,24 @@ class _ArcDimensionState extends State<ArchitectWallArcDimensionDialog> {
         },
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: 280,
-            maxHeight: MediaQuery.sizeOf(context).height - 32,
+            maxWidth: 264,
+            maxHeight:
+                MediaQuery.sizeOf(context).height -
+                MediaQuery.viewInsetsOf(context).bottom -
+                MediaQuery.paddingOf(context).vertical -
+                24,
           ),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 SegmentedButton<ArchitectArcDimension>(
                   showSelectedIcon: false,
+                  style: SegmentedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                  ),
                   segments: [
                     ButtonSegment(
                       value: ArchitectArcDimension.sagitta,
@@ -171,14 +194,17 @@ class _ArcDimensionState extends State<ArchitectWallArcDimensionDialog> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(6),
+                      color: colors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: _invalid ? colors.error : colors.primary,
+                        color: _invalid ? colors.error : colors.outlineVariant,
                       ),
                     ),
                     child: Text(
                       '${_dimension == ArchitectArcDimension.sagitta ? 'h' : 'R'}=$displayed ${widget.project.units.symbol}',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -213,6 +239,12 @@ class _ArcDimensionState extends State<ArchitectWallArcDimensionDialog> {
                         onPressed: _invalid
                             ? null
                             : () => Navigator.pop(context, _wall),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
                         child: Text(widget.confirmLabel),
                       ),
                     ),

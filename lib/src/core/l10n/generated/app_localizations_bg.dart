@@ -6991,7 +6991,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get wallArcSagittaHelp =>
-      'Разстояние от средата на хордата до средата на дъгата по водещата линия.';
+      'Разстояние от средата на хордата до средата на дъгата по водещата линия. Въведи 0 за изправяне.';
 
   @override
   String get wallArcDimensionHelp =>

@@ -4547,7 +4547,7 @@
     "description": "Perpendicular distance from the chord midpoint to the curve handle"
   },
   "wallArcSagitta": "Rise",
-  "wallArcSagittaHelp": "Distance from the chord midpoint to the arc midpoint along the reference line.",
+  "wallArcSagittaHelp": "Distance from the chord midpoint to the arc midpoint along the reference line. Enter 0 to straighten.",
   "wallArcDimensionHelp": "Tap to change the rise or radius. The start and end stay fixed.",
   "wallArcInvalidDimension": "Invalid dimension for this wall or its openings.",
   "wallArcPickEnd": "Pick the end of the arc",

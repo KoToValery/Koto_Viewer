@@ -14,13 +14,14 @@ class ArchitectWallArcEditing {
         : arc.withRadius(value);
     final result = wall.copyWith(arcBulge: next.bulge);
     result.validateGeometry();
-    if (!result.isCurved) throw ArgumentError('Arc is too shallow');
+    if (!result.isCurved && value != 0) {
+      throw ArgumentError('Arc is too shallow');
+    }
     validateOpenings(result);
     return result;
   }
 
   static void validateOpenings(ArchitectWall wall) {
-    if (!wall.isCurved) return;
     final openings = [
       for (final d in wall.doors)
         (d.offsetRatio, d.width, d.sillHeight, d.sillHeight + d.height),

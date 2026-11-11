@@ -49,6 +49,8 @@ void main() {
         await tester.tapAt(workspace.screen(tester, const Offset(1.5, 0)));
         await tester.pumpAndSettle();
         expect(model.project.activeStorey.walls, isEmpty);
+        await tester.tap(find.byKey(const ValueKey('wall-end')));
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('wall-arc-radius')));
         await tester.pumpAndSettle();
         for (final key in ['2', '0', '0']) {
@@ -87,14 +89,15 @@ void main() {
         await tester.pumpAndSettle();
         expect(model.canUndo, isFalse);
         expect(model.project.activeStorey.walls, isEmpty);
-        for (final p in [
-          const Offset(-1.5, 0),
-          const Offset(1.5, 0),
-          const Offset(0, 1),
-        ]) {
-          await tester.tapAt(workspace.screen(tester, p));
-          await tester.pumpAndSettle();
-        }
+        await workspace.wallTap(tester, const Offset(-1.5, 0));
+        await workspace.wallTap(tester, const Offset(1.5, 0));
+        await tester.tap(find.byKey(const ValueKey('wall-end')));
+        await tester.pumpAndSettle();
+        await workspace.wallTap(tester, const Offset(0, 1));
+        await tester.pumpAndSettle();
+        expect(model.project.activeStorey.walls, isEmpty);
+        await tester.tap(find.byKey(const ValueKey('wall-arc-dimension-save')));
+        await tester.pumpAndSettle();
         expect(
           model.project.activeStorey.walls.single.arc!.radius,
           closeTo(1.625, .000001),

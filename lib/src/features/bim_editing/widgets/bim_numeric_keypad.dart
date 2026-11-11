@@ -45,26 +45,38 @@ class BimNumericKeypad extends StatelessWidget {
           children: [
             for (final key in row)
               Expanded(
-                child: SizedBox(
-                  height: 36,
-                  child: TextButton(
-                    key: ValueKey('$keyPrefix-$key'),
-                    onPressed: key == '.' && decimals == 0
-                        ? null
-                        : () => onKey(key),
-                    child: key == '⌫'
-                        ? AppIcon(
-                            AppIconId.backspace,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            size: 20,
-                          )
-                        : Text(
-                            key,
-                            style: TextStyle(
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: SizedBox(
+                    height: 40,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                      ),
+                      key: ValueKey('$keyPrefix-$key'),
+                      onPressed: key == '.' && decimals == 0
+                          ? null
+                          : () => onKey(key),
+                      child: key == '⌫'
+                          ? AppIcon(
+                              AppIconId.backspace,
                               color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: 18,
+                              size: 20,
+                            )
+                          : Text(
+                              key,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontSize: 18,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
               ),

@@ -6965,7 +6965,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wallArcSagittaHelp =>
-      'Distance from the chord midpoint to the arc midpoint along the reference line.';
+      'Distance from the chord midpoint to the arc midpoint along the reference line. Enter 0 to straighten.';
 
   @override
   String get wallArcDimensionHelp =>
