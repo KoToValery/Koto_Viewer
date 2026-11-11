@@ -1,39 +1,21 @@
-# Initial Scheme Generator — LLM Semantic Navigation Map
-> **Path**: `lib/src/features/structural_designer/analysis/initial_scheme_generator.dart`  
-> **Total Lines**: ~2,342 | **Primary Class**: `InitialSchemeGenerator`  
-> **Companion Document**: Used by LLMs (Antigravity, Gemini, Codex, Copilot, Cursor) to navigate and locate code in 1 step.
+# Initial Scheme Generator — Reference & Navigation Map
+> **Path**: `lib/src/features/structural_designer/analysis/initial_scheme_generator.dart`
+> **Primary class**: `InitialSchemeGenerator`
+> **Important**: Header TOC tags in this file are topic summaries while the body uses `// === SECTION: ... ===` comments inside `_generateLayout`. Treat this map as a discovery aid and search concrete symbols or section titles with `rg -n`.
 
----
+## 1. How to use this map
 
-## 1. LLM Navigation Protocol (How to search in 1 step)
+1. Use this map to find the synthesis stage or model class you need.
+2. Search the current Dart source, for example: `rg -n "_generateLayout|SHEAR WALL PLACEMENT|COLUMN LAYOUT" lib/src/features/structural_designer/analysis/initial_scheme_generator.dart`.
+3. Inspect the target section inside `InitialSchemeGenerator` and its callers before altering column/wall/beam synthesis rules.
 
-1. **Find the Scheme Synthesis Stage**: Look at Section 2 (Master Section Registry).
-2. **Jump via Unique Tag or Line Range**:
-   - In Antigravity / CLI: Use `git grep -n "\[TAG:<NAME>\]"` or read the specified line range via `read_file`.
-   - In Copilot / Codex / Cursor: Mention the tag `[TAG:<NAME>]` or target method name in your prompt.
+## 2. Key classes, sections & synthesis stages
 
----
-
-## 2. Master Section Registry & Line Spans
-
-| Section ID | Tag | Approx Lines | Description & Primary Responsibilities |
-| :--- | :--- | :--- | :--- |
-| `[SEC-00-IMPORTS]` | `[TAG:ISG_IMPORTS]` | L1 – L20 | Wall networks, window detectors, seismic/vertical calculators |
-| `[SEC-01-OPTIONS]` | `[TAG:ISG_OPTIONS]` | L31 – L267 | `InitialSchemeOptions`, `InitialSchemeProposal`, `_WallRun` |
-| `[SEC-02-GEN]` | `[TAG:ISG_GENERATOR]`| L268 – L1227| `InitialSchemeGenerator.generate()` pipeline & geometric helpers |
-| `[SEC-03-CORES]` | `[TAG:ISG_CORES]` | L1228 – L1414| Staircase, elevator shaft & core boundary shear walls |
-| `[SEC-04-WALLS]` | `[TAG:ISG_WALLS]` | L1415 – L1791| Shear wall placement, seismic X/Y pairing, stiffness center |
-| `[SEC-05-COLUMNS]` | `[TAG:ISG_COLUMNS]` | L1792 – L2164| Column layout, span optimization, grid intersection matching |
-| `[SEC-06-BEAMS]` | `[TAG:ISG_BEAMS]` | L2165 – L2342| Perimeter & tie beams, final scheme structural validation |
-
----
-
-## 3. Structural Synthesis Operations
-
-| Synthesis Stage | Method Name | Section Tag |
-| :--- | :--- | :--- |
-| Core Wall Placement | `_placeCoreWalls` | `[TAG:ISG_CORES]` |
-| Seismic Wall Pairing | `_placeSeismicShearWalls` | `[TAG:ISG_WALLS]` |
-| Column Span Grid | `_placeColumns` | `[TAG:ISG_COLUMNS]` |
-| Tie Beam Generation | `_generateConnectingBeams` | `[TAG:ISG_BEAMS]` |
-| Layout Optimization | `_evaluateAndOptimizeScheme` | `[TAG:ISG_OPTIONS]` |
+| Section / symbol | Responsibility |
+| --- | --- |
+| `InitialSchemeOptions`, `InitialSchemeProposal`, `_WallRun` (`[SEC-01-OPTIONS]`) | Configuration options, proposal output, and wall run structures |
+| `InitialSchemeGenerator.generate`, `_continueLowerStorey`, `_generateInMetres`, `_generateLayout` | Public entrypoint, lower-storey continuation, metric normalization, layout synthesis |
+| `// === SECTION: STAIRCASE, SHAFTS & CORE BOUNDARY WALLS ===` | Staircase, shaft, and core boundary shear wall generation |
+| `// === SECTION: SHEAR WALL PLACEMENT & SEISMIC PAIRING ===` | Shear wall placement and X/Y seismic pairing |
+| `// === SECTION: COLUMN LAYOUT & SPAN OPTIMIZATION ===` | Column grid placement and span optimization |
+| `// === SECTION: BEAMS & FINAL SCHEME VALIDATION ===` | Perimeter/tie beams and final structural validation |

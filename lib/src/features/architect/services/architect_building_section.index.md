@@ -1,41 +1,28 @@
-# Architect Building Section — LLM Semantic Navigation Map
-> **Path**: `lib/src/features/architect/services/architect_building_section.dart`  
-> **Total Lines**: ~2,637 | **Primary Class**: `ArchitectBuildingSection`  
-> **Companion Document**: Used by LLMs to locate section generation, boolean clipping, and junction logic in 1 step.
+# Architect Building Section — Reference & Navigation Map
+> **Path**: `lib/src/features/architect/services/architect_building_section.dart`
+> **Primary class**: `ArchitectBuildingSection`
+> **Important**: Treat this map as a discovery aid, not a specification. Verify concrete symbols and behavior in the current source with `rg -n`.
 
----
+## 1. How to use this map
 
-## 1. Master Section Registry & Line Spans
+1. Use this map to locate section slicing, elevation projection, or constructive junction logic.
+2. Search the current Dart source, for example: `rg -n "\[TAG:SPANDREL_INFILL\]|_findCutOpeningsOnWall|ArchitectBuildingSection" lib/src/features/architect/services/architect_building_section.dart`.
+3. Inspect the actual implementation in `ArchitectBuildingSection.build` and related roof/slab/wall helpers before modifying section geometry or hatching rules.
 
-| Section ID | Tag | Approx Lines | Description & Primary Responsibilities |
-| :--- | :--- | :--- | :--- |
-| `[SEC-00-IMPORTS]` | `[TAG:IMPORTS]` | L1 – L33 | Core models, mesh boolean, geometry, and rendering imports |
-| `[SEC-01-REGIONS]` | `[TAG:SECTION_REGION]` | L34 – L185 | `ArchitectSectionRegion` data class and bounding geometry |
-| `[SEC-02-ROOF_MAT]` | `[TAG:ROOF_MATERIAL]` | L186 – L340 | Roof member materials to `SlabMaterial` mappings |
-| `[SEC-03-BUILD_MAIN]` | `[TAG:SECTION_BUILD]` | L341 – L1320 | Main `ArchitectBuildingSection.build(...)` method |
-| ↳ `[SUB-03A]` | `[TAG:ROOF_SLICING]` | L370 – L434 | Roof slicing and envelope extraction |
-| ↳ `[SUB-03B]` | `[TAG:SLAB_JUNCTIONS]` | L435 – L510 | Cut wall analysis & symbiotic slab/foundation junctions |
-| ↳ `[SUB-03C]` | `[TAG:OPENING_SLICING]` | L530 – L780 | Cut window and door apertures, sills, and sub-assembly profiles |
-| ↳ `[SUB-03D]` | `[TAG:SPANDREL_INFILL]` | L809 – L952 | Continuous drop beams, RC lintels (щурцове $h=14\text{ cm}$), and aerated concrete infill |
-| ↳ `[SUB-03E]` | `[TAG:TIE_BEAMS]` | L953 – L1010 | Automatic intermediate RC tie beams (бетонни пояси) on tall masonry walls |
-| ↳ `[SUB-03F]` | `[TAG:COMPOSITIONS]` | L1011 – L1200 | Layered wall solids and multi-material section slicing |
-| ↳ `[SUB-03G]` | `[TAG:BEAMS_COLUMNS]` | L1201 – L1300 | Columns, drop beams, and stairs slicing |
-| `[SEC-04-ELEVATION]` | `[TAG:ELEVATION_PROJECT]` | L1321 – L1970 | Elevation line projection, hidden line removal, openings |
-| `[SEC-05-OPENINGS]` | `[TAG:FIND_OPENINGS]` | L1971 – L2390 | `_findCutOpeningsOnWall`, frame section profiles, glass panes |
-| `[SEC-06-DATA]` | `[TAG:DATA_CLASSES]` | L2391 – L2637 | `_CutOpeningSpan`, helper point & segment data structures |
+## 2. Source section registry
 
----
+| Source anchor / topic | Responsibility |
+| --- | --- |
+| `ArchitectSectionRegion` | Section cut region bounds and orientation data |
+| `ArchitectBuildingSection` | Main section and elevation builder (`build(...)`) |
+| `[TAG:SPANDREL_INFILL]` | Continuous drop beams, RC lintels, and aerated concrete infill |
+| `[TAG:TIE_BEAMS]` | Intermediate RC tie beams on tall masonry walls |
+| `_findCutOpeningsOnWall` | Cut window/door aperture detection and frame section profiles |
 
-## 2. Key Features & Structural Schemes
+## 3. Structural scheme behaviors to verify in source
 
-- **Flat Slab (`flatSlab`)**:
-  - Openings in masonry walls automatically receive **RC Lintels (`SlabMaterial.concrete`, $h=14\text{ cm}$)** directly above the window/door head, and **Aerated Concrete (`SlabMaterial.aeratedConcrete`)** spandrel infill up to the slab underside with the dedicated `aeratedConcrete` hatch.
-- **Beam & Slab (`beamAndSlab`)**:
-  - Exterior walls receive continuous perimeter RC drop beams (`SlabMaterial.concrete`) under the upper slab spanning wall piers and openings.
-  - Windows receive RC lintels ($h=14\text{ cm}$) and aerated concrete infill in any gap between lintel top and beam soffit.
-- **Timber Joist Floor (`roundLogs` & `studFrame`)**:
-  - Intermediate floors automatically resolve to timber joist floors (`SlabMaterial.timber` core, acoustic wool, OSB subfloor, ceiling lining) instead of 20 cm RC slabs.
-- **Sandwich Panels (`sandwichPanels`)**:
-  - Industrial walls on ground slabs receive elevated RC plinth curbs ($+35\text{ cm}$ above grade), horizontal DPC waterproofing, and starter profile flashing with exterior drip edge.
-- **Intermediate RC Tie Beams (Бетонни пояси)**:
-  - Masonry walls (`brick` or `aeratedConcrete`) exceeding $3.00\text{ m}$ clear height automatically receive $0.20\text{ m}$ reinforced concrete tie beams at every $3.00\text{ m}$ elevation step per Eurocode 6 & 8, after which the masonry wall continues upward.
+- **Flat slab**: Masonry openings receive RC lintels and aerated concrete spandrel infill up to the slab underside.
+- **Beam & slab**: Exterior walls receive continuous perimeter drop beams under the upper slab plus lintels/infill where needed.
+- **Timber joist floors** (round-log / stud-frame schemes): Intermediate floors resolve to timber joist assemblies instead of RC slabs.
+- **Sandwich panels**: Industrial walls on ground slabs receive elevated RC plinth curbs, horizontal DPC, and starter profile flashing.
+- **Intermediate RC tie beams**: Tall masonry walls receive intermediate concrete tie beams per Eurocode height steps (`[TAG:TIE_BEAMS]`).

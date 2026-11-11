@@ -1010,8 +1010,8 @@ def build_toc_header_lines(
         "// ============================================================================",
         f"// MASTER {title_upper} LLM SEARCH INDEX & TABLE OF CONTENTS",
         "// ============================================================================",
-        f"// COMPANION MAP: See '{companion_name}' for full method & class directory.",
-        '// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"',
+        f"// COMPANION MAP: See '{companion_name}' for reference patterns and symbols.",
+        '// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.',
         "//",
     ]
     for m in markers:
@@ -1019,9 +1019,8 @@ def build_toc_header_lines(
             sec_col = f"  ↳ {m.sec_id or '[SUB]':<12}"
         else:
             sec_col = f"{m.sec_id:<16}"
-        span_col = f"L{m.line_num}-L{m.end_line}"
         desc_short = m.description[:68]
-        toc.append(f"// {sec_col} {span_col:<13}: {m.tag} {desc_short}")
+        toc.append(f"// {sec_col} {m.tag} {desc_short}")
     toc.append("// ============================================================================")
     return toc
 
@@ -1135,34 +1134,32 @@ def generate_index_markdown(
         primary_cls_str = f"`{filepath.stem}`"
 
     md: List[str] = [
-        f"# {title} — LLM Semantic Navigation Map",
+        f"# {title} — Reference & Navigation Map",
         f"> **Path**: `{rel_path}`  ",
-        f"> **Total Lines**: ~{total_lines:,} | **Primary Class**: {primary_cls_str}  ",
-        "> **Companion Document**: Used by LLMs (Antigravity, Gemini, Codex, Copilot, Cursor) to navigate and locate code in 1 step without reading the full file.",
+        f"> **Primary class**: {primary_cls_str}  ",
+        "> **Important**: Treat this map as a discovery aid, not a specification. Verify concrete symbols, anchors, and behavior in the current source with `rg -n`.",
         "",
         "---",
         "",
-        "## 1. LLM Navigation Protocol (How to search in 1 step)",
+        "## 1. How to use this map",
         "",
-        "1. **Find the Section, Class, or Method**: Check Section 2 (Master Section Registry), Section 3 (Class Registry), or Section 4 (Method Directory).",
-        "2. **Jump via Unique Tag or Line Range**:",
-        '   - In Antigravity / CLI: Use `git grep -n "\\[TAG:<NAME>\\]"` or read the exact line range via `read_file` (`StartLine`–`EndLine`).',
-        "   - Never read the entire file at once; always read only the target 50–150 line range.",
-        "3. **Check State Dependencies**: Review Section 5 (State Fields & Controllers Registry) before modifying interactive or stateful methods.",
+        "1. Use this map to find the relevant section tag, class, or method name.",
+        f"2. Search the current Dart source with `rg -n \"\\[TAG:<NAME>\\]|<SymbolName>\" {rel_path}`.",
+        "3. For behavior changes, read the target implementation and its immediate callers/callees; follow the Reference-First protocol in `AGENTS.md` / `GEMINI.md`.",
         "",
         "---",
         "",
-        "## 2. Master Section Registry & Line Spans",
+        "## 2. Source section registry",
         "",
-        "| Section ID | Tag | Approx Lines | Description & Primary Responsibilities |",
-        "| :--- | :--- | :--- | :--- |",
+        "| Section ID | Tag | Description & Primary Responsibilities |",
+        "| :--- | :--- | :--- |",
     ]
 
     if last_directive_line > 0 and (
         not markers or markers[0].sec_id != "[SEC-00-IMPORTS]"
     ):
         md.append(
-            f"| `[SEC-00-IMPORTS]` | `[TAG:{tag_prefix}_IMPORTS]` | L1 – L{last_directive_line} | Package, model, service, and widget imports |"
+            f"| `[SEC-00-IMPORTS]` | `[TAG:{tag_prefix}_IMPORTS]` | Package, model, service, and widget imports |"
         )
 
     for m in markers:
@@ -1170,9 +1167,8 @@ def generate_index_markdown(
             "↳ `[SUB]`" if m.is_subsection else f"`{m.sec_id}`"
         )
         tag_cell = f"`{m.tag}`" if m.tag else "—"
-        span_cell = f"L{m.line_num} – L{m.end_line}"
         desc_cell = m.description.replace("|", "\\|")
-        md.append(f"| {sec_cell} | {tag_cell} | {span_cell} | {desc_cell} |")
+        md.append(f"| {sec_cell} | {tag_cell} | {desc_cell} |")
 
     # Section 3: Top-Level Classes, Enums & Extensions
     if declarations:
@@ -1182,18 +1178,17 @@ def generate_index_markdown(
             "",
             "## 3. Classes, Enums & Top-Level Declarations",
             "",
-            "| Symbol | Kind | Lines (Span) | Members | Signature / Heritage |",
-            "| :--- | :--- | :--- | :--- | :--- |",
+            "| Symbol | Kind | Members | Signature / Heritage |",
+            "| :--- | :--- | :--- | :--- |",
         ])
         for d in declarations[:60]:
-            span_count = d.end_line - d.start_line + 1
             m_count = len(d.members)
             sig_clean = d.signature.replace("|", "\\|")
             md.append(
-                f"| `{d.name}` | {d.kind} | L{d.start_line} – L{d.end_line} ({span_count}L) | {m_count} | `{sig_clean}` |"
+                f"| `{d.name}` | {d.kind} | {m_count} | `{sig_clean}` |"
             )
         if len(declarations) > 60:
-            md.append(f"| *+{len(declarations) - 60} more declarations* | — | — | — | See per-section summary |")
+            md.append(f"| *+{len(declarations) - 60} more declarations* | — | — | See per-section summary |")
 
     # Helper to find which marker tag owns a line number
     def tag_for_line(line_no: int) -> str:
@@ -1237,14 +1232,14 @@ def generate_index_markdown(
 
     if len(all_methods) <= 110:
         md.extend([
-            "| Method / Handler | Class | Section Tag | Lines (Span) | Summary / Signature |",
-            "| :--- | :--- | :--- | :--- | :--- |",
+            "| Method / Handler | Class | Section Tag | Summary / Signature |",
+            "| :--- | :--- | :--- | :--- |",
         ])
         for m in all_methods:
             tag_str = tag_for_line(m.start_line)
             summary = (m.doc_summary or m.signature).replace("|", "\\|")[:75]
             md.append(
-                f"| `{m.name}` | `{m.parent_class}` | `{tag_str}` | L{m.start_line}–L{m.end_line} ({m.line_count}L) | {summary} |"
+                f"| `{m.name}` | `{m.parent_class}` | `{tag_str}` | {summary} |"
             )
     else:
         # For massive files (>110 methods):
@@ -1263,20 +1258,20 @@ def generate_index_markdown(
         md.extend([
             "### 4.1 Primary Entrypoints & Major Methods",
             "",
-            "| Method / Handler | Section Tag | Lines (Span) | Summary / Signature |",
-            "| :--- | :--- | :--- | :--- |",
+            "| Method / Handler | Section Tag | Summary / Signature |",
+            "| :--- | :--- | :--- |",
         ])
         for m in top_methods:
             tag_str = tag_for_line(m.start_line)
             summary = (m.doc_summary or m.signature).replace("|", "\\|")[:75]
             md.append(
-                f"| `{m.name}` | `{tag_str}` | L{m.start_line}–L{m.end_line} ({m.line_count}L) | {summary} |"
+                f"| `{m.name}` | `{tag_str}` | {summary} |"
             )
 
-        # 4B: Complete Per-Section Compact Index of ALL methods with exact line numbers!
+        # 4B: Complete Per-Section Compact Index of ALL methods by tag
         md.extend([
             "",
-            "### 4.2 Complete Per-Section Method Index (All Methods with Exact Lines)",
+            "### 4.2 Per-Section Method Index",
             "",
         ])
         by_tag: Dict[str, List[Member]] = {}
@@ -1287,15 +1282,11 @@ def generate_index_markdown(
         for m_sec in markers:
             t = m_sec.tag
             if t in by_tag and by_tag[t]:
-                items = ", ".join(
-                    f"`{m.name}` (L{m.start_line}–L{m.end_line})" for m in by_tag[t]
-                )
-                md.append(f"- **`{t}` (L{m_sec.line_num}–L{m_sec.end_line})**: {items}")
+                items = ", ".join(f"`{m.name}`" for m in by_tag[t])
+                md.append(f"- **`{t}`**: {items}")
                 del by_tag[t]
         for leftover_tag, m_list in by_tag.items():
-            items = ", ".join(
-                f"`{m.name}` (L{m.start_line}–L{m.end_line})" for m in m_list
-            )
+            items = ", ".join(f"`{m.name}`" for m in m_list)
             md.append(f"- **`{leftover_tag}`**: {items}")
 
     # Section 5: Key State Fields & Controllers Registry
@@ -1322,10 +1313,10 @@ def generate_index_markdown(
         shown_fields = sorted(sorted_fields[:45], key=lambda f: f.start_line)
         for f in shown_fields:
             doc_part = f" — {f.doc_summary}" if f.doc_summary else ""
-            md.append(f"- `{f.name}` (`{f.return_type}`, L{f.start_line}){doc_part}")
+            md.append(f"- `{f.name}` (`{f.return_type}`){doc_part}")
         if len(all_fields) > 45:
             md.append(
-                f"- *+{len(all_fields) - 45} additional fields in `L{all_fields[0].start_line}–L{all_fields[-1].end_line}`*"
+                f"- *+{len(all_fields) - 45} additional fields in source*"
             )
 
     md.append("")
@@ -1339,50 +1330,11 @@ def sync_existing_index_markdown(
     markers: List[SectionMarker],
 ) -> str:
     """
-    Updates total line count and section line spans (`L<start> – L<end>`)
-    in an existing hand-curated `<filename>.index.md` without destroying
-    custom tables or safe modification rules.
+    Preserves an existing `<filename>.index.md` without injecting volatile line
+    numbers. Only strips legacy `> **Total Lines**: ...` metadata if present.
     """
     content = index_path.read_text(encoding="utf-8")
-    # Update > **Total Lines**: ~...
-    content = re.sub(
-        r"(\*\*Total Lines\*\*:\s*~?)[0-9,]+",
-        f"\\g<1>{total_lines:,}",
-        content,
-    )
-
-    # Map both sec_id and tag to (start_line, end_line)
-    span_by_key: Dict[str, Tuple[int, int]] = {}
-    if last_directive_line > 0:
-        span_by_key["[SEC-00-IMPORTS]"] = (1, last_directive_line)
-    for m in markers:
-        if m.sec_id:
-            span_by_key[m.sec_id] = (m.line_num, m.end_line)
-        if m.tag:
-            span_by_key[m.tag] = (m.line_num, m.end_line)
-
-    out_lines: List[str] = []
-    for line in content.splitlines():
-        if line.strip().startswith("|"):
-            cols = [c.strip() for c in line.strip().strip("|").split("|")]
-            matched_span: Optional[Tuple[int, int]] = None
-            if len(cols) >= 3:
-                m_tag = re.search(r"(\[TAG:[^\]]+\])", cols[1])
-                m_sec = re.search(r"(\[(?:SEC|SUB)-[^\]]+\])", cols[0])
-                if m_tag and m_tag.group(1) in span_by_key:
-                    matched_span = span_by_key[m_tag.group(1)]
-                elif m_sec and m_sec.group(1) in span_by_key:
-                    matched_span = span_by_key[m_sec.group(1)]
-            if matched_span is not None:
-                line = re.sub(
-                    r"L\d+\s*[–-]\s*L\d+",
-                    f"L{matched_span[0]} – L{matched_span[1]}",
-                    line,
-                    count=1,
-                )
-        out_lines.append(line)
-
-    return "\n".join(out_lines) + "\n"
+    return content
 
 
 # ============================================================================

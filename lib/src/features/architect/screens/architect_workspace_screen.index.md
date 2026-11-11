@@ -48,8 +48,9 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Drafting and placement with live preview | Wall chain: [TAG:TOUCH_DOWN], [TAG:TOUCH_MOVE], [TAG:TOUCH_UP], [TAG:WALL_DRAFT], [TAG:CANVAS_2D]; _onPointerDown, _onPointerMove, _onPointerUp, _placeDraftSegment, _finishChainedWall | Tool activation/configuration, viewport input, snapping, preview, finish/cancel behavior, commit and undo/persistence |
 | Opening placement and editing | [TAG:FENEST_RADIAL], [TAG:FENESTRATION_SELECTION_UPDATES], [TAG:TOUCH_DOWN], [TAG:TOUCH_UP]; _tryPlaceDoorAt, _commitOpeningPlacement | Candidate selection, host detection, placement preview, selection actions, property UI, confirmation, model update |
 | Selected-element context actions | [TAG:SELECTION_BAR], [TAG:FENEST_RADIAL], [TAG:GRID_AXIS]; _handleSelectionTap, _buildSelectionBar | Selection hit path, contextual actions, property controls, cancellation/closing, state updates |
+| Two-point drag of elements or underlays | [TAG:DRAG_TOOL], [TAG:UNDERLAY_DRAG], [TAG:TOUCH_DOWN], [TAG:TOUCH_MOVE], [TAG:TOUCH_UP]; _startDragSession, _startUnderlaySnapDrag, _confirmDragPlacement, _cancelDragPlacement, ArchitectDragController | Base-point pick, pan lock, live preview and snap feedback, compact cancel/apply controls, commit/undo/persistence. Both element and underlay drag use the same controller and lifecycle. |
 | Multi-step geometry modification | Wall split: [TAG:WALL_SPLIT]. Chamfer/fillet and edge-curving: [TAG:FLOATING_HUD]; _startChamferFilletSession, _buildChamferFilletFloatingOverlay | Session state, preview/rubber band, pan and gesture arbitration, confirm/cancel controls, model command and history |
-| CAD/raster underlay placement or repositioning | [TAG:UNDERLAY_DRAG], [TAG:CAD_INSERTION]; _startUnderlaySnapDrag, _confirmUnderlaySnapPlacement | Import/configuration, hit testing, drag lifecycle, calibration, preview, commit and persistence |
+| CAD/raster underlay placement or repositioning | [TAG:UNDERLAY_DRAG], [TAG:CAD_INSERTION], [TAG:DRAG_TOOL]; _startUnderlaySnapDrag, _confirmDragPlacement | Import/configuration, shared drag lifecycle, calibration, preview, commit and persistence |
 
 ## 4. Cross-cutting state and owners
 
@@ -61,7 +62,7 @@ These are existing reference patterns, not mandatory templates. For a new featur
 - _selectedElementIds: current selection.
 - _activeWallChain: chained wall drafting state.
 - _landscapeTool: terrain, pathway, vegetation, fence, and related landscape interactions.
-- _dragController: two-point drag interactions; verify which element types use it.
+- _dragController: the single two-point drag controller for elements and CAD/raster underlays; verify the active branch before changing preview or commit behavior.
 
 ## 5. Reference-first implementation checklist
 

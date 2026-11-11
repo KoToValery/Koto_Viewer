@@ -1,62 +1,60 @@
-# Structural Designer Screen — LLM Semantic Navigation Map
-> **Path**: `lib/src/features/structural_designer/structural_designer_screen.dart`  
-> **Total Lines**: ~9,175 | **Primary Class**: `_StructuralDesignerScreenState`  
-> **Companion Document**: Used by LLMs (Antigravity, Gemini, Codex, Copilot, Cursor) to navigate and locate code in 1 step.
+# Structural Designer Screen — Reference & Navigation Map
+> **Path**: `lib/src/features/structural_designer/structural_designer_screen.dart`
+> **Primary class**: `_StructuralDesignerScreenState`
+> **Important**: In this file, the header TOC `[TAG:STRUCT_*]` labels are topic summaries while the body uses `// === SECTION: ... ===` headers. Treat this map as a discovery aid and verify symbol names and behavior in the current source with `rg -n`.
 
----
+## 1. How to use this map
 
-## 1. LLM Navigation Protocol (How to search in 1 step)
+1. Use this map to find the closest existing interaction archetype and concrete method names.
+2. Search the current Dart source, for example: `rg -n "_commitPlacement|_handlePointerDown|_buildContextualElementBottomDock" lib/src/features/structural_designer/structural_designer_screen.dart`.
+3. For behavior changes, read the relevant method bodies and immediate callers/callees across the screen, `Structural2dPainter`, models, and analysis helpers where they participate.
+4. Select the closest behaviorally similar feature as a reference; do not copy a pattern mechanically when the requirement differs.
 
-1. **Find the Tool or Feature in this document**: Look at Section 3 (Tool & Action Directory) or Section 2 (Master Section Registry).
-2. **Jump via Unique Tag or Line Range**:
-   - In Antigravity / CLI: Use `git grep -n "\[TAG:<NAME>\]"` or read the specified line range via `read_file`.
-   - In Copilot / Codex / Cursor: Mention the tag `[TAG:<NAME>]` or target method name in your prompt or infill range.
-3. **Verify State Dependencies**: Look at Section 4 (State & Controller Registry) before editing.
+## 2. Source section registry
 
----
+| Section header in source | Header topic tag | Responsibility |
+| --- | --- | --- |
+| `// === SECTION: [SEC-01-WIDGET]` | `[TAG:STRUCT_WIDGET]` | `StructuralDesignerScreen` widget declaration and public API |
+| `// === SECTION: STATE VARIABLES & LIFECYCLE` | `[TAG:STRUCT_STATE]` | State fields, `_project`, `_activeTool`, selections, `_pushUndo`, `_undo` |
+| `// === SECTION: COORDINATE TRANSFORMATIONS & VIEWPORT` | `[TAG:STRUCT_XFORM]` | Screen/CAD coordinate transforms and viewport helpers |
+| `// === SECTION: HIT TESTING & SELECTION HELPERS` | `[TAG:STRUCT_HITS]` | Hit testing and selection helpers for columns, walls, beams, openings, slabs, axes |
+| `// === SECTION: ELEMENT ACTIONS (COLUMNS, WALLS, BEAMS)` | `[TAG:STRUCT_ACTIONS]` | Element mutations, duplicate drag, move sessions, custom dialogs |
+| `// === SECTION: OPENINGS & GRID AXES MANAGEMENT` | `[TAG:STRUCT_OPENINGS]` | Slab openings, offset drag modes, grid axis management |
+| `// === SECTION: SLAB CORRECTION & POLYGON EDITING` | `[TAG:STRUCT_SLABS]` | Slab contour editing (`_startSlabCorrection`, `_saveSlabCorrection`) and opening taps |
+| `// === SECTION: POINTER GESTURES & INTERACTION CONTROLLER` | `[TAG:STRUCT_POINTER]` | `_handlePointerDown`, `_handlePointerMove`, `_handlePointerUp`, `_handleTapUp`, `_handleLongPressStart` |
+| `// === SECTION: ELEMENT PLACEMENT & COMMIT LOGIC` | `[TAG:STRUCT_COMMITS]` | `_commitPlacement`, stair/slab generation, `_saveProject` |
+| `// === SECTION: UNDERLAY FILTERING & CAD SETTINGS` | `[TAG:STRUCT_UNDERLAY]` | Underlay filtering, layer sheets, wall/axis auto-detection triggers |
+| `// === SECTION: STOREY MANAGEMENT & ANALYSIS DIALOGS` | `[TAG:STRUCT_STOREY]` | Storey switching, vertical/cantilever/seismic report triggers |
+| `// === SECTION: APPBAR & HUD ACTION BUILDERS` | `[TAG:STRUCT_APPBAR]` | Top AppBar actions and tool switching (`_selectTool`) |
+| `// === SECTION: MAIN BUILD METHOD & VIEWPORT CANVAS` | `[TAG:STRUCT_BUILD]` | Main `build()`, `BimEditingViewport`, `DxfPainter`, `Structural2dPainter` |
+| `// === SECTION: CONTEXTUAL BOTTOM DOCKS & ACTION BARS` | `[TAG:STRUCT_DOCKS]` | `_buildContextualElementBottomDock`, `_buildSlabCorrectionBottomBar`, `_buildFloatingMoveBottomBar` |
 
-## 2. Master Section Registry & Line Spans
+## 3. Tool archetypes and reference flows
 
-| Section ID | Tag | Approx Lines | Description & Primary Responsibilities |
-| :--- | :--- | :--- | :--- |
-| `[SEC-00-IMPORTS]` | `[TAG:STRUCT_IMPORTS]` | L1 – L78 | All package and internal imports |
-| `[SEC-01-WIDGET]` | `[TAG:STRUCT_WIDGET]` | L97 – L126 | `StructuralDesignerScreen` StatefulWidget & parameters |
-| `[SEC-02-STATE]` | `[TAG:STRUCT_STATE]` | L127 – L767 | State fields, active tool, storey cache, `initState`, `dispose` |
-| `[SEC-03-XFORM]` | `[TAG:STRUCT_XFORM]` | L768 – L872 | Matrix4 & Canvas transforms: screenToCad, cadToScreen, zoom/pan |
-| `[SEC-04-HITS]` | `[TAG:STRUCT_HITS]` | L873 – L1196 | Hit testing for structural columns, walls, slabs, and beam edges |
-| `[SEC-05-ACTIONS]` | `[TAG:STRUCT_ACTIONS]` | L1197 – L1966 | Column dimensioning, wall thickness, beam profile mutation |
-| `[SEC-06-OPENINGS]` | `[TAG:STRUCT_OPENINGS]`| L1967 – L2992 | Wall openings, slab voids, grid axes creation & resequencing |
-| `[SEC-07-SLABS]` | `[TAG:STRUCT_SLABS]` | L2993 – L3339 | Slab contour auto-detection, polygon editing, cantilever check |
-| `[SEC-08-POINTER]` | `[TAG:STRUCT_POINTER]` | L3340 – L5740 | Pointer gestures: onPointerDown, onPointerMove, onPointerUp |
-| `[SEC-09-COMMITS]` | `[TAG:STRUCT_COMMITS]` | L5741 – L6282 | Final commit handlers for placed columns, walls, slabs, beams |
-| `[SEC-10-UNDERLAY]` | `[TAG:STRUCT_UNDERLAY]`| L6283 – L7126 | DXF layer filtering, pen color overrides, trace reference levels |
-| `[SEC-11-STOREY]` | `[TAG:STRUCT_STOREY]` | L7127 – L7363 | Storey switching, vertical alignment, seismic analysis triggers |
-| `[SEC-12-APPBAR]` | `[TAG:STRUCT_APPBAR]` | L7364 – L7674 | Header app bar, tool palette toggle, calculation action icons |
-| `[SEC-13-BUILD]` | `[TAG:STRUCT_BUILD]` | L7675 – L8384 | Main `build()` method, interactive canvas viewport stack |
-| `[SEC-14-DOCKS]` | `[TAG:STRUCT_DOCKS]` | L8385 – L9175 | Contextual bottom sheets, candidate picker dock, element properties |
+These are existing reference patterns, not mandatory templates. For a new feature, choose the closest match by interaction and user intent, then verify the implementation in source.
 
----
+| Interaction archetype | Reference symbols to inspect | What to trace |
+| --- | --- | --- |
+| Viewport routing & gesture arbitration | `BimEditingViewport`, `_viewportDragging`, `_handlePointerDown`, `_moveViewportTool`, `_releaseViewportTool`, `_beginViewportHold`, `_cancelViewportTool` | Shared viewport ownership, pan lock via `isDraggingHandle`, hold-to-place, cancel cleanup |
+| Element placement & polygon drafting | `_selectTool`, `_handleTapUp`, `_commitPlacement`, `_commitOpeningTap`, `_closeSlabPolygon`, `_closeOpeningPolygon` | Tool preset state, snap/alignment preview in `Structural2dPainter`, commit, `_pushUndo`, `_saveProject` |
+| Selected-element contextual dock actions | `_buildContextualElementBottomDock`, `_deleteSelectedColumn`, `_rotateSelectedWall`, `_updateOpeningTypeInStorey`, `_deleteSelectedGridAxis` | Selection state (`_selectedColumn`, `_selectedShearWall`, `_selectedBeam`, `_selectedOpening`, `_selectedGridAxis`), dock actions, undo/save |
+| Interactive move & duplicate drag sessions | `_startDuplicateDrag`, `_commitDuplicateDrag`, `_startMovingSelectedColumn`, `_startMovingSelectedWall`, `_startMovingOpening`, `_confirmCurrentMove`, `_cancelCurrentMove`, `_buildFloatingMoveBottomBar` | Session start, live move preview, viewport drag lock, confirm/cancel floating bar, undo/save |
+| Multi-step slab contour correction | `_startSlabCorrection`, `_pushSlabCorrectionUndo`, `_undoSlabCorrection`, `_cancelSlabCorrection`, `_saveSlabCorrection`, `_buildSlabCorrectionBottomBar`, `_updateSlabVertexDrag`, `_updateEdgeExtrusion` | Isolated editing state (`_editingSlab`), vertex/edge extrusion drag, dedicated correction bar, save/cancel |
+| Offset drag & numeric input | `_startAxisOffsetDragMode`, `_startColumnOffsetDragMode`, `_updateAxisOffsetDrag`, `_updateColumnOffsetDrag`, `_showGridAxisOffsetDialog`, `_showColumnOffsetDialog` | Interactive drag preview combined with exact distance dialog |
 
-## 3. Tool & Action Directory
+## 4. Cross-cutting state and owners
 
-| Element / Tool | Pointer Handler | Commit Method | Context UI / Dock |
-| :--- | :--- | :--- | :--- |
-| **Column** | L3340+ | `_commitColumnPlacement` | `_buildColumnDock` |
-| **Shear Wall** | L3340+ | `_commitWallPlacement` | `_buildWallDock` |
-| **Beam** | L3340+ | `_commitBeamPlacement` | `_buildBeamDock` |
-| **Slab** | L2993+ | `_commitSlabContour` | `_buildSlabDock` |
-| **Opening** | L1967+ | `_commitOpeningPlacement` | Opening candidate sheet |
-| **Grid Axis** | L1967+ | `_commitGridAxis` | Grid axis property bar |
-| **Cantilever** | L2993+ | `_checkCantileverOverhangs`| `VerticalCapacitySheet` |
+- `_project` (`StructuralProject`): Active structural engineering model and active storey (`_project.activeStorey`).
+- `_activeTool` (`StructuralDrawTool`): Currently selected structural tool (`select`, `gridAxis`, `column`, `shearWall`, `beam`, `slab`, `slabOpening`, `measure`, `layers`).
+- `_viewportNavigation` & `_transformController`: Viewport transform and `BimEditingViewport` navigation controller; pan locking is driven by `_viewportDragging`.
+- Selection fields: `_selectedColumn`, `_selectedShearWall`, `_selectedBeam`, `_selectedOpening`, `_selectedOpeningVertexIndex`, `_selectedGridAxis`, `_selectedSlabVertexIndex`.
+- Undo and persistence: `_pushUndo()`, `_undo()`, and `_saveProject()` (plus slab-correction-local undo via `_pushSlabCorrectionUndo()` / `_undoSlabCorrection()`).
+- Analysis & overlays: `_runAnalysis()`, `_verticalCapacityReport`, `_seismicAnalysisReport`, `_openCantileverReport()`, `_openVerticalCapacityReport()`, `_openSeismicReport()`.
 
----
+## 5. Reference-first implementation checklist
 
-## 4. Key State Fields & Controllers Registry
-
-- `_project` (`StructuralProject`): The active structural engineering model.
-- `_activeStoreyId` (`String`): Current building level ID.
-- `_activeTool` (`StructuralTool`): Currently selected structural design tool.
-- `_selectedElementIds` (`Set<String>`): Highlighted structural members.
-- `_traceStoreyId` (`String?`): Underlay trace reference storey ID.
-- `_transform` (`Matrix4`): Interactive viewport transform matrix.
-- `_analysisController`: Manages seismic, vertical capacity, and deflection analysis.
+1. For a behavior or interaction change, identify the closest existing feature above and inspect its source in `structural_designer_screen.dart` and `Structural2dPainter`.
+2. Trace the relevant `BimEditingViewport` callbacks, `_viewportDragging` pan lock, state fields, preview rendering, bottom dock/floating bar, `_pushUndo()`, and `_saveProject()`.
+3. Reuse the established UI archetype (`_buildContextualElementBottomDock`, `_buildFloatingMoveBottomBar`, `_buildSlabCorrectionBottomBar`, or dialogs) by operation type.
+4. Use ARB localization for new user-facing text and follow the nearest equivalent control's mobile layout.
+5. For isolated visual, copy, or localization changes without behavior changes, verify only the nearest affected widget/control.
