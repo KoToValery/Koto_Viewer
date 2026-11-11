@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import 'architect_canvas_hint.dart';
 
-/// Floating confirmation and cancellation pill placed directly near the active element.
+/// Independent, touch-friendly actions with optional lightweight context chips.
 class ArchitectFloatingCommandOverlay extends StatelessWidget {
   final String label;
   final bool ready;
@@ -32,86 +33,67 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final hasConfirm = showConfirm && onConfirm != null;
+    final availableWidth = (MediaQuery.sizeOf(context).width - position.dx - 8)
+        .clamp(hasConfirm ? 100.0 : 48.0, double.infinity);
     return Positioned(
       left: position.dx,
       top: position.dy,
       child: Material(
         key: surfaceKey,
-        color: const Color(0xEE1E2430),
-        elevation: 8,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: ready && showConfirm
-                  ? const Color(0xFF00E676).withValues(alpha: 0.6)
-                  : Colors.white24,
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+        type: MaterialType.transparency,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: availableWidth),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (label.isNotEmpty) ...[
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 180),
-                  child: Text(
-                    label,
+                Flexible(
+                  child: ArchitectCanvasHint(
+                    message: label,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                    maxWidth: 180,
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+              if (customContent != null) ...[
+                Flexible(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Material(
+                      // Existing embedded editors use light text. Their small
+                      // surface stays independent of the two action buttons.
+                      color: const Color(0xF02A333B),
+                      borderRadius: BorderRadius.circular(7),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
+                        child: customContent!,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
               ],
-              if (customContent != null) ...[
-                customContent!,
-                const SizedBox(width: 6),
-              ],
-              // Cancel button (X)
-              IconButton(
+              _action(
                 key: const ValueKey('architect-command-cancel'),
+                discKey: const ValueKey('architect-command-cancel-disc'),
                 tooltip: cancelTooltip ?? l.cancel,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                splashRadius: 18,
-                icon: const AppIcon(
-                  AppIconId.close,
-                  color: Colors.white70,
-                  size: 18,
-                ),
+                icon: AppIconId.close,
+                color: const Color(0xFF65737E),
                 onPressed: onCancel,
               ),
-              if (showConfirm && onConfirm != null) ...[
+              if (hasConfirm) ...[
                 const SizedBox(width: 4),
-                // Confirm button (Green checkmark)
-                IconButton(
+                _action(
                   key: const ValueKey('architect-command-apply'),
+                  discKey: const ValueKey('architect-command-apply-disc'),
                   tooltip: confirmTooltip ?? l.applyAction,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 34,
-                    minHeight: 34,
-                  ),
-                  splashRadius: 18,
-                  icon: AppIcon(
-                    AppIconId.confirm,
-                    color: ready ? const Color(0xFF00E676) : Colors.white24,
-                    size: 20,
-                  ),
+                  icon: AppIconId.confirm,
+                  color: const Color(0xFF18846B),
                   onPressed: ready ? onConfirm : null,
                 ),
               ],
@@ -119,6 +101,59 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _action({
+    required Key key,
+    required Key discKey,
+    required String tooltip,
+    required AppIconId icon,
+    required Color color,
+    required VoidCallback? onPressed,
+  }) {
+    final enabled = onPressed != null;
+    return IconButton(
+      key: key,
+      tooltip: tooltip,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+      style: IconButton.styleFrom(
+        fixedSize: const Size(48, 48),
+        padding: EdgeInsets.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: const CircleBorder(),
+      ),
+      icon: Container(
+        key: discKey,
+        width: 32,
+        height: 32,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xF7FFFFFF),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: enabled
+                ? color.withValues(alpha: .27)
+                : const Color(0xFFE2E6E9),
+            width: .8,
+          ),
+          boxShadow: [
+            if (enabled)
+              const BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 5,
+                offset: Offset(0, 1),
+              ),
+          ],
+        ),
+        child: AppIcon(
+          icon,
+          color: enabled ? color : const Color(0xFFBFC8CD),
+          size: 18,
+        ),
+      ),
+      onPressed: onPressed,
     );
   }
 }

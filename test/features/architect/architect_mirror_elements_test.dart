@@ -15,6 +15,7 @@ import 'package:kotoview/src/features/architect/services/architect_element_tool.
 import 'package:kotoview/src/features/bim_editing/geometry/bim_grid_axis.dart';
 import 'package:kotoview/src/features/bim_projects/controllers/bim_viewport_controller.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_transform_point_input.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_floating_command_overlay.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_edit_actions.dart';
 import 'architect_editing_test.dart' as editing;
 import 'architect_element_group_test.dart' as groups;
@@ -162,12 +163,6 @@ void main() {
         }
 
         await start();
-        await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
-        await tester.pump();
-        await tester.tap(
-          find.byKey(const ValueKey('architect-mirror-pick-anchor')),
-        );
-        await tester.pump();
         await tester.tapAt(workspace.screen(tester, const Offset(1.02, 1.01)));
         await tester.pump();
         final marker =
@@ -185,6 +180,33 @@ void main() {
         );
         await mouse.moveTo(workspace.screen(tester, const Offset(3.01, 2.02)));
         await tester.pump();
+        expect(
+          find.byKey(const ValueKey('architect-command-review-input')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-command-cancel')),
+          findsOneWidget,
+        );
+        // Repeated aiming must always reflect the original selection, without
+        // accumulating copies or alternating between the two sides of the axis.
+        for (final point in [
+          const Offset(5, 1),
+          const Offset(3.02, 2.01),
+          const Offset(3.01, 2.02),
+        ]) {
+          await mouse.moveTo(workspace.screen(tester, point));
+          await tester.pump();
+          expect(
+            workspace.overlay(tester).project.activeStorey.cadPrimitives,
+            hasLength(copy ? 3 : 2),
+          );
+          expect(model.project.activeStorey.toJson(), before);
+          expect(
+            find.byKey(const ValueKey('architect-command-review-input')),
+            findsNothing,
+          );
+        }
         final preview = workspace
             .overlay(tester)
             .project
@@ -206,6 +228,10 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(workspace.overlay(tester).project.activeStorey.toJson(), before);
+        expect(
+          find.byKey(const ValueKey('architect-mirror-input')),
+          findsNothing,
+        );
         await mouse.removePointer();
         await start();
         await tester.tapAt(workspace.screen(tester, const Offset(1, 1)));
@@ -229,7 +255,7 @@ void main() {
     );
   }
   group('ArchitectElementTool - mirrorElementById', () {
-    test('mirrors wall across vertical axis with door and inverted hinge', () {
+    test('mirrors wall across vertical axis with door and inverted swing', () {
       final wall = ArchitectWall(
         id: 'w1',
         startPoint: const Offset(1, 1),
@@ -282,9 +308,11 @@ void main() {
       expect(mirrored.exteriorSide, WallExteriorSide.right);
       // Arc bulge negates
       expect(mirrored.arcBulge, closeTo(-0.4, 0.001));
-      // Door hinge flips
+      // The baseline keeps its endpoint order, so the hinge retains its jamb
+      // while the normal and opening side reverse.
       expect(mirrored.doors.length, 1);
-      expect(mirrored.doors.first.isHingeLeft, false);
+      expect(mirrored.doors.first.isHingeLeft, true);
+      expect(mirrored.doors.first.openInward, false);
       expect(mirrored.doors.first.offsetRatio, closeTo(0.3, 0.001));
       // Window is kept
       expect(mirrored.windows.length, 1);
@@ -524,11 +552,11 @@ void main() {
         await tester.tap(mirrorCopyBtn);
         await tester.pumpAndSettle();
 
-        // Banner should now be visible asking for anchor point
-        final banner = find.byKey(const ValueKey('architect-mirror-banner'));
-        expect(banner, findsOneWidget);
+        // The placement HUD asks for the first axis point.
+        final hud = find.byType(ArchitectFloatingCommandOverlay);
+        expect(hud, findsOneWidget);
         expect(
-          find.descendant(of: banner, matching: find.textContaining('anchor')),
+          find.descendant(of: hud, matching: find.textContaining('anchor')),
           findsOneWidget,
         );
 
@@ -552,9 +580,9 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Banner dismissed, mirror committed
+        // Placement HUD dismissed; the geometry command is ready to accept.
         expect(
-          find.byKey(const ValueKey('architect-mirror-banner')),
+          find.byKey(const ValueKey('architect-mirror-vertical-btn')),
           findsNothing,
         );
 

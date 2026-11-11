@@ -20,6 +20,7 @@ import '../widgets/architect_selection_control.dart';
 import '../widgets/architect_selection_move_button.dart';
 import '../widgets/architect_selection_action_bar.dart';
 import '../widgets/architect_floating_command_overlay.dart';
+import '../widgets/architect_canvas_hint.dart';
 import '../services/architect_command_preview.dart';
 import '../../bim_editing/commands/bim_edit_history.dart';
 import '../../../core/services/ui_settings_service.dart';
@@ -357,6 +358,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-08-FENEST]  [TAG:FENEST_RADIAL] Door/Window Placement & Radial Context Menus
 //   ↳ [SUB]        [TAG:FLOATING_HUD] Contextual Floating Command Overlays & Interactive Edge Curving
 //   ↳ [SUB]        [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG METHODS
+//   ↳ [SUB]        [TAG:MIRROR_WORKFLOW] Mirror axis picking, preview and commit
 // [SEC-09-SELECT]  [TAG:SELECTION_BAR] Selection HUD, Action Bars & Layer Modals
 //   ↳ [SUB]        [TAG:FENESTRATION_SELECTION_UPDATES] Live Door & Window Parameter Mutators
 // [SEC-10-GRIDS]   [TAG:GRID_AXIS] Grid Axes Alignments, Offsets & Numbering
@@ -6571,6 +6573,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _discardGeometryCommand();
       return true;
     }
+    next = _prepareGeometryPreview(next);
+    session.stage(_commandContext, next);
+    _commands.editPreview = next;
+    setState(() {});
+    _repaintPreview();
+    return true;
+  }
+
+  ArchitectProject _prepareGeometryPreview(ArchitectProject next) {
     // Room updates belong to the same transaction as their wall edit.
     if (_commands.isPlan) {
       final storey = next.activeStorey;
@@ -6591,11 +6602,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     } else {
       next = ArchitectDimensionChain.resolve(next);
     }
-    session.stage(_commandContext, next);
-    _commands.editPreview = next;
-    setState(() {});
-    _repaintPreview();
-    return true;
+    return next;
   }
 
   void _discardGeometryCommand() {
@@ -25644,7 +25651,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ? l.architectMirrorPromptPickAnchor
           : l.architectMirrorPromptPickAxis,
       showConfirm: false,
-      onCancel: _cancelMirrorSession,
+      onCancel: _commandPreview != null
+          ? _cancelGeometryCommand
+          : _cancelMirrorSession,
       customContent: _mirrorAnchor != null
           ? Row(
               mainAxisSize: MainAxisSize.min,
@@ -27214,23 +27223,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  // --- SUBSECTION: [TAG:MIRROR_WORKFLOW] Mirror axis picking, preview and commit ---
   void _previewMirrorSnap(ArchitectSnapResult snap) {
+    if (!_mirrorActive) return;
     _cursorModel = snap.point;
     _activeSnapLabel = snap.snapLabel;
     _activeMagneticGuides = snap.magneticGuides;
     _mirrorCurrentPoint = snap.point;
     final anchor = _mirrorAnchor;
     try {
-    if (anchor != null) {
-      final direction = snap.point - anchor;
-      _elementMovePreview = direction.distanceSquared <= 1e-8 ? null :
-        MirrorArchitectElements(storeyId: _project.activeStoreyId,
-          elementIds: _mirrorSourceIds, origin: anchor, direction: direction,
-          isDuplicate: _mirrorIsDuplicate, idMap: _mirrorIdMap,
-          copyGroups: _editingGroupId == null,
-              ).apply(_project);
+      if (anchor != null) {
+        final direction = snap.point - anchor;
+        final source = _commandPreview?.original ?? _project;
+        // Aiming must not stage the generic command: doing so changes _project
+        // and reflects the previous preview again on the next pointer update.
+        // The second axis pick stages the command through _executeMirror.
+        _elementMovePreviewValue = direction.distanceSquared <= 1e-8
+            ? null
+            : _prepareGeometryPreview(
+                MirrorArchitectElements(
+                  storeyId: source.activeStoreyId,
+                  elementIds: _mirrorSourceIds,
+                  origin: anchor,
+                  direction: direction,
+                  isDuplicate: _mirrorIsDuplicate,
+                  idMap: _mirrorIdMap,
+                  copyGroups: _editingGroupId == null,
+                ).apply(source),
+              );
+      }
+    } on ArgumentError {
+      _elementMovePreviewValue = null;
     }
-    } on ArgumentError { _elementMovePreview = null; }
     _repaintPreview();
   }
 
@@ -33149,39 +33173,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   valueListenable: _previewRevision,
 
-                  builder: (context, revision, child) => DecoratedBox(
-
-                    decoration: BoxDecoration(
-
-                      color: const Color(0xE61E1E26),
-
-                      borderRadius: BorderRadius.circular(6),
-
-                      border: Border.all(color: Colors.white24, width: 1.0),
-
-                      boxShadow: const [
-
-                        BoxShadow(
-
-                          color: Colors.black38,
-
-                          blurRadius: 8,
-
-                          offset: Offset(0, 2),
-
-                        ),
-
-                      ],
-
-                    ),
-
-                    child: Padding(
-
-                      padding: const EdgeInsets.all(8),
-
-                      child: Text(
-
-                        _activeTool == ArchitectTool.dimension
+                  builder: (context, revision, child) => ArchitectCanvasHint(
+                    message: _activeTool == ArchitectTool.dimension
 
                             ? (_dimensionChoosingDirection
 
@@ -33306,21 +33299,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             : 'X: ${_project.formatLength((_columnPreviewPoint ?? _draftEnd ?? _cursorModel!).dx)}  '
 
                                   'Y: ${_project.formatLength((_columnPreviewPoint ?? _draftEnd ?? _cursorModel!).dy)}',
-
-                        style: const TextStyle(
-
-                          color: Colors.white,
-
-                          fontSize: 12,
-
-                        ),
-
-                        maxLines: 2,
-
-                      ),
-
-                    ),
-
                   ),
 
                 ),
@@ -35034,7 +35012,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ),
-      if (_commandPreview != null && !_dragController.isActive)
+      if (_commandPreview != null && !_dragController.isActive && !_mirrorActive)
         ArchitectFloatingCommandOverlay(
           surfaceKey: const ValueKey('architect-generic-command-overlay'),
           label: BimEditActions.label(_commandAction!, context.l10n),

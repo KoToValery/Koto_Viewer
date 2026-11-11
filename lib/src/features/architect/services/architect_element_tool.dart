@@ -25,7 +25,22 @@ import '../../bim_editing/geometry/bim_transform_2d.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 import 'architect_wall_relations.dart';
 import 'architect_floor_drain_geometry.dart';
+import 'architect_mirror_geometry.dart';
 
+// ============================================================================
+// MASTER ARCHITECT ELEMENT TOOL LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'architect_element_tool.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
+//
+// [SEC-01-ELEMENTS] [TAG:ELEMENT_TOOL] Drafting, picking and element operations
+// [SEC-02-TRANSFORMS] [TAG:ELEMENT_TRANSFORMS] Duplicate, rotate, flip and mirror
+//   ↳ [SUB]        [TAG:ELEMENT_MIRROR] Model-space reflection and local handedness
+//   ↳ [SUB]        [TAG:ELEMENT_MIRROR_BATCH] Reflection with group and dimension associations
+// [SEC-03-HELPERS] [TAG:ELEMENT_HELPERS] Deletion, connected chains and distance
+// ============================================================================
+
+// === SECTION: [SEC-01-ELEMENTS] [TAG:ELEMENT_TOOL] Drafting, picking and element operations ===
 /// Unified controller and interaction manager for specialized architectural drafting elements
 /// (windows, columns, beams, slabs, openings, stairs, dimensions, elevation markers, annotations, and CAD primitives).
 class ArchitectElementTool extends ChangeNotifier {
@@ -1015,7 +1030,7 @@ class ArchitectElementTool extends ChangeNotifier {
   }
 
   // ===========================================================================
-  // 14. ELEMENT TRANSFORMS (DUPLICATE, ROTATE, FLIP)
+  // === SECTION: [SEC-02-TRANSFORMS] [TAG:ELEMENT_TRANSFORMS] Duplicate, rotate, flip and mirror ===
   // ===========================================================================
 
   (ArchitectStorey, String?) duplicateElementById(
@@ -1447,6 +1462,7 @@ class ArchitectElementTool extends ChangeNotifier {
     return currentStorey;
   }
 
+  // --- SUBSECTION: [TAG:ELEMENT_MIRROR] Model-space reflection and local handedness ---
   (ArchitectStorey, String?) mirrorElementById(
     ArchitectStorey storey,
     String elementId, {
@@ -1503,7 +1519,7 @@ class ArchitectElementTool extends ChangeNotifier {
             id: isDuplicate ? '${targetId}_door_${d.id}' : d.id,
             wallId: targetId,
             uuid: isDuplicate ? '${targetId}_uuid_${d.uuid}' : d.uuid,
-            isHingeLeft: !d.isHingeLeft,
+            openInward: !d.openInward,
           ),
       ];
       final newWindows = [
@@ -1519,6 +1535,12 @@ class ArchitectElementTool extends ChangeNotifier {
         startPoint: newStart,
         endPoint: newEnd,
         arcBulge: -wall.arcBulge,
+        referenceLine: switch (wall.referenceLine) {
+          WallReferenceLine.left => WallReferenceLine.right,
+          WallReferenceLine.right => WallReferenceLine.left,
+          _ => wall.referenceLine,
+        },
+        tiltAngle: wall.tiltAngle == null ? null : -wall.tiltAngle!,
         exteriorSide: wall.exteriorSide == WallExteriorSide.left
             ? WallExteriorSide.right
             : WallExteriorSide.left,
@@ -1572,6 +1594,10 @@ class ArchitectElementTool extends ChangeNotifier {
       final newSlab = slab.copyWith(
         id: targetId,
         polygon: newPoly,
+        bulges: ArchitectMirrorGeometry.reversedBulges(
+          slab.bulges,
+          slab.polygon.length,
+        ),
         holes: ArchitectContour.transform(
           slab.holes,
           (p) => BimTransform2D.mirror(p, origin, direction),
@@ -1608,6 +1634,14 @@ class ArchitectElementTool extends ChangeNotifier {
           (p) => BimTransform2D.mirror(p, origin, direction),
         ),
         eavesEdgeIndex: safeEaves,
+        slopeArrows: [
+          for (final arrow in roof.slopeArrows)
+            arrow.copyWith(
+              id: isDuplicate ? '${targetId}_arrow_${arrow.id}' : arrow.id,
+              roofPlaneId: targetId,
+              position: BimTransform2D.mirror(arrow.position, origin, direction),
+            ),
+        ],
         drainage: roof.drainage.copyWith(
           downpipes: [
             for (final pipe in roof.drainage.downpipes)
@@ -1640,6 +1674,12 @@ class ArchitectElementTool extends ChangeNotifier {
       final newZone = zone.copyWith(
         id: targetId,
         polygon: newPoly,
+        seedPoint: zone.seedPoint == null
+            ? null
+            : BimTransform2D.mirror(zone.seedPoint!, origin, direction),
+        scheduleOrigin: zone.scheduleOrigin == null
+            ? null
+            : BimTransform2D.mirror(zone.scheduleOrigin!, origin, direction),
         clearScheduleOrigin: isDuplicate,
       );
       if (isDuplicate) {
@@ -1680,6 +1720,7 @@ class ArchitectElementTool extends ChangeNotifier {
         id: targetId,
         startPoint: BimTransform2D.mirror(stair.startPoint, origin, direction),
         endPoint: BimTransform2D.mirror(stair.endPoint, origin, direction),
+        design: stair.design?.copyWith(turnLeft: !stair.design!.turnLeft),
       );
       if (isDuplicate) {
         return (
@@ -1701,6 +1742,10 @@ class ArchitectElementTool extends ChangeNotifier {
         id: targetId,
         startPoint: BimTransform2D.mirror(dim.startPoint, origin, direction),
         endPoint: BimTransform2D.mirror(dim.endPoint, origin, direction),
+        offsetDistance: -dim.offsetDistance,
+        direction: dim.direction == null
+            ? null
+            : BimTransform2D.mirror(dim.direction!, Offset.zero, direction),
         anchors: [
           for (final a in dim.anchors)
             a.at(BimTransform2D.mirror(a.point, origin, direction)),
@@ -1772,34 +1817,11 @@ class ArchitectElementTool extends ChangeNotifier {
     final cadIndex = storey.cadPrimitives.indexWhere((c) => c.id == elementId);
     if (cadIndex != -1) {
       final prim = storey.cadPrimitives[cadIndex];
-      final hatchRadians = prim.hatchAngle * math.pi / 180;
-      final hatchDirection = BimTransform2D.mirror(
-        Offset(math.cos(hatchRadians), math.sin(hatchRadians)),
-        Offset.zero,
-        direction,
-      );
-      final newPrim = prim.copyWith(
+      final newPrim = ArchitectMirrorGeometry.cad(
+        prim,
         id: targetId,
-        holes: ArchitectContour.transform(
-          prim.holes,
-          (p) => BimTransform2D.mirror(p, origin, direction),
-        ),
-        startPoint: BimTransform2D.mirror(prim.startPoint, origin, direction),
-        endPoint: BimTransform2D.mirror(prim.endPoint, origin, direction),
-        hatchAngle:
-            math.atan2(hatchDirection.dy, hatchDirection.dx) * 180 / math.pi,
-        polygon: prim.type == CadPrimitiveType.polyline
-            ? [
-                for (final p in prim.linePoints)
-                  BimTransform2D.mirror(p, origin, direction),
-              ]
-            : prim.isPolygon || prim.polygon != null
-            ? [
-                for (final p
-                    in prim.isPolygon ? prim.polygonCorners : prim.polygon!)
-                  BimTransform2D.mirror(p, origin, direction),
-              ].reversed.toList()
-            : null,
+        origin: origin,
+        direction: direction,
       );
       if (isDuplicate) {
         return (
@@ -1821,7 +1843,7 @@ class ArchitectElementTool extends ChangeNotifier {
       final decor = storey.decorativeElements[decorIndex];
       final newDecor = decor
           .copyWith(id: targetId, clearHostWallId: true)
-          .mirroredInPlan(origin, direction);
+          .mirroredInPlan(origin, origin + direction);
       if (isDuplicate) {
         return (
           storey.copyWith(
@@ -1841,6 +1863,7 @@ class ArchitectElementTool extends ChangeNotifier {
     return (storey, null);
   }
 
+  // --- SUBSECTION: [TAG:ELEMENT_MIRROR_BATCH] Reflection with group and dimension associations ---
   (ArchitectStorey, List<String>) mirrorElementsByIds(
     ArchitectStorey storey,
     Set<String> elementIds, {
@@ -1870,6 +1893,14 @@ class ArchitectElementTool extends ChangeNotifier {
         copiedIds?[id] = affectedId;
       }
     }
+    currentStorey = ArchitectMirrorGeometry.dimensionReferences(
+      storey,
+      currentStorey,
+      mirroredIds: copied,
+      duplicate: isDuplicate,
+      origin: origin,
+      direction: direction,
+    );
     if (isDuplicate && copyGroups) {
       var groupIndex = 0;
       currentStorey = currentStorey.copyWith(
@@ -1888,6 +1919,7 @@ class ArchitectElementTool extends ChangeNotifier {
     return (currentStorey, affectedIds);
   }
 
+  // === SECTION: [SEC-03-HELPERS] [TAG:ELEMENT_HELPERS] Deletion, connected chains and distance ===
   ArchitectStorey deleteElementsByIds(
     ArchitectStorey storey,
     Set<String> elementIds,

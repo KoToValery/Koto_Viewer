@@ -11,8 +11,8 @@ import '../services/architect_drag_controller.dart';
 /// 2. In [draggingToTarget]:
 ///    - Gold/amber anchor marker at the locked base point.
 ///    - Cyan/green rubber-band displacement line.
-///    - Snapped/free target ring with pulse glow and snap label badge.
-///    - Real-time length & angle badge (`L=...m  ...°`).
+///    - Small snapped/free target ring.
+///    - One lightweight badge for distance, angle, and snap feedback.
 ///    - Magnetic alignment guide lines.
 class ArchitectDragPainterHelper {
   static void drawDragInteraction({
@@ -64,9 +64,9 @@ class ArchitectDragPainterHelper {
         final ringPaint = Paint()
           ..color = const Color(0xFF00E676)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.0 / draftingScale;
+          ..strokeWidth = 1.2 / draftingScale;
         final glowPaint = Paint()
-          ..color = const Color(0xFF00E676).withValues(alpha: 0.3)
+          ..color = const Color(0xFF00E676).withValues(alpha: 0.1)
           ..style = PaintingStyle.fill;
 
         canvas.drawCircle(pt, 9.0 / draftingScale, glowPaint);
@@ -82,8 +82,8 @@ class ArchitectDragPainterHelper {
             ? localizeSnap(dragController.currentSnapLabel!) ??
                   dragController.currentSnapLabel!
             : dragController.currentSnapLabel;
-        if (label != null) {
-          _drawBadge(canvas, pt, label, const Color(0xFF00E676), zoomScale);
+        if (label != null && dragController.currentSnapLabel != 'Grip') {
+          _drawBadge(canvas, pt, label, zoomScale, palette);
         }
       }
       return;
@@ -120,56 +120,58 @@ class ArchitectDragPainterHelper {
       final rubberBandPaint = Paint()
         ..color = const Color(0xFF00E5FF)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0 / zoomScale;
+        ..strokeWidth = 1.2 / zoomScale;
       canvas.drawLine(base, target, rubberBandPaint);
 
       // 3. Anchor marker at base point (amber gold)
       final anchorOuter = Paint()
         ..color = const Color(0xFFFFB300)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.2 / zoomScale;
+        ..strokeWidth = 1.2 / zoomScale;
       final anchorFill = Paint()
-        ..color = const Color(0xFFFFB300).withValues(alpha: 0.3)
+        ..color = const Color(0xFFFFB300).withValues(alpha: 0.10)
         ..style = PaintingStyle.fill;
-      canvas.drawCircle(base, 8.0 / zoomScale, anchorFill);
-      canvas.drawCircle(base, 8.0 / zoomScale, anchorOuter);
+      canvas.drawCircle(base, 6.0 / zoomScale, anchorFill);
+      canvas.drawCircle(base, 6.0 / zoomScale, anchorOuter);
       canvas.drawCircle(base, 2.5 / zoomScale, Paint()..color = Colors.white);
 
       // 4. Target marker (green if snapped, cyan if free)
       final isSnapped = dragController.isSnapped;
       final targetRing = Paint()
-        ..color = isSnapped ? const Color(0xFF00E676) : const Color(0xFF00E5FF)
+        ..color = isSnapped ? const Color(0xFF279A83) : const Color(0xFF399AA7)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.2 / zoomScale;
+        ..strokeWidth = 1.4 / zoomScale;
       final targetGlow = Paint()
         ..color =
             (isSnapped ? const Color(0xFF00E676) : const Color(0xFF00E5FF))
-                .withValues(alpha: 0.25)
+                .withValues(alpha: 0.08)
         ..style = PaintingStyle.fill;
-      canvas.drawCircle(target, 10.0 / zoomScale, targetGlow);
-      canvas.drawCircle(target, 10.0 / zoomScale, targetRing);
+      canvas.drawCircle(target, 7.0 / zoomScale, targetGlow);
+      canvas.drawCircle(target, 7.0 / zoomScale, targetRing);
       canvas.drawCircle(target, 2.5 / zoomScale, Paint()..color = Colors.white);
 
-      // 5. Target snap label badge
-      if (isSnapped && dragController.currentSnapLabel != null) {
-        final label = localizeSnap != null
-            ? localizeSnap(dragController.currentSnapLabel!) ??
-                  dragController.currentSnapLabel!
-            : dragController.currentSnapLabel!;
-        _drawBadge(canvas, target, label, const Color(0xFF00E676), zoomScale);
-      }
-
-      // 6. Dimension & angle badge at midpoint of rubber-band line
+      // One badge prevents snap text and the displacement from overlapping on
+      // short moves. Angular snap values already appear in the measurement.
       final dist = dragController.distanceMeters;
-      if (dist * zoomScale > 3) {
-        final mid = Offset(
-          (base.dx + target.dx) / 2,
-          (base.dy + target.dy) / 2,
+      final showDistance = dist * zoomScale > 3;
+      final angle = '${dragController.angleDeg.toStringAsFixed(0)}°';
+      final rawSnap = isSnapped ? dragController.currentSnapLabel : null;
+      final parts = <String>[
+        if (showDistance) ...['${dist.toStringAsFixed(2)} m', angle],
+        if (rawSnap != null && (!showDistance || rawSnap != angle))
+          localizeSnap?.call(rawSnap) ?? rawSnap,
+      ];
+      if (parts.isNotEmpty) {
+        _drawBadge(
+          canvas,
+          showDistance ? (base + target) / 2 : target,
+          parts.join(' · '),
+          zoomScale,
+          palette,
+          beside:
+              showDistance &&
+              (target - base).dy.abs() > (target - base).dx.abs(),
         );
-        final deg = dragController.angleDeg;
-        final distText =
-            '${dist.toStringAsFixed(2)} m  ${deg.toStringAsFixed(0)}°';
-        _drawBadge(canvas, mid, distText, const Color(0xFFFFB300), zoomScale);
       }
     }
   }
@@ -183,7 +185,7 @@ class ArchitectDragPainterHelper {
     canvas.drawCircle(
       handle,
       6.0 / draftingScale,
-      Paint()..color = const Color(0xFF1E1E26),
+      Paint()..color = const Color(0xF7FFFFFF),
     );
     canvas.drawCircle(
       handle,
@@ -200,44 +202,63 @@ class ArchitectDragPainterHelper {
     Canvas canvas,
     Offset modelPoint,
     String text,
-    Color accentColor,
     double scale,
-  ) {
+    ArchitectCanvasPalette palette, {
+    bool beside = false,
+  }) {
+    final safe = canvas.getLocalClipBounds().deflate(4 / scale);
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: palette.isDark
+              ? const Color(0xFFEDF2F4)
+              : const Color(0xFF34424C),
           fontFamily: 'Roboto',
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
         ),
       ),
       textDirection: TextDirection.ltr,
-    )..layout();
+      maxLines: 1,
+      ellipsis: '…',
+    )..layout(maxWidth: math.max(1, math.min(240, safe.width * scale - 14)));
 
-    final padH = 5.0 / scale;
-    final padV = 3.0 / scale;
+    final padH = 7.0 / scale;
+    final padV = 4.0 / scale;
     final bw = tp.width / scale + padH * 2;
     final bh = tp.height / scale + padV * 2;
+    var proposed = Rect.fromLTWH(
+      beside ? modelPoint.dx + 12 / scale : modelPoint.dx - bw / 2,
+      beside ? modelPoint.dy - bh / 2 : modelPoint.dy - bh - 12 / scale,
+      bw,
+      bh,
+    );
+    if (beside && proposed.right > safe.right) {
+      proposed = proposed.shift(Offset(-bw - 24 / scale, 0));
+    }
     final badgeRect = Rect.fromLTWH(
-      modelPoint.dx - bw / 2,
-      modelPoint.dy - bh - 12.0 / scale,
+      proposed.left.clamp(safe.left, math.max(safe.left, safe.right - bw)),
+      proposed.top.clamp(safe.top, math.max(safe.top, safe.bottom - bh)),
       bw,
       bh,
     );
 
     final bgPaint = Paint()
-      ..color = const Color(0xFF1E242C).withValues(alpha: 0.92)
+      ..color = palette.isDark
+          ? const Color(0xF0272F36)
+          : const Color(0xF8FFFFFF)
       ..style = PaintingStyle.fill;
     final borderPaint = Paint()
-      ..color = accentColor
+      ..color = palette.isDark
+          ? const Color(0xFF52606A)
+          : const Color(0xFFD8E0E4)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 / scale;
+      ..strokeWidth = .7 / scale;
 
     final rrect = RRect.fromRectAndRadius(
       badgeRect,
-      Radius.circular(3.0 / scale),
+      Radius.circular(5.0 / scale),
     );
     canvas.drawRRect(rrect, bgPaint);
     canvas.drawRRect(rrect, borderPaint);

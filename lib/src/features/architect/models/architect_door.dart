@@ -1,5 +1,4 @@
 import '../rendering/architect_vector_scene.dart';
-import '../rendering/architect_path_solid.dart';
 import '../rendering/architect_opening_plan_painter.dart';
 import '../rendering/architect_canvas_palette.dart';
 import 'dart:math' as math;
@@ -39,8 +38,7 @@ class ArchitectDoor {
           : null);
 
   /// Whether casing is effectively enabled (explicit override or inherited from style).
-  bool get effectiveHasCasing =>
-      hasCasing ?? resolvedStyle?.hasCasing ?? false;
+  bool get effectiveHasCasing => hasCasing ?? resolvedStyle?.hasCasing ?? false;
 
   const ArchitectDoor({
     required this.id,
@@ -725,20 +723,48 @@ class ArchitectDoor {
     final lzMin = zBottom + 0.01;
     final lzMax = zTop - frameThickness - 0.01;
 
-    tris.addAll(
-      ArchitectPathSolid.extrude(
-        Path()..addPolygon([lp1, lp2, lp3, lp4], true),
-        lzMin,
-        lzMax,
-        leafColor,
-      ),
-    );
+    // The leaf is an exact rectangular prism. Avoid flattening its thin rotated
+    // outline through a float32 Path, which can trim corners after reflection.
+    final leafCross =
+        (lp2 - lp1).dx * (lp4 - lp1).dy - (lp2 - lp1).dy * (lp4 - lp1).dx;
+    final outline = leafCross >= 0
+        ? [lp1, lp2, lp3, lp4]
+        : [lp4, lp3, lp2, lp1];
+    Vector3 leafVertex(int i, double z) =>
+        Vector3(outline[i].dx, outline[i].dy, z);
+    void leafTriangle(Vector3 a, Vector3 b, Vector3 c) =>
+        tris.add(Triangle3D(v0: a, v1: b, v2: c, color: leafColor));
+    for (var i = 0; i < 4; i++) {
+      final next = (i + 1) % 4;
+      leafTriangle(
+        leafVertex(i, lzMin),
+        leafVertex(next, lzMin),
+        leafVertex(next, lzMax),
+      );
+      leafTriangle(
+        leafVertex(i, lzMin),
+        leafVertex(next, lzMax),
+        leafVertex(i, lzMax),
+      );
+    }
+    for (var i = 1; i < 3; i++) {
+      leafTriangle(
+        leafVertex(0, lzMax),
+        leafVertex(i, lzMax),
+        leafVertex(i + 1, lzMax),
+      );
+      leafTriangle(
+        leafVertex(0, lzMin),
+        leafVertex(i + 1, lzMin),
+        leafVertex(i, lzMin),
+      );
+    }
 
     // 5. 3D Lever Handle on Door Leaf
     final handleStation = leafStart + leafU * (clearWidth - 0.08);
     final handleRoot = handleStation + leafN * leafThickness;
     final zHandle = zBottom + math.min(1.00, height - 0.20);
-    final hp1 = handleRoot + leafN * (swingSign * 0.06);
+    final hp1 = handleRoot + leafN * 0.06;
     final hp2 = hp1 - leafU * 0.10;
     const handleColor = Color(0xFFCFD8DC);
 

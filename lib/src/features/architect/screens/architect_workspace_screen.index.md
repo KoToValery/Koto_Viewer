@@ -32,6 +32,7 @@
 | [TAG:SELECTION_BAR] | Selection HUD, action bars, and layer dialogs |
 | [TAG:FENESTRATION_SELECTION_UPDATES] | Selected opening parameter updates |
 | [TAG:FLOATING_HUD] | Multi-step overlays and interactive edge curving |
+| [TAG:MIRROR_WORKFLOW] | Mirror axis picking, preview, cancellation and commit |
 | [TAG:GRID_AXIS] | Grid axis operations |
 | [TAG:BUILD_LAYOUT] | Screen layout, bars, sheets, and view switching |
 | [TAG:LOGGER_UI] | Diagnostic logs UI |
@@ -68,6 +69,32 @@ While active, drafting/selection/context-hold controls and the bottom palette
 are hidden. The palette retains its state and returns after confirm/cancel;
 the canvas expands before the base-point pick and stays stable during movement.
 Regression coverage: test/features/architect/architect_drag_tool_ui_regression_test.dart.
+
+### Lightweight command controls and hints
+
+ArchitectFloatingCommandOverlay renders independent 32 px action discs with
+48 px touch targets on a transparent surface. Labels and the general canvas
+guidance use ArchitectCanvasHint (compact, neutral chips); embedded numeric
+editors retain their own surface. Drag measurements and snap feedback share
+one badge in ArchitectDragPainterHelper to avoid overlapping labels.
+These widgets/painters change presentation only; session ownership stays above.
+
+### Mirror axis workflow
+
+`[TAG:MIRROR_WORKFLOW]` covers `_previewMirrorSnap`, `_pickMirrorSnap`,
+`_startMirrorSession`, `_cancelMirrorSession`, and `_executeMirror`.
+`ArchitectTransformPointInput` owns axis picks and navigation; preview and
+commit use the same `MirrorArchitectElements` command. Aiming always applies
+that command to `_commandPreview.original`, prepares the result through the
+same pure `_prepareGeometryPreview` used by command staging, and writes only the transient
+`_elementMovePreviewValue`; it must not use the staging setter or mutate
+`_commands.editPreview`, which would mirror the preceding preview again and
+activate the review input before the second axis pick. While `_mirrorActive`,
+`_buildMirrorFloatingOverlay` is the sole command HUD and its Cancel calls
+`_cancelGeometryCommand` when a command preview exists. The generic command
+HUD appears after axis placement, so there are no duplicate Cancel controls.
+Model reflection details and associations live in
+`architect_element_tool.index.md` and `ArchitectMirrorGeometry`.
 
 ## 4. Cross-cutting state and owners
 

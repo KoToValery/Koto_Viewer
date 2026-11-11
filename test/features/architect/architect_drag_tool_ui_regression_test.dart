@@ -115,7 +115,18 @@ void _expectCompactInBounds(WidgetTester tester) {
   final canvas = tester.getRect(
     find.byKey(const ValueKey('architect-viewport-input')),
   );
-  expect(rect.width, lessThanOrEqualTo(132));
+  expect(rect.width, lessThanOrEqualTo(100));
+  expect(tester.widget<Material>(overlay).type, MaterialType.transparency);
+  for (final key in ['architect-command-cancel', 'architect-command-apply']) {
+    final action = find.byKey(ValueKey(key));
+    if (action.evaluate().isNotEmpty) {
+      expect(tester.getSize(action), const Size(48, 48));
+    }
+  }
+  expect(
+    tester.getSize(find.byKey(const ValueKey('architect-command-cancel-disc'))),
+    const Size(32, 32),
+  );
   expect(canvas.contains(rect.topLeft), isTrue);
   expect(canvas.contains(rect.bottomRight), isTrue);
   expect(find.byType(ArchitectToolPalette), findsNothing);
@@ -312,6 +323,7 @@ void main() {
       await _openPhone(tester, model);
       await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
+      await _snapshot(tester, 'drag_idle_hint_phone');
       await _radialMove(tester, const Offset(-1, 0));
       _expectCompactInBounds(tester);
       await _snapshot(tester, 'drag_wall_pick_phone');

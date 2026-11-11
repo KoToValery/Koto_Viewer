@@ -414,10 +414,11 @@ class ArchitectDecorativeElement {
     final reflectedOrigin = lineA + reflectVec(rel);
     final nextTangent = reflectVec(tangent);
     final nextNormal = reflectVec(normal);
-    // Keep front coordinate U positive along the mirrored span
+    // The mesh builder supports either basis handedness and fixes triangle
+    // winding. Reflect both axes directly so asymmetric profiles stay exact.
     return copyWith(
-      origin: reflectedOrigin + nextTangent * width,
-      tangent: -nextTangent,
+      origin: reflectedOrigin,
+      tangent: nextTangent,
       normal: nextNormal,
     );
   }
