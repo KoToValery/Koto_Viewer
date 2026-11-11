@@ -10,18 +10,18 @@ import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 // MASTER IFC 3D PARSER LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
 // COMPANION MAP: See 'ifc_parser.index.md' for full parser pipeline & operations.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
 //
-// [SEC-01-PARSER]    L10-L90    : [TAG:IFC_PARSER_API] IfcParser public API & isolate runner
-// [SEC-02-STRUCTS]   L91-L234   : [TAG:IFC_STRUCTS] _RawIfcEntity, tokenizer, 3D math primitives
-// [SEC-03-SOLVER]    L235-L733  : [TAG:IFC_SOLVER_INIT] _IfcGeometrySolver setup & spatial index
-// [SEC-04-ELEMENTS]  L734-L1346 : [TAG:IFC_CATEGORIES] Element categorizer, wall corner bridge
-// [SEC-05-XFORMS]    L1347-L1750: [TAG:IFC_XFORMS] Placement & coordinate transform matrices
-// [SEC-06-PROFILES]  L1751-L2260: [TAG:IFC_PROFILES] 2D curve profiles & extruded area solids
-// [SEC-07-OPENINGS]  L2261-L2809: [TAG:IFC_OPENINGS] Opening elements & void bounds extraction
-// [SEC-08-BOOLEANS]  L2810-L3295: [TAG:IFC_BOOLEANS] CSG boolean cuts & triangle clipping
-// [SEC-09-MATERIALS] L3296-L3600: [TAG:IFC_MATERIALS] Surface styling, RGB colors & materials
-// [SEC-10-BREP-MESH] L3601-L4207: [TAG:IFC_BREP_MESH] Brep faces, 3D polygon triangulation
+// [SEC-01-PARSER] [TAG:IFC_PARSER_API] IfcParser public API & isolate runner
+// [SEC-02-STRUCTS] [TAG:IFC_STRUCTS] _RawIfcEntity, tokenizer, 3D math primitives
+// [SEC-03-SOLVER] [TAG:IFC_SOLVER_INIT] _IfcGeometrySolver setup & spatial index
+// [SEC-04-ELEMENTS] [TAG:IFC_CATEGORIES] Element categorizer, wall corner bridge
+// [SEC-05-XFORMS] [TAG:IFC_XFORMS] Placement & coordinate transform matrices
+// [SEC-06-PROFILES] [TAG:IFC_PROFILES] 2D curve profiles & extruded area solids
+// [SEC-07-OPENINGS] [TAG:IFC_OPENINGS] Opening elements & void bounds extraction
+// [SEC-08-BOOLEANS] [TAG:IFC_BOOLEANS] CSG boolean cuts & triangle clipping
+// [SEC-09-MATERIALS] [TAG:IFC_MATERIALS] Surface styling, RGB colors & materials
+// [SEC-10-BREP-MESH] [TAG:IFC_BREP_MESH] Brep faces, 3D polygon triangulation
 // ============================================================================
 
 // === SECTION: [SEC-01-PARSER] IFC PARSER PUBLIC API ===

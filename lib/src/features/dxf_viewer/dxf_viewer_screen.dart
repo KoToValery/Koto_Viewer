@@ -49,16 +49,16 @@ import '../structural_designer/structural_designer_screen.dart';
 // MASTER DXF VIEWER SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
 // COMPANION MAP: See 'dxf_viewer_screen.index.md' for full operations matrix.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
 //
-// [SEC-01-WIDGET]   L60-L84    : [TAG:DXF_WIDGET] DxfViewerScreen StatefulWidget & parameters
-// [SEC-02-STATE]    L85-L524   : [TAG:DXF_STATE] State variables, async DXF parsing & transforms
-// [SEC-03-MEASURE]  L525-L834  : [TAG:DXF_MEASURE] Distance measurement controller & snapping
-// [SEC-04-ACTIONS]  L835-L1157 : [TAG:DXF_ACTIONS] Area calculations, PDF export & screenshot
-// [SEC-05-GESTURES] L1158-L1446: [TAG:DXF_GESTURES] Pan/zoom, mouse wheel scaling & hotkeys
-// [SEC-06-DIALOGS]  L1447-L1730: [TAG:DXF_DIALOGS] Layer manager sheet, entity context dialogs
-// [SEC-07-HUD]      L1731-L2063: [TAG:DXF_HUD] Top bar, Layout/Model tabs & zoom extents HUD
-// [SEC-08-BUILD]    L2064-L2555: [TAG:DXF_BUILD] Main build method & interactive canvas viewport
+// [SEC-01-WIDGET] [TAG:DXF_WIDGET] DxfViewerScreen StatefulWidget & parameters
+// [SEC-02-STATE] [TAG:DXF_STATE] State variables, async DXF parsing & transforms
+// [SEC-03-MEASURE] [TAG:DXF_MEASURE] Distance measurement controller & snapping
+// [SEC-04-ACTIONS] [TAG:DXF_ACTIONS] Area calculations, PDF export & screenshot
+// [SEC-05-GESTURES] [TAG:DXF_GESTURES] Pan/zoom, mouse wheel scaling & hotkeys
+// [SEC-06-DIALOGS] [TAG:DXF_DIALOGS] Layer manager sheet, entity context dialogs
+// [SEC-07-HUD] [TAG:DXF_HUD] Top bar, Layout/Model tabs & zoom extents HUD
+// [SEC-08-BUILD] [TAG:DXF_BUILD] Main build method & interactive canvas viewport
 // ============================================================================
 
 // === SECTION: [SEC-01-WIDGET] WIDGET DECLARATION & PUBLIC API ===

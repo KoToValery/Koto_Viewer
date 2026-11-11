@@ -11,15 +11,15 @@ import 'structural_column_detector.dart';
 // MASTER WALL AXIS DETECTOR LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
 // COMPANION MAP: See 'wall_axis_detector.index.md' for parallel pair & axis logic.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
 //
-// [SEC-01-DETECT]   L10-L420   : [TAG:WAD_DETECT] WallAxisDetector.detect() & auto-scale
-// [SEC-02-AXIS-GEN] L421-L909  : [TAG:WAD_AXES] Grid axis clustering & bubble labels
-// [SEC-03-FILTERS]  L910-L1100 : [TAG:WAD_FILTERS] Clutter layers, margins & border rejection
-// [SEC-04-SEGMENTS] L1101-L1446: [TAG:WAD_SEGMENTS] Segment extraction (Lines, Polylines, Inserts)
-// [SEC-05-PAIRS]    L1447-L1840: [TAG:WAD_PAIRS] Parallel pair matching & thickness tolerances
-// [SEC-06-BRIDGES]  L1841-L2020: [TAG:WAD_BRIDGES] Door/window opening bridging & collinear merge
-// [SEC-07-TOPOLOGY] L2021-L2353: [TAG:WAD_TOPOLOGY] Corner snapping (L & T joints) & contour output
+// [SEC-01-DETECT] [TAG:WAD_DETECT] WallAxisDetector.detect() & auto-scale
+// [SEC-02-AXIS-GEN] [TAG:WAD_AXES] Grid axis clustering & bubble labels
+// [SEC-03-FILTERS] [TAG:WAD_FILTERS] Clutter layers, margins & border rejection
+// [SEC-04-SEGMENTS] [TAG:WAD_SEGMENTS] Segment extraction (Lines, Polylines, Inserts)
+// [SEC-05-PAIRS] [TAG:WAD_PAIRS] Parallel pair matching & thickness tolerances
+// [SEC-06-BRIDGES] [TAG:WAD_BRIDGES] Door/window opening bridging & collinear merge
+// [SEC-07-TOPOLOGY] [TAG:WAD_TOPOLOGY] Corner snapping (L & T joints) & contour output
 // ============================================================================
 
 // === SECTION: [SEC-01-DETECT] WALL AXIS DETECTOR PUBLIC API ===

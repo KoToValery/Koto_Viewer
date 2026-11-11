@@ -13,18 +13,18 @@ import 'dxf_snap_helper.dart';
 // MASTER DXF PAINTER LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
 // COMPANION MAP: See 'dxf_painter.index.md' for full entity render directory.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
 //
-// [SEC-01-ENUMS]    L26-L140   : [TAG:PAINTER_ENUMS] Enums, theme presets & paint stats models
-// [SEC-02-LOOP]     L141-L748  : [TAG:PAINTER_LOOP] DxfPainter declaration & main paint loop
-// [SEC-03-STROKES]  L749-L874  : [TAG:PAINTER_STROKES] Canvas & stroke drawing helpers, pen colors
-// [SEC-04-GEOMETRY] L875-L1472 : [TAG:PAINTER_GEOM] Lines, arcs, circles, polylines, splines
-// [SEC-05-TEXT]     L1473-L1808: [TAG:PAINTER_TEXT] Single-line TEXT & multiline MTEXT rendering
-// [SEC-06-HATCH]    L1809-L2157: [TAG:PAINTER_HATCH] Solids, hatches & pattern fills
-// [SEC-07-BLOCKS]   L2158-L2342: [TAG:PAINTER_BLOCKS] Blocks & INSERT entities expansion
-// [SEC-08-DIMS]     L2343-L2978: [TAG:PAINTER_DIMS] Dimensions, leaders & arrowheads
-// [SEC-09-SNAPS]    L2979-L3091: [TAG:PAINTER_SNAPS] Snapping, magnetic highlights & annotations
-// [SEC-10-MEASURE]  L3092-L3835: [TAG:PAINTER_MEASURE] Interactive measurement tools & badges
+// [SEC-01-ENUMS] [TAG:PAINTER_ENUMS] Enums, theme presets & paint stats models
+// [SEC-02-LOOP] [TAG:PAINTER_LOOP] DxfPainter declaration & main paint loop
+// [SEC-03-STROKES] [TAG:PAINTER_STROKES] Canvas & stroke drawing helpers, pen colors
+// [SEC-04-GEOMETRY] [TAG:PAINTER_GEOM] Lines, arcs, circles, polylines, splines
+// [SEC-05-TEXT] [TAG:PAINTER_TEXT] Single-line TEXT & multiline MTEXT rendering
+// [SEC-06-HATCH] [TAG:PAINTER_HATCH] Solids, hatches & pattern fills
+// [SEC-07-BLOCKS] [TAG:PAINTER_BLOCKS] Blocks & INSERT entities expansion
+// [SEC-08-DIMS] [TAG:PAINTER_DIMS] Dimensions, leaders & arrowheads
+// [SEC-09-SNAPS] [TAG:PAINTER_SNAPS] Snapping, magnetic highlights & annotations
+// [SEC-10-MEASURE] [TAG:PAINTER_MEASURE] Interactive measurement tools & badges
 // ============================================================================
 
 // === SECTION: [SEC-01-ENUMS] ENUMS & PAINT STATS MODELS ===

@@ -54,16 +54,16 @@ import 'architect_railing_geometry.dart';
 // COMPANION MAP: See 'architect_2d_painter.index.md' for full method & class directory.
 // QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
 //
-// [SEC-01-ENUMS]   L66-L125     : [TAG:ARCH_PAINTER_ENUMS] Declarations: `ArchitectPaintLayer`, `ArchitectTool`, `WallDraftingM
-// [SEC-02-STATE]   L126-L387    : [TAG:ARCH_PAINTER_STATE] `Architect2dPainter` state fields (111 fields: `_project`, `_visible
-// [SEC-03-PAINT]   L388-L734    : [TAG:ARCH_PAINTER_PAINT_RENDER] Canvas Painting & Geometry Rendering: `_paint`, `paint` (2 methods)
-// [SEC-04-CORE]    L735-L825    : [TAG:ARCH_PAINTER_CORE_LOGIC] Core Operations & Helpers: `_filterElements` (1 methods)
-// [SEC-05-PAINT]   L826-L1011   : [TAG:ARCH_PAINTER_DRAW_SELECTED] Canvas Painting & Geometry Rendering: `_drawSelectedElement`, `_draw
-// [SEC-06-WALLS]   L1012-L1226  : [TAG:ARCH_PAINTER_WALL_OPS] Wall Drafting, Splitting & Joints: `_drawPolygonEditing`, `_drawNewP
-// [SEC-07-GRIDS]   L1227-L1388  : [TAG:ARCH_PAINTER_GRID_AXES] Grid Axes, Alignment & Snapping: `_drawDraftingGrid`, `_drawGridAxes
-// [SEC-08-WALLS]   L1389-L1556  : [TAG:ARCH_PAINTER_DRAW_WALLS] Wall Drafting, Splitting & Joints: `_drawWalls`, `_drawWallLayers` (
-// [SEC-09-PAINT]   L1557-L2260  : [TAG:ARCH_PAINTER_DRAW_ACTIVE] Canvas Painting & Geometry Rendering: `_drawActiveDrafting`, `_drawD
-// [SEC-10-CORE]    L2261-L2302  : [TAG:ARCH_PAINTER_SHOULD_REPAINT] Core Operations & Helpers: `shouldRepaint` (1 methods)
+// [SEC-01-ENUMS] [TAG:ARCH_PAINTER_ENUMS] Declarations: `ArchitectPaintLayer`, `ArchitectTool`, `WallDraftingM
+// [SEC-02-STATE] [TAG:ARCH_PAINTER_STATE] `Architect2dPainter` state fields (111 fields: `_project`, `_visible
+// [SEC-03-PAINT] [TAG:ARCH_PAINTER_PAINT_RENDER] Canvas Painting & Geometry Rendering: `_paint`, `paint` (2 methods)
+// [SEC-04-CORE] [TAG:ARCH_PAINTER_CORE_LOGIC] Core Operations & Helpers: `_filterElements` (1 methods)
+// [SEC-05-PAINT] [TAG:ARCH_PAINTER_DRAW_SELECTED] Canvas Painting & Geometry Rendering: `_drawSelectedElement`, `_draw
+// [SEC-06-WALLS] [TAG:ARCH_PAINTER_WALL_OPS] Wall Drafting, Splitting & Joints: `_drawPolygonEditing`, `_drawNewP
+// [SEC-07-GRIDS] [TAG:ARCH_PAINTER_GRID_AXES] Grid Axes, Alignment & Snapping: `_drawDraftingGrid`, `_drawGridAxes
+// [SEC-08-WALLS] [TAG:ARCH_PAINTER_DRAW_WALLS] Wall Drafting, Splitting & Joints: `_drawWalls`, `_drawWallLayers` (
+// [SEC-09-PAINT] [TAG:ARCH_PAINTER_DRAW_ACTIVE] Canvas Painting & Geometry Rendering: `_drawActiveDrafting`, `_drawD
+// [SEC-10-CORE] [TAG:ARCH_PAINTER_SHOULD_REPAINT] Core Operations & Helpers: `shouldRepaint` (1 methods)
 // ============================================================================
 
 

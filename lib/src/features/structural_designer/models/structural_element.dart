@@ -13,15 +13,15 @@ export 'staircase_core.dart';
 // MASTER STRUCTURAL ELEMENT MODELS LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
 // COMPANION MAP: See 'structural_element.index.md' for element properties.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
 //
-// [SEC-01-COLUMNS]  L12-L223   : [TAG:SEM_COLUMNS] StructuralColumn & ColumnShape models
-// [SEC-02-WALLS]    L224-L373  : [TAG:SEM_WALLS] StructuralShearWall & reference lines
-// [SEC-03-BEAMS]    L374-L489  : [TAG:SEM_BEAMS] StructuralBeam start/end nodes & profiles
-// [SEC-04-OPENINGS] L490-L547  : [TAG:SEM_OPENINGS] SlabOpening & SlabOpeningType
-// [SEC-05-SLABS]    L548-L1203 : [TAG:SEM_SLABS] StructuralSlab & polygon contours
-// [SEC-06-STOREYS]  L1204-L1371: [TAG:SEM_STOREYS] StoreyLevel elevation & trace reference
-// [SEC-07-PROJECT]  L1372-L1908: [TAG:SEM_PROJECT] StructuralProject master document model
+// [SEC-01-COLUMNS] [TAG:SEM_COLUMNS] StructuralColumn & ColumnShape models
+// [SEC-02-WALLS] [TAG:SEM_WALLS] StructuralShearWall & reference lines
+// [SEC-03-BEAMS] [TAG:SEM_BEAMS] StructuralBeam start/end nodes & profiles
+// [SEC-04-OPENINGS] [TAG:SEM_OPENINGS] SlabOpening & SlabOpeningType
+// [SEC-05-SLABS] [TAG:SEM_SLABS] StructuralSlab & polygon contours
+// [SEC-06-STOREYS] [TAG:SEM_STOREYS] StoreyLevel elevation & trace reference
+// [SEC-07-PROJECT] [TAG:SEM_PROJECT] StructuralProject master document model
 // ============================================================================
 
 // === SECTION: [SEC-01-COLUMNS] STRUCTURAL COLUMN MODELS ===

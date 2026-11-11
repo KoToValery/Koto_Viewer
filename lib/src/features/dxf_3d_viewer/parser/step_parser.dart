@@ -11,13 +11,13 @@ import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 // MASTER STEP 3D PARSER LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
 // COMPANION MAP: See 'step_parser.index.md' for full STEP geometry operations.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
 //
-// [SEC-01-MATH]     L10-L285   : [TAG:STEP_MATH] _UVPoint, _StepEntity, B-Spline curves & matrices
-// [SEC-02-API]      L286-L600  : [TAG:STEP_API] StepParser public API & isolate background runner
-// [SEC-03-CURVES]   L601-L1100 : [TAG:STEP_CURVES] Cartesian points, directions & 3D curve evaluators
-// [SEC-04-SURFACES] L1101-L1500: [TAG:STEP_SURFACES] Analytic & freeform NURBS surfaces tessellation
-// [SEC-05-TOPOLOGY] L1501-L1787: [TAG:STEP_TOPOLOGY] ADVANCED_FACE, shells & triangle mesh generation
+// [SEC-01-MATH] [TAG:STEP_MATH] _UVPoint, _StepEntity, B-Spline curves & matrices
+// [SEC-02-API] [TAG:STEP_API] StepParser public API & isolate background runner
+// [SEC-03-CURVES] [TAG:STEP_CURVES] Cartesian points, directions & 3D curve evaluators
+// [SEC-04-SURFACES] [TAG:STEP_SURFACES] Analytic & freeform NURBS surfaces tessellation
+// [SEC-05-TOPOLOGY] [TAG:STEP_TOPOLOGY] ADVANCED_FACE, shells & triangle mesh generation
 // ============================================================================
 
 // === SECTION: [SEC-01-MATH] 3D STEP MATH & NURBS PRIMITIVES ===

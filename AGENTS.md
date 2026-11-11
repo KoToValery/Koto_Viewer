@@ -17,33 +17,15 @@
 - The primary goal of the architectural and structural BIM module is to automatically produce the cleanest, most accurate, publication-ready architectural and structural drawings/details without requiring the user to manually trim or delete redundant lines.
 - When generating sections, elevations, plans, or 3D views, intersecting elements (e.g., roofs, walls, slabs, ring beams, wall plates, rafters, fascia, flashing) must form structurally and architecturally accurate junctions with boolean-clean geometry (no overlapping hatches, crossing lines, or protruding wall slivers).
 
-# LLM Navigation & Search Protocol (Large Files >1500 lines)
+# LLM Navigation & Reference-First Implementation (Large / Interactive Features)
 
-- **Holistic System Architecture over Local Snippet Editing (Anti-Tunnel-Vision Protocol)**:
-  - **The index is a navigational GPS, NOT a substitute for understanding the architecture**: `<filename>.index.md` exists to save tokens and find line numbers in 30k+ line files. It must NEVER be used to make isolated code edits in a vacuum.
-  - **Mandatory End-to-End Tracing**: Before modifying any tool or interaction, the agent MUST trace the complete lifecycle:
-    `Input Gesture (Pointer/Viewport) -> Gesture Arena Arbitration (isDraggingHandle/Pan Lock) -> Tool State Machine (Controller) -> Standard UI (ArchitectRadialMenu/HUD) -> Model Commit (CommandController with Undo/Redo)`.
-  - **Zero Divergent UI Paradigm**: Every drafting entity in Koto BIM (walls, slabs, roofs, zones, underlays) MUST adhere to standard unified UI controls (`ArchitectRadialMenu`, `BimEditAction`). Never introduce disparate local popups (e.g. Material `showMenu`) or alien detached modal windows when a unified mechanism exists.
-  - **Gesture Collision Auditing**: When modifying interaction modes, agents MUST verify:
-    1. Large bounding boxes (such as CAD drawings or raster underlays) never intercept or hijack clicks/holds meant for underlying elements.
-    2. Single-pointer panning (`_canPan` in viewport) is strictly locked out during active dragging or multi-step placement (`isDraggingHandle`).
-    3. Stationary hold timers (`onContextHold`) and secondary tap timers never interrupt or abort active placement sessions.
-
-- **Companion Semantic Maps (<filename>.index.md)**:
-  - For massive screens and controllers (such as architect_workspace_screen.dart and structural_designer_screen.dart), always check for a companion <filename>.index.md file in the same directory before reading or editing the Dart file.
-  - Read <filename>.index.md first (it is compact, ~100-300 lines) to obtain the exact method names, state variables, tool routing matrices, and line number ranges.
-
-- **Top-of-File Table of Contents (TOC) & Grep Anchors**:
-  - Large files (>1500 lines) maintain a structured Table of Contents in the header with standardized section markers:
-    // === SECTION: [SEC-ID] <NAME> ===
-    // --- SUBSECTION: [TAG:<NAME>] <SUBTITLE> ---
-  - When searching for specific tools or logic (e.g. wall split, fenestration radial actions, 2D viewport overlays), search for the unique tag (e.g. [TAG:TOUCH_UP], [TAG:WALL_SPLIT]) or use the line ranges indicated in the TOC and .index.md.
-
-- **Mandatory Maintenance (Definition of Done)**:
-  - Whenever you add new methods, classes, tool handlers, or structural sections in these large files, updating the corresponding <filename>.index.md and the in-file Table of Contents is a **mandatory completion requirement**:
-    1. Register new methods, command classes, or tool handlers in the <filename>.index.md tables/matrices.
-    2. Add or maintain // --- SUBSECTION: [TAG:<NAME>] --- grep anchors for new features.
-    3. Keep approximate line ranges in TOC and .index.md up to date so subsequent agent invocations do not search blindly.
+- **Indexes are discovery aids, not specifications.** A companion <filename>.index.md or in-file TOC can suggest relevant tags, methods, state, and related UI. Verify every lead against the current source with rg and read the implementation before relying on it. Do not use line numbers in a map as authoritative locations; prefer stable [TAG:...] anchors and method names.
+- **Reference-first for behavior changes:** When a change affects interaction, tool behavior, model mutation, or introduces a new user-facing flow, identify the closest existing feature with the same interaction pattern. Inspect its relevant implementation and immediate callers/callees. Inspect a second example only when the first leaves ambiguity or several established patterns may apply. For isolated presentation, localization, copy, or layout changes that do not alter behavior, use a targeted check of the nearest control; full lifecycle tracing is not required.
+- **Trace the applicable path.** For behavior changes, follow the relevant input and viewport hit/gesture routing, tool or screen state, preview/rendering, contextual UI, model mutation, undo/redo, and persistence. These parts may be split across files and need not form one fixed sequence. Do not inspect unrelated layers merely to satisfy a checklist. Record which existing pattern the change follows and explain any meaningful deviation.
+- **Reuse the closest fitting UI archetype.** Preserve established behavior for comparable operations, but do not force every tool into one widget such as ArchitectRadialMenu. Placement HUDs, selection actions, property bars, dialogs, and multi-step overlays are distinct existing patterns; choose by the operation and verify the analogous implementation.
+- **Audit gesture conflicts when changing interaction or viewport behavior.** Check hit testing, large underlay bounds, active drag/placement pan locks, and hold/secondary-tap timers where relevant. Verify the actual mechanism and names in the code instead of assuming every viewport uses _canPan or isDraggingHandle.
+- **Follow the domain's real mutation path.** Inspect the analogous feature to determine its command, undo/redo, and persistence flow. Use the owning module's established mechanisms; do not assume every operation must call a particular command controller or save hook.
+- **Navigation markers and maintenance:** For large files, use an existing companion map if present, then verify its entries in source. Add or update stable section/tag markers when they materially improve navigation. Update a companion map when its feature relationships or reference patterns change; manual line-range maintenance is not required. Treat any line spans in existing in-file TOCs as hints and verify them before use.
 
 # Token & Resource Efficiency (Static Analysis & Verification)
 

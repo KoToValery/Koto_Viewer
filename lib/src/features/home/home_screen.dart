@@ -27,16 +27,16 @@ import '../architect/screens/architect_studio_tab.dart';
 // MASTER HOME SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
 // COMPANION MAP: See 'home_screen.index.md' for full navigation & routing matrix.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
 //
-// [SEC-01-ICONS]   L39-L1635  : [TAG:HOME_ICONS] File type icons, badges & format previews
-// [SEC-02-WIDGET]  L1636-L1655: [TAG:HOME_WIDGET] HomeScreen StatefulWidget declaration
-// [SEC-03-STATE]   L1656-L1755: [TAG:HOME_STATE] State variables, tab controller, file scanning & cache
-// [SEC-04-FOLDERS] L1756-L2052: [TAG:HOME_FOLDERS] Folder picker & directory management
-// [SEC-05-ACTIONS] L2053-L2236: [TAG:HOME_ACTIONS] File opening actions & viewer navigation
-// [SEC-06-DIALOGS] L2237-L2265: [TAG:HOME_DIALOGS] Settings, coordinate system & app info dialogs
-// [SEC-07-HEADER]  L2266-L2780: [TAG:HOME_HEADER] Top header, search bar & category filters
-// [SEC-08-BUILD]   L2781-L3268: [TAG:HOME_BUILD] 3-Tab Shell (AIO Viewer, Architect, Structural) & build
+// [SEC-01-ICONS] [TAG:HOME_ICONS] File type icons, badges & format previews
+// [SEC-02-WIDGET] [TAG:HOME_WIDGET] HomeScreen StatefulWidget declaration
+// [SEC-03-STATE] [TAG:HOME_STATE] State variables, tab controller, file scanning & cache
+// [SEC-04-FOLDERS] [TAG:HOME_FOLDERS] Folder picker & directory management
+// [SEC-05-ACTIONS] [TAG:HOME_ACTIONS] File opening actions & viewer navigation
+// [SEC-06-DIALOGS] [TAG:HOME_DIALOGS] Settings, coordinate system & app info dialogs
+// [SEC-07-HEADER] [TAG:HOME_HEADER] Top header, search bar & category filters
+// [SEC-08-BUILD] [TAG:HOME_BUILD] 3-Tab Shell (AIO Viewer, Architect, Structural) & build
 // ============================================================================
 
 // === SECTION: [SEC-01-ICONS] FILE TYPE ICONS & BADGES ===

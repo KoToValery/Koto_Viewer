@@ -18,16 +18,16 @@ import 'structural_overview_layout.dart';
 // MASTER STRUCTURAL 2D PAINTER LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
 // COMPANION MAP: See 'structural_2d_painter.index.md' for element paint routines.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
 //
-// [SEC-01-DISPATCH]   L29-L333   : [TAG:S2D_DISPATCH] Structural2dPainter declaration & main loop
-// [SEC-02-GHOSTS]     L334-L657  : [TAG:S2D_GHOSTS] Trace reference ghost storeys & support spans
-// [SEC-03-SLABS]      L658-L1249 : [TAG:S2D_SLABS] Floor & ceiling slabs, void contours & labels
-// [SEC-04-STAIRS]     L1250-L1347: [TAG:S2D_STAIRS] Stairs, elevator shafts & architectural cuts
-// [SEC-05-BEAMS-AXES] L1348-L1590: [TAG:S2D_BEAMS] Beams, structural grid axes & bubble layout
-// [SEC-06-WALLS-COLS] L1591-L1849: [TAG:S2D_WALLS] Shear walls, columns & reference lines
-// [SEC-07-PREVIEWS]   L1850-L2250: [TAG:S2D_PREVIEWS] Interactive drafting previews & snapping
-// [SEC-08-ANALYSIS]   L2251-L2404: [TAG:S2D_ANALYSIS] Cantilever heatmap & seismic rigidity targets
+// [SEC-01-DISPATCH] [TAG:S2D_DISPATCH] Structural2dPainter declaration & main loop
+// [SEC-02-GHOSTS] [TAG:S2D_GHOSTS] Trace reference ghost storeys & support spans
+// [SEC-03-SLABS] [TAG:S2D_SLABS] Floor & ceiling slabs, void contours & labels
+// [SEC-04-STAIRS] [TAG:S2D_STAIRS] Stairs, elevator shafts & architectural cuts
+// [SEC-05-BEAMS-AXES] [TAG:S2D_BEAMS] Beams, structural grid axes & bubble layout
+// [SEC-06-WALLS-COLS] [TAG:S2D_WALLS] Shear walls, columns & reference lines
+// [SEC-07-PREVIEWS] [TAG:S2D_PREVIEWS] Interactive drafting previews & snapping
+// [SEC-08-ANALYSIS] [TAG:S2D_ANALYSIS] Cantilever heatmap & seismic rigidity targets
 // ============================================================================
 
 // === SECTION: [SEC-01-DISPATCH] PAINTER DECLARATION & MAIN PAINT DISPATCHER ===

@@ -1,134 +1,75 @@
-# Architect Workspace Screen — LLM Semantic Navigation Map
-> **Path**: `lib/src/features/architect/screens/architect_workspace_screen.dart`  
-> **Total Lines**: ~33,316 | **Primary Class**: `_ArchitectWorkspaceScreenState`  
-> **Companion Document**: Used by LLMs (Antigravity, Gemini, Codex, Copilot, Cursor) to navigate and locate code in 1 step without reading 31k lines.
+# Architect Workspace Screen — Reference & Navigation Map
+> **Path**: lib/src/features/architect/screens/architect_workspace_screen.dart
+> **Primary class**: _ArchitectWorkspaceScreenState
+> **Important**: The source header TOC lists grep tags without line offsets. Treat this map as a discovery aid; verify method names and behavior in the current source with rg.
 
----
+## 1. How to use this map
 
-## 1. LLM Navigation Protocol (How to search in 1 step)
+1. Use this map to discover a likely analogous feature and its source tags.
+2. Search the current Dart source, for example: rg -n "\[TAG:WALL_DRAFT\]|_finishChainedWall" lib/src/features/architect/screens/architect_workspace_screen.dart
+3. For behavior changes, read the relevant method bodies and immediate callers/callees. Follow related widgets, services, rendering, and viewport routing only where they participate in the feature.
+4. Treat the patterns below as examples. Select the closest behaviorally similar feature; do not copy a pattern mechanically when the new requirement differs.
 
-1. **Find the Tool or Feature in this document**: Look at Section 3 (Tool Routing Matrix) or Section 2 (Master Section Registry).
-2. **Jump via Unique Tag or Line Range**:
-   - In Antigravity / CLI: Use `git grep -n "\[TAG:<NAME>\]"` or read the specified line range via `read_file`.
-   - In Copilot / Codex / Cursor: Mention the tag `[TAG:<NAME>]` or target method name in your prompt or infill range.
-3. **Verify State Dependencies**: Look at Section 4 (State & Controller Registry) to see which fields control the tool before editing.
+## 2. Source section registry
 
----
+| Source anchor | Responsibility |
+| --- | --- |
+| [SEC-01-WIDGET] | Screen API and widget declaration |
+| [TAG:STATE_FIELDS] | Tool flags, drafting state, caches, and preview state |
+| [TAG:UNDERLAY_TOOLS] | CAD/raster underlay handlers and related state |
+| [TAG:CAD_INSERTION] | Interactive CAD underlay placement |
+| [TAG:UNDERLAY_DRAG] | Underlay snap and repositioning |
+| [TAG:DRAG_TOOL] | Two-point drag and element relocation |
+| [TAG:STATE_LIFECYCLE] | Initialization, listeners, and disposal |
+| [TAG:XFORM_COORDS] | Screen/model transforms, snapping, and hit-test helpers |
+| [TAG:TOUCH_DOWN] | Pointer-down dispatch and tool start |
+| [TAG:TOUCH_MOVE] | Pointer movement, preview, and snapping |
+| [TAG:TOUCH_UP] | Pointer-up dispatch and commits |
+| [TAG:ZONE_LOGIC] | Zone mutations, area updates, and schedules |
+| [TAG:WALL_DRAFT] | Wall drafting and chained wall placement |
+| [TAG:WALL_SPLIT] | Wall splitting and cut sessions |
+| [TAG:FENEST_RADIAL] | Door/window placement and radial context actions |
+| [TAG:SELECTION_BAR] | Selection HUD, action bars, and layer dialogs |
+| [TAG:FENESTRATION_SELECTION_UPDATES] | Selected opening parameter updates |
+| [TAG:FLOATING_HUD] | Multi-step overlays and interactive edge curving |
+| [TAG:GRID_AXIS] | Grid axis operations |
+| [TAG:BUILD_LAYOUT] | Screen layout, bars, sheets, and view switching |
+| [TAG:LOGGER_UI] | Diagnostic logs UI |
+| [TAG:CANVAS_2D] | 2D viewport, painter stack, and draft overlays |
+| [TAG:CAD_EXPANSION_COMMITS] | CAD primitive commit handlers |
+| [TAG:VIEW_3D] | 3D viewport and publication preview |
 
-## 2. Master Section Registry & Line Spans
+## 3. Tool archetypes and reference flows
 
-| Section ID | Tag | Approx Lines | Description & Primary Responsibilities |
-| :--- | :--- | :--- | :--- |
-| `[SEC-00-IMPORTS]` | `[TAG:IMPORTS]` | L1 – L329 | All package and internal imports (widgets, services, models) |
-| `[SEC-01-WIDGET]` | `[TAG:WIDGET_API]` | L362 – L433 | `ArchitectWorkspaceScreen` StatefulWidget & `_ArchitectSurfaceHit` |
-| `[SEC-02-STATE]` | `[TAG:STATE_CORE]` | L434 – L7461 | State fields, controllers, listeners, dialog triggers, and lifecycle |
-| ↳ `[SUB-02A]` | `[TAG:STATE_FIELDS]` | L435 – L3831 | Active tool flags, drafting caches, preview points, mode enums |
-| ↳ `[SUB-02B]` | `[TAG:STATE_PRESETS]` | L3001 – L6140 | Wall/opening style caches, layer filters, command controllers |
-| ↳ `[SUB-02U]` | `[TAG:UNDERLAY_TOOLS]` | L3832 – L7197 | CAD Xref live-reload, Raster 2-point calibration & Geodesy handlers |
-| ↳ `[SUB-02UI]` | `[TAG:CAD_INSERTION]` | L3890 – L4250 | CAD underlay control points, ghost preview & repositioning workflow |
-| ↳ `[SUB-02DRAG]` | `[TAG:DRAG_TOOL]` | L3920 – L3924 | Architect 2-point snap Drag controller & element relocation |
-| ↳ `[SUB-02UD]` | `[TAG:UNDERLAY_DRAG]` | L4280 – L4450 | Underlay 2-point snap & drag controller, rubber-band preview & selection |
-| ↳ `[SUB-02C]` | `[TAG:STATE_LIFECYCLE]` | L7198 – L7461 | `initState()`, `_initTransform()`, `dispose()` |
-| `[SEC-03-XFORM]` | `[TAG:XFORM_COORDS]` | L7462 – L7682 | Coordinate transforms: `_screenToModel`, `_modelToScreen`, hit tests |
-| `[SEC-04-TOUCH]` | `[TAG:TOUCH_INPUT]` | L7683 – L14324 | 2D Pointer & Gesture dispatch for all architectural tools |
-| ↳ `[SUB-04A]` | `[TAG:TOUCH_DOWN]` | L7684 – L8724 | `_onPointerDown`: hit detection, drag initiation, tool start |
-| ↳ `[SUB-04B]` | `[TAG:TOUCH_MOVE]` | L8725 – L11297 | `_onPointerMove`: hover previews, rubber-banding, snap calculations |
-| ↳ `[SUB-04C]` | `[TAG:TOUCH_UP]` | L11298 – L14324 | `_onPointerUp`: tool commits, geometry insertion, history push |
-| `[SEC-05-ZONES]` | `[TAG:ZONE_LOGIC]` | L14325 – L14830 | Zone mutations, area recalculations, room schedule dialogs |
-| `[SEC-06-WALLS]` | `[TAG:WALL_DRAFT]` | L14831 – L15393 | Wall segment chain grouping, concept draft commit, angle locks |
-| `[SEC-07-SPLIT]` | `[TAG:WALL_SPLIT]` | L15394 – L18156 | Wall splitting, cut sessions, clearance checks, intersection joints |
-| `[SEC-08-FENEST]` | `[TAG:FENEST_RADIAL]` | L18157 – L23634 | Doors, windows, vitrines, radial actions menu, opening hover |
-| `[SEC-09-SELECT]` | `[TAG:SELECTION_BAR]` | L23635 – L26917 | Selection HUD, reference line switch, layer dialogs, thickness bar |
-| `[SEC-10-GRIDS]` | `[TAG:GRID_AXIS]` | L26918 – L27232 | Dynamic grid axes actions (offset, align, resequence, delete) |
-| `[SEC-11-LAYOUT]` | `[TAG:BUILD_LAYOUT]` | L27233 – L29067 | Main `build()` method: Scaffold, HUD bars, sheets, 2D/3D toggle |
-| `[SEC-12-LOGS]` | `[TAG:LOGGER_UI]` | L29068 – L29276 | `_showDebugLogsDialog` diagnostic console |
-| `[SEC-13-VIEW2D]` | `[TAG:CANVAS_2D]` | L29277 – L33254 | 2D Canvas Viewport, CustomPainter stack, preview commit overlays |
-| `[SEC-14-VIEW3D]` | `[TAG:VIEW_3D]` | L33255 – L33316 | 3D Viewport builder & publication preview painter |
+These are existing reference patterns, not mandatory templates. For a new feature, choose the closest match by interaction and user intent, then verify the implementation in source.
 
----
+| Interaction archetype | Reference examples to inspect | What to trace |
+| --- | --- | --- |
+| Drafting and placement with live preview | Wall chain: [TAG:TOUCH_DOWN], [TAG:TOUCH_MOVE], [TAG:TOUCH_UP], [TAG:WALL_DRAFT], [TAG:CANVAS_2D]; _onPointerDown, _onPointerMove, _onPointerUp, _placeDraftSegment, _finishChainedWall | Tool activation/configuration, viewport input, snapping, preview, finish/cancel behavior, commit and undo/persistence |
+| Opening placement and editing | [TAG:FENEST_RADIAL], [TAG:FENESTRATION_SELECTION_UPDATES], [TAG:TOUCH_DOWN], [TAG:TOUCH_UP]; _tryPlaceDoorAt, _commitOpeningPlacement | Candidate selection, host detection, placement preview, selection actions, property UI, confirmation, model update |
+| Selected-element context actions | [TAG:SELECTION_BAR], [TAG:FENEST_RADIAL], [TAG:GRID_AXIS]; _handleSelectionTap, _buildSelectionBar | Selection hit path, contextual actions, property controls, cancellation/closing, state updates |
+| Multi-step geometry modification | Wall split: [TAG:WALL_SPLIT]. Chamfer/fillet and edge-curving: [TAG:FLOATING_HUD]; _startChamferFilletSession, _buildChamferFilletFloatingOverlay | Session state, preview/rubber band, pan and gesture arbitration, confirm/cancel controls, model command and history |
+| CAD/raster underlay placement or repositioning | [TAG:UNDERLAY_DRAG], [TAG:CAD_INSERTION]; _startUnderlaySnapDrag, _confirmUnderlaySnapPlacement | Import/configuration, hit testing, drag lifecycle, calibration, preview, commit and persistence |
 
-## 3. Tool Routing Matrix (Pointer -> Commit -> UI)
+## 4. Cross-cutting state and owners
 
-| Tool (`ArchitectTool`) | Pointer Down/Move/Up | Commit / Action Handler | UI Bar / Dialog Widget |
-| :--- | :--- | :--- | :--- |
-| **wall** | L7025, L10149, L12612 | `_finishChainedWall`, `_placeDraftSegment` | `ArchitectWallReferenceControl`, `ArchitectWallThicknessDialog` |
-| **door** | L7025, L10277, L11971 | `_tryPlaceDoorAt`, `_commitOpeningPlacement`, `_updateSelectedDoor` | `ArchitectCandidatePicker`, `ArchitectDoorPropertiesDialog`, `ArchitectToolPalette` (3-row HUD) |
-| **window** | L7025, L10277, L12045 | `_tryPlaceDoorAt`, `_commitOpeningPlacement`, `_updateSelectedWindow` | `ArchitectCandidatePicker`, `ArchitectFenestrationStyle`, `ArchitectToolPalette` (3-row HUD) |
-| **column** | L7025, L9613, L11925 | `_commitColumnPlacement` | `ArchitectColumnClearance`, `ArchitectCandidatePicker` |
-| **beam** | L7025, L8043, L12842 | `_commitBeamPlacement` | `ArchitectElementPropertiesDialog` |
-| **slab** | L7025, L8043, L12925 | `_commitPolygonDraft` | `ArchitectSlabLayersDialog` |
-| **roof** | L7025, L10261, L12989 | `_commitRoofDraft` | `ArchitectRoofLayersDialog`, `ArchitectRoofNumberField` |
-| **zone** | L7959, L10099, L12308 | `_commitDraftedZone`, `_updateZone` | `ArchitectZonePropertyBar`, `_showRoomScheduleDialog` |
-| **zoneTable** | L7025, L8043, L12565 | `_commitZoneTablePlacement` | Zone schedule overlay |
-| **axis** | L7161, L10055, L12174 | `_handleAxisOffset`, `_handleAxisAlign` | `ArchitectDynamicGridBar`, `_handleResequenceAxes` |
-| **dimension** | L7151, L9267, L11451 | `_commitDimensionDraft` | `ArchitectAnnotationSettings` |
-| **measure** | L7025, L8043, L13383 | `_finishMeasurement` | Distance preview tooltip |
-| **select** | L7025, L10139, L11323 | `_commitMarquee`, `_handleSelectionTap` | `ArchitectSelectionActionBar`, `ArchitectSelectionControl` |
-| **drag** | L8715, L9823, L12630 | `_startDragSession`, `_confirmDragPlacement`, `_cancelDragPlacement` | `_buildDragFloatingOverlay` (`ArchitectFloatingCommandOverlay`), Radial Menu, `Ctrl+D` |
-| **floorDrain** | L7025, L8043, L11366 | `_commitFloorDrain` | `ArchitectFloorDrainBar` |
-| **hatch** | L7025, L8043, L11392 | `_commitHatch` | `ArchitectHatchPicker` |
-| **services** | L7025, L9633, L12725 | `_commitServicePlacement` | Service component selector |
-| **stair** | L7025, L8043, L13104 | `_commitStairDraft` | `ArchitectElementPropertiesDialog` |
-| **cadLine** | L7025, L10157, L14140 | `_commitCurrentWallSegment`, `_commitLineArc` | `_lineStyleControl`, `_showLineCapsDialog`, polyline width |
-| **cadArc** | L7025, L10157, L12624 | `_commitLineArc`, `_commitWallArc` | Arc radius HUD (`R=`), line style control |
-| **mask** | L7025, L10310, L13000 | `_commitMask`, `_elementTool.cancelSlabDrafting` | Mask HUD bar, border toggle checkbox |
-| **leader** | L7025, L10212, L13380 | `_promptAddLeaderAnnotation` | Multileader HUD bar, note dialog |
-| **spline** | L7025, L10310, L13000 | `_commitSpline`, `_continueLineDrafting`, `_toggleSplineClosed` | Spline HUD bar (Open & Close buttons), fit-point grip dragging |
-| **chamferFillet** | L8766, L13440, L27160 | `_triggerChamfer`, `_triggerFillet`, `_startChamferFilletSession`, `_chamferFilletLeaderLine` | 2-step Join workflow with `_buildChamferFilletFloatingOverlay` |
-| **edgeCurving** | L8700, L12170, L12470, L24800–L25120 | `_startEdgeCurvingSession`, `_initCurvingEdgeSession`, `_showCurvingEdgeExactInputDialog`, `_commitCurvingEdgeSession`, `_cancelCurvingEdgeSession` | Interactive edge curving with remote offset grip, magnetic snap HUD & exact dimension dialog |
-| **floatingHUD** | L25000, L34020 | `_buildDetachFloatingOverlay`, `_buildAttachFloatingOverlay`, `_buildChamferFilletFloatingOverlay`, `_buildWallJoinFloatingOverlay`, `_buildCurvingEdgeFloatingOverlay`, `_buildUnderlayDragFloatingOverlay`, `_buildCutFloatingOverlay`, `_buildSplitFloatingOverlay`, `_buildNewPointFloatingOverlay`, `_buildMirrorFloatingOverlay`, `_buildOffsetFloatingOverlay` | `ArchitectFloatingCommandOverlay` (contextual floating ✓ & ✕ near active element) |
-| **cadEllipse** | L7735, L10212, L14100 | `_commitCadEllipse` | Ellipse HUD bar, line style control |
-| **roofSlope** | L7735, L10315, L14115 | `_commitRoofSlopeArrow` | Roof slope HUD bar (format chips %, °, both; reverse arrow) |
-| **cadUnderlay** | L3890, L30506 | `_importOrReplaceCadUnderlay`, `_startUnderlaySnapDrag`, `_confirmUnderlaySnapPlacement`, `_repositionCurrentCadUnderlay`, `_toggleCadVisibility`, `_openCadContextMenu`, `_openCadMaskMenu`, `_openCadScaleDialog`, `_openCadEditDialog` | `ArchitectCadUnderlayBar`, `ArchitectRadialMenu`, `showArchitectCadScaleDialog`, `showArchitectUnderlayMaskMenu`, busy progress HUD |
-| **rasterUnderlay** | L7780, L9945, L13365 | `_importRasterUnderlay`, `_startUnderlaySnapDrag`, `_toggleRasterVisibility`, `_openRasterContextMenu`, `_openRasterMaskMenu`, `_openRasterScaleDialog`, `_openRasterEditDialog`, `_commitUnderlayMask` | `ArchitectRasterUnderlayBar`, `ArchitectRadialMenu`, `showArchitectRasterCalibrationDialog`, `showArchitectUnderlayMaskMenu`, busy progress HUD |
-| **wallAttach** | L11025, L12390, L23350 | _triggerWallAttach, ConnectArchitectWallsAtVertex | _buildAttachPromptBanner, quick access bar |
-| **wallDetach** | L23390, L26090 | _triggerWallDetach, _confirmWallDetach, _cancelWallDetach | _buildDetachConfirmationBanner (on-screen green checkmark) |
-| **wallOffset** | L12065, L24435, L24595 | _previewOffset, _commitOffset, dynamic distance chip | _offsetBanner with tappable distance chip & green checkmark |
-| **terrain** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_syncTerrainFromGeodesy`, `_updateSelectedLandscapeElement` | `ArchitectLandscapeBar` (Existing / Proposed, Boundary / Hole / Contour / Spot / Pad, Datum ±0.00, G-TOPO sync) |
-| **contour** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement` | `ArchitectLandscapeBar` (Absolute / Relative Z, Datum ±0.00, Major/Minor, Closed loop, 90° Guide) |
-| **pathway** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (Width, Paving Material, Automatic Curbs, 90° Ortho/Perp Guide, Fillet & Chamfer, Split) |
-| **vegetation** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (8 Species incl. Artistic Low-Poly, Single/Row/Hedge, Crown & Height, Fast 3D Meshes) |
-| **siteFence** | L11082, L13941, L29936 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (6 Presets: Piers+Slats, Gabion Fence/Retaining, Louvers, Iron, RC Retaining, 90° Guide, Fillet & Chamfer, Split) |
-| **street** | L11082, L13975, L29988 | `_landscapeTool.handleTap`, `_commitLandscapeDraft`, `_updateSelectedLandscapeElement`, `_applyChamferFillet` | `ArchitectLandscapeBar` (Road Width, Markings: Dashed/Solid/Double/None, Left/Right Sidewalks, Curbs, Fillet & Chamfer, Split) |
+- _commands: ArchitectWorkspaceViewController, the screen-level document operations controller.
+- _modelCommands: ArchitectCommandController; inspect its callers to determine which mutations use this command path.
+- _project: active ArchitectProject.
+- _viewport: viewport transform and navigation state; verify the actual pan/gesture owner for the operation.
+- _activeTool and _cursorModel: active drafting mode and current model-space pointer.
+- _selectedElementIds: current selection.
+- _activeWallChain: chained wall drafting state.
+- _landscapeTool: terrain, pathway, vegetation, fence, and related landscape interactions.
+- _dragController: two-point drag interactions; verify which element types use it.
 
----
+## 5. Reference-first implementation checklist
 
-## 4. Key State Fields & Controllers Registry
-
-- `_commands` (`ArchitectWorkspaceViewController`): Main document controller.
-- `_modelCommands` (`ArchitectCommandController`): Undo/Redo & geometry transaction coordinator.
-- `_project` (`ArchitectProject`): The active architectural document model.
-- `_viewport` (`ArchitectViewportController`): Handles zoom, pan, screen-to-model matrix.
-- `_activeTool` (`ArchitectTool`): Currently selected drafting tool.
-- `_cursorModel` (`Offset?`): Real-time snapped model coordinates of pointer.
-- `_selectedElementIds` (`Set<String>`): Currently highlighted/selected element IDs.
-- `_activeWallChain` (`List<Offset>`): Points in currently chaining wall.
-- `_marqueeTool` (`ArchitectMarqueeTool`): Multi-select rectangle logic.
-- `_axisTool` (`ArchitectAxisTool`): Dynamic grid axis placement controller.
-- `_zoneTool` (`ArchitectZoneTool`): Zone polygon drafting state.
-- `_landscapeTool` (`ArchitectLandscapeTool`): Unified controller for Terrain (`existingTerrain` / `proposedTerrain`), Pathway with automatic curbs, Vegetation, and Site Fences.
-- `_dragController` (`ArchitectDragController`): 2-point snap Drag controller for walls, components, underlays, and drawing geometry.
-- `_dragMovedSinceBaseGrab` (`bool`): Tracks pointer translation to arbitrate between Click-Click and continuous Drag-and-Drop.
-- `_activeLineStartCap` / `_activeLineEndCap` (`ArchitectLineEndCap`): Active line start/end terminating caps (arrows, dots, ticks).
-- `_activeLineCapSize` (`double`): Size in meters for line terminating end caps.
-- `_activePolylineWidth` (`double?`): Custom thickness for polyline segments.
-- `_polylineArcSegmentMode` (`bool`): Mixed polyline arc segment toggle.
-- `_chamferFilletSourceId` / `_chamferFilletOptions` / `_chamferFilletPointer` / `_lastFilletRadius` / `_lastChamferDistance`: Join-style 2-step Chamfer and Fillet source state, sticky radius/distance, and dynamic rubber-band pointer.
-- `_curvingEdgeElementId` / `_curvingEdgeSegmentIndex` / `_curvingEdgeStartPoint` / `_curvingEdgeEndPoint` / `_curvingEdgeBulge` / `_curvingEdgeGripDirection` / `_curvingEdgeSnapped` / `_curvingEdgePendingConfirmation`: Dynamic edge curving interactive session state with remote grip, magnetic snapping, and exact precision dialog for walls, lines, polylines, slabs, and contours.
-- `_selectedSpline`: Single selected CadPrimitiveType.spline accessor.
-- `_maskBorder` (`bool`): Mask / wipeout border frame visibility.
-- `_activeRoofSlopeFormat` (`RoofSlopeFormat`): Roof slope display format (`percent`, `degree`, `both`).
-- `_activeRoofSlopeDirection` (`RoofSlopeDirection`): Roof slope arrow direction (`downslope`, `upslope`).
-- `_activeLeaderArrowStyle` (`ArchitectLineEndCap`): Leader arrow head terminating style.
-- `_cadFileWatcher` (`ArchitectCadFileWatcher?`): Watches external CAD/DXF files for live Xref reload.
-- `_rasterImages` (`Map<String, ui.Image>`): Decoded GPU images for active raster underlays.
-- `_rasterCalibrationStep` / `_rasterCalibrationP1` / `_rasterCalibrationP2`: 2-point scale + deskew calibration state.
-- `_applyStructuralSchemeDefaults` (`void Function(ArchitectStructuralScheme)`): Synchronizes active wall types and roof assemblies with the project's structural scheme (`flatSlab`, `beamAndSlab`, `sandwichPanels`, `roundLogs`, `studFrame`).
-
----
-
-## 5. Safe Modification Rules for Agents
-1. **Never alter the public API** of `ArchitectWorkspaceScreen` (constructor, parameters) — 55 tests depend on it.
-2. **Coordinate discipline**: Always convert touch inputs via `_screenToModel(event.localPosition)` before passing to geometry algorithms.
-3. **Save hook**: Any operation mutating `_project` must invoke `_saveBiMProjectIfAttached()` to preserve workspace sync.
-4. **Command transactions**: Use `_beginGeometryCommand(...)` and `_modelCommands.execute(...)` to preserve Undo/Redo integrity.
+1. For a behavior or interaction change, identify the closest existing feature with the same interaction pattern and inspect its source. Inspect a second only when needed to resolve ambiguity.
+2. Trace the relevant input, hit testing/gesture arbitration, state, preview, contextual UI, commit, undo/redo, and persistence across files. Skip layers that the change does not touch.
+3. Reuse the established UI behavior for comparable actions. Do not force all tools into a radial menu or all multi-step operations into one overlay.
+4. Check cancellation, confirmation, active-pan behavior, hold timers, and underlying-element selection when relevant to the changed interaction.
+5. Follow the analogous feature's actual command and save path. Do not assume every mutation uses _modelCommands.execute or _saveBiMProjectIfAttached.
+6. Use ARB localization for new user-facing text and follow the nearest equivalent control's mobile behavior.
+7. For a small presentation, localization, copy, or layout-only change, use a targeted comparison rather than tracing the full interaction lifecycle.
+8. If requirements justify a meaningful deviation, implement it coherently and explain the reason in the change summary.

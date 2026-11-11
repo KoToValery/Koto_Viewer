@@ -22,14 +22,14 @@ import '../models/vertical_capacity_models.dart';
 // MASTER INITIAL SCHEME GENERATOR LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
 // COMPANION MAP: See 'initial_scheme_generator.index.md' for structural layout logic.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
 //
-// [SEC-01-OPTIONS] L31-L267   : [TAG:ISG_OPTIONS] InitialSchemeOptions, proposals & wall runs
-// [SEC-02-GEN]     L268-L1227 : [TAG:ISG_GENERATOR] InitialSchemeGenerator pipeline & geometric network
-// [SEC-03-CORES]   L1228-L1414: [TAG:ISG_CORES] Staircase, elevator shaft & core boundary walls
-// [SEC-04-WALLS]   L1415-L1791: [TAG:ISG_WALLS] Shear wall placement & seismic X/Y pairing
-// [SEC-05-COLUMNS] L1792-L2164: [TAG:ISG_COLUMNS] Column layout & span grid optimization
-// [SEC-06-BEAMS]   L2165-L2342: [TAG:ISG_BEAMS] Tie beams & final scheme structural validation
+// [SEC-01-OPTIONS] [TAG:ISG_OPTIONS] InitialSchemeOptions, proposals & wall runs
+// [SEC-02-GEN] [TAG:ISG_GENERATOR] InitialSchemeGenerator pipeline & geometric network
+// [SEC-03-CORES] [TAG:ISG_CORES] Staircase, elevator shaft & core boundary walls
+// [SEC-04-WALLS] [TAG:ISG_WALLS] Shear wall placement & seismic X/Y pairing
+// [SEC-05-COLUMNS] [TAG:ISG_COLUMNS] Column layout & span grid optimization
+// [SEC-06-BEAMS] [TAG:ISG_BEAMS] Tie beams & final scheme structural validation
 // ============================================================================
 
 // === SECTION: [SEC-01-OPTIONS] OPTIONS & PROPOSAL MODELS ===

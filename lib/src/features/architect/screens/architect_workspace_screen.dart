@@ -338,33 +338,36 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // ============================================================================
 // MASTER ARCHITECT WORKSPACE SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
-// COMPANION MAP: See 'architect_workspace_screen.index.md' for full method & class directory.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// COMPANION MAP: See 'architect_workspace_screen.index.md' for reference patterns and navigation.
+// QUICK GREP:   rg -n "TAG:WALL_DRAFT" lib/src/features/architect/screens/architect_workspace_screen.dart
 //
-// [SEC-01-WIDGET]  L362-L433    : [TAG:WIDGET_API] `ArchitectWorkspaceScreen` StatefulWidget & `_ArchitectSurfaceHit`
-// [SEC-02-STATE]   L434-L7461   : [TAG:STATE_CORE] State fields, controllers, listeners, dialog triggers, and lifecycle
-//   ↳ [SUB-02A]    L435-L3831   : [TAG:STATE_FIELDS] Active tool flags, drafting caches, preview points, mode enums
-//   ↳ [SUB-02U]    L3832-L7197  : [TAG:UNDERLAY_TOOLS] CAD Xref live-reload, Raster 2-point calibration & Geodesy handlers
-//   ↳ [SUB-02UI]   L3890-L4250  : [TAG:CAD_INSERTION] CAD underlay control points, ghost preview & repositioning
-//   ↳ [SUB-02DRAG] L3920-L3923  : [TAG:DRAG_TOOL] Architect 2-point snap Drag controller & element relocation
-//   ↳ [SUB-02UD]   L4280-L4450  : [TAG:UNDERLAY_DRAG] Underlay 2-point snap & drag controller, rubber-band preview & selection
-//   ↳ [SUB-02C]    L7198-L7461  : [TAG:STATE_LIFECYCLE] `initState()`, `_initTransform()`, `dispose()`
-// [SEC-03-XFORM]   L7462-L7682  : [TAG:XFORM_COORDS] Coordinate transforms: `_screenToModel`, `_modelToScreen`, hit tests
-// [SEC-04-TOUCH]   L7683-L14324 : [TAG:TOUCH_INPUT] 2D Pointer & Gesture dispatch for all architectural tools
-//   ↳ [SUB-04A]    L7684-L8724  : [TAG:TOUCH_DOWN] `_onPointerDown`: hit detection, drag initiation, tool start
-//   ↳ [SUB-04B]    L8725-L11297 : [TAG:TOUCH_MOVE] `_onPointerMove`: hover previews, rubber-banding, snap calculations
-//   ↳ [SUB-04C]    L11298-L14324: [TAG:TOUCH_UP] `_onPointerUp`: tool commits, geometry insertion, history push
-// [SEC-05-ZONES]   L14325-L14830: [TAG:ZONE_LOGIC] Zone mutations, area recalculations, room schedule dialogs
-// [SEC-06-WALLS]   L14831-L15393: [TAG:WALL_DRAFT] Wall segment chain grouping, concept draft commit, angle locks
-// [SEC-07-SPLIT]   L15394-L18156: [TAG:WALL_SPLIT] Wall splitting, cut sessions, clearance checks, intersection joints
-// [SEC-08-FENEST]  L18157-L23634: [TAG:FENEST_RADIAL] Doors, windows, vitrines, radial actions menu, opening hover
-// [SEC-09-SELECT]  L23635-L26917: [TAG:SELECTION_BAR] Selection HUD, reference line switch, layer dialogs, thickness bar
-// [SEC-10-GRIDS]   L26918-L27232: [TAG:GRID_AXIS] Dynamic grid axes actions (offset, align, resequence, delete)
-// [SEC-11-LAYOUT]  L27233-L29067: [TAG:BUILD_LAYOUT] Main `build()` method: Scaffold, HUD bars, sheets, 2D/3D toggle
-// [SEC-12-LOGS]    L29068-L29276: [TAG:LOGGER_UI] `_showDebugLogsDialog` diagnostic console
-// [SEC-13-VIEW2D]  L29277-L33254: [TAG:CANVAS_2D] 2D Canvas Viewport, CustomPainter stack, preview commit overlays
-//   ↳ [SUB]        L32146-L33254: [TAG:CAD_EXPANSION_COMMITS] CAD EXPANSION COMMITS (ARC, MASK, SPLINE, ELLIPSE, LEADER, ROOF SLOP
-// [SEC-14-VIEW3D]  L33255-L33316: [TAG:VIEW_3D] 3D Viewport builder & publication preview painter
+// SECTION MAP: Tags are grep anchors; numeric line ranges are intentionally omitted.
+// [SEC-01-WIDGET] Screen API and widget declaration
+// [SEC-02-STATE] State fields, controllers, and lifecycle
+//   ↳ [TAG:STATE_FIELDS] Tool flags, drafting state, caches, and previews
+//   ↳ [TAG:UNDERLAY_TOOLS] CAD/raster underlay handlers and related state
+//   ↳ [TAG:CAD_INSERTION] Interactive CAD underlay placement
+//   ↳ [TAG:DRAG_TOOL] Two-point drag state and relocation
+//   ↳ [TAG:UNDERLAY_DRAG] Underlay snap and repositioning
+//   ↳ [TAG:STATE_LIFECYCLE] Initialization, listeners, and disposal
+// [SEC-03-XFORM] [TAG:XFORM_COORDS] Screen/model transforms, snapping, and hit tests
+// [SEC-04-TOUCH] Pointer input and gesture dispatch
+//   ↳ [TAG:TOUCH_DOWN] Pointer-down dispatch and tool start
+//   ↳ [TAG:TOUCH_MOVE] Pointer movement, preview, and snapping
+//   ↳ [TAG:TOUCH_UP] Pointer-up dispatch and commits
+// [SEC-05-ZONES] [TAG:ZONE_LOGIC] Zone mutations, area updates, and schedules
+// [SEC-06-WALLS] [TAG:WALL_DRAFT] Wall drafting and chained placement
+// [SEC-07-SPLIT] [TAG:WALL_SPLIT] Wall splitting and cut sessions
+// [SEC-08-FENEST] [TAG:FENEST_RADIAL] Door/window placement and radial context actions
+//   ↳ [TAG:FLOATING_HUD] Multi-step overlays and interactive edge curving
+// [SEC-09-SELECT] [TAG:SELECTION_BAR] Selection HUD, actions, and layer dialogs
+//   ↳ [TAG:FENESTRATION_SELECTION_UPDATES] Selected opening parameter updates
+// [SEC-10-GRIDS] [TAG:GRID_AXIS] Grid axis operations
+// [SEC-11-LAYOUT] [TAG:BUILD_LAYOUT] Screen layout, bars, sheets, and view switching
+// [SEC-12-LOGS] [TAG:LOGGER_UI] Diagnostic logs UI
+// [SEC-13-VIEW2D] [TAG:CANVAS_2D] 2D viewport, painter stack, and draft overlays
+//   ↳ [TAG:CAD_EXPANSION_COMMITS] CAD primitive commit handlers
+// [SEC-14-VIEW3D] [TAG:VIEW_3D] 3D viewport and publication preview
 // ============================================================================
 
 // === SECTION: [SEC-01-WIDGET] WIDGET DECLARATION & PUBLIC API ===

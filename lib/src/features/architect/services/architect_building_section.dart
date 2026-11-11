@@ -1,12 +1,12 @@
 // === SECTION: [SEC-00-TOC] TABLE OF CONTENTS ===
-// [SEC-01-REGIONS] ArchitectSectionRegion data class (L40-L190)
-// [SEC-02-ROOF_MAT] Roof member materials to SlabMaterial (L191-L345)
-// [SEC-03-BUILD_MAIN] ArchitectBuildingSection.build (L346-L1310)
+// [SEC-01-REGIONS] ArchitectSectionRegion data class
+// [SEC-02-ROOF_MAT] Roof member materials to SlabMaterial
+// [SEC-03-BUILD_MAIN] ArchitectBuildingSection.build
 //   --- SUBSECTION: [TAG:SPANDREL_INFILL] Window Spandrel Aerated Concrete Infill ---
 //   --- SUBSECTION: [TAG:TIE_BEAMS] Intermediate RC Tie Beams on Tall Masonry Walls ---
-// [SEC-04-ELEVATION] Elevation line projection & hidden lines (L1311-L1960)
-// [SEC-05-OPENINGS] Opening cut analyzer & profiles (L1961-L2380)
-// [SEC-06-DATA] Helper data structures (L2381-L2615)
+// [SEC-04-ELEVATION] Elevation line projection & hidden lines
+// [SEC-05-OPENINGS] Opening cut analyzer & profiles
+// [SEC-06-DATA] Helper data structures
 
 import 'architect_drain_surface.dart';
 import 'architect_stair_floor_contact.dart';

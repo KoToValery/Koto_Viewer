@@ -23,14 +23,14 @@ import 'bim_workspace_screen.dart';
 // MASTER BIM ALIGNMENT SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
 // COMPANION MAP: See 'bim_alignment_screen.index.md' for multi-storey alignment.
-// QUICK GREP:   grep "=== SECTION: [SEC-" or grep "--- SUBSECTION: [TAG:"
+// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
 //
-// [SEC-01-WIDGET]  L22-L38    : [TAG:BAS_WIDGET] BimAlignmentScreen StatefulWidget
-// [SEC-02-STATE]   L39-L300   : [TAG:BAS_STATE] State variables & viewport matrix
-// [SEC-03-LOADER]  L301-L650  : [TAG:BAS_LOADER] Underlay DXF file loading & caching
-// [SEC-04-POINTS]  L651-L950  : [TAG:BAS_POINTS] Common control point placement & snap
-// [SEC-05-BUILD]   L951-L1350 : [TAG:BAS_BUILD] Main build method & storey tabs HUD
-// [SEC-06-PAINTER] L1351-L1560: [TAG:BAS_PAINTER] Control point overlay custom painter
+// [SEC-01-WIDGET] [TAG:BAS_WIDGET] BimAlignmentScreen StatefulWidget
+// [SEC-02-STATE] [TAG:BAS_STATE] State variables & viewport matrix
+// [SEC-03-LOADER] [TAG:BAS_LOADER] Underlay DXF file loading & caching
+// [SEC-04-POINTS] [TAG:BAS_POINTS] Common control point placement & snap
+// [SEC-05-BUILD] [TAG:BAS_BUILD] Main build method & storey tabs HUD
+// [SEC-06-PAINTER] [TAG:BAS_PAINTER] Control point overlay custom painter
 // ============================================================================
 
 // === SECTION: [SEC-01-WIDGET] BIM ALIGNMENT SCREEN WIDGET ===
