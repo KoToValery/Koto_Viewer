@@ -337,36 +337,34 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // ============================================================================
 // MASTER ARCHITECT WORKSPACE SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
-// COMPANION MAP: See 'architect_workspace_screen.index.md' for reference patterns and navigation.
-// QUICK GREP:   rg -n "TAG:WALL_DRAFT" lib/src/features/architect/screens/architect_workspace_screen.dart
+// COMPANION MAP: See 'architect_workspace_screen.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
 //
-// SECTION MAP: Tags are grep anchors; numeric line ranges are intentionally omitted.
-// [SEC-01-WIDGET] Screen API and widget declaration
-// [SEC-02-STATE] State fields, controllers, and lifecycle
-//   ↳ [TAG:STATE_FIELDS] Tool flags, drafting state, caches, and previews
-//   ↳ [TAG:UNDERLAY_TOOLS] CAD/raster underlay handlers and related state
-//   ↳ [TAG:CAD_INSERTION] Interactive CAD underlay placement
-//   ↳ [TAG:DRAG_TOOL] Two-point drag state and relocation
-//   ↳ [TAG:UNDERLAY_DRAG] Underlay snap and repositioning
-//   ↳ [TAG:STATE_LIFECYCLE] Initialization, listeners, and disposal
-// [SEC-03-XFORM] [TAG:XFORM_COORDS] Screen/model transforms, snapping, and hit tests
-// [SEC-04-TOUCH] Pointer input and gesture dispatch
-//   ↳ [TAG:TOUCH_DOWN] Pointer-down dispatch and tool start
-//   ↳ [TAG:TOUCH_MOVE] Pointer movement, preview, and snapping
-//   ↳ [TAG:TOUCH_UP] Pointer-up dispatch and commits
-// [SEC-05-ZONES] [TAG:ZONE_LOGIC] Zone mutations, area updates, and schedules
-// [SEC-06-WALLS] [TAG:WALL_DRAFT] Wall drafting and chained placement
-// [SEC-07-SPLIT] [TAG:WALL_SPLIT] Wall splitting and cut sessions
-// [SEC-08-FENEST] [TAG:FENEST_RADIAL] Door/window placement and radial context actions
-//   ↳ [TAG:FLOATING_HUD] Multi-step overlays and interactive edge curving
-// [SEC-09-SELECT] [TAG:SELECTION_BAR] Selection HUD, actions, and layer dialogs
-//   ↳ [TAG:FENESTRATION_SELECTION_UPDATES] Selected opening parameter updates
-// [SEC-10-GRIDS] [TAG:GRID_AXIS] Grid axis operations
-// [SEC-11-LAYOUT] [TAG:BUILD_LAYOUT] Screen layout, bars, sheets, and view switching
-// [SEC-12-LOGS] [TAG:LOGGER_UI] Diagnostic logs UI
-// [SEC-13-VIEW2D] [TAG:CANVAS_2D] 2D viewport, painter stack, and draft overlays
-//   ↳ [TAG:CAD_EXPANSION_COMMITS] CAD primitive commit handlers
-// [SEC-14-VIEW3D] [TAG:VIEW_3D] 3D viewport and publication preview
+// [SEC-01-WIDGET]   Widget Declaration & Public Api
+// [SEC-02-STATE]   [TAG:STATE_FIELDS] State Declarations & Tool Flags
+//   ↳ [SUB]        [TAG:UNDERLAY_TOOLS] CAD Xref & Raster Underlay State & Handlers
+//   ↳ [SUB]        [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG CONTROLLER
+//   ↳ [SUB]        [TAG:UNDERLAY_DRAG] UNDERLAY 2-POINT SNAP DRAG & SELECTION
+//   ↳ [SUB]        [TAG:CAD_INSERTION] CAD UNDERLAY INTERACTIVE PLACEMENT
+//   ↳ [SUB]        [TAG:STATE_LIFECYCLE] Lifecycle: initState & dispose
+// [SEC-03-XFORM]   [TAG:XFORM_COORDS] Screen <-> Model Space & Snapping
+// [SEC-04-TOUCH]   [TAG:TOUCH_DOWN] _onPointerDown Input Dispatch
+//   ↳ [SUB]        [TAG:TOUCH_MOVE] _onPointerMove Input Dispatch & Previews
+//   ↳ [SUB]        [TAG:TOUCH_UP] _onPointerUp Input Dispatch & Tool Commits
+// [SEC-05-ZONES]   [TAG:ZONE_LOGIC] Zone Updates, Schedules & Presets
+// [SEC-06-WALLS]   [TAG:WALL_DRAFT] Wall Concept Drafting & Chain Grouping
+// [SEC-07-SPLIT]   [TAG:WALL_SPLIT] Wall Splitting, Cut Sessions & Clearances
+// [SEC-08-FENEST]  [TAG:FENEST_RADIAL] Door/Window Placement & Radial Context Menus
+//   ↳ [SUB]        [TAG:FLOATING_HUD] Contextual Floating Command Overlays & Interactive Edge Curving
+//   ↳ [SUB]        [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG METHODS
+// [SEC-09-SELECT]  [TAG:SELECTION_BAR] Selection HUD, Action Bars & Layer Modals
+//   ↳ [SUB]        [TAG:FENESTRATION_SELECTION_UPDATES] Live Door & Window Parameter Mutators
+// [SEC-10-GRIDS]   [TAG:GRID_AXIS] Grid Axes Alignments, Offsets & Numbering
+// [SEC-11-LAYOUT]  [TAG:BUILD_LAYOUT] Scaffold, Top/Bottom Bars & Sheet Panels
+// [SEC-12-LOGS]    [TAG:LOGGER_UI] Diagnostic Logger Dialog Modal
+// [SEC-13-VIEW2D]  [TAG:CANVAS_2D] 2D CustomPainter Canvas, Viewport & Draft Overlays
+//   ↳ [SUB]        [TAG:CAD_EXPANSION_COMMITS] CAD EXPANSION COMMITS (ARC, MASK, SPLINE, ELLIPSE, LEADER, ROOF SLOP
+// [SEC-14-VIEW3D]  [TAG:VIEW_3D] 3D Solid Viewport & Publication Preview
 // ============================================================================
 
 // === SECTION: [SEC-01-WIDGET] WIDGET DECLARATION & PUBLIC API ===
@@ -3922,7 +3920,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // --- SUBSECTION: [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG CONTROLLER ---
   final ArchitectDragController _dragController = ArchitectDragController();
-  bool _dragMovedSinceBaseGrab = false;
+  // A released target stays frozen for review until another canvas pick.
+  bool _dragTargetPlaced = false;
+  Offset _dragPointerOffset = Offset.zero;
 
   // --- SUBSECTION: [TAG:UNDERLAY_DRAG] UNDERLAY 2-POINT SNAP DRAG & SELECTION ---
   // Underlays use the shared [_dragController] so their gesture, preview,
@@ -4341,6 +4341,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _startUnderlaySnapDrag({required bool isCad, String? rasterId}) async {
+    _discardGeometryCommand();
     _cancelActiveDrags();
     final storeyId = _project.activeStorey.id;
     if (isCad) {
@@ -4389,7 +4390,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         handleOffsetLength: _handleOffsetLength,
         zoomScale: _currentScale,
       );
-      _dragMovedSinceBaseGrab = false;
+      _dragTargetPlaced = false;
       setState(() {
         _isCadUnderlaySelected = true;
         _selectedRasterId = null;
@@ -4414,7 +4415,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         handleOffsetLength: _handleOffsetLength,
         zoomScale: _currentScale,
       );
-      _dragMovedSinceBaseGrab = false;
+      _dragTargetPlaced = false;
       setState(() {
         _selectedRasterId = raster.id;
         _isCadUnderlaySelected = false;
@@ -5499,7 +5500,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  void _changeTool(ArchitectTool tool, {bool toggle = true}) => setState(() {
+  void _changeTool(ArchitectTool tool, {bool toggle = true}) {
+    // Move is a transient selection operation; preserve the drawing tool and
+    // selection instead of clearing them during a tool switch.
+    if (tool == ArchitectTool.drag) {
+      _startDragSession();
+      return;
+    }
+    setState(() {
     _discardGeometryCommand();
     _touchCandidates = null;
     final previousMode = _interactionMode;
@@ -5581,15 +5589,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectionIds.add(keepSingle);
       _selectedElementId = keepSingle;
     }
-    if (nextTool == ArchitectTool.drag) {
-      if (keepSingle != null) {
-        _selectionIds.add(keepSingle);
-        _selectedElementId = keepSingle;
-      }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _startDragSession();
-      });
-    }
 
     _midpointTracking.clear();
 
@@ -5611,7 +5610,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _isZoneTableSelected = false;
 
-  });
+    });
+  }
 
 
 
@@ -8600,7 +8600,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerDown(PointerDownEvent event) {
     if (_commandReady) return;
     _dismissTouchCandidates();
-    if (_interactionMode == ArchitectInteractionMode.navigation && !_terrainDrafting) {
+    if (_interactionMode == ArchitectInteractionMode.navigation &&
+        !_terrainDrafting && !_dragController.isActive) {
       _touchInput = event.kind == PointerDeviceKind.touch;
       _handlePointerDown = event.localPosition;
       _handleMoved = false;
@@ -8647,14 +8648,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           raster: _selectedRasterUnderlay,
         );
         final base = _dragController.currentPointModel ?? rawModel;
+        _dragPointerOffset = _dragController.currentSnapLabel == 'Grip'
+            ? base - rawModel : Offset.zero;
         _dragController.grabBasePoint(base, frame: _effectiveUnderlayFrame);
-        _dragMovedSinceBaseGrab = false;
+        _dragTargetPlaced = false;
         _isHandleEngaged = true;
         HapticFeedback.selectionClick();
         setState(() {});
         return;
       } else if (_dragController.isDraggingToTarget) {
-        _confirmDragPlacement();
+        _dragTargetPlaced = false;
+        _dragPointerOffset = Offset.zero;
+        _isHandleEngaged = true;
+        _updateDragTarget(rawModel);
+        _repaintPreview();
+        setState(() {});
         return;
       }
     }
@@ -9722,25 +9730,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           raster: _selectedRasterUnderlay,
         );
       } else if (_dragController.isDraggingToTarget) {
-        _dragMovedSinceBaseGrab = true;
-        _dragController.updateTargetHover(
-          rawModel,
-          project: _project,
-          scale: _currentScale,
-        );
-        if (!_dragController.isUnderlay && _elementMoveOriginal != null && _dragController.deltaModel != null) {
-          final delta = _dragController.deltaModel!;
-          try {
-            _elementMovePreview = MoveArchitectElements(
-              storeyId: _project.activeStoreyId,
-              elementIds: _dragController.elementIds,
-              delta: delta,
-            ).apply(_elementMoveOriginal!);
-            _elementMoveDelta = delta;
-          } on ArgumentError {
-            _elementMoveDelta = null;
-          }
-        }
+        _updateDragTarget(rawModel);
       }
       _cursorModel = _dragController.currentPointModel;
       _activeSnapLabel = _dragController.currentSnapLabel;
@@ -10964,6 +10954,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _updateMidpointReferences(rawModel);
 
     if (_dragController.isActive) {
+      if (_dragTargetPlaced) return;
       if (_dragController.isPickingBasePoint) {
         _dragController.updateBaseHover(
           rawModel,
@@ -10974,25 +10965,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           raster: _selectedRasterUnderlay,
         );
       } else if (_dragController.isDraggingToTarget) {
-        _dragMovedSinceBaseGrab = true;
-        _dragController.updateTargetHover(
-          rawModel,
-          project: _project,
-          scale: _currentScale,
-        );
-        if (!_dragController.isUnderlay && _elementMoveOriginal != null && _dragController.deltaModel != null) {
-          final delta = _dragController.deltaModel!;
-          try {
-            _elementMovePreview = MoveArchitectElements(
-              storeyId: _project.activeStoreyId,
-              elementIds: _dragController.elementIds,
-              delta: delta,
-            ).apply(_elementMoveOriginal!);
-            _elementMoveDelta = delta;
-          } on ArgumentError {
-            _elementMoveDelta = null;
-          }
-        }
+        _updateDragTarget(rawModel);
       }
       _cursorModel = _dragController.currentPointModel;
       _activeSnapLabel = _dragController.currentSnapLabel;
@@ -12487,14 +12460,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerUp(PointerUpEvent event) {
     if (_commandReady) return;
     if (_dragController.isActive) {
-      if (_dragController.isDraggingToTarget && _dragMovedSinceBaseGrab) {
-        if (_dragController.distanceMeters > 0.05) {
-          _confirmDragPlacement();
-        }
-      }
-      // The base-point tap and a stationary target tap belong to Drag. They
-      // must not fall through into ordinary selection handling, which would
-      // cancel the active drag session.
+      // Release freezes the preview; only the Drag overlay may commit it.
+      _dragTargetPlaced = _hasValidDragTarget;
+      _dragPointerOffset = Offset.zero;
+      _isHandleEngaged = false;
+      _handlePointerDown = null;
+      setState(() {});
       return;
     }
     if (_isCurvingEdgeDragging) {
@@ -12800,7 +12771,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _isHandleEngaged = false;
     _dragController.cancel();
-    _dragMovedSinceBaseGrab = false;
+    _dragTargetPlaced = false;
+    _dragPointerOffset = Offset.zero;
     _underlayMaskDrafting = false;
     _underlayMaskDraftStart = null;
     _underlayMaskPoints = [];
@@ -22500,7 +22472,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     if (const {
-      ArchitectRadialAction.move, ArchitectRadialAction.edit,
+      ArchitectRadialAction.edit,
       ArchitectRadialAction.duplicate, ArchitectRadialAction.rotate,
       ArchitectRadialAction.split,
       ArchitectRadialAction.cut, ArchitectRadialAction.cutOpening,
@@ -22615,7 +22587,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           return;
 
         case ArchitectRadialAction.move:
-          _cancelActiveDrags();
           _startDragSession();
           return;
 
@@ -22779,7 +22750,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
       case ArchitectRadialAction.move:
-        _cancelActiveDrags();
         _startDragSession();
         break;
 
@@ -25313,7 +25283,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG METHODS ---
 
   void _startDragSession() {
+    // Free Move owns its preview/commit. Numeric and transverse moves keep
+    // their separate generic geometry-command workflow.
+    _discardGeometryCommand();
     _cancelActiveDrags();
+    _resetWallDraft();
+    _touchCandidates = null;
+    _moveSelection = false;
+    _transverseMove = false;
+    assert(_commandPreview == null);
 
     final storeyId = _project.activeStorey.id;
 
@@ -25338,7 +25316,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         handleOffsetLength: _handleOffsetLength,
         zoomScale: _currentScale,
       );
-      _dragMovedSinceBaseGrab = false;
+      _dragTargetPlaced = false;
       setState(() {});
       return;
     }
@@ -25361,7 +25339,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           handleOffsetLength: _handleOffsetLength,
           zoomScale: _currentScale,
         );
-        _dragMovedSinceBaseGrab = false;
+        _dragTargetPlaced = false;
         setState(() {});
         return;
       }
@@ -25405,12 +25383,43 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementMoveOriginal = _project;
     _elementMovePreview = null;
     _elementMoveDelta = null;
-    _dragMovedSinceBaseGrab = false;
+    _dragTargetPlaced = false;
     setState(() {});
   }
 
+  bool get _hasValidDragTarget =>
+      _dragController.isDraggingToTarget &&
+      _dragController.distanceMeters > 1e-7 &&
+      (_dragController.isUnderlay || _elementMovePreview != null);
+
+  void _updateDragTarget(Offset rawModel) {
+    _dragController.updateTargetHover(
+      rawModel + _dragPointerOffset, project: _project, scale: _currentScale,
+    );
+    _cursorModel = _dragController.currentPointModel;
+    _activeSnapLabel = _dragController.currentSnapLabel;
+    _activeMagneticGuides = _dragController.magneticGuides;
+    if (_dragController.isUnderlay) return;
+    _elementMovePreview = null;
+    _elementMoveDelta = null;
+    final source = _elementMoveOriginal;
+    final delta = _dragController.deltaModel;
+    if (source == null || delta == null || delta.distance <= 1e-7) return;
+    try {
+      _elementMovePreview = MoveArchitectElements(
+        storeyId: _dragController.storeyId,
+        elementIds: _dragController.elementIds,
+        delta: delta,
+      ).apply(source);
+      _elementMoveDelta = delta;
+    } on ArgumentError {
+      // An invalid candidate must not leave an earlier valid preview applied.
+    }
+  }
+
   void _confirmDragPlacement() {
-    if (!_dragController.isDraggingToTarget) return;
+    if (!_dragTargetPlaced || !_hasValidDragTarget) return;
+    assert(_commandPreview == null);
     final target = _dragController.currentPointModel;
     if (target == null) return;
 
@@ -25463,13 +25472,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
 
-    _dragController.cancel();
-    _elementMovePreview = null;
-    _elementMoveOriginal = null;
-    _elementMoveDelta = null;
-    _dragMovedSinceBaseGrab = false;
-    _isHandleEngaged = false;
-    setState(() {});
+    _cancelDragPlacement();
   }
 
   void _cancelDragPlacement() {
@@ -25477,9 +25480,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _elementMovePreview = null;
     _elementMoveOriginal = null;
     _elementMoveDelta = null;
-    _dragMovedSinceBaseGrab = false;
+    _dragTargetPlaced = false;
+    _dragPointerOffset = Offset.zero;
     _isHandleEngaged = false;
+    _cursorModel = null;
+    _activeSnapLabel = null;
+    _activeMagneticGuides = const [];
     setState(() {});
+    _repaintPreview();
   }
 
   Widget _buildDragFloatingOverlay() {
@@ -25489,15 +25497,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         Offset.zero;
     final screenPos = _viewport.toScreen(targetModel);
     final isPicking = _dragController.isPickingBasePoint;
-    final clamped = _clampOverlayPosition(
-      screenPos,
-      width: isPicking ? 76 : 132,
-      height: 60,
+    // Keep the pill below the target, clear of its snap and length badges,
+    // and clamp against the canvas rather than the whole phone screen.
+    final width = isPicking ? 76.0 : 132.0;
+    final canvasSize = _viewport.size;
+    const height = 60.0;
+    final safe = (Offset.zero & canvasSize).deflate(8);
+    final candidates = [
+      screenPos + const Offset(24, 32),
+      screenPos + const Offset(24, -height - 36),
+      screenPos + Offset(-width - 24, 32),
+      screenPos + Offset(-width - 24, -height - 36),
+    ];
+    final clamped = candidates.where((position) =>
+      safe.contains(position) && safe.contains(position + Offset(width, height)),
+    ).firstOrNull ?? Offset(
+      (screenPos.dx + 24).clamp(8.0, math.max(8.0, canvasSize.width - width - 8)),
+      (screenPos.dy + 32).clamp(8.0, math.max(8.0, canvasSize.height - height - 8)),
     );
     return ArchitectFloatingCommandOverlay(
+      surfaceKey: const ValueKey('architect-drag-command-overlay'),
       position: clamped,
       label: '',
-      ready: !isPicking,
+      ready: _dragTargetPlaced && _hasValidDragTarget,
       showConfirm: !isPicking,
       onCancel: _cancelDragPlacement,
       onConfirm: _confirmDragPlacement,
@@ -26051,7 +26073,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   );
 
   Widget _buildWallSelectionActions(Set<String> wallIds) {
-    if (_commandPreview != null) return const SizedBox.shrink();
+    if (_commandPreview != null || _dragController.isActive) return const SizedBox.shrink();
 
     final l = context.l10n;
 
@@ -30385,7 +30407,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               ? null
 
-              : ArchitectToolPalette(
+              : Visibility(
+                  visible: !_dragController.isActive,
+                  maintainState: true,
+                  child: ArchitectToolPalette(
 
                   zonePresets: _zonePresets,
 
@@ -30807,6 +30832,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   },
 
                 ),
+                ),
 
           body: Column(
 
@@ -30838,7 +30864,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               : _build2DCanvas()),
 
-                    if (_activeTool == ArchitectTool.zone &&
+                    if (!_dragController.isActive && _activeTool == ArchitectTool.zone &&
 
                         !_is3DView &&
 
@@ -30909,7 +30935,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ),
 
-                    if (_activeTool == ArchitectTool.zoneTable &&
+                    if (!_dragController.isActive && _activeTool == ArchitectTool.zoneTable &&
                         !_is3DView &&
                         _radialMenuScreenPosition == null &&
                         _newPointTargetId == null) ...[
@@ -31012,7 +31038,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       ],
                     ],
 
-                    if (_activeTool == ArchitectTool.axis && !_is3DView)
+                    if (!_dragController.isActive && _activeTool == ArchitectTool.axis && !_is3DView)
 
                       Positioned(
 
@@ -31038,7 +31064,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ),
 
-                    if ((_activeTool == ArchitectTool.roof ||
+                    if (!_dragController.isActive && (_activeTool == ArchitectTool.roof ||
 
                             _selectedRoof != null) &&
                         _selectedPolygonHoleIndex == null &&
@@ -31429,7 +31455,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     // Floating Overshoot Notice Banner
 
-                    if (_activeOvershoot != null && !_is3DView)
+                    if (!_dragController.isActive && _activeOvershoot != null && !_is3DView)
 
                       Positioned(
 
@@ -32425,7 +32451,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     builder: (context, _) {
 
-      if (_commandPreview != null) {
+      if (_commandPreview != null || _dragController.isActive) {
         _renderedDraftCancelRect = null;
         _renderedDraftConfirmRect = null;
         return const SizedBox.shrink();
@@ -32648,7 +32674,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         holdToEdit:
 
-            _duplicateMove == null &&
+            !_dragController.isActive && _duplicateMove == null &&
 
             _offsetOptions == null &&
 
@@ -32670,19 +32696,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             _newPointTargetId == null,
 
-        touchHoldToPlace: _canPlaceWithMarker,
+        touchHoldToPlace: !_dragController.isActive && _canPlaceWithMarker,
 
         onToolHoldStart: _beginPlacementHold,
 
-        onSelectionHold: _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSelectionHold: !_dragController.isActive && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
 
             ? _onSelectionHold
 
             : null,
 
-        onSecondaryTap: _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSecondaryTap: !_dragController.isActive && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
             ? _onContextHold : null,
-        onContextHold: _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onContextHold: !_dragController.isActive && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
 
             ? _onContextHold
 
@@ -32704,7 +32730,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         onToolCancel: () {
 
-          _cancelActiveDrags();
+          if (_dragController.isActive) {
+            _cancelDragPlacement();
+          } else {
+            _cancelActiveDrags();
+          }
 
           _repaintPreview();
 
@@ -33105,7 +33135,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             Positioned.fill(child: _buildDraftCancel()),
 
-            if (!_showSelectionControl && _touchCandidates == null && _newPointTargetId == null) Positioned(
+            if (!_dragController.isActive && !_showSelectionControl && _touchCandidates == null && _newPointTargetId == null) Positioned(
 
               left: 12,
 
@@ -33468,8 +33498,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         ),
 
-      _buildWallClearanceOverlay(),
-      _buildWallArcDimensionOverlay(),
+      if (!_dragController.isActive) ...[
+        _buildWallClearanceOverlay(),
+        _buildWallArcDimensionOverlay(),
+      ],
 
       if (_placingDownpipe)
 
@@ -35002,8 +35034,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ),
-      if (_commandPreview != null)
+      if (_commandPreview != null && !_dragController.isActive)
         ArchitectFloatingCommandOverlay(
+          surfaceKey: const ValueKey('architect-generic-command-overlay'),
           label: BimEditActions.label(_commandAction!, context.l10n),
           ready: _commandCanConfirm,
           onCancel: _cancelGeometryCommand,
@@ -36142,7 +36175,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     activeSnapLabel: _localizedSnapLabel(_activeSnapLabel),
 
-    selectedElementId: _selectedElementId,
+    // Selection outlines remain visible, but idle vertex/endpoint grips and
+    // property dimensions must not compete with the active Drag controls.
+    selectedElementId: _dragController.isActive ? null : _selectedElementId,
 
     selectedElementIds: _effectiveSelection,
     selectionPreviewActive: layer == ArchitectPaintLayer.interaction && _selectionPreview.active,
@@ -36150,7 +36185,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     selectionPreviewAddedIds: layer == ArchitectPaintLayer.interaction ? _selectionPreview.added : const {},
     selectionPreviewRemovedIds: layer == ArchitectPaintLayer.interaction ? _selectionPreview.removed : const {},
 
-    selectedZoneId: _selectedZoneId,
+    selectedZoneId: _dragController.isActive ? null : _selectedZoneId,
 
     activeZoneCategory: _activeZoneCategory,
 

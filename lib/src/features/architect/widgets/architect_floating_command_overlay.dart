@@ -13,6 +13,7 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
   final bool showConfirm;
   final String? confirmTooltip;
   final String? cancelTooltip;
+  final Key surfaceKey;
 
   const ArchitectFloatingCommandOverlay({
     super.key,
@@ -25,6 +26,7 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
     this.showConfirm = true,
     this.confirmTooltip,
     this.cancelTooltip,
+    this.surfaceKey = const ValueKey('architect-floating-command-overlay'),
   });
 
   @override
@@ -34,7 +36,7 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
       left: position.dx,
       top: position.dy,
       child: Material(
-        key: const ValueKey('architect-floating-command-overlay'),
+        key: surfaceKey,
         color: const Color(0xEE1E2430),
         elevation: 8,
         borderRadius: BorderRadius.circular(24),
@@ -100,7 +102,10 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
                   key: const ValueKey('architect-command-apply'),
                   tooltip: confirmTooltip ?? l.applyAction,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                  constraints: const BoxConstraints(
+                    minWidth: 34,
+                    minHeight: 34,
+                  ),
                   splashRadius: 18,
                   icon: AppIcon(
                     AppIconId.confirm,

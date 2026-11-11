@@ -58,7 +58,8 @@ class ArchitectDragPainterHelper {
       }
 
       // 2. Draw hover snap point on element if hovering near snap
-      if (dragController.isSnapped && dragController.currentPointModel != null) {
+      if (dragController.isSnapped &&
+          dragController.currentPointModel != null) {
         final pt = dragController.currentPointModel!;
         final ringPaint = Paint()
           ..color = const Color(0xFF00E676)
@@ -70,10 +71,16 @@ class ArchitectDragPainterHelper {
 
         canvas.drawCircle(pt, 9.0 / draftingScale, glowPaint);
         canvas.drawCircle(pt, 9.0 / draftingScale, ringPaint);
-        canvas.drawCircle(pt, 2.5 / draftingScale, Paint()..color = Colors.white);
+        canvas.drawCircle(
+          pt,
+          2.5 / draftingScale,
+          Paint()..color = Colors.white,
+        );
 
-        final label = dragController.currentSnapLabel != null && localizeSnap != null
-            ? localizeSnap(dragController.currentSnapLabel!) ?? dragController.currentSnapLabel!
+        final label =
+            dragController.currentSnapLabel != null && localizeSnap != null
+            ? localizeSnap(dragController.currentSnapLabel!) ??
+                  dragController.currentSnapLabel!
             : dragController.currentSnapLabel;
         if (label != null) {
           _drawBadge(canvas, pt, label, const Color(0xFF00E676), zoomScale);
@@ -98,7 +105,14 @@ class ArchitectDragPainterHelper {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.0 / draftingScale;
         for (final guide in dragController.magneticGuides) {
-          _drawDashedLine(canvas, guide.$1, guide.$2, guidePaint, 6.0 / zoomScale, 4.0 / zoomScale);
+          _drawDashedLine(
+            canvas,
+            guide.$1,
+            guide.$2,
+            guidePaint,
+            6.0 / zoomScale,
+            4.0 / zoomScale,
+          );
         }
       }
 
@@ -128,8 +142,9 @@ class ArchitectDragPainterHelper {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.2 / zoomScale;
       final targetGlow = Paint()
-        ..color = (isSnapped ? const Color(0xFF00E676) : const Color(0xFF00E5FF))
-            .withValues(alpha: 0.25)
+        ..color =
+            (isSnapped ? const Color(0xFF00E676) : const Color(0xFF00E5FF))
+                .withValues(alpha: 0.25)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(target, 10.0 / zoomScale, targetGlow);
       canvas.drawCircle(target, 10.0 / zoomScale, targetRing);
@@ -138,17 +153,24 @@ class ArchitectDragPainterHelper {
       // 5. Target snap label badge
       if (isSnapped && dragController.currentSnapLabel != null) {
         final label = localizeSnap != null
-            ? localizeSnap(dragController.currentSnapLabel!) ?? dragController.currentSnapLabel!
+            ? localizeSnap(dragController.currentSnapLabel!) ??
+                  dragController.currentSnapLabel!
             : dragController.currentSnapLabel!;
         _drawBadge(canvas, target, label, const Color(0xFF00E676), zoomScale);
       }
 
       // 6. Dimension & angle badge at midpoint of rubber-band line
-      final mid = Offset((base.dx + target.dx) / 2, (base.dy + target.dy) / 2);
       final dist = dragController.distanceMeters;
-      final deg = dragController.angleDeg;
-      final distText = 'L=${dist.toStringAsFixed(2)}m  ${deg.toStringAsFixed(0)}°';
-      _drawBadge(canvas, mid, distText, const Color(0xFFFFB300), zoomScale);
+      if (dist * zoomScale > 3) {
+        final mid = Offset(
+          (base.dx + target.dx) / 2,
+          (base.dy + target.dy) / 2,
+        );
+        final deg = dragController.angleDeg;
+        final distText =
+            '${dist.toStringAsFixed(2)} m  ${deg.toStringAsFixed(0)}°';
+        _drawBadge(canvas, mid, distText, const Color(0xFFFFB300), zoomScale);
+      }
     }
   }
 
@@ -186,6 +208,7 @@ class ArchitectDragPainterHelper {
         text: text,
         style: const TextStyle(
           color: Colors.white,
+          fontFamily: 'Roboto',
           fontSize: 10,
           fontWeight: FontWeight.bold,
         ),
@@ -212,7 +235,10 @@ class ArchitectDragPainterHelper {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0 / scale;
 
-    final rrect = RRect.fromRectAndRadius(badgeRect, Radius.circular(3.0 / scale));
+    final rrect = RRect.fromRectAndRadius(
+      badgeRect,
+      Radius.circular(3.0 / scale),
+    );
     canvas.drawRRect(rrect, bgPaint);
     canvas.drawRRect(rrect, borderPaint);
 
