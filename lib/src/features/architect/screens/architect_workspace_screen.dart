@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import '../services/architect_underlay_service.dart';
 import '../services/architect_drag_controller.dart';
+import '../services/architect_wall_endpoint_snap.dart';
+import '../widgets/architect_wall_angle_control.dart';
 import '../services/architect_geodetic_detector.dart';
 import '../widgets/architect_underlay_bar.dart';
 import '../../bim_projects/services/bim_underlay_picker_helper.dart';
@@ -349,6 +351,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 //   ↳ [SUB]        [TAG:UNDERLAY_DRAG] UNDERLAY 2-POINT SNAP DRAG & SELECTION
 //   ↳ [SUB]        [TAG:CAD_INSERTION] CAD UNDERLAY INTERACTIVE PLACEMENT
 //   ↳ [SUB]        [TAG:ARC_EXACT_PLACEMENT] Chord input, shaping, exact rise, commit
+//   ↳ [SUB]        [TAG:WALL_ENDPOINT_ANGLE] Endpoint angle constraint and fine adjustment
 //   ↳ [SUB]        [TAG:STATE_LIFECYCLE] Lifecycle: initState & dispose
 // [SEC-03-XFORM]   [TAG:XFORM_COORDS] Screen <-> Model Space & Snapping
 // [SEC-04-TOUCH]   [TAG:TOUCH_DOWN] _onPointerDown Input Dispatch
@@ -5622,6 +5625,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _clearSelection() {
+    _wallAngleUnlockedId = null;
     _discardGeometryCommand();
     _touchCandidates = null;
 
@@ -6972,6 +6976,61 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _touchPosition;
 
   ArchitectWall? _wallEndpointOriginal;
+
+  // --- SUBSECTION: [TAG:WALL_ENDPOINT_ANGLE] Endpoint angle constraint and fine adjustment ---
+  String? _wallAngleUnlockedId;
+
+  Widget _buildWallAngleOverlay() => Positioned.fill(
+    child: AnimatedBuilder(
+      animation: Listenable.merge([_viewport, _previewRevision]),
+      builder: (context, _) {
+        final selected = _selectedWall;
+        if (!_commands.isPlan ||
+            _printPreview ||
+            selected == null ||
+            selected.isCurved ||
+            _effectiveSelection.length != 1 ||
+            _commandPreview != null ||
+            _moveSelection ||
+            _mirrorActive ||
+            _splitActive ||
+            _offsetOptions != null ||
+            _rotationSource != null ||
+            _duplicateMove != null ||
+            _newPointTargetId != null ||
+            _wallCutIds.isNotEmpty ||
+            _wallExtendId != null ||
+            _wallJoinSourceId != null ||
+            _wallAttachSourceId != null ||
+            _pendingDetachWallIds != null ||
+            _curvingEdgeElementId != null ||
+            _radialMenuScreenPosition != null) {
+          return const SizedBox.shrink();
+        }
+        final wall = _drawingProject.activeStorey.walls
+            .where((w) => w.id == selected.id)
+            .firstOrNull;
+        if (wall == null) return const SizedBox.shrink();
+        return ArchitectWallAngleControl(
+          wall: wall,
+          walls: _drawingProject.activeStorey.walls,
+          locked: _wallAngleUnlockedId != wall.id,
+          toScreen: _viewport.toScreen,
+          toModel: _screenToModel,
+          handleClearance: _handleOffsetLength,
+          onToggle: _isDraggingVertexOrHandle
+              ? null
+              : () {
+                  setState(() {
+                    _wallAngleUnlockedId =
+                        _wallAngleUnlockedId == wall.id ? null : wall.id;
+                  });
+                  HapticFeedback.selectionClick();
+                },
+        );
+      },
+    ),
+  );
 
   ArchitectProject? _wallSnapProject;
 
@@ -9807,6 +9866,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_draftCancelPointer == event.pointer) return;
+    // Explicit unlock permits a fine nudge without a large initial excursion.
+    final fineEndpointAdjustment = _wallEndpointOriginal != null &&
+        _wallEndpointOriginal!.id == _wallAngleUnlockedId;
 
     if (_touchInput &&
 
@@ -9816,7 +9878,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _handlePointerDown != null &&
 
-        (event.localPosition - _handlePointerDown!).distance <= 6) {
+        (event.localPosition - _handlePointerDown!).distance <=
+            (fineEndpointAdjustment ? 1 : 6)) {
 
       return;
 
@@ -11368,31 +11431,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final origNormal = Offset(-origDir.dy, origDir.dx);
 
-      final snap = ArchitectWallSnap.resolve(
-
-        midpointReferences: _midpointTracking.references,
-
-        raw: rawTarget,
-
-        magnetic: _magnetEnabled,
-
-        anchor: _wallDragStart ? original.endPoint : original.startPoint,
-
-        dragOrigin: _wallDragStart ? original.startPoint : original.endPoint,
-
-        project: snapProject,
-
-        scale: _currentScale,
-
-        underlay: _currentUnderlayDoc,
-
-        frame: _effectiveUnderlayFrame,
-
-        visibility: _effectiveUnderlayLayerVisibility,
-
-        referenceDirections: [origDir, origNormal],
-
-      );
+      final isStraightWall =
+          !original.isCurved &&
+          _elementMoveOriginal!.activeStorey.walls.any((w) => w.id == original.id);
+      final snap = isStraightWall
+          ? ArchitectWallEndpointSnap.resolve(
+              wall: original,
+              atStart: _wallDragStart,
+              raw: rawTarget,
+              snapProject: snapProject,
+              scale: _currentScale,
+              angleLocked: _wallAngleUnlockedId != original.id,
+              magnetic: _magnetEnabled,
+              underlay: _currentUnderlayDoc,
+              frame: _effectiveUnderlayFrame,
+              visibility: _effectiveUnderlayLayerVisibility,
+            )
+          : ArchitectWallSnap.resolve(
+              midpointReferences: _midpointTracking.references,
+              raw: rawTarget,
+              magnetic: _magnetEnabled,
+              anchor: _wallDragStart ? original.endPoint : original.startPoint,
+              dragOrigin: _wallDragStart ? original.startPoint : original.endPoint,
+              project: snapProject,
+              scale: _currentScale,
+              underlay: _currentUnderlayDoc,
+              frame: _effectiveUnderlayFrame,
+              visibility: _effectiveUnderlayLayerVisibility,
+              referenceDirections: [origDir, origNormal],
+            );
 
       final updated = original.copyWith(
 
@@ -33445,6 +33512,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (!_dragController.isActive) ...[
         _buildWallClearanceOverlay(),
         _buildWallArcDimensionOverlay(),
+        _buildWallAngleOverlay(),
       ],
 
       if (_placingDownpipe)

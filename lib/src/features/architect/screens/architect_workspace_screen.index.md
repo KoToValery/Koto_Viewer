@@ -27,6 +27,7 @@
 | [TAG:TOUCH_UP] | Pointer-up dispatch and commits |
 | [TAG:ZONE_LOGIC] | Zone mutations, area updates, and schedules |
 | [TAG:WALL_DRAFT] | Wall drafting and chained wall placement |
+| [TAG:WALL_ENDPOINT_ANGLE] | Straight-wall endpoint angle constraint and compact unlock control |
 | [TAG:ARC_EXACT_PLACEMENT] | Shared wall/line/arc sequence: exact chord, shaping, exact rise, commit |
 | [TAG:WALL_SPLIT] | Wall splitting and cut sessions |
 | [TAG:FENEST_RADIAL] | Door/window placement and radial context actions |
@@ -100,6 +101,23 @@ Model reflection details and associations live in
 `architect_element_tool.index.md` and `ArchitectMirrorGeometry`.
 
 ## 4. Cross-cutting state and owners
+
+### Straight-wall endpoint angle
+
+`[TAG:WALL_ENDPOINT_ANGLE]`: `_buildWallAngleOverlay` reuses the temporary
+white-paper dimension badge pattern, with a 44 px touch target outside the
+endpoint/offset grips. A straight selected wall starts angle-locked. Tapping
+the badge sets `_wallAngleUnlockedId`; explicit unlock removes angular capture
+for small corrections. The choice is transient and clears with selection.
+Unlocked endpoint nudges use a 1 px touch dead zone; other handles retain 6 px.
+The endpoint branch of `_updatePointerPreview` uses `ArchitectWallEndpointSnap`
+for actual straight walls only; CAD lines, polylines and curved walls keep their
+existing resolver. Locked snaps use true crossings on the original direction,
+never an off-axis endpoint. Global magnet toggling does not change the lock.
+Preview and release keep `UpdateArchitectWall(carryConnections: true)`,
+`_commitActiveHandleDrag`, the existing history/save path and gesture ownership.
+Whole-wall Drag, transverse move and numeric offset do not use this constraint.
+Regression coverage: `test/features/architect/architect_wall_angle_lock_test.dart`.
 
 - _commands: ArchitectWorkspaceViewController, the screen-level document operations controller.
 - _modelCommands: ArchitectCommandController; inspect its callers to determine which mutations use this command path.

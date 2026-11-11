@@ -9,6 +9,20 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get architectWallAngleLocked => 'Angle locked';
+
+  @override
+  String get architectWallAngleFree => 'Free angle';
+
+  @override
+  String get architectWallAngleUnlockHelp =>
+      'Unlock the angle for a small sideways correction of the endpoint. Moving the whole wall remains available.';
+
+  @override
+  String get architectWallAngleLockHelp =>
+      'Lock the current angle to lengthen or shorten the wall without rotating it. Moving the whole wall remains available.';
+
+  @override
   String get appTitle => 'KoToViewer';
 
   @override

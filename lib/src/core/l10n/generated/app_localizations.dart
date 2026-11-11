@@ -98,6 +98,30 @@ abstract class AppLocalizations {
     Locale('en'),
   ];
 
+  /// No description provided for @architectWallAngleLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Angle locked'**
+  String get architectWallAngleLocked;
+
+  /// No description provided for @architectWallAngleFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free angle'**
+  String get architectWallAngleFree;
+
+  /// No description provided for @architectWallAngleUnlockHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock the angle for a small sideways correction of the endpoint. Moving the whole wall remains available.'**
+  String get architectWallAngleUnlockHelp;
+
+  /// No description provided for @architectWallAngleLockHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock the current angle to lengthen or shorten the wall without rotating it. Moving the whole wall remains available.'**
+  String get architectWallAngleLockHelp;
+
   /// The title of the application
   ///
   /// In en, this message translates to:

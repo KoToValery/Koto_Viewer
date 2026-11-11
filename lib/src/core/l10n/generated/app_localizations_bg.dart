@@ -9,6 +9,20 @@ class AppLocalizationsBg extends AppLocalizations {
   AppLocalizationsBg([String locale = 'bg']) : super(locale);
 
   @override
+  String get architectWallAngleLocked => 'Заключен ъгъл';
+
+  @override
+  String get architectWallAngleFree => 'Свободен ъгъл';
+
+  @override
+  String get architectWallAngleUnlockHelp =>
+      'Отключете ъгъла за малка странична корекция на края. Местенето на цялата стена остава достъпно.';
+
+  @override
+  String get architectWallAngleLockHelp =>
+      'Заключете текущия ъгъл за удължаване или скъсяване без завъртане. Местенето на цялата стена остава достъпно.';
+
+  @override
   String get appTitle => 'KoToViewer';
 
   @override

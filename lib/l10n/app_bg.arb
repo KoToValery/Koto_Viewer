@@ -1,4 +1,8 @@
 {
+  "architectWallAngleLocked": "Заключен ъгъл",
+  "architectWallAngleFree": "Свободен ъгъл",
+  "architectWallAngleUnlockHelp": "Отключете ъгъла за малка странична корекция на края. Местенето на цялата стена остава достъпно.",
+  "architectWallAngleLockHelp": "Заключете текущия ъгъл за удължаване или скъсяване без завъртане. Местенето на цялата стена остава достъпно.",
   "@@locale": "bg",
   "appTitle": "KoToViewer",
 

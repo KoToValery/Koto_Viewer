@@ -1,4 +1,8 @@
 {
+  "architectWallAngleLocked": "Angle locked",
+  "architectWallAngleFree": "Free angle",
+  "architectWallAngleUnlockHelp": "Unlock the angle for a small sideways correction of the endpoint. Moving the whole wall remains available.",
+  "architectWallAngleLockHelp": "Lock the current angle to lengthen or shorten the wall without rotating it. Moving the whole wall remains available.",
   "@@locale": "en",
   "appTitle": "KoToViewer",
   "@appTitle": { "description": "The title of the application" },
