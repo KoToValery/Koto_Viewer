@@ -582,12 +582,16 @@ class SlabPlateModel {
     var unsupportedArea = 0.0;
     var lostLoad = 0.0;
     final keptCell = Uint8List(nx * ny);
+    // Staircase cell edges are corrected so the total load equals the drawn
+    // net area. Overlapping zones would distort the factor; then keep 1.0.
     final regionScale = [
       for (var r = 0; r < localRegions.length; r++)
-        regionMeshArea[r] > 0
-            ? _netAreaM2(localRegions[r].$2, localRegions[r].$3) /
-                regionMeshArea[r]
-            : 0.0,
+        () {
+          if (regionMeshArea[r] <= 0) return 0.0;
+          final f = _netAreaM2(localRegions[r].$2, localRegions[r].$3) /
+              regionMeshArea[r];
+          return f >= .7 && f <= 1.3 ? f : 1.0;
+        }(),
     ];
     var totalLoad = 0.0;
     for (var i = 0; i < nx; i++) {

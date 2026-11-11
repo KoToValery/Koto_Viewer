@@ -21,6 +21,7 @@ import '../widgets/architect_selection_move_button.dart';
 import '../widgets/architect_selection_action_bar.dart';
 import '../widgets/architect_floating_command_overlay.dart';
 import '../widgets/architect_canvas_hint.dart';
+import '../widgets/architect_curving_edge_overlay.dart';
 import '../services/architect_command_preview.dart';
 import '../../bim_editing/commands/bim_edit_history.dart';
 import '../../../core/services/ui_settings_service.dart';
@@ -358,6 +359,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-07-SPLIT]   [TAG:WALL_SPLIT] Wall Splitting, Cut Sessions & Clearances
 // [SEC-08-FENEST]  [TAG:FENEST_RADIAL] Door/Window Placement & Radial Context Menus
 //   ↳ [SUB]        [TAG:FLOATING_HUD] Contextual Floating Command Overlays & Interactive Edge Curving
+//   ↳ [SUB]        [TAG:CURVING_FEEDBACK] Compact neutral rise/snap feedback outside edited geometry
 //   ↳ [SUB]        [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG METHODS
 // [SEC-09-SELECT]  [TAG:SELECTION_BAR] Selection HUD, Action Bars & Layer Modals
 //   ↳ [SUB]        [TAG:MIRROR_WORKFLOW] Mirror axis picking, preview and commit
@@ -25047,6 +25049,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  // --- SUBSECTION: [TAG:CURVING_FEEDBACK] Compact neutral rise/snap feedback outside edited geometry ---
   Widget _buildCurvingEdgeFloatingOverlay() {
     if (_curvingEdgeElementId == null ||
         _curvingEdgeStartPoint == null ||
@@ -25055,68 +25058,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     final p1 = _curvingEdgeStartPoint!;
     final p2 = _curvingEdgeEndPoint!;
-    final chordMid = (p1 + p2) / 2;
     final arc = ArchitectWallArc(p1, p2, _curvingEdgeBulge);
-    final handlePos = _curvingEdgeBulge.abs() > 1e-4 ? arc.midpoint : chordMid;
-    final handleScreen = _viewport.toScreen(handlePos);
-    final chordMidScreen = _viewport.toScreen(chordMid);
-    final p1Screen = _viewport.toScreen(p1);
-    final p2Screen = _viewport.toScreen(p2);
-    final gripScreen = _curvingEdgeGripScreen ?? handleScreen;
-
-    final l = context.l10n;
-    final chordDist = _project.formatLength(arc.sagitta);
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: IgnorePointer(
-            child: CustomPaint(
-              painter: _CurvingEdgeGuidePainter(
-                p1: p1Screen,
-                p2: p2Screen,
-                chordMid: chordMidScreen,
-                handlePos: handleScreen,
-                gripPos: gripScreen,
-                isCurved: _curvingEdgeBulge.abs() > 1e-4,
-                distanceText: chordDist,
-                snapLabel: _curvingEdgeSnapped ? _curvingEdgeSnapLabel : null,
-              ),
-            ),
-          ),
-        ),
-        if (_curvingEdgePendingConfirmation) ...[
-          () {
-            final clamped = _clampOverlayPosition(handleScreen + const Offset(0, 16), width: 220);
-            return ArchitectFloatingCommandOverlay(
-              position: clamped,
-              label: l.architectLineCurved,
-              showConfirm: true,
-              ready: true,
-              onConfirm: _commitCurvingEdgeSession,
-              onCancel: _cancelCurvingEdgeSession,
-              customContent: _curvingEdgeSnapLabel != null
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00E676).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFF00E676), width: 0.8),
-                      ),
-                      child: Text(
-                        _curvingEdgeSnapLabel!,
-                        style: const TextStyle(
-                          color: Color(0xFF00E676),
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    )
-                  : null,
-            );
-          }(),
-        ],
-      ],
+    final curved = _curvingEdgeBulge.abs() > 1e-4;
+    final apex = curved ? arc.midpoint : (p1 + p2) / 2;
+    final handle = _viewport.toScreen(apex);
+    final obstacles = ArchitectClearanceObstacles.forWalls(
+      _drawingProject.activeStorey.walls,
+    );
+    final snap = _curvingEdgeSnapped ? _curvingEdgeSnapLabel : null;
+    final label = snap == 'Midpoint alignment'
+        ? context.l10n.snapMidpoint
+        : _localizedSnapLabel(snap);
+    return ArchitectCurvingEdgeOverlay(
+      p1: _viewport.toScreen(p1),
+      p2: _viewport.toScreen(p2),
+      chordMid: _viewport.toScreen((p1 + p2) / 2),
+      handlePos: handle,
+      gripPos: _curvingEdgeGripScreen ?? handle,
+      isCurved: curved,
+      curvePoints: curved
+          ? arc.face(0, 0).map(_viewport.toScreen).toList()
+          : [_viewport.toScreen(p1), _viewport.toScreen(p2)],
+      distanceText: _project.formatLength(arc.sagitta),
+      snapLabel: label,
+      pendingConfirmation: _curvingEdgePendingConfirmation,
+      intersectsDrawing: (rect) => obstacles.intersects(Rect.fromPoints(
+        _viewport.toModel(rect.topLeft), _viewport.toModel(rect.bottomRight),
+      )),
+      onConfirm: _commitCurvingEdgeSession,
+      onCancel: _cancelCurvingEdgeSession,
     );
   }
 
@@ -36369,174 +36339,3 @@ extension _ArchitectLineEndCapL10n on ArchitectLineEndCap {
     ArchitectLineEndCap.tick => l.architectLineCapTick,
   };
 }
-
-class _CurvingEdgeGuidePainter extends CustomPainter {
-  final Offset p1, p2, chordMid, handlePos, gripPos;
-  final bool isCurved;
-  final String distanceText;
-  final String? snapLabel;
-
-  _CurvingEdgeGuidePainter({
-    required this.p1,
-    required this.p2,
-    required this.chordMid,
-    required this.handlePos,
-    required this.gripPos,
-    required this.isCurved,
-    required this.distanceText,
-    this.snapLabel,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // 1. Dashed chord line between p1 and p2
-    final chordPaint = Paint()
-      ..color = const Color(0x9900E5FF)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-    _drawDashedLine(canvas, p1, p2, chordPaint, 6, 4);
-
-    // 2. Height / sagitta line from chordMid to handlePos (apex)
-    final heightPaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..strokeWidth = 1.6
-      ..style = PaintingStyle.stroke;
-    if (isCurved && (handlePos - chordMid).distance > 2) {
-      canvas.drawLine(chordMid, handlePos, heightPaint);
-
-      // Ticks at both ends of height line
-      final delta = handlePos - chordMid;
-      final dist = delta.distance;
-      if (dist > 1e-4) {
-        final tick = Offset(-delta.dy, delta.dx) / dist * 5;
-        canvas.drawLine(chordMid - tick, chordMid + tick, heightPaint);
-        canvas.drawLine(handlePos - tick, handlePos + tick, heightPaint);
-      }
-    }
-
-    final midDotPaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(chordMid, 3.0, midDotPaint);
-
-    // 3. Leader line from handlePos (apex) to gripPos (remote offset handle)
-    if ((gripPos - handlePos).distance > 2) {
-      final leaderPaint = Paint()
-        ..color = const Color(0xCC00E5FF)
-        ..strokeWidth = 1.4
-        ..style = PaintingStyle.stroke;
-      _drawDashedLine(canvas, handlePos, gripPos, leaderPaint, 4, 3);
-    }
-
-    // Apex marker (small hollow circle at the apex of the curve)
-    if (isCurved) {
-      canvas.drawCircle(
-        handlePos,
-        4.0,
-        Paint()
-          ..color = const Color(0xFF00E5FF)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
-      );
-      canvas.drawCircle(
-        handlePos,
-        2.0,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.fill,
-      );
-    }
-
-    // 4. Remote touch grip (at gripPos): glowing, white knockout, accent ring
-    final glowPaint = Paint()
-      ..color = const Color(0x5500E5FF)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(gripPos, 14, glowPaint);
-
-    final bgGripPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(gripPos, 8, bgGripPaint);
-
-    final outerHandlePaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2;
-    canvas.drawCircle(gripPos, 7.5, outerHandlePaint);
-
-    final innerHandlePaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(gripPos, 2.5, innerHandlePaint);
-
-    // 5. Dimension badge (h = ... or snap label)
-    if (isCurved && (handlePos - chordMid).distance > 8) {
-      final midLeader = (chordMid + handlePos) / 2;
-      final label = snapLabel != null ? 'h=$distanceText ($snapLabel)' : 'h=$distanceText';
-      final textSpan = TextSpan(
-        text: label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w600,
-        ),
-      );
-      final textPainter = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      final badgeRect = Rect.fromCenter(
-        center: midLeader + const Offset(20, -12),
-        width: textPainter.width + 12,
-        height: textPainter.height + 6,
-      );
-
-      final rrect = RRect.fromRectAndRadius(badgeRect, const Radius.circular(6));
-      canvas.drawRRect(
-        rrect,
-        Paint()..color = const Color(0xEE1E2430),
-      );
-      canvas.drawRRect(
-        rrect,
-        Paint()
-          ..color = snapLabel != null ? const Color(0xFF00E676) : const Color(0xFF00E5FF)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.0,
-      );
-      textPainter.paint(
-        canvas,
-        Offset(badgeRect.left + 6, badgeRect.top + 3),
-      );
-    }
-  }
-
-  void _drawDashedLine(Canvas canvas, Offset p1, Offset p2, Paint paint, double dashWidth, double dashSpace) {
-    final dx = p2.dx - p1.dx;
-    final dy = p2.dy - p1.dy;
-    final distance = math.sqrt(dx * dx + dy * dy);
-    if (distance < 1e-4) return;
-    final unitX = dx / distance;
-    final unitY = dy / distance;
-    var current = 0.0;
-    while (current < distance) {
-      final start = Offset(p1.dx + unitX * current, p1.dy + unitY * current);
-      final endDist = math.min(current + dashWidth, distance);
-      final end = Offset(p1.dx + unitX * endDist, p1.dy + unitY * endDist);
-      canvas.drawLine(start, end, paint);
-      current += dashWidth + dashSpace;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _CurvingEdgeGuidePainter old) =>
-      old.p1 != p1 ||
-      old.p2 != p2 ||
-      old.chordMid != chordMid ||
-      old.handlePos != handlePos ||
-      old.gripPos != gripPos ||
-      old.isCurved != isCurved ||
-      old.distanceText != distanceText ||
-      old.snapLabel != snapLabel;
-}
-

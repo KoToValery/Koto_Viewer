@@ -33,6 +33,7 @@
 | [TAG:SELECTION_BAR] | Selection HUD, action bars, and layer dialogs |
 | [TAG:FENESTRATION_SELECTION_UPDATES] | Selected opening parameter updates |
 | [TAG:FLOATING_HUD] | Multi-step overlays and interactive edge curving |
+| [TAG:CURVING_FEEDBACK] | One neutral localized rise/snap badge, placed clear of edited geometry |
 | [TAG:MIRROR_WORKFLOW] | Mirror axis picking, preview, cancellation and commit |
 | [TAG:GRID_AXIS] | Grid axis operations |
 | [TAG:BUILD_LAYOUT] | Screen layout, bars, sheets, and view switching |
@@ -136,3 +137,16 @@ context-hold guards reject active drafts before underlay hit testing. The shared
 panel uses a centered bottom position on phones, with bounded scrolling for
 short viewports. `ArchitectWallArcDimensionDialog` shares the numeric keypad
 and permits zero for sagitta while radius still requires a finite positive value.
+
+### Curving feedback presentation
+
+`_buildCurvingEdgeFloatingOverlay` (`[TAG:CURVING_FEEDBACK]`) supplies model
+geometry, compact localized snap labels, and drawing obstacle queries to
+`widgets/architect_curving_edge_overlay.dart`. `ArchitectCurvingEdgeOverlay`
+owns the neutral guide painter and one `h=… · Midpoint` badge. It reuses
+`ArchitectClearanceBadgeLayout` and `ArchitectFloatingCommandOverlay`, avoids
+the edited curve, walls, grips and endpoints, and reserves canvas edges for
+the existing bars. The painter no longer paints a second label on the wall;
+midpoint alignment uses the existing `snapMidpoint` ARB message. Pending
+Apply/Cancel still call `_commitCurvingEdgeSession` / `_cancelCurvingEdgeSession`;
+input routing, snap calculations, model commands and history stay in the screen.
