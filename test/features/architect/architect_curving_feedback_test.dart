@@ -144,6 +144,8 @@ void main() {
         await tester.tapAt(workspace.screen(tester, Offset.zero));
         await tester.pumpAndSettle();
         await tools.selectionAction(tester, 'wall-curve');
+        await arc_ui.enter(tester, '1.5');
+        await arc_ui.button(tester, 'wall-arc-dimension-save');
         final overlay = tester.widget<ArchitectCurvingEdgeOverlay>(
           find.byType(ArchitectCurvingEdgeOverlay),
         );

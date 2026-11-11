@@ -359,6 +359,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-07-SPLIT]   [TAG:WALL_SPLIT] Wall Splitting, Cut Sessions & Clearances
 // [SEC-08-FENEST]  [TAG:FENEST_RADIAL] Door/Window Placement & Radial Context Menus
 //   ↳ [SUB]        [TAG:FLOATING_HUD] Contextual Floating Command Overlays & Interactive Edge Curving
+//   ↳ [SUB]        [TAG:CURVING_EXACT_INPUT] Existing element: exact h, side preview, final Apply/Cancel
 //   ↳ [SUB]        [TAG:CURVING_FEEDBACK] Compact neutral rise/snap feedback outside edited geometry
 //   ↳ [SUB]        [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG METHODS
 // [SEC-09-SELECT]  [TAG:SELECTION_BAR] Selection HUD, Action Bars & Layer Modals
@@ -6278,14 +6279,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _curvingEdgeStartPoint;
   Offset? _curvingEdgeEndPoint;
   double _curvingEdgeBulge = 0.0;
-  double _curvingEdgeInitialBulge = 0.0;
+  double? _curvingEdgeExactBulge;
+  bool _curvingEdgeEditorOpen = false;
   bool _isCurvingEdgeDragging = false;
   bool _curvingEdgeSnapped = false;
   String? _curvingEdgeSnapLabel;
   bool _curvingEdgePendingConfirmation = false;
   Offset _curvingEdgeGripDirection = const Offset(0, -1);
   Offset _curvingDragScreenOffset = Offset.zero;
-  ArchitectArcDimension _curvingDimensionMode = ArchitectArcDimension.sagitta;
   Offset? _lastTapModelPosition;
 
   Offset? get _curvingEdgeGripScreen {
@@ -6667,7 +6668,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _curvingEdgeStartPoint = null;
     _curvingEdgeEndPoint = null;
     _curvingEdgeBulge = 0.0;
-    _curvingEdgeInitialBulge = 0.0;
+    _curvingEdgeExactBulge = null;
     _isCurvingEdgeDragging = false;
     _curvingEdgeSnapped = false;
     _curvingEdgeSnapLabel = null;
@@ -10976,6 +10977,47 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
+    // Curving owns its grip before any adopted drawing tool can consume motion.
+    if (_isCurvingEdgeDragging &&
+        _curvingEdgeElementId != null &&
+        _curvingEdgeStartPoint != null &&
+        _curvingEdgeEndPoint != null) {
+      _updateMidpointReferences(rawModel);
+      final p1 = _curvingEdgeStartPoint!;
+      final p2 = _curvingEdgeEndPoint!;
+      final chord = p2 - p1;
+      final len = chord.distance;
+      if (len > 1e-4) {
+        final length = _handleOffsetLength > 0 ? _handleOffsetLength : 48.0;
+        final currentGripScreen = screenPosition + _curvingDragScreenOffset;
+        final targetApexScreen = currentGripScreen - (_curvingEdgeGripDirection * length);
+        final targetModel = _screenToModel(targetApexScreen);
+
+        final exact = _curvingEdgeExactBulge;
+        final n = Offset(-chord.dy, chord.dx) / len;
+        final chordMid = (p1 + p2) / 2;
+        final v = targetModel - chordMid;
+        final projection = v.dx * n.dx + v.dy * n.dy;
+        final aimed = (-2.0 * projection / len).clamp(-20.0, 20.0);
+        _curvingEdgeBulge = exact == null
+            ? aimed
+            : (projection.abs() < 1e-6 ? _curvingEdgeBulge.sign : aimed.sign) * exact;
+        _curvingEdgeSnapped = false;
+        _curvingEdgeSnapLabel = null;
+        final apex = ArchitectWallArc(p1, p2, _curvingEdgeBulge).midpoint;
+        final snap = _snapElement(apex, tolerancePixels: _touchInput ? 18 : 12);
+        // A target is advertised only if the exact arc actually reaches it.
+        if (snap.snapLabel != null &&
+            (apex - snap.point).distance * _currentScale <= .5) {
+          _curvingEdgeSnapped = true;
+          _curvingEdgeSnapLabel = snap.snapLabel;
+        }
+        _updateCurvingPreview();
+      }
+      _repaintPreview();
+      return;
+    }
+
     if (_offsetOptions != null) {
 
       _previewOffset(rawModel);
@@ -12185,43 +12227,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _chamferFilletPointer = rawModel;
     }
 
-    if (_isCurvingEdgeDragging &&
-        _curvingEdgeElementId != null &&
-        _curvingEdgeStartPoint != null &&
-        _curvingEdgeEndPoint != null) {
-      final p1 = _curvingEdgeStartPoint!;
-      final p2 = _curvingEdgeEndPoint!;
-      final chord = p2 - p1;
-      final len = chord.distance;
-      if (len > 1e-4) {
-        final length = _handleOffsetLength > 0 ? _handleOffsetLength : 48.0;
-        final currentGripScreen = screenPosition + _curvingDragScreenOffset;
-        final targetApexScreen = currentGripScreen - (_curvingEdgeGripDirection * length);
-        final targetModel = _screenToModel(targetApexScreen);
-
-        final snap = _snapElement(targetModel, tolerancePixels: _touchInput ? 18 : 12);
-        if (snap.snapLabel != null &&
-            (targetModel - snap.point).distance * _currentScale <= 24) {
-          final snapBulge = ArchitectWallArc.through(p1, p2, snap.point);
-          if (snapBulge.isFinite && snapBulge.abs() <= 20.0) {
-            _curvingEdgeSnapped = true;
-            _curvingEdgeSnapLabel = snap.snapLabel;
-            _curvingEdgeBulge = snapBulge;
-          }
-        } else {
-          _curvingEdgeSnapped = false;
-          _curvingEdgeSnapLabel = null;
-          final n = Offset(-chord.dy, chord.dx) / len;
-          final chordMid = (p1 + p2) / 2;
-          final v = targetModel - chordMid;
-          final proj = v.dx * n.dx + v.dy * n.dy;
-          _curvingEdgeBulge = (-2.0 * proj / len).clamp(-20.0, 20.0);
-        }
-        _updateCurvingPreview();
-      }
-      _repaintPreview();
-      return;
-    }
 
     _repaintPreview();
 
@@ -12499,22 +12504,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_isCurvingEdgeDragging) {
       _isCurvingEdgeDragging = false;
       _isHandleEngaged = false;
-      if (_curvingEdgeSnapped) {
-        setState(() {
-          _curvingEdgePendingConfirmation = true;
-        });
-        _repaintPreview();
-      } else {
-        setState(() {
-          _curvingEdgePendingConfirmation = false;
-        });
-        _repaintPreview();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _curvingEdgeElementId != null) {
-            _showCurvingEdgeExactInputDialog();
-          }
-        });
-      }
+      setState(() => _curvingEdgePendingConfirmation = true);
+      _repaintPreview();
       return;
     }
     if (_underlayMaskDrafting) {
@@ -19631,7 +19622,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _onSelectionHold(Offset screenPoint) {
-    if (_marqueeTool.isDrafting) return false;
+    if (_marqueeTool.isDrafting || _curvingEdgeElementId != null) return false;
 
     if (_wallCutIds.isNotEmpty ||
 
@@ -19745,7 +19736,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _onContextHold(Offset screenPoint) {
     _dismissTouchCandidates();
-    if (_marqueeTool.isDrafting) return false;
+    if (_marqueeTool.isDrafting || _curvingEdgeElementId != null) return false;
 
     // Candidates already respect the active drawing tool. Existing elements
     // keep their context menu while that tool is active, as well as in Select.
@@ -24796,7 +24787,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _curvingEdgeSegmentIndex = segmentIndex;
       _curvingEdgeStartPoint = p1;
       _curvingEdgeEndPoint = p2;
-      _curvingEdgeInitialBulge = bulge;
+      _curvingEdgeExactBulge = null;
       _curvingEdgeBulge = bulge;
       _curvingEdgeGripDirection = normalScreen;
       _curvingDragScreenOffset = Offset.zero;
@@ -24804,9 +24795,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _curvingEdgeSnapped = false;
       _curvingEdgeSnapLabel = null;
       _curvingEdgePendingConfirmation = false;
-      _curvingDimensionMode = ArchitectArcDimension.sagitta;
     });
     _repaintPreview();
+    unawaited(_showCurvingEdgeExactInputDialog());
   }
 
   void _startEdgeCurvingSession(String id, [int? segmentIndex]) {
@@ -24908,13 +24899,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (prim != null) {
         if (prim.type == CadPrimitiveType.line || prim.type == CadPrimitiveType.arc) {
           _commands.execute(
-            PlaceArchitectCadPrimitive(
+            _linearCommand(UpdateArchitectWall(
               storeyId: storey.id,
-              primitive: prim.copyWith(
-                type: bulge.abs() > 1e-6 ? CadPrimitiveType.arc : CadPrimitiveType.line,
-                arcBulge: bulge,
-              ),
-            ),
+              wall: ArchitectLineEditing.segment(prim).copyWith(arcBulge: bulge),
+              carryConnections: false,
+            )),
           );
         } else if (prim.type == CadPrimitiveType.polyline) {
           final bulges = List<double>.from(prim.bulges ?? List.filled(prim.linePoints.length, 0.0));
@@ -24922,9 +24911,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           if (segIdx < bulges.length) {
             bulges[segIdx] = bulge;
             _commands.execute(
-              PlaceArchitectCadPrimitive(
+              UpdateArchitectBulges(
                 storeyId: storey.id,
-                primitive: prim.copyWith(bulges: bulges),
+                elementId: prim.id,
+                bulges: bulges,
               ),
             );
           }
@@ -24935,9 +24925,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           if (segIdx < bulges.length) {
             bulges[segIdx] = bulge;
             _commands.execute(
-              PlaceArchitectCadPrimitive(
+              UpdateArchitectBulges(
                 storeyId: storey.id,
-                primitive: prim.copyWith(bulges: bulges),
+                elementId: prim.id,
+                bulges: bulges,
               ),
             );
           }
@@ -24970,7 +24961,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _curvingEdgeStartPoint = null;
       _curvingEdgeEndPoint = null;
       _curvingEdgeBulge = 0.0;
-      _curvingEdgeInitialBulge = 0.0;
+      _curvingEdgeExactBulge = null;
       _isCurvingEdgeDragging = false;
       _curvingEdgeSnapped = false;
       _curvingEdgeSnapLabel = null;
@@ -24988,7 +24979,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _curvingEdgeStartPoint = null;
       _curvingEdgeEndPoint = null;
       _curvingEdgeBulge = 0.0;
-      _curvingEdgeInitialBulge = 0.0;
+      _curvingEdgeExactBulge = null;
       _isCurvingEdgeDragging = false;
       _curvingEdgeSnapped = false;
       _curvingEdgeSnapLabel = null;
@@ -24999,54 +24990,66 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _repaintPreview();
   }
 
+  // --- SUBSECTION: [TAG:CURVING_EXACT_INPUT] Existing element: exact h, side preview, final Apply/Cancel ---
   Future<void> _showCurvingEdgeExactInputDialog() async {
-    if (_curvingEdgeElementId == null ||
+    if (_curvingEdgeEditorOpen ||
+        _curvingEdgeElementId == null ||
         _curvingEdgeStartPoint == null ||
-        _curvingEdgeEndPoint == null) {
-      return;
-    }
+        _curvingEdgeEndPoint == null) return;
+    final source = _project;
+    final id = _curvingEdgeElementId!;
     final p1 = _curvingEdgeStartPoint!;
     final p2 = _curvingEdgeEndPoint!;
-    final initialBulge = _curvingEdgeBulge;
-    final tempWall = ArchitectWall(
-      id: _curvingEdgeElementId!,
-      startPoint: p1,
-      endPoint: p2,
-      arcBulge: initialBulge.abs() > 1e-6 ? initialBulge : 0.001,
+    final host = source.activeStorey.walls.where((w) => w.id == id).firstOrNull;
+    final basis = host?.copyWith(arcBulge: _curvingEdgeBulge) ?? ArchitectWall(
+      id: id, startPoint: p1, endPoint: p2,
+      thickness: .001, arcBulge: _curvingEdgeBulge,
     );
-
-    final result = await showDialog<ArchitectWall>(
-      context: context,
-      builder: (_) => ArchitectWallArcDimensionDialog(
-        project: _project,
-        wall: tempWall,
-        dimension: _curvingDimensionMode,
-        confirmLabel: context.l10n.applyAction,
-        onDimension: (dim) {
-          setState(() => _curvingDimensionMode = dim);
-        },
-        validate: (candidate) {
-          if (!candidate.arcBulge.isFinite) {
-            throw ArgumentError('Invalid arc');
-          }
-        },
-        onPreview: (candidate) {
-          setState(() {
-            _curvingEdgeBulge = candidate.arcBulge;
-            _updateCurvingPreview();
-          });
-          _repaintPreview();
-        },
-      ),
-    );
-
-    if (result != null) {
-      _curvingEdgeBulge = result.arcBulge;
-      _commitCurvingEdgeSession();
-    } else {
-      _curvingEdgeBulge = _curvingEdgeInitialBulge;
-      _cancelCurvingEdgeSession();
+    bool current() => mounted && identical(_project, source) &&
+        _curvingEdgeElementId == id &&
+        _curvingEdgeStartPoint == p1 && _curvingEdgeEndPoint == p2;
+    _curvingEdgeEditorOpen = true;
+    ArchitectWall? result;
+    try {
+      result = await showDialog<ArchitectWall>(
+        context: context,
+        builder: (_) => ArchitectWallArcDimensionDialog(
+          project: source,
+          wall: basis,
+          dimension: ArchitectArcDimension.sagitta,
+          confirmLabel: context.l10n.applyAction,
+          onDimension: (_) {},
+          validate: (candidate) {
+            if (!current()) throw ArgumentError('Curving context changed');
+            candidate.validateGeometry();
+            ArchitectWallArcEditing.validateOpenings(candidate);
+          },
+          onPreview: (candidate) {
+            if (!current()) return;
+            setState(() {
+              _curvingEdgeBulge = candidate.arcBulge;
+              _updateCurvingPreview();
+            });
+            _repaintPreview();
+          },
+        ),
+      );
+    } finally {
+      _curvingEdgeEditorOpen = false;
     }
+    if (!current()) return;
+    final accepted = result;
+    if (accepted == null) {
+      _cancelCurvingEdgeSession();
+      return;
+    }
+    setState(() {
+      _curvingEdgeBulge = accepted.arcBulge;
+      _curvingEdgeExactBulge = accepted.arcBulge.abs();
+      _curvingEdgePendingConfirmation = true;
+      _updateCurvingPreview();
+    });
+    _repaintPreview();
   }
 
   // --- SUBSECTION: [TAG:CURVING_FEEDBACK] Compact neutral rise/snap feedback outside edited geometry ---

@@ -33,6 +33,7 @@
 | [TAG:SELECTION_BAR] | Selection HUD, action bars, and layer dialogs |
 | [TAG:FENESTRATION_SELECTION_UPDATES] | Selected opening parameter updates |
 | [TAG:FLOATING_HUD] | Multi-step overlays and interactive edge curving |
+| [TAG:CURVING_EXACT_INPUT] | Existing-element Curve: exact h first, fixed-rise side preview, final Apply/Cancel |
 | [TAG:CURVING_FEEDBACK] | One neutral localized rise/snap badge, placed clear of edited geometry |
 | [TAG:MIRROR_WORKFLOW] | Mirror axis picking, preview, cancellation and commit |
 | [TAG:GRID_AXIS] | Grid axis operations |
@@ -150,3 +151,24 @@ the existing bars. The painter no longer paints a second label on the wall;
 midpoint alignment uses the existing `snapMidpoint` ARB message. Pending
 Apply/Cancel still call `_commitCurvingEdgeSession` / `_cancelCurvingEdgeSession`;
 input routing, snap calculations, model commands and history stay in the screen.
+
+### Existing-element exact Curve workflow
+
+`_initCurvingEdgeSession` opens `_showCurvingEdgeExactInputDialog` immediately
+(`[TAG:CURVING_EXACT_INPUT]`), with sagitta mode and the element's actual
+curvature (including 0). Wall validation retains its real host properties;
+CAD/contour edges use a thin surrogate. Typing updates only the preview.
+Accepting the dialog sets `_curvingEdgeExactBulge` and shows the neutral
+Apply/Cancel HUD without committing. Handle dragging selects the side and
+preserves the entered rise; snap labels appear only when the exact apex
+reaches a target. Release returns to review, without reopening numeric input.
+Only the HUD Apply calls `_commitCurvingEdgeSession` through the existing
+command/history/save path; Cancel restores the original. Dialog callbacks
+check project/element/endpoints before applying asynchronous results.
+
+The curving preview branch precedes adopted drawing-tool previews in
+`_updatePointerPreview`. Selection/context holds reject active curving sessions,
+so stationary holds and secondary taps cannot steal the grip; viewport pan
+locking continues through `_isActivelyDraggingHandle`. Final CAD line/arc edits
+use the existing `ArchitectLineEditing` adapter with `UpdateArchitectWall`;
+polyline/contour segments use `UpdateArchitectBulges`, preserving existing IDs.
