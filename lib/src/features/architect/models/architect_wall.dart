@@ -93,6 +93,8 @@ class ArchitectWall {
   final double? insulationThicknessOverride;
   final bool connectStart;
   final bool connectEnd;
+  /// A user Detach is released by the next actual relocation, unlike a cut.
+  final bool autoAttachAfterMove;
   final String? wallTypeId;
   final ParapetFinish? parapetFinish;
   final ArchitectRailingDesign? railing;
@@ -130,6 +132,7 @@ class ArchitectWall {
     this.insulationThicknessOverride,
     this.connectStart = true,
     this.connectEnd = true,
+    this.autoAttachAfterMove = false,
     this.wallTypeId,
     this.parapetFinish,
     this.railing,
@@ -549,6 +552,7 @@ class ArchitectWall {
     double? insulationThicknessOverride,
     bool? connectStart,
     bool? connectEnd,
+    bool? autoAttachAfterMove,
     String? wallTypeId,
     ParapetFinish? parapetFinish,
     ArchitectRailingDesign? railing,
@@ -585,6 +589,7 @@ class ArchitectWall {
         insulationThicknessOverride ?? this.insulationThicknessOverride,
     connectStart: connectStart ?? this.connectStart,
     connectEnd: connectEnd ?? this.connectEnd,
+    autoAttachAfterMove: autoAttachAfterMove ?? this.autoAttachAfterMove,
     wallTypeId: wallTypeId ?? this.wallTypeId,
     parapetFinish: parapetFinish ?? this.parapetFinish,
     railing: clearRailing ? null : railing ?? this.railing,
@@ -719,6 +724,7 @@ class ArchitectWall {
     'insulationThicknessOverride': insulationThicknessOverride,
     'connectStart': connectStart,
     'connectEnd': connectEnd,
+    if (autoAttachAfterMove) 'autoAttachAfterMove': true,
     'wallTypeId': wallTypeId,
     'parapetFinish': parapetFinish?.name,
     if (railing != null) 'railing': railing!.toJson(),
@@ -798,6 +804,7 @@ class ArchitectWall {
         ?.toDouble(),
     connectStart: json['connectStart'] as bool? ?? true,
     connectEnd: json['connectEnd'] as bool? ?? true,
+    autoAttachAfterMove: json['autoAttachAfterMove'] as bool? ?? false,
     wallTypeId: json['wallTypeId'] as String?,
     parapet: json['parapet'] as bool?,
     railing: json['railing'] == null

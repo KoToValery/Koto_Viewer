@@ -11,6 +11,7 @@ import '../models/architect_elements.dart';
 import '../models/architect_wall.dart';
 import 'architect_wall_operation_axis.dart';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
+import '../../bim_editing/geometry/bim_polygon_geometry.dart';
 
 class ArchitectChamferFillet {
   // === SECTION: 1. MATH HELPERS ===
@@ -37,9 +38,11 @@ class ArchitectChamferFillet {
     required double distance,
     bool isClosed = true,
   }) {
-    if (polygon.length < 3 || distance <= 1e-6) return polygon;
+    if (polygon.length < 3 || !distance.isFinite || distance <= 1e-6)
+      return polygon;
     final n = polygon.length;
     final result = <Offset>[];
+    final used = List<double>.filled(n, 0);
 
     for (var i = 0; i < n; i++) {
       if (vertexIndex != null && vertexIndex != i) {
@@ -75,8 +78,12 @@ class ArchitectChamferFillet {
         continue;
       }
 
-      final c1 = math.min(distance, l1 * 0.49);
-      final c2 = math.min(distance, l2 * 0.49);
+      used[(i - 1 + n) % n] += distance;
+      used[i] += distance;
+      if (used[(i - 1 + n) % n] >= l1 - 1e-6 || used[i] >= l2 - 1e-6)
+        return polygon;
+      final c1 = distance;
+      final c2 = distance;
 
       final p1 = curr + u1 * c1;
       final p2 = curr + u2 * c2;
@@ -84,7 +91,7 @@ class ArchitectChamferFillet {
       result.add(p1);
       result.add(p2);
     }
-    return result;
+    return isClosed && !BimPolygonGeometry.valid(result) ? polygon : result;
   }
 
   /// Applies fillet (arc rounding) to vertices of a polygon.
@@ -97,9 +104,11 @@ class ArchitectChamferFillet {
     int segments = 8,
     bool isClosed = true,
   }) {
-    if (polygon.length < 3 || radius <= 1e-6) return polygon;
+    if (polygon.length < 3 || !radius.isFinite || radius <= 1e-6)
+      return polygon;
     final n = polygon.length;
     final result = <Offset>[];
+    final used = List<double>.filled(n, 0);
 
     for (var i = 0; i < n; i++) {
       if (vertexIndex != null && vertexIndex != i) {
@@ -144,9 +153,12 @@ class ArchitectChamferFillet {
       }
 
       final idealTangent = radius / tanAlpha;
-      final maxTangent = math.min(l1, l2) * 0.49;
-      final tEff = math.min(idealTangent, maxTangent);
-      final rEff = tEff * tanAlpha;
+      used[(i - 1 + n) % n] += idealTangent;
+      used[i] += idealTangent;
+      if (used[(i - 1 + n) % n] >= l1 - 1e-6 || used[i] >= l2 - 1e-6)
+        return polygon;
+      final tEff = idealTangent;
+      final rEff = radius;
 
       final t1 = curr + u1 * tEff;
       final t2 = curr + u2 * tEff;
@@ -180,7 +192,7 @@ class ArchitectChamferFillet {
         result.add(center + Offset(math.cos(phi), math.sin(phi)) * rEff);
       }
     }
-    return result;
+    return isClosed && !BimPolygonGeometry.valid(result) ? polygon : result;
   }
 
   // === SECTION: 3. WALL PAIR CHAMFER & FILLET ===
@@ -270,17 +282,32 @@ class ArchitectChamferFillet {
       // even when the stored direction of A runs outwards from the corner.
       final reverseSide =
           wallA.unitVector.dx * -uA.dx + wallA.unitVector.dy * -uA.dy < 0;
+      final sideA = wallA.exteriorSign * (reverseSide ? -1 : 1);
+      final sideB =
+          wallB.exteriorSign *
+          (wallB.unitVector.dx * uB.dx + wallB.unitVector.dy * uB.dy < 0
+              ? -1
+              : 1);
+      if (sideA != sideB &&
+          wallA.exteriorSideMode == WallResolutionMode.manual &&
+          wallB.exteriorSideMode == WallResolutionMode.manual)
+        return null;
+      final side = wallB.exteriorSideMode == WallResolutionMode.manual
+          ? sideB
+          : sideA;
       final connector = wallA.copyWith(
         id: '${fillet ? 'fillet' : 'chamfer'}_wall_${DateTime.now().microsecondsSinceEpoch}',
         startPoint: pA,
         endPoint: pB,
         arcBulge: bulge,
         referenceLine: WallReferenceLine.center,
-        exteriorSide: reverseSide
-            ? (wallA.exteriorSide == WallExteriorSide.left
-                  ? WallExteriorSide.right
-                  : WallExteriorSide.left)
-            : wallA.exteriorSide,
+        exteriorSide: side > 0 ? WallExteriorSide.left : WallExteriorSide.right,
+        exteriorSideMode:
+            wallA.exteriorSideMode == WallResolutionMode.manual ||
+                wallB.exteriorSideMode == WallResolutionMode.manual
+            ? WallResolutionMode.manual
+            : WallResolutionMode.automatic,
+        autoAttachAfterMove: false,
         connectStart: true,
         connectEnd: true,
         doors: const [],
@@ -312,7 +339,7 @@ class ArchitectChamferFillet {
       lineB.startPoint,
       lineB.endPoint,
     );
-    if (v == null || distance <= 1e-6) return null;
+    if (v == null || !distance.isFinite || distance <= 1e-6) return null;
 
     final (
       aNearStart,
@@ -330,8 +357,11 @@ class ArchitectChamferFillet {
     final uA = (aFar - v) / (aFar - v).distance;
     final uB = (bFar - v) / (bFar - v).distance;
 
-    final cA = math.min(distance, (aFar - v).distance * 0.49);
-    final cB = math.min(distance, (bFar - v).distance * 0.49);
+    if (distance >= (aFar - v).distance - .001 ||
+        distance >= (bFar - v).distance - .001)
+      return null;
+    final cA = distance;
+    final cB = distance;
 
     final pA = v + uA * cA;
     final pB = v + uB * cB;
@@ -370,7 +400,7 @@ class ArchitectChamferFillet {
       lineB.startPoint,
       lineB.endPoint,
     );
-    if (v == null || radius <= 1e-6) return null;
+    if (v == null || !radius.isFinite || radius <= 1e-6) return null;
 
     final (
       aNearStart,
@@ -401,9 +431,9 @@ class ArchitectChamferFillet {
     if (tanAlpha.abs() < 1e-6) return null;
 
     final idealT = radius / tanAlpha;
-    final maxT = math.min(lenA, lenB) * 0.49;
-    final tEff = math.min(idealT, maxT);
-    final rEff = tEff * tanAlpha;
+    if (idealT >= math.min(lenA, lenB) - .001) return null;
+    final tEff = idealT;
+    final rEff = radius;
 
     final tA = v + uA * tEff;
     final tB = v + uB * tEff;

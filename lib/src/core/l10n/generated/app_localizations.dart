@@ -7826,7 +7826,7 @@ abstract class AppLocalizations {
   /// Wall positioning control guidance
   ///
   /// In en, this message translates to:
-  /// **'End offset'**
+  /// **'Core end offset'**
   String get architectWallEndpointClearance;
 
   /// Wall positioning control guidance
@@ -8198,19 +8198,19 @@ abstract class AppLocalizations {
   /// Prompt when selecting the second wall to attach
   ///
   /// In en, this message translates to:
-  /// **'Select second wall to connect at common vertex'**
+  /// **'Select a touching wall'**
   String get architectWallAttachSelectSecond;
 
   /// Success message when walls are attached at common vertex
   ///
   /// In en, this message translates to:
-  /// **'Walls connected at common vertex'**
+  /// **'Walls connected'**
   String get architectWallAttachSuccess;
 
   /// Error message when walls cannot be connected
   ///
   /// In en, this message translates to:
-  /// **'Walls cannot be connected at a common vertex'**
+  /// **'Walls must touch to connect'**
   String get architectWallAttachIncompatible;
 
   /// Success message when wall is detached
@@ -8318,7 +8318,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectWallClearance.
   ///
   /// In en, this message translates to:
-  /// **'Clearance'**
+  /// **'Core clearance'**
   String get architectWallClearance;
 
   /// No description provided for @architectGridNone.
@@ -8972,7 +8972,7 @@ abstract class AppLocalizations {
   /// Mirror move action tooltip
   ///
   /// In en, this message translates to:
-  /// **'Mirror move'**
+  /// **'Mirror; optionally keep the original'**
   String get architectMirrorMoveTooltip;
 
   /// Mirror copy action label
@@ -21519,7 +21519,7 @@ abstract class AppLocalizations {
   /// Error when chamfer or fillet exceeds segment length
   ///
   /// In en, this message translates to:
-  /// **'Cannot form this corner. Check the distance or radius, wall types and openings.'**
+  /// **'The exact value does not fit, or the exterior sides conflict.'**
   String get architectChamferFilletInvalid;
 
   /// Layers management title
@@ -23375,6 +23375,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select second element for fillet / chamfer'**
   String get architectChamferFilletSelectSecond;
+
+  /// No description provided for @architectMirrorKeepOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep original'**
+  String get architectMirrorKeepOriginal;
+
+  /// No description provided for @architectPreserveWallPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep position'**
+  String get architectPreserveWallPosition;
+
+  /// No description provided for @architectEdgeExtendHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Extend adjacent sides while keeping their angles.'**
+  String get architectEdgeExtendHint;
 }
 
 class _AppLocalizationsDelegate

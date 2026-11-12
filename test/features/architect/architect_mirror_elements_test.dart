@@ -156,10 +156,7 @@ void main() {
         final before = model.project.activeStorey.toJson();
         Future<void> start() async {
           await editing.contextHold(tester, const Offset(4, 3));
-          await groups.action(
-            tester,
-            copy ? BimEditAction.mirrorCopy : BimEditAction.mirrorMove,
-          );
+          await groups.action(tester, BimEditAction.mirrorMove);
         }
 
         await start();
@@ -199,7 +196,7 @@ void main() {
           await tester.pump();
           expect(
             workspace.overlay(tester).project.activeStorey.cadPrimitives,
-            hasLength(copy ? 3 : 2),
+            hasLength(2),
           );
           expect(model.project.activeStorey.toJson(), before);
           expect(
@@ -212,7 +209,7 @@ void main() {
             .project
             .activeStorey
             .cadPrimitives;
-        final mirrored = copy ? preview.last : preview.first;
+        final mirrored = preview.first;
         expect(
           (mirrored.startPoint - const Offset(3.2, .6)).distance,
           lessThan(1e-8),
@@ -238,6 +235,12 @@ void main() {
         await tester.pump();
         await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
         await tester.pumpAndSettle();
+        if (copy) {
+          await tester.tap(
+            find.byKey(const ValueKey('architect-mirror-keep-original')),
+          );
+          await tester.pumpAndSettle();
+        }
         await editing.acceptGeometryCommand(tester);
         final committed = model.project.activeStorey.cadPrimitives;
         expect(committed, hasLength(copy ? 3 : 2));
@@ -544,7 +547,7 @@ void main() {
 
         // Verify selection bar has mirror copy button
         final mirrorCopyBtn = find.byKey(
-          const ValueKey('architect-selection-mirror-copy'),
+          const ValueKey('architect-selection-mirror-move'),
         );
         expect(mirrorCopyBtn, findsOneWidget);
 
@@ -586,6 +589,10 @@ void main() {
           findsNothing,
         );
 
+        await tester.tap(
+          find.byKey(const ValueKey('architect-mirror-keep-original')),
+        );
+        await tester.pumpAndSettle();
         await editing.acceptGeometryCommand(tester);
         // Verify that activeStorey now has 2 walls, one at x = 2, one at x = -2
         final walls = controller.project.activeStorey.walls;

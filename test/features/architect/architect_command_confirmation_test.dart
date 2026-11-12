@@ -205,20 +205,20 @@ void main() {
           Future<void> mirror() async {
             await tool_ui.selectionAction(
               tester,
-              'architect-selection-mirror-copy',
+              'architect-selection-mirror-move',
             );
             expect(
-              tester
-                  .widget<IconButton>(
-                    find.byKey(const ValueKey('architect-command-apply')),
-                  )
-                  .onPressed,
-              isNull,
+              find.byKey(const ValueKey('architect-command-apply')),
+              findsNothing,
             );
             await tester.tapAt(workspace.screen(tester, Offset.zero));
             await tester.pumpAndSettle();
             await tester.tap(
               find.byKey(const ValueKey('architect-mirror-vertical-btn')),
+            );
+            await tester.pumpAndSettle();
+            await tester.tap(
+              find.byKey(const ValueKey('architect-mirror-keep-original')),
             );
             await tester.pumpAndSettle();
           }

@@ -93,8 +93,7 @@ the same pure geometry, then the existing atomic commit/Undo/save path.
 `ArchitectOffset` normalizes connected core-axis endpoints, offsets the chains,
 and restores each wall's own reference and opening stations. Detached ends stay
 independent. CAD/polygon operations retain their native geometry. Short ARB
-axis labels are passed only for wall selections; clear dimensions still use
-physical faces. Pointer routing, hold timers and pan locks remain unchanged.
+axis labels are passed only for wall selections; dynamic wall clearances use core faces. Pointer routing, hold timers and pan locks remain unchanged.
 Coverage: `architect_wall_operation_axis_test.dart` and
 `architect_wall_core_operations_phone_test.dart` in `test/features/architect/`.
 
@@ -110,19 +109,49 @@ These widgets/painters change presentation only; session ownership stays above.
 ### Mirror axis workflow
 
 `[TAG:MIRROR_WORKFLOW]` covers `_previewMirrorSnap`, `_pickMirrorSnap`,
-`_startMirrorSession`, `_cancelMirrorSession`, and `_executeMirror`.
-`ArchitectTransformPointInput` owns axis picks and navigation; preview and
-commit use the same `MirrorArchitectElements` command. Aiming always applies
-that command to `_commandPreview.original`, prepares the result through the
-same pure `_prepareGeometryPreview` used by command staging, and writes only the transient
-`_elementMovePreviewValue`; it must not use the staging setter or mutate
-`_commands.editPreview`, which would mirror the preceding preview again and
-activate the review input before the second axis pick. While `_mirrorActive`,
-`_buildMirrorFloatingOverlay` is the sole command HUD and its Cancel calls
-`_cancelGeometryCommand` when a command preview exists. The generic command
-HUD appears after axis placement, so there are no duplicate Cancel controls.
-Model reflection details and associations live in
-`architect_element_tool.index.md` and `ArchitectMirrorGeometry`.
+`_startMirrorSession`, `_executeMirror`, and `_confirmMirror`.
+`ArchitectTransformPointInput` owns axis picks and navigation. Aiming applies
+`MirrorArchitectElements` to `ArchitectCommandPreview.original`; it never stages
+another reflection of the preview. Axis placement stages one candidate and
+keeps the Mirror HUD as the sole owner through review. The localized Keep
+original checkbox defaults off, reuses a session-stable ID map and rebuilds from
+the original model on every toggle. `_confirmMirror` publishes once through the
+shared confirmation/history path and selects the final copies. The generic HUD
+and generic review input stay suppressed while Mirror owns the session.
+
+### Wall reference, detach and contact-only attach
+
+`_setWallReferenceLine` and wall properties use
+`SetArchitectElementProperties.preserveWallPosition` (default true). The core
+axis remains fixed while the saved reference is reconstructed, including
+concentric arcs; connected neighbours are not carried by that representation
+change. The setting can be disabled explicitly.
+
+`_confirmWallDetach` publishes its candidate directly after its sole confirmation.
+The persisted `ArchitectWall.autoAttachAfterMove` distinguishes a temporary user
+Detach from cut ends. Movement commands call `ArchitectWallConnectionPolicy.afterMove`
+using the original detached wall, so old neighbours do not follow it. A real
+relocation restores connections only at finite physical contact; a free wall
+keeps waiting. Zero movement and cancellation do not release Detach. `AttachArchitectWalls` validates existing finite end-cap/body contact and
+only changes connection flags. CAD vertex joining retains its separate command.
+Contact predicates use model metres (0.1 mm tolerance), never the pointer radius.
+
+### Core clearances and contour editing
+
+`ArchitectWallClearance.nearest`, `endpoints`, and `nearView` use physical core
+faces for witnesses and numeric movement. Support recognition retains the saved
+physical wall relationship, including endpoints placed on a finish face.
+Persistent dimension chains have their independent measurement convention.
+Chamfer/Fillet initial input and parameter changes share
+`BimDistanceDraftingPanel`, project units/decimals and one final command preview.
+The second-wall HUD excludes the generic HUD until a result is ready.
+Hatch edit entry initializes `ArchitectPolygonEdgeMode.pull`; subsequent explicit
+mode choices survive within that edit. Dedicated `edgePull`, `edgeMove` and
+`edgeExtend` SVG IDs and independent ARB tooltips describe the three operations.
+
+Regression coverage: `architect_wall_safety_refinements_test.dart`,
+`architect_wall_core_operations_phone_test.dart`, `architect_mirror_elements_test.dart`,
+and `architect_wall_operation_axis_test.dart` in `test/features/architect/`.
 
 ## 4. Cross-cutting state and owners
 

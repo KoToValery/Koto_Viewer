@@ -52,6 +52,8 @@ void main() {
             tester,
             fillet ? BimEditAction.fillet : BimEditAction.chamfer,
           );
+          await tester.tap(find.byKey(const ValueKey('wall-end')));
+          await tester.pumpAndSettle();
           expect(model.undoCount, 0);
           // Cancelling the second-wall pick never edits the first wall.
           await tester.tap(
@@ -64,8 +66,12 @@ void main() {
             tester,
             fillet ? BimEditAction.fillet : BimEditAction.chamfer,
           );
+          await tester.tap(find.byKey(const ValueKey('wall-end')));
+          await tester.pumpAndSettle();
           await workspace.wallTap(tester, const Offset(1, 2));
           await tester.pumpAndSettle();
+          expect(model.undoCount, 0);
+          await editing.acceptGeometryCommand(tester);
           expect(model.project.activeStorey.walls, hasLength(3));
           final walls = model.project.activeStorey.walls;
           geometry.near(walls[0].coreCenterStart, a.coreCenterStart);

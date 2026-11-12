@@ -4462,7 +4462,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get architectWallEndpointClearance => 'End offset';
+  String get architectWallEndpointClearance => 'Core end offset';
 
   @override
   String get architectMagnetHelp => 'Snap to walls, axes and drawing points.';
@@ -4687,15 +4687,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallAttach => 'Attach';
 
   @override
-  String get architectWallAttachSelectSecond =>
-      'Select second wall to connect at common vertex';
+  String get architectWallAttachSelectSecond => 'Select a touching wall';
 
   @override
-  String get architectWallAttachSuccess => 'Walls connected at common vertex';
+  String get architectWallAttachSuccess => 'Walls connected';
 
   @override
-  String get architectWallAttachIncompatible =>
-      'Walls cannot be connected at a common vertex';
+  String get architectWallAttachIncompatible => 'Walls must touch to connect';
 
   @override
   String get architectWallDetachSuccess => 'Wall detached';
@@ -4750,7 +4748,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallSplitBoth => 'Both';
 
   @override
-  String get architectWallClearance => 'Clearance';
+  String get architectWallClearance => 'Core clearance';
 
   @override
   String get architectGridNone => 'None';
@@ -5088,7 +5086,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectMirrorMove => 'Mirror';
 
   @override
-  String get architectMirrorMoveTooltip => 'Mirror move';
+  String get architectMirrorMoveTooltip =>
+      'Mirror; optionally keep the original';
 
   @override
   String get architectMirrorCopy => 'Mirror+';
@@ -11804,7 +11803,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectChamferFilletInvalid =>
-      'Cannot form this corner. Check the distance or radius, wall types and openings.';
+      'The exact value does not fit, or the exterior sides conflict.';
 
   @override
   String get architectLayers => 'Layers';
@@ -12834,4 +12833,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectChamferFilletSelectSecond =>
       'Select second element for fillet / chamfer';
+
+  @override
+  String get architectMirrorKeepOriginal => 'Keep original';
+
+  @override
+  String get architectPreserveWallPosition => 'Keep position';
+
+  @override
+  String get architectEdgeExtendHint =>
+      'Extend adjacent sides while keeping their angles.';
 }

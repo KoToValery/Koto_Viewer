@@ -33,6 +33,24 @@ import 'architect_wall_type_label.dart';
 import 'architect_wall_type_picker.dart';
 import 'architect_component_library_dialog.dart';
 
+// ============================================================================
+// MASTER ARCHITECT ELEMENT PROPERTIES DIALOG LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'architect_element_properties_dialog.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
+//
+// [SEC-01-WIDGET]  [TAG:ARCH_PROPS_WIDGET] Declarations: `ArchitectElementPropertiesDialog`
+// [SEC-02-STATE]   [TAG:ARCH_PROPS_STATE] `_ArchitectElementPropertiesDialogState` state fields (45 fields: `v
+// [SEC-03-LIFECYCL] [TAG:ARCH_PROPS_STATE_LIFECYCLE] Lifecycle & Initialization: `initState`, `label`, `reference`, `metr
+// [SEC-04-ZONES]   [TAG:ARCH_PROPS_ZONE_ROOMS] Zones, Rooms & Area Schedules: `_zoneNumberAndNameFields`, `_zoneMet
+// [SEC-05-ZONES]   [TAG:ARCH_PROPS_ZONE_FINISH] Zones, Rooms & Area Schedules: `_zoneFinishField`, `numberField`, `m
+// [SEC-06-CORE]    [TAG:ARCH_PROPS_CORE_LOGIC] Core Operations & Helpers: `_candidate`, `_save`, `_textField`, `_wa
+// [SEC-07-CORE]    [TAG:ARCH_PROPS_TEXT_FIELDS] Core Operations & Helpers: `_textFields`, `_levelFields`, `_title` (
+// [SEC-08-BUILD]   [TAG:ARCH_PROPS_BUILD_LAYOUT] Widget Build & HUD Layout: `build` (1 methods)
+// ============================================================================
+
+// === SECTION: [SEC-01-WIDGET] WIDGET DECLARATIONS & PUBLIC API ===
+// --- SUBSECTION: [TAG:ARCH_PROPS_WIDGET] Declarations: `ArchitectElementPropertiesDialog` ---
 class ArchitectElementPropertiesDialog extends StatefulWidget {
   final bool Function(ArchitectProject)? onApplyProject;
   final void Function(ArchitectProject?)? onPreview;
@@ -70,6 +88,8 @@ class ArchitectElementPropertiesDialog extends StatefulWidget {
       _ArchitectElementPropertiesDialogState();
 }
 
+// === SECTION: [SEC-02-STATE] ARCHITECTELEMENTPROPERTIESDIALOGSTATE STATE & FIELDS ===
+// --- SUBSECTION: [TAG:ARCH_PROPS_STATE] `_ArchitectElementPropertiesDialogState` state fields (45 fields: `values`, `texts`, `panelPlacement`, `_lineStyle`, `_hatchPattern`) ---
 class _ArchitectElementPropertiesDialogState
     extends State<ArchitectElementPropertiesDialog> {
   final values = <String, double>{};
@@ -79,6 +99,8 @@ class _ArchitectElementPropertiesDialogState
         ? jsonDecode(texts['wallPanelPlacement']!) as Map
         : records.first['systemPlacement'] as Map? ?? {},
   );
+  // === SECTION: [SEC-03-LIFECYCL] LIFECYCLE & INITIALIZATION ===
+  // --- SUBSECTION: [TAG:ARCH_PROPS_STATE_LIFECYCLE] Lifecycle & Initialization: `initState`, `label`, `reference`, `metric` (5 methods) ---
   void updatePanelPlacement(Map<String, dynamic> patch) => setState(() {
     texts['wallPanelPlacement'] = jsonEncode({...panelPlacement, ...patch});
   });
@@ -87,6 +109,7 @@ class _ArchitectElementPropertiesDialogState
   ArchitectDrawingColor? _hatchColor;
   bool? _hatchBorder;
   bool _preserveDimensionsOnStyleChange = true;
+  bool _preserveWallPosition = true;
   bool get _supportsHatch => widget.elementIds.every(
     (id) => widget.project.activeStorey.cadPrimitives.any(
       (p) => p.id == id && p.type == CadPrimitiveType.hatch,
@@ -290,6 +313,8 @@ class _ArchitectElementPropertiesDialogState
           (_common('endHeight') != null && !_cleared.contains('endHeight'))) &&
       records.every((e) => e.containsKey('referenceLine'));
 
+  // === SECTION: [SEC-04-ZONES] ZONES, ROOMS & AREA SCHEDULES ===
+  // --- SUBSECTION: [TAG:ARCH_PROPS_ZONE_ROOMS] Zones, Rooms & Area Schedules: `_zoneNumberAndNameFields`, `_zoneMetricsBanner`, `_zoneCategoryField`, `fieldValue` (4 methods) ---
   double? fieldValue(String key) {
     if (_cleared.contains(key)) return null;
     if (key == 'height' &&
@@ -441,7 +466,9 @@ class _ArchitectElementPropertiesDialogState
         SizedBox(
           width: 75,
           child: TextFormField(
-            key: ValueKey('architect-property-number-${_initialText("number")}'),
+            key: ValueKey(
+              'architect-property-number-${_initialText("number")}',
+            ),
             controller: numberController,
             decoration: InputDecoration(
               labelText: l.architectZoneNumberPrompt,
@@ -488,6 +515,8 @@ class _ArchitectElementPropertiesDialogState
     );
   }
 
+  // === SECTION: [SEC-05-ZONES] ZONES, ROOMS & AREA SCHEDULES ===
+  // --- SUBSECTION: [TAG:ARCH_PROPS_ZONE_FINISH] Zones, Rooms & Area Schedules: `_zoneFinishField`, `numberField`, `materialField`, `_zoneBoundaryModeSwitch` (7 methods) ---
   Widget _zoneFinishField(String key, String label, List<String> presets) {
     final current =
         texts[key] ??
@@ -659,6 +688,8 @@ class _ArchitectElementPropertiesDialogState
   }
 
   Map<String, String> get _patch => {
+    if (!_preserveWallPosition && texts.containsKey('referenceLine'))
+      'preserveWallPosition': 'false',
     for (final e in texts.entries)
       if (e.value != (_initialTexts[e.key] ?? '${_common(e.key) ?? ''}'))
         e.key: e.value,
@@ -685,6 +716,8 @@ class _ArchitectElementPropertiesDialogState
     });
   }
 
+  // === SECTION: [SEC-06-CORE] CORE OPERATIONS & HELPERS ===
+  // --- SUBSECTION: [TAG:ARCH_PROPS_CORE_LOGIC] Core Operations & Helpers: `_candidate`, `_save`, `_textField`, `_wallType` (9 methods) ---
   ArchitectProject _candidate() {
     var next = SetArchitectElementProperties(
       storeyId: widget.project.activeStoreyId,
@@ -692,10 +725,12 @@ class _ArchitectElementPropertiesDialogState
       values: values,
       clearValues: _cleared,
       textValues: _patch,
+      preserveWallPosition: _preserveWallPosition,
     ).apply(widget.project);
     if (_composition != null) {
-      final originalWall = widget.project.activeStorey.walls
-          .firstWhere((wall) => widget.elementIds.contains(wall.id));
+      final originalWall = widget.project.activeStorey.walls.firstWhere(
+        (wall) => widget.elementIds.contains(wall.id),
+      );
       final compositionHeight = _composition!.customHeight;
       final heightEdited = _composition!.railing != null &&
           compositionHeight != null &&
@@ -867,8 +902,9 @@ class _ArchitectElementPropertiesDialogState
   Future<void> _pickType() async {
     final result = await showArchitectWallTypePicker(
       context,
-      types: ArchitectWallLibrary.available(widget.project.wallTypes)
-          .where((t) => t.isParapet == _wallType().isParapet).toList(),
+      types: ArchitectWallLibrary.available(
+        widget.project.wallTypes,
+      ).where((t) => t.isParapet == _wallType().isParapet).toList(),
       activeType: _composition ?? _wallType(),
       unit: widget.project.units,
       projectId: widget.project.id,
@@ -933,6 +969,8 @@ class _ArchitectElementPropertiesDialogState
       _projectLevelDecimals ??
       widget.project.levelDecimals;
 
+  // === SECTION: [SEC-07-CORE] CORE OPERATIONS & HELPERS ===
+  // --- SUBSECTION: [TAG:ARCH_PROPS_TEXT_FIELDS] Core Operations & Helpers: `_textFields`, `_levelFields`, `_title` (3 methods) ---
   List<Widget> _textFields(AppLocalizations l) {
     final heights = {
       for (final id in widget.elementIds)
@@ -1095,6 +1133,8 @@ class _ArchitectElementPropertiesDialogState
     return ids.length == 1 ? name : l.propertiesSelection(name, ids.length);
   }
 
+  // === SECTION: [SEC-08-BUILD] WIDGET BUILD & HUD LAYOUT ===
+  // --- SUBSECTION: [TAG:ARCH_PROPS_BUILD_LAYOUT] Widget Build & HUD Layout: `build` (1 methods) ---
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -1133,28 +1173,78 @@ class _ArchitectElementPropertiesDialogState
           )) ...[
             DropdownButtonFormField<ArchitectLineEndCap>(
               decoration: InputDecoration(labelText: l.architectLineStartCap),
-              value: ArchitectLineEndCap.values.where((c) => c.name == (texts['startCap'] ?? _common('startCap'))).firstOrNull ?? ArchitectLineEndCap.none,
+              value:
+                  ArchitectLineEndCap.values
+                      .where(
+                        (c) =>
+                            c.name ==
+                            (texts['startCap'] ?? _common('startCap')),
+                      )
+                      .firstOrNull ??
+                  ArchitectLineEndCap.none,
               items: [
-                DropdownMenuItem(value: ArchitectLineEndCap.none, child: Text(l.architectLineCapNone)),
-                DropdownMenuItem(value: ArchitectLineEndCap.arrowFilled, child: Text(l.architectLineCapArrowFilled)),
-                DropdownMenuItem(value: ArchitectLineEndCap.arrowOpen, child: Text(l.architectLineCapArrowOpen)),
-                DropdownMenuItem(value: ArchitectLineEndCap.dotFilled, child: Text(l.architectLineCapDotFilled)),
-                DropdownMenuItem(value: ArchitectLineEndCap.dotOpen, child: Text(l.architectLineCapDotOpen)),
-                DropdownMenuItem(value: ArchitectLineEndCap.tick, child: Text(l.architectLineCapTick)),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.none,
+                  child: Text(l.architectLineCapNone),
+                ),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.arrowFilled,
+                  child: Text(l.architectLineCapArrowFilled),
+                ),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.arrowOpen,
+                  child: Text(l.architectLineCapArrowOpen),
+                ),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.dotFilled,
+                  child: Text(l.architectLineCapDotFilled),
+                ),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.dotOpen,
+                  child: Text(l.architectLineCapDotOpen),
+                ),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.tick,
+                  child: Text(l.architectLineCapTick),
+                ),
               ],
               onChanged: (v) => setState(() => texts['startCap'] = v?.name ?? 'none'),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<ArchitectLineEndCap>(
               decoration: InputDecoration(labelText: l.architectLineEndCap),
-              value: ArchitectLineEndCap.values.where((c) => c.name == (texts['endCap'] ?? _common('endCap'))).firstOrNull ?? ArchitectLineEndCap.none,
+              value:
+                  ArchitectLineEndCap.values
+                      .where(
+                        (c) => c.name == (texts['endCap'] ?? _common('endCap')),
+                      )
+                      .firstOrNull ??
+                  ArchitectLineEndCap.none,
               items: [
-                DropdownMenuItem(value: ArchitectLineEndCap.none, child: Text(l.architectLineCapNone)),
-                DropdownMenuItem(value: ArchitectLineEndCap.arrowFilled, child: Text(l.architectLineCapArrowFilled)),
-                DropdownMenuItem(value: ArchitectLineEndCap.arrowOpen, child: Text(l.architectLineCapArrowOpen)),
-                DropdownMenuItem(value: ArchitectLineEndCap.dotFilled, child: Text(l.architectLineCapDotFilled)),
-                DropdownMenuItem(value: ArchitectLineEndCap.dotOpen, child: Text(l.architectLineCapDotOpen)),
-                DropdownMenuItem(value: ArchitectLineEndCap.tick, child: Text(l.architectLineCapTick)),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.none,
+                  child: Text(l.architectLineCapNone),
+                ),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.arrowFilled,
+                  child: Text(l.architectLineCapArrowFilled),
+                ),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.arrowOpen,
+                  child: Text(l.architectLineCapArrowOpen),
+                ),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.dotFilled,
+                  child: Text(l.architectLineCapDotFilled),
+                ),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.dotOpen,
+                  child: Text(l.architectLineCapDotOpen),
+                ),
+                DropdownMenuItem(
+                  value: ArchitectLineEndCap.tick,
+                  child: Text(l.architectLineCapTick),
+                ),
               ],
               onChanged: (v) => setState(() => texts['endCap'] = v?.name ?? 'none'),
             ),
@@ -1374,9 +1464,9 @@ class _ArchitectElementPropertiesDialogState
               contentPadding: EdgeInsets.zero,
               title: Text(
                 l.architectCasingToggle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
               ),
               value: texts.containsKey('hasCasing')
                   ? texts['hasCasing'] == 'true'
@@ -1963,6 +2053,14 @@ class _ArchitectElementPropertiesDialogState
             'inner': l.architectWallReferenceInner,
             'outer': l.architectWallReferenceOuter,
           }),
+          CheckboxListTile(
+            key: const ValueKey('architect-preserve-wall-position'),
+            contentPadding: EdgeInsets.zero,
+            title: Text(l.architectPreserveWallPosition),
+            value: _preserveWallPosition,
+            onChanged: (value) =>
+                setState(() => _preserveWallPosition = value ?? true),
+          ),
           _choice('cutDisplayMode', l.architectPropertyCutDisplay, {
             'auto': l.architectCutDisplayAuto,
             'projected': l.architectCutDisplayProjected,

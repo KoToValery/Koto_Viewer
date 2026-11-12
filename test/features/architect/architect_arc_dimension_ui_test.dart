@@ -189,7 +189,7 @@ void main() {
   );
 
   testWidgets(
-    'The old size action opens curvature editing; numeric draft cancellation restores its shape',
+    'Curvature remains available from its dimension badge; draft cancellation restores its shape',
     (tester) async {
       final model = editing.seeded(
         const ArchitectStorey(id: 's', name: '', walls: [arc]),
@@ -198,12 +198,8 @@ void main() {
       await open(tester, model, 'en', const Size(1600, 1200));
       await tester.tapAt(workspace.screen(tester, arc.centerPointAt(.5)));
       await tester.pumpAndSettle();
-      await button(tester, 'architect-wall-actions');
-      final l = AppLocalizations.of(
-        tester.element(find.byType(ArchitectWorkspaceScreen)),
-      )!;
-      await tester.tap(find.text(l.wallArc));
-      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('wall-length')), findsNothing);
+      await button(tester, 'wall-arc-dimension-badge');
       expect(find.byType(ArchitectWallArcDimensionDialog), findsOneWidget);
       await button(tester, 'wall-arc-dimension-cancel');
       expect(model.canUndo, isFalse);

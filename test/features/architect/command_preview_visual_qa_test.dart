@@ -61,7 +61,7 @@ void main() {
     await editing.ensureSelectionTool(tester);
     await workspace.wallTap(tester, const Offset(2, -1));
     await tester.pumpAndSettle();
-    await tool_ui.selectionAction(tester, 'architect-selection-mirror-copy');
+    await tool_ui.selectionAction(tester, 'architect-selection-mirror-move');
     await tester.tapAt(workspace.screen(tester, Offset.zero));
     await tester.pumpAndSettle();
     Future<void> screenshot(String name) async {
@@ -90,6 +90,10 @@ void main() {
           .onPressed,
       isNotNull,
     );
+    await tester.tap(
+      find.byKey(const ValueKey('architect-mirror-keep-original')),
+    );
+    await tester.pumpAndSettle();
     expect(workspace.overlay(tester).project.activeStorey.walls, hasLength(2));
     await screenshot('command_mirror_review_bg');
     expect(model.project.activeStorey.walls, hasLength(1));

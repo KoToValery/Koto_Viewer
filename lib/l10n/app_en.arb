@@ -3289,7 +3289,7 @@
   "architectWallInsertPoint": "Point",
   "architectWallEndpointValue": "{endpoint} · {distance}",
   "@architectWallEndpointValue": {"description": "Endpoint marker number and its editable offset", "placeholders": {"endpoint": {"type": "int"}, "distance": {"type": "String"}}},
-  "architectWallEndpointClearance": "End offset",
+  "architectWallEndpointClearance": "Core end offset",
   "@architectWallEndpointClearance": {"description": "Wall positioning control guidance"},
   "architectMagnetHelp": "Snap to walls, axes and drawing points.",
   "@architectMagnetHelp": {"description": "Wall positioning control guidance"},
@@ -3424,15 +3424,15 @@
   "architectWallCutHint": "Tap the part between crossings",
   "architectWallDetach": "Detach",
   "architectWallAttach": "Attach",
-  "architectWallAttachSelectSecond": "Select second wall to connect at common vertex",
+  "architectWallAttachSelectSecond": "Select a touching wall",
   "@architectWallAttachSelectSecond": {
     "description": "Prompt when selecting the second wall to attach"
   },
-  "architectWallAttachSuccess": "Walls connected at common vertex",
+  "architectWallAttachSuccess": "Walls connected",
   "@architectWallAttachSuccess": {
     "description": "Success message when walls are attached at common vertex"
   },
-  "architectWallAttachIncompatible": "Walls cannot be connected at a common vertex",
+  "architectWallAttachIncompatible": "Walls must touch to connect",
   "@architectWallAttachIncompatible": {
     "description": "Error message when walls cannot be connected"
   },
@@ -3489,7 +3489,7 @@
   "@architectWallSplitBoth": {
     "description": "Button to keep both sides selected after split"
   },
-  "architectWallClearance": "Clearance",
+  "architectWallClearance": "Core clearance",
   "architectGridNone": "None",
   "architectGridCustom": "Custom",
   "architectGridBays": "Bays {x} × {y}",
@@ -3695,7 +3695,7 @@
   "@architectRadialOffset": { "description": "Radial menu offset action" },
   "architectMirrorMove": "Mirror",
   "@architectMirrorMove": { "description": "Mirror move action label" },
-  "architectMirrorMoveTooltip": "Mirror move",
+  "architectMirrorMoveTooltip": "Mirror; optionally keep the original",
   "@architectMirrorMoveTooltip": { "description": "Mirror move action tooltip" },
   "architectMirrorCopy": "Mirror+",
   "@architectMirrorCopy": { "description": "Mirror copy action label" },
@@ -6419,7 +6419,7 @@
   "@architectApplyToAllCorners": { "description": "Apply chamfer or fillet to all polygon corners" },
   "architectApplyToCorner": "Apply to selected corner",
   "@architectApplyToCorner": { "description": "Apply chamfer or fillet to selected corner" },
-  "architectChamferFilletInvalid": "Cannot form this corner. Check the distance or radius, wall types and openings.",
+  "architectChamferFilletInvalid": "The exact value does not fit, or the exterior sides conflict.",
   "@architectChamferFilletInvalid": { "description": "Error when chamfer or fillet exceeds segment length" },
   "architectLayers": "Layers",
   "@architectLayers": { "description": "Layers management title" },
@@ -7066,5 +7066,8 @@
   "architectChamferFilletSelectSecond": "Select second element for fillet / chamfer",
   "@architectChamferFilletSelectSecond": {
     "description": "Prompt to select second wall or line for chamfer/fillet"
-  }
+  },
+  "architectMirrorKeepOriginal": "Keep original",
+  "architectPreserveWallPosition": "Keep position",
+  "architectEdgeExtendHint": "Extend adjacent sides while keeping their angles."
 }

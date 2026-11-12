@@ -12,6 +12,17 @@ import '../rendering/architect_wall_network.dart';
 
 // === SECTION: WALL CLEARANCES ===
 class ArchitectWallClearance {
+  /// Distance witnesses belong to the structural core, not the finish envelope.
+  static ArchitectWall _core(ArchitectWall wall) => ArchitectWall(
+    id: wall.id,
+    startPoint: wall.coreCenterStart,
+    endPoint: wall.coreCenterEnd,
+    arcBulge: wall.arcBulge,
+    thickness: wall.coreThickness,
+    insulationThicknessOverride: 0,
+    connectStart: wall.connectStart,
+    connectEnd: wall.connectEnd,
+  );
   final String wallId, neighborId;
   final int side;
   final double distance;
@@ -36,10 +47,11 @@ class ArchitectWallClearance {
       : '$neighborId-${atStart! ? 'start' : 'end'}';
 
   ArchitectWallClearance nearView(
-    ArchitectWall wall,
-    ArchitectWall neighbor,
+    ArchitectWall sourceWall,
+    ArchitectWall sourceNeighbor,
     Rect view,
   ) {
+    final wall = _core(sourceWall), neighbor = _core(sourceNeighbor);
     if (atStart != null) return this;
     double along(Offset p) {
       final d = p - wall.centerStart;
@@ -62,14 +74,15 @@ class ArchitectWallClearance {
   }
 
   /// Distances from connected endpoint junctions, along their supports, to
-  /// perpendicular reference walls. The clearance is measured from the visual
-  /// intersection point of the inner/outer wall edge with the support face,
-  /// preserving clear room dimensions and visual edge corners.
+  /// perpendicular reference walls, measured between their core faces.
   static List<ArchitectWallClearance> endpoints(
-    ArchitectWall wall,
-    List<ArchitectWall> walls, {
+    ArchitectWall sourceWall,
+    List<ArchitectWall> sourceWalls, {
     bool includeParallel = false,
   }) {
+    if (sourceWall.isOpenRailing) return const [];
+    final wall = _core(sourceWall), walls = sourceWalls.map(_core).toList();
+    final sources = {for (final w in sourceWalls) w.id: w};
     if (wall.isCurved || wall.isOpenRailing) return const [];
     double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
     double cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
@@ -80,21 +93,31 @@ class ArchitectWallClearance {
       final point = atStart ? wall.startPoint : wall.endPoint;
       final bestBySide = <int, ArchitectWallClearance>{};
       for (final support in ordered) {
+        final physicalSupport = sources[support.id]!;
+        final connectionPoint = atStart
+            ? sourceWall.startPoint
+            : sourceWall.endPoint;
         if (support.id == wall.id ||
-            support.isOpenRailing ||
+            physicalSupport.isOpenRailing ||
             support.isDetached ||
-            !support.connectsAt(point) ||
+            !physicalSupport.connectsAt(connectionPoint) ||
             cross(support.unitVector, wall.unitVector).abs() < 1e-5) {
           continue;
         }
         final lines = [
-          (support.startPoint, support.endPoint),
-          (support.coreCenterStart, support.coreCenterEnd),
-          (support.polygonCorners[0], support.polygonCorners[1]),
-          (support.polygonCorners[3], support.polygonCorners[2]),
+          (physicalSupport.startPoint, physicalSupport.endPoint),
+          (physicalSupport.coreCenterStart, physicalSupport.coreCenterEnd),
+          (
+            physicalSupport.polygonCorners[0],
+            physicalSupport.polygonCorners[1],
+          ),
+          (
+            physicalSupport.polygonCorners[3],
+            physicalSupport.polygonCorners[2],
+          ),
         ];
         final onSupport = lines.any((line) {
-          final d = point - line.$1;
+          final d = connectionPoint - line.$1;
           final along = dot(d, support.unitVector);
           return cross(d, support.unitVector).abs() < .001 &&
               along >= -.001 &&
@@ -247,11 +270,14 @@ class ArchitectWallClearance {
     return result;
   }
 
-  /// Finished-face distance to the nearest facing wall on each side.
+  /// Core-face distance to the nearest facing wall on each side.
   static List<ArchitectWallClearance> nearest(
-    ArchitectWall wall,
-    List<ArchitectWall> walls,
+    ArchitectWall sourceWall,
+    List<ArchitectWall> sourceWalls,
   ) {
+    if (sourceWall.isOpenRailing) return const [];
+    final wall = _core(sourceWall);
+    final walls = sourceWalls.where((w) => !w.isOpenRailing).map(_core);
     if (wall.isCurved || wall.isOpenRailing) return const [];
     double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
     final nearest = <int, ArchitectWallClearance>{};
@@ -356,7 +382,8 @@ class ArchitectWallTrimSpan {
         final segments = <(Offset, Offset)>[];
         if (primitive.type == CadPrimitiveType.line) {
           segments.add((primitive.startPoint, primitive.endPoint));
-        } else if (primitive.type == CadPrimitiveType.polyline || primitive.type == CadPrimitiveType.mask) {
+        } else if (primitive.type == CadPrimitiveType.polyline ||
+            primitive.type == CadPrimitiveType.mask) {
           final pts = primitive.linePoints;
           for (var i = 1; i < pts.length; i++) {
             segments.add((pts[i - 1], pts[i]));

@@ -11,6 +11,7 @@ import '../models/architect_drawing_color.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import 'architect_wall_arc_editing.dart';
+import 'architect_wall_operation_axis.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import 'architect_decorative_geometry.dart';
@@ -102,11 +103,13 @@ class ArchitectSelection {
     }
   }
 
-  static Map<String, dynamic>? findRecord(ArchitectProject project, String id) =>
-      records(
-        project.toJson(),
-        project.activeStoreyId,
-      ).where((e) => e['id'] == id).firstOrNull;
+  static Map<String, dynamic>? findRecord(
+    ArchitectProject project,
+    String id,
+  ) => records(
+    project.toJson(),
+    project.activeStoreyId,
+  ).where((e) => e['id'] == id).firstOrNull;
   static Map<String, dynamic> record(ArchitectProject project, String id) =>
       records(
         project.toJson(),
@@ -424,7 +427,10 @@ class ArchitectSelection {
         return path..addPolygon(p.arc!.face(0, 0), false);
       }
       if (p.id == id && p.type == CadPrimitiveType.spline) {
-        return ArchitectSplineGeometry.generatePath(p.linePoints, closed: p.closed == true);
+        return ArchitectSplineGeometry.generatePath(
+          p.linePoints,
+          closed: p.closed == true,
+        );
       }
       if (p.id == id && p.type == CadPrimitiveType.circle) {
         return path..addOval(
@@ -438,11 +444,7 @@ class ArchitectSelection {
         final rx = p.radiusX ?? (p.endPoint - p.startPoint).distance;
         final ry = p.radiusY ?? (rx * 0.6);
         return path..addOval(
-          Rect.fromCenter(
-            center: p.startPoint,
-            width: rx * 2,
-            height: ry * 2,
-          ),
+          Rect.fromCenter(center: p.startPoint, width: rx * 2, height: ry * 2),
         );
       }
       if (p.id == id && p.isPolygon) {
@@ -561,6 +563,7 @@ class ArchitectSelection {
 }
 
 class SetArchitectElementProperties extends ArchitectModelCommand {
+  final bool preserveWallPosition;
   final String storeyId;
   final Set<String> elementIds;
   final Map<String, double> values;
@@ -572,6 +575,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
     this.values = const {},
     this.textValues = const {},
     this.clearValues = const {},
+    this.preserveWallPosition = true,
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
@@ -629,8 +633,8 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
           throw ArgumentError('Unsupported property');
         }
         if (value.key == 'arcRadius') {
-          final wall = ArchitectWall.fromJson(e);
-          e['arcBulge'] = wall.arc!.withRadius(value.value).bulge;
+          // Apply after reconstructing a changed reference, so a simultaneous
+          // radius edit uses that reference's actual chord.
           continue;
         }
         e[value.key] = value.key == 'stepCount'
@@ -641,6 +645,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         }
       }
       for (final value in textValues.entries) {
+        if (value.key == 'preserveWallPosition') continue;
         final isText = project.activeStorey.annotations.any(
           (a) => a.id == e['id'],
         );
@@ -674,7 +679,13 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
           );
           continue;
         }
-        if ({'startCap', 'endCap', 'maskBorder', 'isArc', 'leaderArrowStyle'}.contains(value.key)) {
+        if ({
+          'startCap',
+          'endCap',
+          'maskBorder',
+          'isArc',
+          'leaderArrowStyle',
+        }.contains(value.key)) {
           if (value.key == 'maskBorder' || value.key == 'isArc') {
             e[value.key] = value.value == 'true';
           } else {
@@ -910,8 +921,9 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         } else {
           e[value.key] = value.value;
           if (value.key == 'styleId') {
-            final newStyle =
-                FenestrationLibraryService.instance.getStyleById(value.value);
+            final newStyle = FenestrationLibraryService.instance.getStyleById(
+              value.value,
+            );
             if (newStyle != null) {
               e['style'] = newStyle.toJson();
             } else {
@@ -1047,25 +1059,42 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
     )) {
       final old = project.activeStorey.walls.firstWhere((w) => w.id == wall.id);
       var updated = wall;
-      if (values.containsKey('arcRadius')) {
-        ArchitectWallArcEditing.validateOpenings(updated);
+      final referenceChanged = old.referenceLine != wall.referenceLine;
+      final keepPosition =
+          referenceChanged &&
+          preserveWallPosition &&
+          textValues['preserveWallPosition'] != 'false';
+      if (keepPosition) {
+        updated = ArchitectWallOperationAxis.restore(
+          wall,
+          ArchitectWallOperationAxis.core(old),
+          keepOpeningPositions: true,
+        );
       }
       final flipped = old.exteriorSide != wall.exteriorSide;
-      if (flipped && wall.isCurved) {
+      if (flipped && !keepPosition && wall.isCurved) {
         updated = wall
             .copyWith(exteriorSide: old.exteriorSide)
             .mirroredAroundCore();
-      } else if (flipped) {
+      } else if (flipped && !keepPosition) {
         final shift = old.coreCenterStart - wall.coreCenterStart;
         updated = wall.copyWith(
           startPoint: wall.startPoint + shift,
           endPoint: wall.endPoint + shift,
         );
       }
+      if (values['arcRadius'] case final radius?) {
+        updated = updated.copyWith(
+          arcBulge: updated.arc!.withRadius(radius).bulge,
+        );
+        ArchitectWallArcEditing.validateOpenings(updated);
+      }
       result = UpdateArchitectWall(
         storeyId: storeyId,
         wall: updated,
-        carryConnections: !flipped && !values.containsKey('arcRadius'),
+        reattachAfterMove: false,
+        carryConnections:
+            !flipped && !referenceChanged && !values.containsKey('arcRadius'),
       ).apply(result);
     }
     // Non-wall fields come from the same validated transaction.

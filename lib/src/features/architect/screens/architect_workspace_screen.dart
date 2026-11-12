@@ -6259,6 +6259,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _wallPanelAnchor;
 
   WallReferenceLine _wallReference = WallReferenceLine.center;
+  bool _preserveWallPosition = true;
   bool _wallReferenceManual = false;
 
   WallExteriorSide _wallExteriorSide = WallExteriorSide.left;
@@ -6648,6 +6649,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _commands.editPreview = null;
     _cancelActiveDrags();
     _mirrorActive = false;
+    _mirrorReview = false;
+    _mirrorDirection = null;
     _mirrorAnchor = null;
     _mirrorCurrentPoint = null;
     _mirrorIdMap = null;
@@ -6919,6 +6922,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   int _offsetEpoch = 0;
 
   bool _mirrorIsDuplicate = false;
+  bool _mirrorReview = false;
+  Offset? _mirrorDirection;
 
   Set<String> _mirrorSourceIds = {};
 
@@ -13739,15 +13744,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (hitWall != null) {
         try {
-          _executeWallEdit(
-            _linearCommand(
-              ConnectArchitectWallsAtVertex(
-                storeyId: _project.activeStoreyId,
-                wallIds: {sourceId, hitWall.id},
-                primaryWallId: sourceId,
-              ),
-            ),
-          );
+          if (!_stageWallAttach({sourceId, hitWall.id})) return;
           HapticFeedback.mediumImpact();
           setState(() {
             _wallAttachSourceId = null;
@@ -18146,19 +18143,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           padding: EdgeInsets.zero,
 
-                          tooltip: mode == ArchitectPolygonEdgeMode.move
-
-                              ? context.l10n.architectEdgeMoveHint
-
-                              : context.l10n.architectEdgePullHint,
-
-                          icon: AppIcon.fromMaterial(
-
-                            mode == ArchitectPolygonEdgeMode.move
-
-                                ? Icons.open_with
-
-                                : Icons.unfold_more,
+                          tooltip: switch (mode) {
+                            ArchitectPolygonEdgeMode.pull => context.l10n.architectEdgePullHint,
+                            ArchitectPolygonEdgeMode.move => context.l10n.architectEdgeMoveHint,
+                            ArchitectPolygonEdgeMode.extendCatheti => context.l10n.architectEdgeExtendHint,
+                          },
+                          icon: AppIcon(
+                            switch (mode) {
+                              ArchitectPolygonEdgeMode.pull => AppIconId.edgePull,
+                              ArchitectPolygonEdgeMode.move => AppIconId.edgeMove,
+                              ArchitectPolygonEdgeMode.extendCatheti => AppIconId.edgeExtend,
+                            },
 
                             size: 20,
 
@@ -19180,111 +19175,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
 
-
-  void _editWallLength() {
-
-    final wall = _selectedLinearElement;
-
-    if (wall == null) return;
-
-    if (wall.isCurved) {
-      _editWallArcDimension();
-      return;
-    }
-
-    var length = wall.length;
-
-    showDialog<void>(
-
-      context: context,
-
-      builder: (dialogContext) => Dialog(
-
-        child: SizedBox(
-
-          width: 250,
-
-          child: ArchitectWallDraftingPanel(
-
-            length: _project.units.toUnit(length),
-
-            unit: _project.units.symbol,
-
-            decimals: _project.distanceDecimals,
-
-            minimumLength: _project.units.toUnit(.001),
-
-            onLength: (value) => length = _project.units.fromUnit(value),
-
-            onEnd: () {
-
-              Navigator.of(dialogContext).pop();
-
-              _executeWallEdit(
-
-                _linearCommand(
-
-                  UpdateArchitectWall(
-
-                    storeyId: _project.activeStorey.id,
-
-                    wall: wall.copyWith(
-
-                      endPoint: wall.startPoint + wall.unitVector * length,
-
-                    ),
-
-                    carryConnections: true,
-
-                  ),
-
-                ),
-
-              );
-
-            },
-
-            onContinue: () {
-
-              Navigator.of(dialogContext).pop();
-
-              _executeWallEdit(
-
-                _linearCommand(
-
-                  UpdateArchitectWall(
-
-                    storeyId: _project.activeStorey.id,
-
-                    wall: wall.copyWith(
-
-                      endPoint: wall.startPoint + wall.unitVector * length,
-
-                    ),
-
-                    carryConnections: true,
-
-                  ),
-
-                ),
-
-              );
-
-            },
-
-            onUnlock: () => Navigator.of(dialogContext).pop(),
-
-            onCancel: () => Navigator.of(dialogContext).pop(),
-
-          ),
-
-        ),
-
-      ),
-
-    );
-
-  }
 
 
 
@@ -20683,14 +20573,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _radialItem(
 
-            action: ArchitectRadialAction.mirrorCopy,
-
-            color: const Color(0xFF64FFDA),
-
-          ),
-
-          _radialItem(
-
             action: ArchitectRadialAction.delete,
 
             color: const Color(0xFFFF5252),
@@ -20741,14 +20623,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _radialItem(
 
-            action: ArchitectRadialAction.mirrorCopy,
-
-            color: const Color(0xFF64FFDA),
-
-          ),
-
-          _radialItem(
-
             action: ArchitectRadialAction.properties,
 
             color: const Color(0xFFB388FF),
@@ -20784,14 +20658,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           action: ArchitectRadialAction.mirrorMove,
 
           color: const Color(0xFF00E5FF),
-
-        ),
-
-        _radialItem(
-
-          action: ArchitectRadialAction.mirrorCopy,
-
-          color: const Color(0xFF64FFDA),
 
         ),
 
@@ -20914,7 +20780,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (storey.annotations.any((a) => a.id == elementId)) {
       for (final action in [ArchitectRadialAction.edit,ArchitectRadialAction.move,
         ArchitectRadialAction.rotate,ArchitectRadialAction.duplicate,
-        ArchitectRadialAction.properties,ArchitectRadialAction.mirrorMove,ArchitectRadialAction.mirrorCopy]) {
+        ArchitectRadialAction.properties,ArchitectRadialAction.mirrorMove]) {
         items.add(_radialItem(action:action,color:const Color(0xFF00E5FF)));
       }
     } else if (isCol || isBeam) {
@@ -21458,18 +21324,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           action: ArchitectRadialAction.mirrorMove,
 
           color: const Color(0xFF00E5FF),
-
-        ),
-
-      );
-
-      items.add(
-
-        _radialItem(
-
-          action: ArchitectRadialAction.mirrorCopy,
-
-          color: const Color(0xFF64FFDA),
 
         ),
 
@@ -22337,6 +22191,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _polygonContourElementId = targetId;
         _polygonContourIndex = holeIndex == null ? 0 : holeIndex + 1;
 
+        if (_polygonEditId != targetId && _selectedHatch != null) _polygonEdgeMode = ArchitectPolygonEdgeMode.pull;
         _polygonEditId = targetId;
 
         _polygonSelectedEdge = hit.edge;
@@ -22679,13 +22534,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         case ArchitectRadialAction.mirrorMove:
 
-          _startMirrorSession(isDuplicate: false);
+          _startMirrorSession();
 
           return;
 
         case ArchitectRadialAction.mirrorCopy:
 
-          _startMirrorSession(isDuplicate: true);
+          _startMirrorSession();
 
           return;
 
@@ -22745,6 +22600,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           setState(() {
 
+            if (_polygonEditId != id && _selectedHatch != null) _polygonEdgeMode = ArchitectPolygonEdgeMode.pull;
             _polygonEditId = id;
 
             _polygonSelectedEdge = _selectedPolygonHoleIndex == null
@@ -23070,7 +22926,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       case ArchitectRadialAction.mirrorMove:
 
-        _startMirrorSession(isDuplicate: false);
+        _startMirrorSession();
 
         break;
 
@@ -23078,7 +22934,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       case ArchitectRadialAction.mirrorCopy:
 
-        _startMirrorSession(isDuplicate: true);
+        _startMirrorSession();
 
         break;
 
@@ -23559,7 +23415,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _selectPolygonContour(point);
     if (_selectedHatch != null && !_multiSelect) {
       setState(() {
-        _polygonEditId = id;
+        if (_polygonEditId != id && _selectedHatch != null) _polygonEdgeMode = ArchitectPolygonEdgeMode.pull;
+            _polygonEditId = id;
         _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
           _selectedPolygon!, point, 18 / _currentScale,
         );
@@ -24618,20 +24475,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  bool _stageWallAttach(Set<String> wallIds) {
+    try {
+      final source = _commands.documentProject;
+      final command = _selectedLineIds.isNotEmpty
+          ? _linearCommand(ConnectArchitectWallsAtVertex(storeyId: source.activeStoreyId,
+              wallIds: wallIds, primaryWallId: _selectedElementId))
+          : AttachArchitectWalls(storeyId: source.activeStoreyId, wallIds: wallIds);
+      final candidate = command.apply(source);
+      _beginGeometryCommand(ArchitectRadialAction.attach);
+      return _captureGeometryPreview(candidate);
+    } on ArgumentError {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(context.l10n.architectWallAttachIncompatible)));
+      return false;
+    }
+  }
+
   void _triggerWallAttach() {
     final wallIds = _selectedLineIds.isNotEmpty ? _selectedLineIds : _selectedWallIds;
     if (wallIds.length >= 2) {
       _cancelActiveDrags();
       try {
-        _executeWallEdit(
-          _linearCommand(
-            ConnectArchitectWallsAtVertex(
-              storeyId: _project.activeStoreyId,
-              wallIds: wallIds,
-              primaryWallId: _selectedElementId,
-            ),
-          ),
-        );
+        if (!_stageWallAttach(wallIds)) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(context.l10n.architectWallAttachSuccess),
@@ -24676,29 +24542,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _elementMovePreview = SetArchitectWallConnection(
         storeyId: _project.activeStoreyId,
         wallIds: wallIds,
-        connected: false,
+        connected: false, temporary: true,
       ).apply(_project);
     });
     _repaintPreview();
   }
 
   void _confirmWallDetach() {
-    if (_pendingDetachWallIds == null) return;
-    final wallIds = _pendingDetachWallIds!;
+    final wallIds = _pendingDetachWallIds;
+    if (wallIds == null) return;
+    final original = _elementMoveOriginal ?? _commands.documentProject;
+    final candidate = SetArchitectWallConnection(storeyId: original.activeStoreyId,
+      wallIds: wallIds, connected: false, temporary: true).apply(original);
     _cancelActiveDrags();
-    _executeWallEdit(
-      SetArchitectWallConnection(
-        storeyId: _project.activeStoreyId,
-        wallIds: wallIds,
-        connected: false,
-      ),
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.l10n.architectWallDetachSuccess),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    _discardGeometryCommand();
+    _commands.commit(candidate);
+    _saveBiMProjectIfAttached();
+    _repaintPreview();
   }
 
   void _cancelWallDetach() {
@@ -24717,42 +24577,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final left = (screenPos.dx + 12).clamp(8.0, math.max(8.0, media.width - width - 8.0));
     final top = (screenPos.dy - height - 12).clamp(8.0, math.max(8.0, media.height - height - 12.0));
     return Offset(left.toDouble(), top.toDouble());
-  }
-
-  Future<double?> _showNumericInputDialog({
-    required String title,
-    required double initialValue,
-  }) async {
-    final controller = TextEditingController(text: initialValue.toStringAsFixed(2));
-    final l = context.l10n;
-    return showDialog<double>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          autofocus: true,
-          decoration: InputDecoration(
-            suffixText: _project.units.symbol,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              final parsed = double.tryParse(controller.text.replaceAll(',', '.'));
-              Navigator.of(ctx).pop(parsed);
-            },
-            child: Text(l.applyAction),
-          ),
-        ],
-      ),
-    );
   }
 
   int _findClosestSegmentIndex(List<Offset> pts, Offset target) {
@@ -25204,104 +25028,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Widget _buildChamferFilletFloatingOverlay() {
-    final l = context.l10n;
-    final wallAxes = _project.activeStorey.walls
-        .any((w) => w.id == _chamferFilletSourceId);
-    final isFillet = _chamferFilletOptions?.isFillet ?? false;
-    final anchor = _chamferFilletPointer ??
-        (_linearEditWalls.where((w) => w.id == _chamferFilletSourceId).firstOrNull?.referencePointAt(0.5) ??
-         _project.activeStorey.cadPrimitives.where((p) => p.id == _chamferFilletSourceId).firstOrNull?.startPoint ??
-         Offset.zero);
-    final screenPos = _viewport.toScreen(anchor);
-    final clamped = _clampOverlayPosition(screenPos, width: 260);
-
-    final curVal = _chamferFilletOptions?.value ?? (isFillet ? 0.50 : 0.30);
+    final options = _chamferFilletOptions!;
+    final anchor = _chamferFilletPointer ?? _selectedLinearElement?.referencePointAt(.5) ?? Offset.zero;
     return ArchitectFloatingCommandOverlay(
-      position: clamped,
-      label: l.architectChamferFilletSelectSecond,
-      showConfirm: false,
-      onCancel: () {
-        setState(() {
-          _chamferFilletSourceId = null;
-          _chamferFilletOptions = null;
-          _chamferFilletPointer = null;
-        });
-        _repaintPreview();
-      },
-      customContent: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: () async {
-              final newVal = await _showNumericInputDialog(
-                title: wallAxes
-                    ? (isFillet ? l.architectWallAxisRadius : l.architectWallAxisSetback)
-                    : (isFillet ? l.architectFilletRadius : l.architectChamferDistance),
-                initialValue: curVal,
-              );
-              if (newVal != null && newVal > 0 && mounted) {
-                setState(() {
-                  _chamferFilletOptions = ArchitectChamferFilletOptions(
-                    isFillet: isFillet,
-                    value: newVal,
-                  );
-                  if (isFillet) {
-                    _lastFilletRadius = newVal;
-                  } else {
-                    _lastChamferDistance = newVal;
-                  }
-                });
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.white12,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
-              ),
-              child: Text(
-                '${isFillet ? "R" : "D"}: ${curVal.toStringAsFixed(2)}m',
-                style: const TextStyle(
-                  color: Color(0xFF00E5FF),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          InkWell(
-            onTap: () {
-              final next = math.max(0.05, curVal - 0.10);
-              setState(() {
-                _chamferFilletOptions = ArchitectChamferFilletOptions(
-                  isFillet: isFillet,
-                  value: double.parse(next.toStringAsFixed(2)),
-                );
-              });
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 3, vertical: 2),
-              child: Text('-', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            ),
-          ),
-          InkWell(
-            onTap: () {
-              final next = curVal + 0.10;
-              setState(() {
-                _chamferFilletOptions = ArchitectChamferFilletOptions(
-                  isFillet: isFillet,
-                  value: double.parse(next.toStringAsFixed(2)),
-                );
-              });
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 3, vertical: 2),
-              child: Text('+', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
+      position: _clampOverlayPosition(_viewport.toScreen(anchor), width: 260),
+      label: context.l10n.architectChamferFilletSelectSecond, showConfirm: false,
+      onCancel: _cancelGeometryCommand,
+      customContent: TextButton(
+        key: const ValueKey('architect-corner-exact-value'),
+        onPressed: () async {
+          final result = await showArchitectChamferFilletDialog(context,
+            unitToMeters: _project.units.scaleToMeters, unitSymbol: _project.units.symbol,
+            decimals: _project.distanceDecimals, initialIsFillet: options.isFillet,
+            initialValue: options.value,
+            wallAxes: _selectedWallIds.isNotEmpty);
+          if (result == null || !mounted || _chamferFilletSourceId == null) return;
+          setState(() {
+            _chamferFilletOptions = result;
+            if (result.isFillet) { _lastFilletRadius = result.value; }
+            else { _lastChamferDistance = result.value; }
+          });
+        },
+        child: Text(_project.formatLength(options.value), style: const TextStyle(color: Colors.white)),
       ),
     );
   }
@@ -25727,14 +25475,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final clamped = _clampOverlayPosition(screenPos, width: 280);
     return ArchitectFloatingCommandOverlay(
       position: clamped,
-      label: _mirrorAnchor == null
+      label: _mirrorReview ? '' : _mirrorAnchor == null
           ? l.architectMirrorPromptPickAnchor
           : l.architectMirrorPromptPickAxis,
-      showConfirm: false,
+      showConfirm: _mirrorReview,
+      ready: _commandReady,
+      onConfirm: _confirmMirror,
       onCancel: _commandPreview != null
           ? _cancelGeometryCommand
           : _cancelMirrorSession,
-      customContent: _mirrorAnchor != null
+      customContent: _mirrorReview
+          ? Row(mainAxisSize: MainAxisSize.min, children: [
+              Checkbox(key: const ValueKey('architect-mirror-keep-original'),
+                value: _mirrorIsDuplicate,
+                onChanged: (value) {
+                  _mirrorIsDuplicate = value ?? false;
+                  _executeMirror(anchor: _mirrorAnchor!, direction: _mirrorDirection!);
+                }),
+              Text(l.architectMirrorKeepOriginal, style: const TextStyle(color: Colors.white)),
+            ])
+          : _mirrorAnchor != null
           ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -26135,7 +25895,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _selectedZoneId = zone.id;
           _zoneTool.startEditingZone(zone);
         }
-        if (_selectedHatch != null) _polygonEditId = ids.single;
+        if (_selectedHatch != null) { _polygonEdgeMode = ArchitectPolygonEdgeMode.pull; _polygonEditId = ids.single; }
       }
       // Area selection remains in the explicitly chosen Multi mode.
       _selectionCyclePoint = null;
@@ -26365,6 +26125,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   ),
 
                   itemBuilder: (context) => [
+                    PopupMenuItem<WallReferenceLine>(enabled: false,
+                      child: StatefulBuilder(builder: (context, update) => CheckboxListTile(
+                        key: const ValueKey('architect-reference-preserve-position'),
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(l.architectPreserveWallPosition),
+                        value: _preserveWallPosition,
+                        onChanged: (value) {
+                          setState(() => _preserveWallPosition = value ?? true);
+                          update(() {});
+                        },
+                      )),
+                    ),
+
 
                     for (final ref in [
 
@@ -26728,6 +26501,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         elementIds: wallIds,
 
         textValues: {'referenceLine': newRef.name},
+        preserveWallPosition: _preserveWallPosition,
 
       ),
 
@@ -27308,7 +27082,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // --- SUBSECTION: [TAG:MIRROR_WORKFLOW] Mirror axis picking, preview and commit ---
   void _previewMirrorSnap(ArchitectSnapResult snap) {
-    if (!_mirrorActive) return;
+    if (!_mirrorActive || _mirrorReview) return;
     _cursorModel = snap.point;
     _activeSnapLabel = snap.snapLabel;
     _activeMagneticGuides = snap.magneticGuides;
@@ -27342,6 +27116,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _pickMirrorSnap(ArchitectSnapResult snap) {
+    if (_mirrorReview) return;
     if (_mirrorAnchor == null) {
       setState(() { _mirrorAnchor = snap.point; _mirrorCurrentPoint = null; });
       HapticFeedback.selectionClick();
@@ -27352,10 +27127,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _repaintPreview();
   }
 
-  void _startMirrorSession({required bool isDuplicate}) {
-    _beginGeometryCommand(isDuplicate
-        ? ArchitectRadialAction.mirrorCopy : ArchitectRadialAction.mirrorMove,
-    );
+  void _startMirrorSession() {
+    _beginGeometryCommand(ArchitectRadialAction.mirrorMove);
 
     if (_selectionHasAutoZones) return;
 
@@ -27370,7 +27143,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _moveSelection = false;
       _mirrorActive = true;
 
-      _mirrorIsDuplicate = isDuplicate;
+      _mirrorIsDuplicate = false;
+      _mirrorReview = false;
+      _mirrorDirection = null;
 
       _mirrorSourceIds = Set<String>.from(_effectiveSelection);
 
@@ -27378,17 +27153,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _mirrorCurrentPoint = null;
 
-      _mirrorIdMap = isDuplicate
-
-          ? {
-
-              for (final id in _effectiveSelection)
-
-                id: ArchitectElementId.next('mirror'),
-
-            }
-
-          : null;
+      _mirrorIdMap = {for (final id in _effectiveSelection)
+        id: ArchitectElementId.next('mirror')};
 
       _radialMenuScreenPosition = null;
 
@@ -27433,89 +27199,43 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _executeMirror({required Offset anchor, required Offset direction}) {
-
-    if (direction.distanceSquared < 1e-12) return;
-
-    final finalIdMap = _mirrorIsDuplicate ? _mirrorIdMap : null;
-
+    final session = _commandPreview;
+    if (session == null || direction.distanceSquared < 1e-12) return;
     try {
-
-      final command = MirrorArchitectElements(
-
-        storeyId: _project.activeStoreyId,
-
-        elementIds: _mirrorSourceIds,
-
-        origin: anchor,
-
-        direction: direction,
-
-        isDuplicate: _mirrorIsDuplicate,
-
-        copyGroups: _editingGroupId == null,
-
-        idMap: finalIdMap,
-
-      );
-
-      _commands.executeBatch([command,
-
-        if (_mirrorIsDuplicate && finalIdMap != null && _editingGroupId != null)
-
-          AddArchitectGroupMembers(storeyId: _project.activeStoreyId,
-
-            groupId: _editingGroupId!, elementIds: finalIdMap.values.toSet(),
-          ),
-
-      ]);
-
-      _saveBiMProjectIfAttached();
-
-      if (_mirrorIsDuplicate && finalIdMap != null) {
-
-        _selectionIds
-
-          ..clear()
-
-          ..addAll(finalIdMap.values);
-
-        _selectedElementId = finalIdMap.values.firstOrNull;
-
+      final source = session.original;
+      var candidate = MirrorArchitectElements(
+        storeyId: source.activeStoreyId, elementIds: _mirrorSourceIds,
+        origin: anchor, direction: direction, isDuplicate: _mirrorIsDuplicate,
+        copyGroups: _editingGroupId == null, idMap: _mirrorIdMap,
+      ).apply(source);
+      if (_mirrorIsDuplicate && _editingGroupId != null) {
+        candidate = AddArchitectGroupMembers(storeyId: source.activeStoreyId,
+          groupId: _editingGroupId!, elementIds: _mirrorIdMap!.values.toSet()).apply(candidate);
       }
-
-      HapticFeedback.mediumImpact();
-
-    } on ArgumentError {
-
-      _operationError();
-
-    } finally {
-
+      _captureGeometryPreview(candidate);
       setState(() {
-
-        _mirrorActive = false;
-
-        _mirrorAnchor = null;
-
-        _mirrorCurrentPoint = null;
-
-        _mirrorIdMap = null;
-
-        _elementMovePreview = null;
-
-        _placingWithHold = false;
-
-        _touchPosition = null;
-
+        _mirrorDirection = direction;
+        _mirrorReview = true;
+        _elementMovePreviewValue = null;
       });
-
       _repaintPreview();
-
-    }
-
+    } on ArgumentError { _operationError(); }
   }
 
-
+  void _confirmMirror() {
+    final copies = _mirrorIsDuplicate ? _mirrorIdMap?.values.toSet() : null;
+    if (!_commandReady) return;
+    _confirmGeometryCommand();
+    if (copies != null && _commandPreview == null) {
+      final existing = ArchitectSelection.records(_commands.documentProject.toJson(),
+        _commands.documentProject.activeStoreyId).map((e) => e['id'] as String).toSet();
+      final selected = copies.intersection(existing);
+      if (selected.isNotEmpty) setState(() {
+        _selectionIds..clear()..addAll(selected);
+        _selectedElementId = selected.first;
+      });
+    }
+  }
 
   void _openSectionOrElevationView(String id) {
     if (_project.sections.any((s) => s.id == id)) {
@@ -28135,9 +27855,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
       );
     } else if (action == 'mirrorMove') {
-      _startMirrorSession(isDuplicate: false);
+      _startMirrorSession();
     } else if (action == 'mirrorCopy') {
-      _startMirrorSession(isDuplicate: true);
+      _startMirrorSession();
     } else if (action == 'join') {
       _beginGeometryCommand(ArchitectRadialAction.join);
       try {
@@ -28155,8 +27875,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     } else if (action == 'extend') {
       setState(() => _wallExtendId = segmentIds.single);
-    } else if (action == 'length') {
-      _editWallLength();
+
     } else if (action == 'point') {
       _startNewPointSession(segmentIds.single);
     }
@@ -28184,26 +27903,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _triggerFillet() => _startChamferFilletSession(isFillet: true);
 
   void _startChamferFilletSession({required bool isFillet}) {
-    final ids = _effectiveSelection;
-    final storey = _project.activeStorey;
-    if (ids.length == 1) {
-      final id = ids.single;
-      final isWall = storey.walls.any((w) => w.id == id);
-      final isLine = storey.cadPrimitives.any((p) => p.id == id && p.type == CadPrimitiveType.line);
-      if (isWall || isLine) {
-        setState(() {
-          _cancelActiveDrags();
-          _chamferFilletSourceId = id;
-          _chamferFilletOptions = ArchitectChamferFilletOptions(
-            isFillet: isFillet,
-            value: isFillet ? (_lastFilletRadius ?? 0.50) : (_lastChamferDistance ?? 0.30),
-          );
-          _chamferFilletPointer = null;
-        });
-        HapticFeedback.selectionClick();
-        return;
-      }
-    }
+    _cancelActiveDrags();
     _openChamferFilletDialog(isFillet: isFillet);
   }
 
@@ -28219,11 +27919,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       unitToMeters: _project.units.scaleToMeters,
       unitSymbol: _project.units.symbol,
       initialIsFillet: isFillet,
+      initialValue: isFillet ? (_lastFilletRadius ?? .50) : (_lastChamferDistance ?? .30),
+      decimals: _project.distanceDecimals,
       canApplyToAll: canApplyToAll,
       wallAxes: ids.isNotEmpty &&
           ids.every((id) => storey.walls.any((w) => w.id == id)),
     );
-    if (options == null) return;
+    if (options == null || !mounted) return;
+    if (options.isFillet) { _lastFilletRadius = options.value; }
+    else { _lastChamferDistance = options.value; }
+    _beginGeometryCommand(options.isFillet ? ArchitectRadialAction.fillet : ArchitectRadialAction.chamfer);
 
     if (ids.length == 1 &&
         (storey.walls.any((w) => w.id == ids.single) ||
@@ -28492,6 +28197,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (changed) {
       _commands.commit(proj.updateActiveStorey(storey));
+      if (!_commandReady) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(context.l10n.architectChamferFilletInvalid)));
+      }
       _saveBiMProjectIfAttached();
       setState(() {});
     }
@@ -29014,19 +28723,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             'architect-selection-mirror-move',
             l.architectMirrorMove,
             Icons.flip,
-            () => _startMirrorSession(isDuplicate: false),
+            () => _startMirrorSession(),
             color: accent,
             commandId: 'mirrorMove',
             tooltip: l.architectMirrorMoveTooltip,
-          ),
-          action(
-            'architect-selection-mirror-copy',
-            l.architectMirrorCopy,
-            Icons.copy_all,
-            () => _startMirrorSession(isDuplicate: true),
-            color: accent,
-            commandId: 'mirrorCopy',
-            tooltip: l.architectMirrorCopyTooltip,
           ),
         ]);
       }
@@ -29245,13 +28945,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 'mirrorMove',
                 commandId: 'mirrorMove',
               ),
-              linear(
-                'wall-mirror-copy',
-                l.architectMirrorCopy,
-                Icons.copy_all,
-                'mirrorCopy',
-                commandId: 'mirrorCopy',
-              ),
               if (lineIds.isEmpty)
                 linear(
                   'wall-mirror',
@@ -29260,14 +28953,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   'mirror',
                 ),
               if (segmentIds.length == 1 && !_multiSelect) ...[
-                linear(
-                  'wall-length',
-                  _selectedLinearElement?.isCurved == true
-                      ? l.wallArc
-                      : l.architectWallLength,
-                  Icons.straighten,
-                  'length',
-                ),
                 linear(
                   'wall-point',
                   l.bimNewPoint,
@@ -33269,7 +32954,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             Positioned.fill(child: _buildDraftCancel()),
 
-            if (!_dragController.isActive && !_showSelectionControl && _touchCandidates == null && _newPointTargetId == null) Positioned(
+            if (!_dragController.isActive && !_mirrorReview && !_showSelectionControl && _touchCandidates == null && _newPointTargetId == null) Positioned(
 
               left: 12,
 
@@ -35150,7 +34835,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ),
-      if (_commandReady)
+      if (_commandReady && !_mirrorActive)
         Positioned.fill(child: ArchitectTransformPointInput(
           key: const ValueKey('architect-command-review-input'),
           toModel: _screenToModel, toScreen: _viewport.toScreen,
@@ -35162,7 +34847,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ),
-      if (_commandPreview != null && !_dragController.isActive && !_mirrorActive)
+      if (_commandPreview != null && !_dragController.isActive && !_mirrorActive && _chamferFilletSourceId == null)
         ArchitectFloatingCommandOverlay(
           surfaceKey: const ValueKey('architect-generic-command-overlay'),
           label: BimEditActions.label(_commandAction!, context.l10n),

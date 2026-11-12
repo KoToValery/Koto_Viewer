@@ -253,14 +253,14 @@ void main() {
       final l = AppLocalizations.of(
         tester.element(find.byType(ArchitectWorkspaceScreen)),
       )!;
-      expect(find.text(l.architectMirrorCopy), findsOneWidget);
+      expect(find.text(l.architectMirrorMove), findsOneWidget);
       expect(find.text(l.bimNewPoint), findsOneWidget);
       expect(find.byKey(const ValueKey('wall-cut')), findsOneWidget);
       await capture(tester, 'actions-bg');
-      await tools.selectionAction(tester, 'architect-selection-mirror-copy');
+      await tools.selectionAction(tester, 'architect-selection-mirror-move');
       expect(
         find.byKey(const ValueKey('architect-command-apply')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(model.undoCount, 0);
       expect(tester.takeException(), isNull);

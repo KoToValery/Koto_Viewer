@@ -15,6 +15,7 @@
 | --- | --- | --- |
 | Command base | `ArchitectModelCommand` (`[SEC-01-BASE]`) | Base undoable command interface (`execute`, `undo`) |
 | Wall mutations | `CreateArchitectWall`, `SplitArchitectWall`, `CutArchitectWalls`, `TrimArchitectWall` | Wall creation, splitting, cutting, trimming, and junctions |
+| Wall contacts | `AttachArchitectWalls`, `SetArchitectWallConnection`, `ArchitectWallConnectionPolicy.afterMove` | Contact-only attachment and persisted temporary Detach; no endpoint relocation |
 | Move / transform | `MoveArchitectElements` | Element translation with topology/room sync |
 | Roofs | `CreateArchitectRoofPlane` | Roof plane creation, updates, and deletion |
 | Polygon / vertex editing | `InsertArchitectElementPoint` | Polygon edge insertion, vertex dragging, hole updates |

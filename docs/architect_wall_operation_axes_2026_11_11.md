@@ -2,8 +2,8 @@
 
 Fillet, Chamfer and Offset now calculate wall geometry on the core axis. The
 saved `referenceLine` remains the placement reference; no project migration or
-additional user setting is needed. Finished-face clearances keep their existing
-meaning.
+additional user setting is needed. Dynamic wall clearances now measure between core faces; persistent dimension
+chains retain their own measurement settings.
 
 `ArchitectWallOperationAxis` converts straight and circular walls to core-axis
 proxies and restores results to each wall's own reference. Arc conversion uses

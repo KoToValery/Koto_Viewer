@@ -2,9 +2,81 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_wall.dart';
 import '../models/architect_project.dart';
+import '../../bim_editing/geometry/bim_polygon_geometry.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 
 /// Construction intent is shared by automatic detection and command execution.
 class ArchitectWallConnectionPolicy {
+  static const contactTolerance = .0001;
+  static final _contactBounds = Expando<Rect>();
+
+  /// Only finite end caps may initiate a join. Never extend either wall to an
+  /// infinite axis intersection or to another junction elsewhere in the floor.
+  static bool touches(ArchitectWall a, ArchitectWall b) {
+    if (a.isOpenRailing || b.isOpenRailing) return false;
+    Rect bounds(ArchitectWall wall) => _contactBounds[wall] ??=
+        (Path()..addPolygon(wall.polygonCorners, true)).getBounds();
+    if (!bounds(
+      a,
+    ).inflate(contactTolerance).overlaps(bounds(b).inflate(contactTolerance)))
+      return false;
+    if (a.baseOffset >= b.baseOffset + b.height - contactTolerance ||
+        b.baseOffset >= a.baseOffset + a.height - contactTolerance)
+      return false;
+    bool capTouches(ArchitectWall tip, ArchitectWall host) {
+      final contour = host.polygonCorners;
+      final low = tip.centerLineOffset - tip.thickness / 2;
+      final high = tip.centerLineOffset + tip.thickness / 2;
+      for (final ratio in [0.0, 1.0]) {
+        final p = tip.referencePointAt(ratio), n = tip.normalAt(ratio);
+        final first = p + n * low, last = p + n * high;
+        if (BimPolygonGeometry.contains(contour, first) ||
+            BimPolygonGeometry.contains(contour, last) ||
+            BimPolygonGeometry.contains(contour, (first + last) / 2))
+          return true;
+        for (var i = 0; i < contour.length; i++) {
+          final c = contour[i], d = contour[(i + 1) % contour.length];
+          if (BimPolygonGeometry.segmentsIntersect(first, last, c, d) ||
+              (first - BimLineGeometry.closest(first, c, d)).distance <=
+                  contactTolerance ||
+              (last - BimLineGeometry.closest(last, c, d)).distance <=
+                  contactTolerance ||
+              (c - BimLineGeometry.closest(c, first, last)).distance <=
+                  contactTolerance)
+            return true;
+        }
+      }
+      return false;
+    }
+
+    return capTouches(a, b) || capTouches(b, a);
+  }
+
+  /// Called by movement commands using their original wall, so previewing or
+  /// cancelling cannot consume a temporary Detach or carry its old neighbours.
+  static ArchitectWall afterMove(
+    ArchitectWall previous,
+    ArchitectWall next,
+    Iterable<ArchitectWall> neighbors,
+  ) {
+    if (!previous.autoAttachAfterMove ||
+        ((previous.coreCenterStart - next.coreCenterStart).distance <= 1e-7 &&
+            (previous.coreCenterEnd - next.coreCenterEnd).distance <= 1e-7))
+      return next;
+    // A free wall keeps waiting for real contact. Never enable the legacy
+    // corner repair across a gap after a temporary Detach.
+    if (!neighbors.any(
+      (other) =>
+          other.id != next.id && !other.isDetached && touches(next, other),
+    ))
+      return next;
+    return next.copyWith(
+      connectStart: true,
+      connectEnd: true,
+      autoAttachAfterMove: false,
+    );
+  }
+
   /// Largest physical distance from the core axis to either finish face.
   static double coreJunctionReach(ArchitectWall wall) =>
       wall.coreThickness / 2 +

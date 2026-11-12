@@ -36,21 +36,11 @@ export 'architect_element_id.dart';
 // ============================================================================
 // MASTER ARCHITECT COMMAND CONTROLLER LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
-// COMPANION MAP: See 'architect_command_controller.index.md' for full command registry.
-// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
+// COMPANION MAP: See 'architect_command_controller.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
 //
-// [SEC-01-BASE] [TAG:CMD_BASE] ArchitectModelCommand base interface
-// [SEC-02-GROUPS] [TAG:CMD_GROUPS] Offset, group & ungroup operations
-// [SEC-03-WALLS] [TAG:CMD_WALLS] Wall creation, split, cut, trim, clearances
-// [SEC-04-ELEMENTS] [TAG:CMD_ELEMENTS] Columns, zones, candidate placement
-// [SEC-05-MOVE] [TAG:CMD_MOVE] Move single & multi-elements with room sync
-// [SEC-06-EXTEND] [TAG:CMD_EXTEND] Wall extensions, joints & dimension overrides
-// [SEC-07-CONTOURS] [TAG:CMD_CONTOURS] Contour cut openings, CAD primitives
-// [SEC-08-ROOFS] [TAG:CMD_ROOFS] Roof planes, pitch updates & replacement
-// [SEC-09-POLYGONS] [TAG:CMD_POLYGONS] Polygon vertex insertion & edge manipulation
-// [SEC-10-CTRL] [TAG:CMD_CONTROLLER] ArchitectCommandController Undo/Redo & transactions
-// [SEC-11-VIEWS] [TAG:CMD_VIEWS] Sections, elevations & decorative element commands
-// [SEC-12-STOREYS] [TAG:CMD_STOREYS] Storey copy, batch additions & deletion
+// [SEC-01-BASE]     Architect Model Command Base
+//   ↳ [SUB]        [TAG:CMD_LANDSCAPE] Terrain, Pathway, Vegetation & Site Fence Commands
 // ============================================================================
 
 // === SECTION: [SEC-01-BASE] ARCHITECT MODEL COMMAND BASE ===
@@ -278,7 +268,11 @@ class CreateArchitectWall extends ArchitectModelCommand {
   final String storeyId;
   final ArchitectWall wall;
   final ArchitectWallType? wallType;
-  const CreateArchitectWall({required this.storeyId, required this.wall, this.wallType});
+  const CreateArchitectWall({
+    required this.storeyId,
+    required this.wall,
+    this.wallType,
+  });
   @override
   ArchitectProject apply(ArchitectProject project) {
     if (wall.hasSolidWallBody && wall.layers.isNotEmpty) {
@@ -316,6 +310,7 @@ class CreateArchitectWall extends ArchitectModelCommand {
 
 /// A changed endpoint carries every attached endpoint with it.
 class UpdateArchitectWall extends ArchitectModelCommand {
+  final bool reattachAfterMove;
   final String storeyId;
   final ArchitectWall wall;
   final bool carryConnections;
@@ -325,6 +320,7 @@ class UpdateArchitectWall extends ArchitectModelCommand {
     required this.wall,
     this.carryConnections = true,
     this.fixedWallIds = const {},
+    this.reattachAfterMove = true,
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
@@ -416,6 +412,14 @@ class UpdateArchitectWall extends ArchitectModelCommand {
       }
     }
 
+    final index = walls.indexWhere((w) => w.id == wall.id);
+    if (reattachAfterMove) {
+      walls[index] = ArchitectWallConnectionPolicy.afterMove(
+        previous,
+        walls[index],
+        walls,
+      );
+    }
     return ArchitectModelCommand.replace(project, s.copyWith(walls: walls));
   }
 }
@@ -457,6 +461,7 @@ class SplitArchitectWall extends ArchitectModelCommand {
       endPoint: point,
       arcBulge: wall.isCurved ? math.tan(math.atan(wall.arcBulge) * ratio) : 0,
       connectEnd: !detachCut,
+      autoAttachAfterMove: detachCut ? false : wall.autoAttachAfterMove,
       endHeight: splitHeight,
       doors: [
         for (final d in wall.doors)
@@ -476,6 +481,7 @@ class SplitArchitectWall extends ArchitectModelCommand {
           ? math.tan(math.atan(wall.arcBulge) * (1 - ratio))
           : 0,
       connectStart: !detachCut,
+      autoAttachAfterMove: detachCut ? false : wall.autoAttachAfterMove,
       height: splitHeight ?? wall.height,
       endHeight: wall.endHeight,
       doors: [
@@ -940,10 +946,12 @@ class SetArchitectWallConnection extends ArchitectModelCommand {
   final String storeyId;
   final Set<String> wallIds;
   final bool connected;
+  final bool temporary;
   const SetArchitectWallConnection({
     required this.storeyId,
     required this.wallIds,
     required this.connected,
+    this.temporary = false,
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
@@ -954,11 +962,41 @@ class SetArchitectWallConnection extends ArchitectModelCommand {
         walls: [
           for (final w in storey.walls)
             wallIds.contains(w.id)
-                ? w.copyWith(connectStart: connected, connectEnd: connected)
+                ? w.copyWith(
+                    connectStart: connected,
+                    connectEnd: connected,
+                    autoAttachAfterMove: !connected && temporary,
+                  )
                 : w,
         ],
       ),
     );
+  }
+}
+
+/// Re-enable existing physical contacts without changing any coordinates.
+class AttachArchitectWalls extends ArchitectModelCommand {
+  final String storeyId;
+  final Set<String> wallIds;
+  const AttachArchitectWalls({required this.storeyId, required this.wallIds});
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    final selected = floor.walls.where((w) => wallIds.contains(w.id)).toList();
+    if (selected.length < 2 ||
+        selected.length != wallIds.length ||
+        selected.any(
+          (a) => !selected.any(
+            (b) => a.id != b.id && ArchitectWallConnectionPolicy.touches(a, b),
+          ),
+        )) {
+      throw ArgumentError('Selected walls must already touch');
+    }
+    return SetArchitectWallConnection(
+      storeyId: storeyId,
+      wallIds: wallIds,
+      connected: true,
+    ).apply(project);
   }
 }
 
@@ -1124,7 +1162,13 @@ class MoveArchitectElement extends ArchitectModelCommand {
           s.copyWith(
             walls: [
               for (final wall in s.walls)
-                wall.id == elementId ? nextWall : wall,
+                wall.id == elementId
+                    ? ArchitectWallConnectionPolicy.afterMove(
+                        wall,
+                        nextWall,
+                        s.walls,
+                      )
+                    : wall,
             ],
           ),
         );
@@ -1644,10 +1688,27 @@ class MoveArchitectElements extends ArchitectModelCommand {
       }
     }
     final movedWallIds = movedWalls.map((w) => w.id).toSet();
+    final contactCandidates = [
+      for (final wall in nextWalls.values)
+        if (movedWallIds.contains(wall.id) && wall.autoAttachAfterMove)
+          wall.copyWith(connectStart: true, connectEnd: true)
+        else
+          wall,
+    ];
     var result = ArchitectModelCommand.replace(
       project,
       storey.copyWith(
-        walls: nextWalls.values.toList(),
+        walls: [
+          for (final w in nextWalls.values)
+            if (movedWallIds.contains(w.id))
+              ArchitectWallConnectionPolicy.afterMove(
+                movedWalls.firstWhere((old) => old.id == w.id),
+                w,
+                contactCandidates,
+              )
+            else
+              w,
+        ],
         decorativeElements: [
           for (final d in storey.decorativeElements)
             if (!elementIds.contains(d.id) &&
@@ -1924,7 +1985,10 @@ class ConnectArchitectWallsAtVertex extends ArchitectModelCommand {
         for (final otherInStorey in s.walls) {
           if (wallIds.contains(otherInStorey.id)) continue;
           for (final oEnd in [other.startPoint, other.endPoint]) {
-            for (final sEnd in [otherInStorey.startPoint, otherInStorey.endPoint]) {
+            for (final sEnd in [
+              otherInStorey.startPoint,
+              otherInStorey.endPoint,
+            ]) {
               if ((oEnd - sEnd).distance <= 0.05) {
                 commonVertex = oEnd;
                 break;
@@ -1958,12 +2022,16 @@ class ConnectArchitectWallsAtVertex extends ArchitectModelCommand {
       }
 
       if (commonVertex == null) {
-        final pairs = [
-          (a.startPoint, b.startPoint),
-          (a.startPoint, b.endPoint),
-          (a.endPoint, b.startPoint),
-          (a.endPoint, b.endPoint),
-        ]..sort((x, y) => (x.$1 - x.$2).distance.compareTo((y.$1 - y.$2).distance));
+        final pairs =
+            [
+              (a.startPoint, b.startPoint),
+              (a.startPoint, b.endPoint),
+              (a.endPoint, b.startPoint),
+              (a.endPoint, b.endPoint),
+            ]..sort(
+              (x, y) =>
+                  (x.$1 - x.$2).distance.compareTo((y.$1 - y.$2).distance),
+            );
         commonVertex = (pairs.first.$1 + pairs.first.$2) / 2;
       }
     }
@@ -2184,7 +2252,12 @@ class UpdateArchitectPolyline extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     final floor = ArchitectModelCommand.storey(project, storeyId);
     final old = floor.cadPrimitives
-        .where((p) => p.id == elementId && (p.type == CadPrimitiveType.polyline || p.type == CadPrimitiveType.spline))
+        .where(
+          (p) =>
+              p.id == elementId &&
+              (p.type == CadPrimitiveType.polyline ||
+                  p.type == CadPrimitiveType.spline),
+        )
         .firstOrNull;
     if (old == null) throw ArgumentError('Polyline or Spline not found');
     final close =
@@ -2478,8 +2551,14 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
           ],
         );
         return isProposed
-            ? project.copyWith(proposedTerrain: nextSurface, updatedAt: DateTime.now())
-            : project.copyWith(existingTerrain: nextSurface, updatedAt: DateTime.now());
+            ? project.copyWith(
+                proposedTerrain: nextSurface,
+                updatedAt: DateTime.now(),
+              )
+            : project.copyWith(
+                existingTerrain: nextSurface,
+                updatedAt: DateTime.now(),
+              );
       }
 
       final cnt = surface.contours.where((c) => c.id == elementId).firstOrNull;
@@ -2494,8 +2573,14 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
             ],
           );
           return isProposed
-              ? project.copyWith(proposedTerrain: nextSurface, updatedAt: DateTime.now())
-              : project.copyWith(existingTerrain: nextSurface, updatedAt: DateTime.now());
+              ? project.copyWith(
+                  proposedTerrain: nextSurface,
+                  updatedAt: DateTime.now(),
+                )
+              : project.copyWith(
+                  existingTerrain: nextSurface,
+                  updatedAt: DateTime.now(),
+                );
         } else {
           if (this.polygon.length < 2) throw ArgumentError('Contour requires at least 2 points');
           final nextSurface = surface.copyWith(
@@ -2505,8 +2590,14 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
             ],
           );
           return isProposed
-              ? project.copyWith(proposedTerrain: nextSurface, updatedAt: DateTime.now())
-              : project.copyWith(existingTerrain: nextSurface, updatedAt: DateTime.now());
+              ? project.copyWith(
+                  proposedTerrain: nextSurface,
+                  updatedAt: DateTime.now(),
+                )
+              : project.copyWith(
+                  existingTerrain: nextSurface,
+                  updatedAt: DateTime.now(),
+                );
         }
       }
     }
@@ -3149,8 +3240,10 @@ class CopyArchitectElementsAcrossStoreys extends ArchitectModelCommand {
 
   @override
   ArchitectProject apply(ArchitectProject project) {
-    final (updated, _) =
-        ArchitectStoreyCopyService.copyElements(project, options);
+    final (updated, _) = ArchitectStoreyCopyService.copyElements(
+      project,
+      options,
+    );
     return updated;
   }
 }

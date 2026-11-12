@@ -4479,7 +4479,7 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
-  String get architectWallEndpointClearance => 'Отстъп на край';
+  String get architectWallEndpointClearance => 'Край до ядро';
 
   @override
   String get architectMagnetHelp =>
@@ -4706,15 +4706,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallAttach => 'Свържи';
 
   @override
-  String get architectWallAttachSelectSecond =>
-      'Изберете втора стена за свързване с общ връх';
+  String get architectWallAttachSelectSecond => 'Избери допряна стена';
 
   @override
-  String get architectWallAttachSuccess => 'Стените са свързани с общ връх';
+  String get architectWallAttachSuccess => 'Стените са свързани';
 
   @override
-  String get architectWallAttachIncompatible =>
-      'Стените не могат да се свържат в общ връх';
+  String get architectWallAttachIncompatible => 'Стените трябва да се допират';
 
   @override
   String get architectWallDetachSuccess => 'Стената е отделена';
@@ -4772,7 +4770,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallSplitBoth => 'И двете';
 
   @override
-  String get architectWallClearance => 'Светло';
+  String get architectWallClearance => 'До ядро';
 
   @override
   String get architectGridNone => 'Без оси';
@@ -5113,7 +5111,8 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectMirrorMove => 'Огледало';
 
   @override
-  String get architectMirrorMoveTooltip => 'Огледално преместване';
+  String get architectMirrorMoveTooltip =>
+      'Огледало с избор за запазване на оригинала';
 
   @override
   String get architectMirrorCopy => 'Огледало+';
@@ -11848,7 +11847,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectChamferFilletInvalid =>
-      'Ъгълът не може да се оформи. Проверете разстоянието или радиуса, типовете стени и отворите.';
+      'Точната стойност не се побира или външните страни си противоречат.';
 
   @override
   String get architectLayers => 'Слоеве';
@@ -12885,4 +12884,14 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectChamferFilletSelectSecond =>
       'Изберете втори елемент за закръгляване / фаска';
+
+  @override
+  String get architectMirrorKeepOriginal => 'Запази оригинала';
+
+  @override
+  String get architectPreserveWallPosition => 'Запази позицията';
+
+  @override
+  String get architectEdgeExtendHint =>
+      'Удължаване на съседните страни със запазване на ъглите.';
 }

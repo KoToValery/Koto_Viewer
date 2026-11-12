@@ -2,6 +2,19 @@
 import 'package:flutter/material.dart';
 import '../l10n/l10n_extensions.dart';
 
+// ============================================================================
+// MASTER APP ICON CATALOG LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'app_icon_catalog.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
+//
+// [SEC-01-ENUMS]   [TAG:APP_CATALOG_ENUMS] Declarations: `AppIconId`
+// [SEC-02-APPICOND] [TAG:APP_CATALOG_APPICOND] Declarations: `AppIconDefinition`
+// [SEC-03-APPICONS] [TAG:APP_CATALOG_APPICONS] Declarations: `AppIcons`
+// ============================================================================
+
+// === SECTION: [SEC-01-ENUMS] ENUMS & CONFIGURATION TYPES ===
+// --- SUBSECTION: [TAG:APP_CATALOG_ENUMS] Declarations: `AppIconId` ---
 /// Semantic, locale-independent identifiers. The same command uses one asset.
 enum AppIconId {
   add,
@@ -164,6 +177,9 @@ enum AppIconId {
   measureArea,
   measureRadius,
   medical,
+  edgePull,
+  edgeMove,
+  edgeExtend,
   mirrorCopy,
   mirrorMove,
   moreHorizontal,
@@ -318,6 +334,8 @@ enum AppIconId {
   zoomOut,
 }
 
+// === SECTION: [SEC-02-APPICOND] EXTENSION AppIconDefinition ===
+// --- SUBSECTION: [TAG:APP_CATALOG_APPICOND] Declarations: `AppIconDefinition` ---
 extension AppIconDefinition on AppIconId {
   String get assetPath => switch (this) {
     AppIconId.add => 'assets/icons/commands/add.svg',
@@ -480,6 +498,9 @@ extension AppIconDefinition on AppIconId {
     AppIconId.measureArea => 'assets/icons/commands/measure_area.svg',
     AppIconId.measureRadius => 'assets/icons/commands/measure_radius.svg',
     AppIconId.medical => 'assets/icons/commands/medical.svg',
+    AppIconId.edgePull => 'assets/icons/commands/edge_pull.svg',
+    AppIconId.edgeMove => 'assets/icons/commands/edge_move.svg',
+    AppIconId.edgeExtend => 'assets/icons/commands/edge_extend.svg',
     AppIconId.mirrorCopy => 'assets/icons/commands/mirror_copy.svg',
     AppIconId.mirrorMove => 'assets/icons/commands/mirror_move.svg',
     AppIconId.moreHorizontal => 'assets/icons/commands/more_horizontal.svg',
@@ -795,6 +816,9 @@ extension AppIconDefinition on AppIconId {
     AppIconId.measureArea => l.commandIconMeasureArea,
     AppIconId.measureRadius => l.commandIconMeasureRadius,
     AppIconId.medical => l.commandIconMedical,
+    AppIconId.edgePull => l.architectEdgePullHint,
+    AppIconId.edgeMove => l.architectEdgeMoveHint,
+    AppIconId.edgeExtend => l.architectEdgeExtendHint,
     AppIconId.mirrorCopy => l.commandIconMirrorCopy,
     AppIconId.mirrorMove => l.commandIconMirrorMove,
     AppIconId.moreHorizontal => l.commandIconMoreHorizontal,
@@ -950,6 +974,8 @@ extension AppIconDefinition on AppIconId {
   };
 }
 
+// === SECTION: [SEC-03-APPICONS] CLASS AppIcons ===
+// --- SUBSECTION: [TAG:APP_CATALOG_APPICONS] Declarations: `AppIcons` ---
 /// Explicit bridge for icons supplied by existing renderer/category models.
 /// New command descriptors use AppIconId directly. Unknown data is an error,
 /// never a generic symbol standing in for an uncovered command.
