@@ -5,6 +5,84 @@ import 'package:kotoview/src/features/architect/widgets/architect_viewport.dart'
 import 'package:kotoview/src/features/bim_projects/controllers/bim_viewport_controller.dart';
 
 void main() {
+  testWidgets('Two-point placement navigates before either tap or held pick', (
+    tester,
+  ) async {
+    final camera = BimViewportController();
+    addTearDown(camera.dispose);
+    var picks = 0;
+    var engaged = false;
+    var moves = 0;
+    Offset? pickedPosition;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ArchitectViewport(
+          controller: camera,
+          singlePointerPan: true,
+          touchHoldToPlace: true,
+          holdExistingHandles: true,
+          isDraggingHandle: () => engaged,
+          onToolDown: (_) {},
+          onToolHoldStart: (_) => engaged = true,
+          onToolMove: (_) => moves++,
+          onToolHover: (_) {},
+          onToolUp: (event) {
+            picks++;
+            pickedPosition = event.localPosition;
+            engaged = false;
+          },
+          onToolCancel: () => engaged = false,
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    for (var phase = 0; phase < 2; phase++) {
+      final translation = camera.translation;
+      final pan = await tester.startGesture(const Offset(100, 200));
+      await pan.moveBy(const Offset(60, 40));
+      await pan.up();
+      expect(camera.translation, translation + const Offset(60, 40));
+      expect(picks, phase);
+      expect(engaged, isFalse);
+
+      final first = await tester.startGesture(
+        const Offset(100, 200),
+        pointer: 21,
+      );
+      final second = await tester.startGesture(
+        const Offset(300, 200),
+        pointer: 22,
+      );
+      final scale = camera.scale;
+      await second.moveTo(const Offset(360, 200));
+      await second.up();
+      await first.moveTo(const Offset(130, 200));
+      await first.up();
+      expect(camera.scale, greaterThan(scale));
+      expect(picks, phase);
+      expect(engaged, isFalse);
+
+      if (phase == 0) {
+        await tester.tapAt(const Offset(150, 250));
+        expect(pickedPosition, const Offset(150, 250));
+      } else {
+        final hold = await tester.startGesture(const Offset(200, 300));
+        await tester.pump(const Duration(milliseconds: 451));
+        expect(engaged, isTrue);
+        final heldTranslation = camera.translation;
+        await hold.moveTo(const Offset(240, 340));
+        await hold.up();
+        expect(camera.translation, heldTranslation);
+        expect(pickedPosition, const Offset(240, 340));
+        expect(moves, 1);
+      }
+      expect(picks, phase + 1);
+      expect(engaged, isFalse);
+    }
+  });
+
   testWidgets('Pending placement hold cannot activate after switching tools', (
     tester,
   ) async {
@@ -24,7 +102,10 @@ void main() {
               touchHoldToPlace: true,
               isDraggingHandle: () => false,
               onToolHoldStart: (_) => holds++,
-              onContextHold: (_) { contexts++; return true; },
+              onContextHold: (_) {
+                contexts++;
+                return true;
+              },
               onToolDown: (_) {},
               onToolMove: (_) {},
               onToolHover: (_) {},
@@ -67,7 +148,10 @@ void main() {
             touchHoldToPlace: true,
             isDraggingHandle: () => false,
             onToolHoldStart: (_) => holds++,
-            onContextHold: (_) { contexts++; return true; },
+            onContextHold: (_) {
+              contexts++;
+              return true;
+            },
             onToolDown: (_) {},
             onToolMove: (_) {},
             onToolHover: (_) {},

@@ -54,7 +54,7 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Drafting and placement with live preview | Wall chain: [TAG:TOUCH_DOWN], [TAG:TOUCH_MOVE], [TAG:TOUCH_UP], [TAG:WALL_DRAFT], [TAG:CANVAS_2D]; _onPointerDown, _onPointerMove, _onPointerUp, _placeDraftSegment, _finishChainedWall | Tool activation/configuration, viewport input, snapping, preview, finish/cancel behavior, commit and undo/persistence |
 | Opening placement and editing | [TAG:FENEST_RADIAL], [TAG:FENESTRATION_SELECTION_UPDATES], [TAG:TOUCH_DOWN], [TAG:TOUCH_UP]; _tryPlaceDoorAt, _commitOpeningPlacement | Candidate selection, host detection, placement preview, selection actions, property UI, confirmation, model update |
 | Selected-element context actions | [TAG:SELECTION_BAR], [TAG:FENEST_RADIAL], [TAG:GRID_AXIS]; _handleSelectionTap, _buildSelectionBar | Selection hit path, contextual actions, property controls, cancellation/closing, state updates |
-| Two-point drag of elements or underlays | [TAG:DRAG_TOOL], [TAG:UNDERLAY_DRAG], [TAG:TOUCH_DOWN], [TAG:TOUCH_MOVE], [TAG:TOUCH_UP]; _startDragSession, _startUnderlaySnapDrag, _updateDragTarget, _confirmDragPlacement, _cancelDragPlacement, ArchitectDragController | Base-point pick, pan lock, live preview and snap feedback; release freezes the target for review, Apply commits once. Both element and underlay drag use the same controller and lifecycle, with no generic geometry-command preview. |
+| Two-point drag of elements or underlays | [TAG:DRAG_TOOL], [TAG:UNDERLAY_DRAG], [TAG:TOUCH_DOWN], [TAG:TOUCH_MOVE], [TAG:TOUCH_UP]; _startDragSession, _startUnderlaySnapDrag, _updateDragTarget, _cancelDragGesture, _confirmDragPlacement, _cancelDragPlacement, ArchitectDragController | Dormant touch input allows pan/pinch before either pick; taps or precision holds choose points. Navigation preserves the session and placed target; Apply commits once. Both element and underlay drag use the same controller and lifecycle, with no generic geometry-command preview. |
 | Multi-step geometry modification | Wall split: [TAG:WALL_SPLIT]. Chamfer/fillet and edge-curving: [TAG:FLOATING_HUD]; _startChamferFilletSession, _buildChamferFilletFloatingOverlay | Session state, preview/rubber band, pan and gesture arbitration, confirm/cancel controls, model command and history |
 | CAD/raster underlay placement or repositioning | [TAG:UNDERLAY_DRAG], [TAG:CAD_INSERTION], [TAG:DRAG_TOOL]; _startUnderlaySnapDrag, _confirmDragPlacement | Import/configuration, shared drag lifecycle, calibration, preview, commit and persistence |
 
@@ -67,14 +67,17 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Transverse move or numeric offset | _beginGeometryCommand(move) and the existing constrained-edit state | Generic geometry-command handlers; do not merge with free Drag |
 
 Free Drag must not coexist with _commandPreview: one owner of preview, cancel,
-and commit. The entire first gesture only aims the base (on or off the element);
-its release locks the base without moving anything. A separate second gesture
-aims the target, and its release freezes a valid candidate (_dragTargetPlaced).
+and commit. A touch down leaves the selected element inactive so an ordinary
+swipe pans, including over the selected element or its leader grip. A tap or
+precision-hold release picks the base (on or off the element) without moving
+anything. A separate pick freezes a valid target candidate (_dragTargetPlaced).
 `_updateDragAim` shares the drafting hold/offset-pointer pattern through
 `_beginPlacementHold` and `StructuralPointerInteraction.placementTarget`;
 grabbing the default leader preserves its offset while relocating the base.
-The viewport allows the precision hold on this active handle, keeps single-pointer
-pan locked, and disables selection/context hold timers. A later canvas pick may revise the target,
+The viewport locks pan only during precision aiming (or direct mouse aiming),
+and disables selection/context hold timers. Pinch, scroll and trackpad navigation
+interrupt the gesture through _cancelDragGesture while preserving the tool,
+base and any already placed target. A later canvas pick may revise the target,
 and the sole Drag Apply control publishes one undoable mutation and saves.
 While active, drafting/selection/context-hold controls and the bottom palette
 are hidden. The palette retains its state and returns after confirm/cancel;
@@ -90,12 +93,19 @@ to the wall's saved placement reference, including concentric arc radii.
 keep hosted opening positions, and refuse clipped openings or an impossible
 typed radius/setback. Both the second-wall pick and two-wall dialog paths use
 the same pure geometry, then the existing atomic commit/Undo/save path.
+With one wall or CAD line selected, _startChamferFilletSession starts the
+second-element HUD before numeric input. A matching pick selects both elements
+and opens _openChamferFilletDialog; a preselected pair opens it immediately.
+Dialog cancellation leaves the single-source session available for another pick.
+_applyChamferFillet stages the pair through the generic preview, whose sole Apply
+publishes the edit. Pending corner picks suppress selection/context hold timers.
 `ArchitectOffset` normalizes connected core-axis endpoints, offsets the chains,
 and restores each wall's own reference and opening stations. Detached ends stay
 independent. CAD/polygon operations retain their native geometry. Short ARB
-axis labels are passed only for wall selections; dynamic wall clearances use core faces. Pointer routing, hold timers and pan locks remain unchanged.
+axis labels are passed only for wall selections; dynamic wall clearances use core faces.
 Coverage: `architect_wall_operation_axis_test.dart` and
-`architect_wall_core_operations_phone_test.dart` in `test/features/architect/`.
+`architect_wall_core_operations_phone_test.dart`, plus
+`architect_corner_selection_test.dart` in `test/features/architect/`.
 
 ### Lightweight command controls and hints
 

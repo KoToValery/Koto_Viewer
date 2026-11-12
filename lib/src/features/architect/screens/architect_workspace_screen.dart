@@ -8739,34 +8739,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_dragController.isActive) {
       _placingWithHold = false;
       _touchPosition = null;
+      _dragPointerOffset = Offset.zero;
       if (_dragController.isPickingBasePoint) {
-        _dragController.updateBaseHover(
-          rawModel,
-          project: _project,
-          scale: _currentScale,
-          dxfDoc: _currentUnderlayDoc,
-          frame: _effectiveUnderlayFrame,
-          raster: _selectedRasterUnderlay,
-        );
-        final base = _dragController.currentPointModel ?? rawModel;
-        _dragPointerOffset = _dragController.currentSnapLabel == 'Grip'
-            ? base - rawModel : Offset.zero;
-        // The whole first gesture aims the base; only release locks it.
+        final grip = _dragController.defaultHandleGrip;
+        final anchor = _dragController.defaultHandleAnchor;
+        final tolerance = (22.0 / math.max(_currentScale, 1e-4))
+            .clamp(0.08, 0.60);
+        if (grip != null && anchor != null &&
+            (rawModel - grip).distance <= tolerance) {
+          _dragPointerOffset = anchor - rawModel;
+        }
+      }
+      // Touch remains a navigation candidate until a tap or precision hold.
+      // In particular, touching the selected element must not move its preview.
+      if (!_touchInput) {
         _dragTargetPlaced = false;
         _isHandleEngaged = true;
         _updateDragAim(event.localPosition);
-        HapticFeedback.selectionClick();
         setState(() {});
-        return;
-      } else if (_dragController.isDraggingToTarget) {
-        _dragTargetPlaced = false;
-        _dragPointerOffset = Offset.zero;
-        _isHandleEngaged = true;
-        _updateDragTarget(rawModel);
-        _repaintPreview();
-        setState(() {});
-        return;
       }
+      return;
     }
 
     if (_curvingEdgeElementId != null &&
@@ -9820,8 +9812,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerMove(PointerMoveEvent event) {
     if (_commandReady) return;
     if (_dragController.isActive) {
-      _updateDragAim(event.localPosition);
-      setState(() {});
+      if (_isHandleEngaged) {
+        _updateDragAim(event.localPosition);
+        setState(() {});
+      }
       return;
     }
     if (_underlayMaskDrafting &&
@@ -9900,9 +9894,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _beginPlacementHold(Offset point) {
 
     if (_dragController.isActive) {
+      _isHandleEngaged = true;
+      _dragTargetPlaced = false;
       _placingWithHold = true;
       _updateDragAim(point);
       HapticFeedback.selectionClick();
+      setState(() {});
       return;
     }
 
@@ -13819,86 +13816,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                (rawModel - BimLineGeometry.closest(rawModel, p.startPoint, p.endPoint)).distance <= math.max(24.0 / _currentScale, 0.4)))
           .firstOrNull;
 
-      if (hitWall != null && storey.walls.any((w) => w.id == sourceId)) {
-        final wA = storey.walls.firstWhere((w) => w.id == sourceId);
-        final wB = hitWall;
-        final res = options.isFillet
-            ? ArchitectChamferFillet.wallPairFillet(wA, wB, radius: options.value)
-            : ArchitectChamferFillet.wallPairChamfer(wA, wB, distance: options.value);
-        if (res != null) {
-          final nextWalls = storey.walls.map((w) {
-            if (w.id == wA.id) return res.wallA;
-            if (w.id == wB.id) return res.wallB;
-            return w;
-          }).toList()..add(res.connector);
-          _commands.commit(_project.updateActiveStorey(storey.copyWith(walls: nextWalls)));
-          _saveBiMProjectIfAttached();
-          HapticFeedback.mediumImpact();
-          setState(() {
-            _chamferFilletSourceId = null;
-            _chamferFilletOptions = null;
-            _chamferFilletPointer = null;
-            _selectionIds.clear();
-            _selectedElementId = null;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(options.isFillet
-                  ? context.l10n.architectFillet
-                  : context.l10n.architectChamfer),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.architectChamferFilletInvalid),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-        return;
-      } else if (hitLine != null &&
-          storey.cadPrimitives.any((p) => p.id == sourceId && p.type == CadPrimitiveType.line)) {
-        final lA = storey.cadPrimitives.firstWhere((p) => p.id == sourceId);
-        final lB = hitLine;
-        final res = options.isFillet
-            ? ArchitectChamferFillet.linePairFillet(lA, lB, radius: options.value)
-            : ArchitectChamferFillet.linePairChamfer(lA, lB, distance: options.value);
-        if (res != null) {
-          final nextPrimitives = storey.cadPrimitives.map((p) {
-            if (p.id == lA.id) return res.lineA;
-            if (p.id == lB.id) return res.lineB;
-            return p;
-          }).toList()..add(res.connector);
-          _commands.commit(_project.updateActiveStorey(storey.copyWith(cadPrimitives: nextPrimitives)));
-          _saveBiMProjectIfAttached();
-          HapticFeedback.mediumImpact();
-          setState(() {
-            _chamferFilletSourceId = null;
-            _chamferFilletOptions = null;
-            _chamferFilletPointer = null;
-            _selectionIds.clear();
-            _selectedElementId = null;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(options.isFillet
-                  ? context.l10n.architectFillet
-                  : context.l10n.architectChamfer),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.architectChamferFilletInvalid),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-        return;
-      }
+      final targetId = storey.walls.any((w) => w.id == sourceId)
+          ? hitWall?.id
+          : hitLine?.id;
+      if (targetId == null) return;
+      setState(() {
+        _selectionIds
+          ..clear()
+          ..addAll({sourceId, targetId});
+        _selectedElementId = sourceId;
+        _selectedZoneId = null;
+        _chamferFilletPointer = rawModel;
+      });
+      _openChamferFilletDialog(isFillet: options.isFillet);
       return;
     }
 
@@ -25029,29 +24959,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Widget _buildChamferFilletFloatingOverlay() {
-    final options = _chamferFilletOptions!;
     final anchor = _chamferFilletPointer ?? _selectedLinearElement?.referencePointAt(.5) ?? Offset.zero;
     return ArchitectFloatingCommandOverlay(
       position: _clampOverlayPosition(_viewport.toScreen(anchor), width: 260),
       label: context.l10n.architectChamferFilletSelectSecond, showConfirm: false,
       onCancel: _cancelGeometryCommand,
-      customContent: TextButton(
-        key: const ValueKey('architect-corner-exact-value'),
-        onPressed: () async {
-          final result = await showArchitectChamferFilletDialog(context,
-            unitToMeters: _project.units.scaleToMeters, unitSymbol: _project.units.symbol,
-            decimals: _project.distanceDecimals, initialIsFillet: options.isFillet,
-            initialValue: options.value,
-            wallAxes: _selectedWallIds.isNotEmpty);
-          if (result == null || !mounted || _chamferFilletSourceId == null) return;
-          setState(() {
-            _chamferFilletOptions = result;
-            if (result.isFillet) { _lastFilletRadius = result.value; }
-            else { _lastChamferDistance = result.value; }
-          });
-        },
-        child: Text(_project.formatLength(options.value), style: const TextStyle(color: Colors.white)),
-      ),
     );
   }
 
@@ -25191,8 +25103,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _dragController.distanceMeters > 1e-7 &&
       (_dragController.isUnderlay || _elementMovePreview != null);
 
-  /// Both picks use the drafting tools' lifted touch target. A grabbed leader
-  /// retains its own offset so it can aim the base without moving the element.
+  /// Taps pick directly; precision holds use the drafting tools' lifted target.
+  /// A grabbed leader retains its offset without moving the element.
   void _updateDragAim(Offset screenPosition) {
     if (_touchInput && _placingWithHold) _touchPosition = screenPosition;
     final aim = StructuralPointerInteraction.placementTarget(
@@ -25322,6 +25234,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _cursorModel = null;
     _activeSnapLabel = null;
     _activeMagneticGuides = const [];
+    setState(() {});
+    _repaintPreview();
+  }
+
+  /// Navigation interrupts only the pending gesture, never the two-point tool.
+  void _cancelDragGesture() {
+    _dragPointerOffset = Offset.zero;
+    _placingWithHold = false;
+    _touchPosition = null;
+    _isHandleEngaged = false;
+    _handlePointerDown = null;
+    _handleMoved = false;
     setState(() {});
     _repaintPreview();
   }
@@ -27905,10 +27829,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _startChamferFilletSession({required bool isFillet}) {
     _cancelActiveDrags();
+    final ids = _effectiveSelection;
+    final storey = _project.activeStorey;
+    if (ids.length == 1 &&
+        (storey.walls.any((w) => w.id == ids.single) ||
+         storey.cadPrimitives.any((p) => p.id == ids.single && p.type == CadPrimitiveType.line))) {
+      _beginGeometryCommand(isFillet ? ArchitectRadialAction.fillet : ArchitectRadialAction.chamfer);
+      setState(() {
+        _chamferFilletSourceId = ids.single;
+        _chamferFilletOptions = ArchitectChamferFilletOptions(
+          isFillet: isFillet,
+          value: isFillet ? (_lastFilletRadius ?? .50) : (_lastChamferDistance ?? .30),
+        );
+        _chamferFilletPointer = null;
+        _radialMenuScreenPosition = null;
+      });
+      _repaintPreview();
+      return;
+    }
     _openChamferFilletDialog(isFillet: isFillet);
   }
 
   Future<void> _openChamferFilletDialog({required bool isFillet}) async {
+    final session = _commandPreview;
     final ids = _effectiveSelection;
     final storey = _project.activeStorey;
     final canApplyToAll = _selectedPolygon != null ||
@@ -27926,22 +27869,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       wallAxes: ids.isNotEmpty &&
           ids.every((id) => storey.walls.any((w) => w.id == id)),
     );
-    if (options == null || !mounted) return;
+    if (options == null || !mounted || !identical(session, _commandPreview)) return;
     if (options.isFillet) { _lastFilletRadius = options.value; }
     else { _lastChamferDistance = options.value; }
     _beginGeometryCommand(options.isFillet ? ArchitectRadialAction.fillet : ArchitectRadialAction.chamfer);
 
-    if (ids.length == 1 &&
-        (storey.walls.any((w) => w.id == ids.single) ||
-         storey.cadPrimitives.any((p) => p.id == ids.single && p.type == CadPrimitiveType.line))) {
-      setState(() {
-        _chamferFilletSourceId = ids.single;
-        _chamferFilletOptions = options;
-      });
-      return;
-    }
-
     _applyChamferFillet(options);
+    if (_commandReady && _chamferFilletSourceId != null) {
+      setState(() {
+        _chamferFilletSourceId = null;
+        _chamferFilletOptions = null;
+        _chamferFilletPointer = null;
+      });
+    }
   }
 
   void _applyChamferFillet(ArchitectChamferFilletOptions options) {
@@ -28193,6 +28133,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }).toList()..add(res.connector);
         storey = storey.copyWith(cadPrimitives: nextPrimitives);
         changed = true;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(context.l10n.architectChamferFilletInvalid),
+        ));
+        return;
       }
     }
 
@@ -32485,7 +32430,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         ),
 
-        singlePointerPan: !_multiSelect,
+        singlePointerPan: _dragController.isActive || !_multiSelect,
 
         holdToEdit:
 
@@ -32504,6 +32449,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _wallExtendId == null &&
 
             _wallJoinSourceId == null &&
+            _chamferFilletSourceId == null &&
             _wallAttachSourceId == null &&
             _pendingDetachWallIds == null &&
 
@@ -32517,15 +32463,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         onToolHoldStart: _beginPlacementHold,
 
-        onSelectionHold: !_dragController.isActive && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSelectionHold: !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
 
             ? _onSelectionHold
 
             : null,
 
-        onSecondaryTap: !_dragController.isActive && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSecondaryTap: !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
             ? _onContextHold : null,
-        onContextHold: !_dragController.isActive && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onContextHold: !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
 
             ? _onContextHold
 
@@ -32535,7 +32481,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ? null
             : (position) => _selectPolygonEdge(_screenToModel(position)),
 
-        isDraggingHandle: () => _selectionBoxDown != null ||
+        // A Drag session stays active for lifecycle guards, but touch claims
+        // the viewport only after the precision hold starts.
+        isDraggingHandle: () => _dragController.isActive
+            ? _isHandleEngaged
+            : _selectionBoxDown != null ||
             _newPointTargetId != null || _isActivelyDraggingHandle ||
             (_curvedDraftTool && _draftStart != null),
 
@@ -32550,7 +32500,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         onToolCancel: () {
 
           if (_dragController.isActive) {
-            _cancelDragPlacement();
+            _cancelDragGesture();
           } else {
             _cancelActiveDrags();
           }

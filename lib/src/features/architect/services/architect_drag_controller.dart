@@ -20,12 +20,14 @@ enum ArchitectDragPhase { idle, pickingBasePoint, draggingToTarget }
 /// 1. Phase [pickingBasePoint]:
 ///    - Shows default offset leader handle with grip dot ("изнесена линия с точка").
 ///    - Aims anywhere on or outside the selected element(s), without moving them.
-///    - Release locks the base; a separate gesture places the target.
+///    - A tap or precision-hold release locks the base; navigation keeps it unpicked.
+///    - Pan and zoom stay available before either point is picked.
 /// 2. Phase [draggingToTarget]:
 ///    - Base point is locked. Rubber-band leader line connects base point to target.
 ///    - Distance and angle badge (`L=...m  ...°`) and magnetic guides.
 ///    - Snaps to all other elements in the project (`excludedIds: selectedElementIds`).
 ///    - Live ghost preview updates in real-time.
+///    - Navigation preserves the base and any previously placed target.
 /// 3. Commit:
 ///    - Commits the displacement strictly to the architectural model via CommandController / Underlay config.
 class ArchitectDragController extends ChangeNotifier {

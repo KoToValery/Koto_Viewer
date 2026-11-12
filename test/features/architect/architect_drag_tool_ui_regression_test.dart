@@ -161,6 +161,52 @@ Future<void> _radialMove(WidgetTester tester, Offset point) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _panAndZoomDrag(WidgetTester tester, {Offset? panStart}) async {
+  final drag = workspace.overlay(tester).dragController!;
+  final camera = workspace.camera(tester);
+  final phase = drag.phase;
+  final base = drag.basePointModel;
+  final target = drag.currentPointModel;
+  final preview = workspace.overlay(tester).project;
+  final canvas = tester.getRect(
+    find.byKey(const ValueKey('architect-viewport-input')),
+  );
+  final translation = camera.translation;
+  final pan = await tester.startGesture(
+    panStart ?? canvas.topLeft + const Offset(30, 170),
+  );
+  await pan.moveBy(const Offset(28, 12));
+  await pan.up();
+  await tester.pumpAndSettle();
+  expect(camera.translation, translation + const Offset(28, 12));
+  expect(drag.phase, phase);
+  expect(drag.basePointModel, base);
+  expect(drag.currentPointModel, target);
+  expect(workspace.overlay(tester).project, same(preview));
+
+  final scale = camera.scale;
+  final first = await tester.startGesture(
+    canvas.topLeft + const Offset(30, 130),
+    pointer: 51,
+  );
+  final second = await tester.startGesture(
+    canvas.topLeft + const Offset(210, 130),
+    pointer: 52,
+  );
+  await second.moveBy(const Offset(18, 0));
+  await second.up();
+  await first.moveBy(const Offset(0, 20));
+  await first.up();
+  await tester.pumpAndSettle();
+  expect(camera.scale, greaterThan(scale));
+  expect(drag.phase, phase);
+  expect(drag.basePointModel, base);
+  expect(drag.currentPointModel, target);
+  expect(workspace.overlay(tester).project, same(preview));
+  expect(find.byType(ArchitectRadialMenu), findsNothing);
+  expect(find.byKey(_dragSurface), findsOneWidget);
+}
+
 Future<void> _snapshot(WidgetTester tester, String name) async {
   if (Platform.environment['UPDATE_ARCHITECT_DRAG_PREVIEW'] != 'true') return;
   final boundary = tester.renderObject<RenderRepaintBoundary>(
@@ -257,13 +303,9 @@ void main() {
         await start();
         final camera = workspace.camera(tester);
         final fixedPoint = camera.toScreen(Offset.zero);
-        // The first complete gesture chooses a base without moving anything.
-        final baseGesture = await tester.startGesture(
-          workspace.screen(tester, const Offset(2, 4)),
-        );
+        // A tap chooses a base; an ordinary swipe is reserved for navigation.
         const baseCorner = Offset(2.875, 4.875);
-        await baseGesture.moveTo(workspace.screen(tester, baseCorner));
-        await baseGesture.up();
+        await tester.tapAt(workspace.screen(tester, baseCorner));
         await tester.pumpAndSettle();
         expect(
           workspace.overlay(tester).dragController!.basePointModel,
@@ -339,6 +381,86 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  testWidgets('Drag navigates over the element before both picks and review', (
+    tester,
+  ) async {
+    final model = _dragModel();
+    addTearDown(model.dispose);
+    await _openPhone(tester, model);
+    await _radialMove(tester, _columnPosition);
+    final drag = workspace.overlay(tester).dragController!;
+
+    await _panAndZoomDrag(
+      tester,
+      panStart: workspace.screen(tester, _columnPosition),
+    );
+    expect(drag.isPickingBasePoint, isTrue);
+    expect(drag.basePointModel, isNull);
+    expect(model.undoCount, 0);
+    const base = Offset(-1.125, -1.125);
+    await tester.tapAt(workspace.screen(tester, base));
+    await tester.pumpAndSettle();
+    expect(drag.basePointModel, base);
+
+    await _panAndZoomDrag(tester);
+    expect(drag.basePointModel, base);
+    expect(drag.distanceMeters, 0);
+    expect(_apply(tester).onPressed, isNull);
+    const target = Offset(0, 1);
+    await tester.tapAt(workspace.screen(tester, target));
+    await tester.pumpAndSettle();
+    final preview = workspace.overlay(tester).project;
+    expect(_apply(tester).onPressed, isNotNull);
+
+    await _panAndZoomDrag(tester);
+    expect(_apply(tester).onPressed, isNotNull);
+    expect(model.project.activeStorey.columns.first.position, _columnPosition);
+    expect(model.undoCount, 0);
+    await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
+    await tester.pumpAndSettle();
+    expect(
+      model.project.activeStorey.columns.first.position,
+      preview.activeStorey.columns.first.position,
+    );
+    expect(model.undoCount, 1);
+    model.undo();
+    await tester.pumpAndSettle();
+    expect(model.project.activeStorey.columns.first.position, _columnPosition);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final picks in [0, 1, 2]) {
+    testWidgets('model changes cancel dormant Drag after $picks picks', (
+      tester,
+    ) async {
+      final model = _dragModel();
+      addTearDown(model.dispose);
+      await _openPhone(tester, model);
+      await _radialMove(tester, _columnPosition);
+      final drag = workspace.overlay(tester).dragController!;
+      if (picks > 0) {
+        await tester.tapAt(workspace.screen(tester, _columnPosition));
+        await tester.pumpAndSettle();
+      }
+      if (picks > 1) {
+        await tester.tapAt(workspace.screen(tester, const Offset(0, 1)));
+        await tester.pumpAndSettle();
+      }
+      final updated = model.project.copyWith(name: 'Updated project');
+      model.commit(updated);
+      await tester.pumpAndSettle();
+      expect(drag.isIdle, isTrue);
+      expect(find.byKey(_dragSurface), findsNothing);
+      expect(model.project.name, updated.name);
+      expect(
+        model.project.activeStorey.columns.first.position,
+        _columnPosition,
+      );
+      expect(model.undoCount, 1);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final language in ['en', 'bg']) {
@@ -499,6 +621,7 @@ void main() {
       await _radialMove(tester, const Offset(2, 1));
       final drag = workspace.overlay(tester).dragController!;
       expect(drag.isCadUnderlay, isTrue);
+      await _panAndZoomDrag(tester);
 
       final finger =
           workspace.screen(tester, Offset.zero) +
@@ -518,6 +641,7 @@ void main() {
       expect(drag.basePointCad, const Offset(5000, 10000));
       expect(drag.distanceMeters, 0);
       expect(model.undoCount, 0);
+      await _panAndZoomDrag(tester);
 
       const target = Offset(-1.125, -1.125);
       await tester.tapAt(workspace.screen(tester, target));
@@ -584,7 +708,10 @@ void main() {
       await tester.pumpAndSettle();
       await _radialMove(tester, Offset.zero);
       _expectCompactInBounds(tester);
+      await _panAndZoomDrag(tester);
       await tester.tapAt(workspace.screen(tester, const Offset(-1, 0)));
+      await tester.pumpAndSettle();
+      await _panAndZoomDrag(tester);
       await tester.tapAt(workspace.screen(tester, const Offset(0, 1.5)));
       await tester.pumpAndSettle();
       _expectCompactInBounds(tester);
