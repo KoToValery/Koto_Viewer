@@ -38,6 +38,8 @@ void main() {
           await tester.pumpAndSettle();
           expect(workspace.overlay(tester).activeWallArcEnd, isNull);
           expect(find.byType(EditableText), findsNothing);
+          expect(find.byKey(const ValueKey('wall-key-0')), findsNothing);
+          await arc_ui.button(tester, 'wall-length-input');
           expect(find.byKey(const ValueKey('wall-key-0')), findsOneWidget);
           for (final key in [
             'wall-length-input',

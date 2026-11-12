@@ -54,3 +54,10 @@
 `AppIconId.edgePull`, `edgeMove`, and `edgeExtend` use separate local SVGs and
 independent ARB-backed labels. The polygon toolbar supplies semantic IDs directly;
 Material bridge mappings do not determine these three edit operations.
+
+## Corner edits
+
+`AppIconId.chamfer` and `fillet` are separate local SVGs for a bevel and a tangent
+round. `BimEditActions.icon` assigns them to their own commands; Curve retains
+`roundedCorner`. Selection menus and landscape controls use the same semantic
+IDs directly, with ARB-backed labels.

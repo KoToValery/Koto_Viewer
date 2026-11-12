@@ -373,6 +373,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-11-LAYOUT]  [TAG:BUILD_LAYOUT] Scaffold, Top/Bottom Bars & Sheet Panels
 // [SEC-12-LOGS]    [TAG:LOGGER_UI] Diagnostic Logger Dialog Modal
 // [SEC-13-VIEW2D]  [TAG:CANVAS_2D] 2D CustomPainter Canvas, Viewport & Draft Overlays
+//   ↳ [SUB]        [TAG:DRAFT_DISTANCE_PANEL] One pending-segment panel and exclusive cancel ownership
 //   ↳ [SUB]        [TAG:CAD_EXPANSION_COMMITS] CAD EXPANSION COMMITS (ARC, MASK, SPLINE, ELLIPSE, LEADER, ROOF SLOP
 // [SEC-14-VIEW3D]  [TAG:VIEW_3D] 3D Solid Viewport & Publication Preview
 // ============================================================================
@@ -28923,6 +28924,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 _triggerChamfer,
                 color: accent,
                 commandId: 'chamfer',
+                graphic: AppIcon(AppIconId.chamfer, size: 20, color: accent),
               ),
               action(
                 'wall-fillet',
@@ -28931,6 +28933,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 _triggerFillet,
                 color: accent,
                 commandId: 'fillet',
+                graphic: AppIcon(AppIconId.fillet, size: 20, color: accent),
               ),
               linear(
                 'wall-split-stroke',
@@ -28992,12 +28995,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _project.existingTerrain.boundaries.any((b) => ids.contains(b.id)) ||
         _project.existingTerrain.contours.any((c) => ids.contains(c.id));
 
-    if (canChamferFillet) {
+    if (canChamferFillet && segmentIds.isEmpty) {
       actions.add(
         ArchitectSelectionAction(
           id: 'architect-chamfer-fillet-menu',
-          label: l.architectChamfer,
-          icon: icon(Icons.rounded_corner),
+          label: l.architectCornerEdits,
+          icon: AppIcon(AppIconId.chamfer, size: 20, color: foreground),
           children: [
             action(
               'architect-chamfer',
@@ -29005,6 +29008,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               Icons.crop_square_outlined,
               _triggerChamfer,
               color: accent,
+              commandId: 'chamfer',
+              graphic: AppIcon(AppIconId.chamfer, size: 20, color: accent),
             ),
             action(
               'architect-fillet',
@@ -29012,6 +29017,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               Icons.rounded_corner,
               _triggerFillet,
               color: accent,
+              commandId: 'fillet',
+              graphic: AppIcon(AppIconId.fillet, size: 20, color: accent),
             ),
           ],
         ),
@@ -32151,7 +32158,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  // --- SUBSECTION: [TAG:DRAFT_DISTANCE_PANEL] One pending-segment panel and exclusive cancel ownership ---
+  bool get _hasDistanceDraftPanel => _wallDirectionLocked &&
+      _draftStart != null && _draftEnd != null &&
+      (_linearDraftTool ||
+          (_activeTool == ArchitectTool.hatch && _elementTool.slabDraftPoints.isNotEmpty));
+
   Rect? get _draftCancelRect {
+
+    if (_hasDistanceDraftPanel) return null;
 
     final anchor = _draftCancelAnchor;
 
@@ -34442,11 +34457,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           builder: (context, _) {
 
-            if (!_wallDirectionLocked ||
-
-                _draftStart == null ||
-
-                _draftEnd == null) {
+            if (!_hasDistanceDraftPanel) {
 
               return const SizedBox.shrink();
 
@@ -34462,7 +34473,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 );
 
-                final width = math.min(264.0, constraints.maxWidth - 16);
+                final width = math.min(344.0, constraints.maxWidth - 16);
 
                 final phone = constraints.maxWidth < 600;
                 final left = phone ? (constraints.maxWidth - width) / 2 : (point.dx + 20).clamp(
@@ -34514,7 +34525,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         decimals: _project.distanceDecimals,
 
                         minimumLength: _project.units.toUnit(.001),
-                        keypadInitiallyOpen: _curvedDraftTool,
+                        keypadInitiallyOpen: false,
                         showContinue: !_curvedDraftTool,
                         title: _curvedDraftTool ? context.l10n.architectEdgeDistance : null,
                         endLabel: _curvedDraftTool ? context.l10n.applyAction : null,

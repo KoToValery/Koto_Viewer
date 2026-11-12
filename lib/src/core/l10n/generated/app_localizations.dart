@@ -23393,6 +23393,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Extend adjacent sides while keeping their angles.'**
   String get architectEdgeExtendHint;
+
+  /// No description provided for @architectCornerEdits.
+  ///
+  /// In en, this message translates to:
+  /// **'Corners'**
+  String get architectCornerEdits;
+
+  /// No description provided for @bimExactDistanceInputHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the value to enter an exact distance.'**
+  String get bimExactDistanceInputHelp;
 }
 
 class _AppLocalizationsDelegate

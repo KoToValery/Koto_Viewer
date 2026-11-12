@@ -4391,5 +4391,7 @@
   "architectChamferFilletSelectSecond": "Изберете втори елемент за закръгляване / фаска",
   "architectMirrorKeepOriginal": "Запази оригинала",
   "architectPreserveWallPosition": "Запази позицията",
-  "architectEdgeExtendHint": "Удължаване на съседните страни със запазване на ъглите."
+  "architectEdgeExtendHint": "Удължаване на съседните страни със запазване на ъглите.",
+  "architectCornerEdits": "Ъгли",
+  "bimExactDistanceInputHelp": "Докосни стойността за точно разстояние."
 }

@@ -12843,4 +12843,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectEdgeExtendHint =>
       'Extend adjacent sides while keeping their angles.';
+
+  @override
+  String get architectCornerEdits => 'Corners';
+
+  @override
+  String get bimExactDistanceInputHelp =>
+      'Tap the value to enter an exact distance.';
 }

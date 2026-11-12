@@ -72,11 +72,101 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
     });
   }
 
+  Widget _value(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final label = widget.title ?? context.l10n.architectEdgeDistance;
+    return Tooltip(
+      message: context.l10n.bimExactDistanceInputHelp,
+      child: Semantics(
+        button: true,
+        expanded: _keypad,
+        label: label,
+        child: InkWell(
+          key: const ValueKey('wall-length-input'),
+          onTap: () => setState(() => _keypad = !_keypad),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: !_valid
+                    ? colors.error
+                    : _keypad
+                    ? colors.primary
+                    : colors.outlineVariant,
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${_input ?? widget.length.toStringAsFixed(widget.decimals)} ${widget.unit}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            height: 1.15,
+                            fontWeight: FontWeight.w600,
+                            color: _valid ? colors.onSurface : colors.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 4),
+                AppIcon(
+                  _keypad ? AppIconId.expandLess : AppIconId.layoutGrid,
+                  size: 16,
+                  color: colors.primary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _symbol(AppIconId icon, Color color, String? caption) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      AppIcon(icon, size: caption == null ? 20 : 18, color: color),
+      if (caption != null) ...[
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            caption,
+            maxLines: 1,
+            style: TextStyle(fontSize: 10, height: 1, color: color),
+          ),
+        ),
+      ],
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l = context.l10n;
     final colors = Theme.of(context).colorScheme;
-    final radius = BorderRadius.circular(16);
     return Focus(
       autofocus: true,
       onKeyEvent: (_, event) {
@@ -92,7 +182,9 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
           _key('⌫');
           return KeyEventResult.handled;
         }
-        if (event.logicalKey == LogicalKeyboardKey.enter && _valid) {
+        if ((event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.numpadEnter) &&
+            _valid) {
           widget.onEnd();
           return KeyEventResult.handled;
         }
@@ -103,164 +195,161 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
         return KeyEventResult.ignored;
       },
       child: Material(
+        key: const ValueKey('bim-distance-panel'),
         color: colors.surface,
-        elevation: 4,
-        shadowColor: Colors.black26,
+        elevation: 1,
+        shadowColor: Colors.black12,
         shape: RoundedRectangleBorder(
-          borderRadius: radius,
+          borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: colors.outlineVariant),
         ),
         clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (widget.extraControls != null) ...[
-                widget.extraControls!,
-                const SizedBox(height: 6),
-              ],
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      key: const ValueKey('wall-length-input'),
-                      onTap: () => setState(() => _keypad = !_keypad),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: 52),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerLow,
-                          border: Border.all(
-                            color: _valid
-                                ? colors.outlineVariant
-                                : colors.error,
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    widget.title ?? l10n.architectEdgeDistance,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: colors.onSurfaceVariant,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                  FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      '${_input ?? widget.length.toStringAsFixed(widget.decimals)} ${widget.unit}',
-                                      style: TextStyle(
-                                        color: _valid
-                                            ? colors.onSurface
-                                            : colors.error,
-                                        fontSize: 21,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            AppIcon(
-                              AppIconId.layoutGrid,
-                              size: 18,
-                              color: colors.primary,
-                            ),
-                          ],
-                        ),
+          padding: const EdgeInsets.all(6),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final inline =
+                  constraints.maxWidth >= 288 || !widget.showContinue;
+              final captions = constraints.maxWidth >= 320 || !inline;
+              final cancel = IconButton(
+                key: const ValueKey('wall-cancel'),
+                tooltip: l.cancel,
+                constraints: const BoxConstraints.tightFor(
+                  width: 44,
+                  height: 44,
+                ),
+                padding: EdgeInsets.zero,
+                onPressed: widget.onCancel,
+                icon: AppIcon(
+                  AppIconId.close,
+                  size: 20,
+                  color: colors.onSurfaceVariant,
+                ),
+              );
+              final direction = IconButton(
+                key: const ValueKey('wall-direction-unlock'),
+                tooltip: l.architectWallDirection,
+                constraints: const BoxConstraints.tightFor(
+                  width: 44,
+                  height: 44,
+                ),
+                padding: EdgeInsets.zero,
+                onPressed: widget.onUnlock,
+                icon: AppIcon(
+                  AppIconId.compass,
+                  size: 20,
+                  color: colors.primary,
+                ),
+              );
+              final continueButton = IconButton(
+                key: const ValueKey('wall-continue'),
+                tooltip: l.architectWallContinue,
+                constraints: BoxConstraints.tightFor(
+                  width: captions ? 64 : 44,
+                  height: 44,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                style: IconButton.styleFrom(
+                  backgroundColor: colors.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: _valid ? widget.onContinue : null,
+                icon: _symbol(
+                  AppIconId.redo,
+                  _valid
+                      ? colors.primary
+                      : colors.onSurface.withValues(alpha: .38),
+                  captions ? l.architectWallContinue : null,
+                ),
+              );
+              final end = Tooltip(
+                message: widget.endLabel ?? l.architectWallEnd,
+                child: SizedBox(
+                  width: captions ? 56 : 44,
+                  height: 44,
+                  child: FilledButton(
+                    key: const ValueKey('wall-end'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                    ),
+                    onPressed: _valid ? widget.onEnd : null,
+                    child: _symbol(
+                      AppIconId.confirm,
+                      _valid
+                          ? colors.onPrimary
+                          : colors.onSurface.withValues(alpha: .38),
+                      captions ? widget.endLabel ?? l.architectWallEnd : null,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    key: const ValueKey('wall-cancel'),
-                    tooltip: l10n.cancel,
-                    onPressed: widget.onCancel,
-                    icon: AppIcon(
-                      AppIconId.close,
-                      color: colors.onSurfaceVariant,
-                      size: 20,
-                    ),
-                  ),
-                ],
-              ),
-              if (_keypad) ...[
-                const SizedBox(height: 6),
-                BimNumericKeypad(decimals: widget.decimals, onKey: _key),
-              ],
-              const SizedBox(height: 6),
-              Row(
+                ),
+              );
+              final signed = TextButton(
+                onPressed: () => _key('±'),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  padding: EdgeInsets.zero,
+                ),
+                child: const Text('±'),
+              );
+              return Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (widget.showDirection)
-                    IconButton(
-                      key: const ValueKey('wall-direction-unlock'),
-                      tooltip: l10n.architectWallDirection,
-                      onPressed: widget.onUnlock,
-                      icon: AppIcon(
-                        AppIconId.compass,
-                        size: 20,
-                        color: colors.primary,
-                      ),
-                    ),
-                  if (_keypad && widget.minimumLength < 0)
-                    TextButton(
-                      onPressed: () => _key('±'),
-                      child: const Text('±'),
-                    ),
-                  const Spacer(),
-                  if (widget.showContinue) ...[
-                    IconButton(
-                      key: const ValueKey('wall-continue'),
-                      tooltip: l10n.architectWallContinue,
-                      onPressed: _valid ? widget.onContinue : null,
-                      icon: AppIcon(
-                        AppIconId.redo,
-                        size: 20,
-                        color: colors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
+                  if (widget.extraControls != null) ...[
+                    widget.extraControls!,
+                    const SizedBox(height: 4),
                   ],
-                  Tooltip(
-                    message: widget.endLabel ?? l10n.architectWallEnd,
-                    child: FilledButton(
-                      key: const ValueKey('wall-end'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(64, 44),
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      onPressed: _valid ? widget.onEnd : null,
-                      child: AppIcon(
-                        AppIconId.confirm,
-                        size: 22,
-                        color: _valid
-                            ? colors.onPrimary
-                            : colors.onSurface.withValues(alpha: .38),
+                  if (inline)
+                    Row(
+                      children: [
+                        Expanded(child: _value(context)),
+                        if (widget.showDirection) direction,
+                        if (_keypad && widget.minimumLength < 0) signed,
+                        if (widget.showContinue) ...[
+                          continueButton,
+                          const SizedBox(width: 4),
+                        ],
+                        end,
+                        cancel,
+                      ],
+                    )
+                  else ...[
+                    Row(
+                      children: [
+                        Expanded(child: _value(context)),
+                        cancel,
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (widget.showDirection) direction,
+                        if (_keypad && widget.minimumLength < 0) signed,
+                        const Spacer(),
+                        if (widget.showContinue) ...[
+                          continueButton,
+                          const SizedBox(width: 4),
+                        ],
+                        end,
+                      ],
+                    ),
+                  ],
+                  if (_keypad)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: BimNumericKeypad(
+                        decimals: widget.decimals,
+                        onKey: _key,
                       ),
                     ),
-                  ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),

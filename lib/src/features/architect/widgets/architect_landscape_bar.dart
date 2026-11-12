@@ -76,7 +76,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
                   tooltip: l.architectFillet,
                   visualDensity: VisualDensity.compact,
                   onPressed: onTriggerFillet,
-                  icon: const Icon(Icons.rounded_corner, size: 18),
+                  icon: const AppIcon(AppIconId.fillet, size: 18),
                 ),
               if (onTriggerChamfer != null)
                 IconButton(
@@ -84,7 +84,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
                   tooltip: l.architectChamfer,
                   visualDensity: VisualDensity.compact,
                   onPressed: onTriggerChamfer,
-                  icon: const Icon(Icons.crop_square_outlined, size: 18),
+                  icon: const AppIcon(AppIconId.chamfer, size: 18),
                 ),
             ],
             if (hasDraft) ...[

@@ -243,3 +243,27 @@ so stationary holds and secondary taps cannot steal the grip; viewport pan
 locking continues through `_isActivelyDraggingHandle`. Final CAD line/arc edits
 use the existing `ArchitectLineEditing` adapter with `UpdateArchitectWall`;
 polyline/contour segments use `UpdateArchitectBulges`, preserving existing IDs.
+
+### Compact distance checkpoint and corner command identities
+
+`[TAG:DRAFT_DISTANCE_PANEL]`: `_hasDistanceDraftPanel` is the shared visibility
+predicate for the pending wall, CAD line/arc/polyline and manual Hatch segment.
+Snapping never hides the editable distance or chooses another confirmation flow.
+The panel starts collapsed, including arc chord input. Tapping its value opens
+the existing in-app keypad immediately. Continue/End/Cancel keep the established
+callbacks, command/history and save paths. The first-point floating cancel stays
+available before a checkpoint; `_draftCancelRect` returns null while the panel
+owns cancellation, including hit-test and obstacle rectangles.
+
+`BimDistanceDraftingPanel` uses a single 44 px action row at phone widths, short
+localized captions where space permits, and a two-row fallback in narrow hosts.
+Its `extraControls` and input state survive leading-line changes. No native
+keyboard is opened. Exact-value dialogs can still request an initially open
+keypad explicitly.
+
+Selection menus expose Chamfer/Fillet once: walls and CAD segments retain the
+wall-actions entries; other contours use the localized Corners group. Both
+entries use canonical command IDs. `BimEditActions.icon` and all direct corner
+controls share the dedicated `chamfer` and `fillet` SVG IDs; Curve keeps its own
+symbol. Coverage: `architect_compact_drafting_panel_test.dart`,
+`architect_arc_exact_placement_test.dart` and `command_icons_test.dart`.

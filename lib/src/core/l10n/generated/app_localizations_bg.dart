@@ -12894,4 +12894,11 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectEdgeExtendHint =>
       'Удължаване на съседните страни със запазване на ъглите.';
+
+  @override
+  String get architectCornerEdits => 'Ъгли';
+
+  @override
+  String get bimExactDistanceInputHelp =>
+      'Докосни стойността за точно разстояние.';
 }
