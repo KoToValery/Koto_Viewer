@@ -9,6 +9,13 @@ class AppLocalizationsBg extends AppLocalizations {
   AppLocalizationsBg([String locale = 'bg']) : super(locale);
 
   @override
+  String get stairLandingPart => 'Площадка';
+
+  @override
+  String get stairPerimeterHint =>
+      'Посочи външния ръб. Избери рамо или площадка.';
+
+  @override
   String get stairCustom => 'Свободна';
 
   @override

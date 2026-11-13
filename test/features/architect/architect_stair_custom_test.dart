@@ -17,7 +17,7 @@ import 'package:kotoview/src/features/architect/services/architect_element_tool.
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_storey_copy_service.dart';
 import 'package:kotoview/src/features/architect/models/architect_storey_copy_types.dart';
-import 'package:kotoview/src/features/architect/widgets/architect_stair_draft_overlay.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_stair_perimeter_overlay.dart';
 import 'architect_stair_design_test.dart' as fixture;
 import 'architect_workspace_interaction_test.dart' as workspace;
 import 'architect_tool_test_helper.dart' as tools;
@@ -719,8 +719,8 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('stair-tool-freeform')));
       await tester.pumpAndSettle();
       final draft = tester
-          .widget<ArchitectStairDraftOverlay>(
-            find.byType(ArchitectStairDraftOverlay),
+          .widget<ArchitectStairPerimeterOverlay>(
+            find.byType(ArchitectStairPerimeterOverlay),
           )
           .draft;
       draft.replaceDesign(draft.design.copyWith(code: StairCode.geometryOnly));
@@ -729,7 +729,9 @@ void main() {
       await tester.pump();
       await tester.tapAt(workspace.screen(tester, const Offset(2, 0)));
       await tester.pumpAndSettle();
-      expect(draft.layout.flights, hasLength(1));
+      expect(draft.preview!.design!.layout!.flights, hasLength(1));
+      draft.acceptPart();
+      await tester.pumpAndSettle();
       expect(model.project.activeStorey.stairs, isEmpty);
       final before = workspace.camera(tester).translation;
       final g = await tester.startGesture(

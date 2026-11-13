@@ -1,4 +1,6 @@
 {
+  "stairLandingPart": "Landing",
+  "stairPerimeterHint": "Trace the outside edge. Choose flight or landing.",
   "stairCustom": "Freeform",
   "stairCustomLayout": "Stair layout",
   "stairEditLayout": "Edit shape",

@@ -1,4 +1,6 @@
 {
+  "stairLandingPart": "Площадка",
+  "stairPerimeterHint": "Посочи външния ръб. Избери рамо или площадка.",
   "stairCustom": "Свободна",
   "stairCustomLayout": "Форма на стълбището",
   "stairEditLayout": "Редактирай форма",

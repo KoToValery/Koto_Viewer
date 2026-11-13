@@ -249,6 +249,8 @@ import '../services/architect_element_tool.dart';
 
 import '../services/architect_stair_rules.dart';
 import '../services/architect_stair_draft_controller.dart';
+import '../services/architect_stair_perimeter_draft.dart';
+import '../widgets/architect_stair_perimeter_overlay.dart';
 import '../services/architect_stair_layout_resolver.dart';
 import '../widgets/architect_stair_draft_overlay.dart';
 
@@ -3858,11 +3860,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  void _updateMidpointReferences(Offset raw) {
+  void _updateMidpointReferences(Offset raw, {ArchitectProject? source}) {
 
     _midpointTracking.update(
 
-      project: _elementMoveOriginal ?? _project,
+      project: _elementMoveOriginal ?? source ?? _project,
 
       raw: raw,
 
@@ -9060,7 +9062,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _handlePointerDown = event.localPosition;
       _placingWithHold = false;
       _isHandleEngaged = !_touchInput;
-      _stairDraft!.aim(_freeStairPoint(event.localPosition));
+      if (_stairDraft case ArchitectStairPerimeterDraft chain) chain.beginPointer();
+      if (!_touchInput) _aimFreeStair(event.localPosition);
       return;
     }
     if (_commandReady) return;
@@ -10186,7 +10189,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:TOUCH_MOVE] _onPointerMove Input Dispatch & Previews ---
   void _onPointerMove(PointerMoveEvent event) {
     if (_stairDraft != null) {
-      _stairDraft!.aim(_freeStairPoint(event.localPosition));
+      _aimFreeStair(event.localPosition);
       return;
     }
     if (_commandReady) return;
@@ -10280,7 +10283,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_stairDraft != null) {
       _placingWithHold = true;
       _isHandleEngaged = true;
-      _stairDraft!.aim(_freeStairPoint(point));
+      _aimFreeStair(point);
       return;
     }
 
@@ -10340,7 +10343,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool get _canPlaceWithMarker =>
-      _stairDraft == null && (_dragController.isActive ||
+      (_stairDraft == null || _stairDraft is ArchitectStairPerimeterDraft) && (_dragController.isActive ||
           (_activeTool != ArchitectTool.select && _activeTool != ArchitectTool.pan && !_selectionContextActive) ||
 
           _mirrorActive ||
@@ -10548,6 +10551,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   Offset? get _placementPreviewTarget {
+    if (_stairDraft case ArchitectStairPerimeterDraft chain) return chain.target;
 
     if (_dragController.isActive) return _dragController.currentPointModel;
 
@@ -10625,6 +10629,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   ArchitectSnapResult _snapElement(Offset raw, {Offset? anchor, double? tolerancePixels,
+    ArchitectProject? source,
   }) {
 
     if (_splitActive && _splitGuidePerpendicular != null) {
@@ -10669,7 +10674,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             rawPoint: raw,
 
-            project: _project,
+            project: source ?? _project,
 
             tolerance: (tolerancePixels ?? (_touchInput ? 12 : 8)) / _currentScale,
 
@@ -10693,7 +10698,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             anchor: anchor,
 
-            project: _project,
+            project: source ?? _project,
 
             tolerance: (tolerancePixels ?? (_touchInput ? 12 : 8)) / _currentScale,
 
@@ -12890,7 +12895,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerHover(PointerHoverEvent event) {
     if (_stairDraft != null) {
       _touchInput = false;
-      _stairDraft!.aim(_freeStairPoint(event.localPosition));
+      _aimFreeStair(event.localPosition);
       return;
     }
     if (_commandReady) return;
@@ -12911,6 +12916,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerUp(PointerUpEvent event) {
     if (_stairDraft != null) {
       _stairDraft!.pick(_freeStairPoint(event.localPosition), tolerance: 18 / _viewport.scale);
+      if (_stairDraft case ArchitectStairPerimeterDraft chain) chain.endPointer();
       _placingWithHold = false;
       _isHandleEngaged = false;
       _handlePointerDown = null;
@@ -23808,11 +23814,42 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:STAIR_FREEFORM] Free stair session, preview and atomic commit ---
   ArchitectStairDraftController? _stairDraft;
   ArchitectProject? _stairDraftDocument;
+  ArchitectStair? _stairSnapModel;
+  ArchitectProject? _stairSnapProject;
 
   Offset _freeStairPoint(Offset screen) {
     final target = StructuralPointerInteraction.placementTarget(screen,
       isMouse: !_touchInput || !_placingWithHold);
-    return _snapElement(_screenToModel(target)).point;
+    final anchor = _stairDraft is ArchitectStairPerimeterDraft ?
+      (_stairDraft as ArchitectStairPerimeterDraft).anchor : null;
+    final raw = _screenToModel(target);
+    var source = _commands.documentProject;
+    if (_stairDraft case ArchitectStairPerimeterDraft chain) {
+      final model = chain.snappingPreview;
+      if (model != null) {
+        if (!identical(_stairSnapModel, model)) {
+          _stairSnapModel = model;
+          _stairSnapProject = source.updateActiveStorey(source.activeStorey.copyWith(
+            stairs: [...source.activeStorey.stairs, model]));
+        }
+        source = _stairSnapProject!;
+      }
+    }
+    _updateMidpointReferences(raw, source: source);
+    final snap = _snapElement(raw, anchor: anchor, source: source);
+    if (_stairDraft case ArchitectStairPerimeterDraft chain) {
+      chain.snapExact = snap.snapLabel != null && !snap.snapLabel!.endsWith('°');
+    }
+    return snap.point;
+  }
+
+  void _aimFreeStair(Offset screen) {
+    if (_placingWithHold) _touchPosition = screen;
+    final point = _freeStairPoint(screen);
+    _stairDraft!.aim(point);
+    _cursorModel = _stairDraft is ArchitectStairPerimeterDraft ?
+      (_stairDraft as ArchitectStairPerimeterDraft).target : point;
+    _repaintPreview();
   }
 
   void _startFreeStair({ArchitectStair? stair, bool create = true}) {
@@ -23822,7 +23859,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     var seed = stair ?? _stairAt(Offset.zero, const Offset(1, 0),
       id: ArchitectElementId.next('stair'));
     if (create) seed = seed.copyWith(id: ArchitectElementId.next('stair'));
-    final draft = ArchitectStairDraftController(seed, create: create);
+    final draft = create ? ArchitectStairPerimeterDraft(seed) : ArchitectStairDraftController(seed, create: false);
     setState(() {
       _stairDraftDocument = _modelCommands.project;
       _stairDraft = draft;
@@ -23840,10 +23877,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _stairDraft = null;
     _interactionEpoch++;
     _stairDraftDocument = null;
+    _stairSnapModel = null;
+    _stairSnapProject = null;
     _commands.editPreview = null;
     _placingWithHold = false;
     _isHandleEngaged = false;
     _handlePointerDown = null;
+    _cursorModel = null;
+    _touchPosition = null;
+    _activeSnapLabel = null;
+    _activeMagneticGuides = [];
     draft.dispose();
   }
 
@@ -23851,9 +23894,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _applyFreeStair() {
     final draft = _stairDraft;
-    if (draft == null || !draft.complete || draft.preview == null ||
+    final candidate = draft is ArchitectStairPerimeterDraft ? draft.committedPreview : draft?.preview;
+    if (draft == null || !draft.complete || candidate == null ||
         !identical(_stairDraftDocument, _modelCommands.project)) return;
-    final stair = ArchitectStairLayoutResolver.normalizePlacement(draft.preview!);
+    final stair = ArchitectStairLayoutResolver.normalizePlacement(candidate);
     final command = PutArchitectStair(storeyId: _commands.documentProject.activeStoreyId,
       stair: stair, create: draft.create);
     try {
@@ -23878,6 +23922,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         onApply: (next) {
           if (!identical(draft, _stairDraft)) return false;
           draft.replaceDesign(next.design!);
+          if (draft is ArchitectStairPerimeterDraft) draft.width = next.width;
           return true;
         }));
   }
@@ -32989,6 +33034,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         onToolCancel: () {
           if (_stairDraft != null) {
+            if (_stairDraft case ArchitectStairPerimeterDraft chain) chain.cancelPointer();
             _placingWithHold = false;
             _isHandleEngaged = false;
             _handlePointerDown = null;
@@ -33244,8 +33290,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             };
 
                       final lastAnchor =
-
-                          _draftStart ??
+                          (_stairDraft is ArchitectStairPerimeterDraft ?
+                            (_stairDraft as ArchitectStairPerimeterDraft).anchor : null) ?? _draftStart ??
 
                           _axisTool.draftStart ??
 
@@ -33800,7 +33846,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_stairDraft case final draft?)
         Positioned.fill(child: AnimatedBuilder(
           animation: Listenable.merge([draft, _viewport]),
-          builder: (_, _) => ArchitectStairDraftOverlay(draft: draft,
+          builder: (_, _) => draft is ArchitectStairPerimeterDraft ?
+            ArchitectStairPerimeterOverlay(draft: draft, project: _commands.documentProject,
+              toScreen: _viewport.toScreen, scale: _viewport.scale, dark: _canvasPalette.isDark,
+              onApply: _applyFreeStair, onCancel: _cancelFreeStair, onProperties: _freeStairProperties) :
+            ArchitectStairDraftOverlay(draft: draft,
             project: _commands.documentProject, toScreen: _viewport.toScreen,
             toModel: _screenToModel, scale: _viewport.scale,
             darkCanvas: _canvasPalette.isDark, onApply: _applyFreeStair,

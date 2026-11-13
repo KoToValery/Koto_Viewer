@@ -9,6 +9,13 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get stairLandingPart => 'Landing';
+
+  @override
+  String get stairPerimeterHint =>
+      'Trace the outside edge. Choose flight or landing.';
+
+  @override
   String get stairCustom => 'Freeform';
 
   @override

@@ -98,6 +98,18 @@ abstract class AppLocalizations {
     Locale('en'),
   ];
 
+  /// No description provided for @stairLandingPart.
+  ///
+  /// In en, this message translates to:
+  /// **'Landing'**
+  String get stairLandingPart;
+
+  /// No description provided for @stairPerimeterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Trace the outside edge. Choose flight or landing.'**
+  String get stairPerimeterHint;
+
   /// No description provided for @stairCustom.
   ///
   /// In en, this message translates to:

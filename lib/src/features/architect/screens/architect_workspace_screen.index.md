@@ -7,6 +7,15 @@
 
 ### Freeform stair reference
 
+New placement follows the wall drafting archetype: `ArchitectStairPerimeterDraft`
+traces outside-edge flight/landing segments and `ArchitectStairPerimeterOverlay`
+embeds `ArchitectWallDraftingPanel` with the shared numeric keypad. The existing
+`StructuralPointerPainter` renders the lifted pointer; `_freeStairPoint` uses
+anchored `_snapElement` and midpoint tracking with a stable unpublished stair
+as an additional snap source. Pan/pinch restore provisional aiming through
+`beginPointer`/`cancelPointer`. Existing layout editing retains its separate
+controller. Regression: `architect_stair_perimeter_test.dart` and both phone locales.
+
 `[TAG:STAIR_FREEFORM]`: `_startFreeStair` owns an unpublished
 `ArchitectStairDraftController`; `_applyFreeStair` normalizes its placement frame
 and publishes one `PutArchitectStair`. `_closeFreeStair` restores the original
