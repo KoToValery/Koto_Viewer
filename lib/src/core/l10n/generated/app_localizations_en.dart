@@ -7003,7 +7003,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wallArcPickEnd => 'Pick the end of the arc';
 
   @override
-  String get wallArcPickThrough => 'Pick a point on the arc';
+  String get wallArcConfirmChord =>
+      'Confirm the length, then set h and direction';
+
+  @override
+  String get wallArcPickThrough => 'Set h and arc direction';
 
   @override
   String get wallArcInvalidRadius => 'Radius is too small for this wall.';

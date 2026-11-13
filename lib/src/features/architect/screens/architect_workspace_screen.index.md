@@ -183,14 +183,21 @@ keep the full physical geometry. A snapped `corePoint` lets
 inside plaster, before preview/commit.
 
 `ArchitectWallDraftControls` places reference, Flip and curve controls above
-the exact length without resetting the keypad. Flip shares `_flipDraftWallSide`
-with the toolbar; `_toggleExactWallCurve` preserves the current chord and enters
+the exact length without resetting the keypad. The exact panel exposes Axis,
+Inside and Outside as separate icon buttons; the toolbar retains its compact
+reference dropdown. Flip shares `_flipDraftWallSide`
+with the toolbar; `_setDraftWallCurve` / `_toggleExactWallCurve` preserve the current chord and enter
 the existing `_beginDraftArcShaping` flow on confirmation. The wall panel uses
 `BimDistanceDraftingPanel.continuePrimary`; Enter follows Next when shown.
-All labels/tooltips reuse existing ARB messages. Placement continues through
+The arc hint distinguishes picking the end, confirming an already fixed chord,
+and setting rise/direction. `_commitWallArc` follows the current chain mode via
+`_commitCurrentWallSegment`; the next segment starts at the saved arc endpoint.
+Toolbar and palette shape changes retain the chain, and switching back to a
+straight segment during shaping restores the fixed chord for exact review.
+All labels/tooltips use ARB messages. Placement continues through
 `_placeDraftSegment`, `CreateArchitectWall`, command history and the existing save
 path. Regression coverage: `architect_wall_core_snapping_test.dart` and
-`architect_wall_drafting_controls_test.dart`.
+`architect_wall_drafting_controls_test.dart` and `architect_arc_exact_placement_test.dart`.
 
 `_setWallReferenceLine` and wall properties use
 `SetArchitectElementProperties.preserveWallPosition` (default true). The core

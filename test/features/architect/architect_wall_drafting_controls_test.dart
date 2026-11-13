@@ -66,6 +66,10 @@ Future<void> chooseReference(
   WallReferenceLine reference, {
   bool toolbar = false,
 }) async {
+  if (!toolbar) {
+    await command(tester, 'wall-panel-reference-${reference.name}');
+    return;
+  }
   final l = AppLocalizations.of(
     tester.element(find.byType(ArchitectWorkspaceScreen)),
   )!;
@@ -76,10 +80,7 @@ Future<void> chooseReference(
     WallReferenceLine.left => l.architectWallReferenceLeft,
     WallReferenceLine.right => l.architectWallReferenceRight,
   };
-  await command(
-    tester,
-    toolbar ? 'wall-toolbar-reference' : 'wall-panel-reference',
-  );
+  await command(tester, 'wall-toolbar-reference');
   await tester.tap(find.text(label).last);
   await tester.pumpAndSettle();
 }
@@ -189,6 +190,9 @@ void main() {
           expect(next.style!.backgroundColor!.resolve({}), colors.primary);
           for (final key in [
             'wall-panel-reference',
+            'wall-panel-reference-center',
+            'wall-panel-reference-inner',
+            'wall-panel-reference-outer',
             'wall-panel-flip',
             'wall-panel-curve',
             'wall-toolbar-reference',

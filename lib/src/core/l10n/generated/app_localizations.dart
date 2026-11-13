@@ -12461,10 +12461,16 @@ abstract class AppLocalizations {
   /// **'Pick the end of the arc'**
   String get wallArcPickEnd;
 
+  /// Arc chord endpoints are already picked; confirm the exact chord length before shaping the arc
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the length, then set h and direction'**
+  String get wallArcConfirmChord;
+
   /// No description provided for @wallArcPickThrough.
   ///
   /// In en, this message translates to:
-  /// **'Pick a point on the arc'**
+  /// **'Set h and arc direction'**
   String get wallArcPickThrough;
 
   /// No description provided for @wallArcInvalidRadius.

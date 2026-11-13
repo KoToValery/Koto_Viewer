@@ -1010,7 +1010,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   ),
                 ),
               ),
-              for (final w in [0.70, 0.80, 0.90, 1.00, 1.20, 1.50, 2.10, 2.50])
+              for (final w in [
+                0.60, 0.70, 0.80, 0.90, 1.00, 1.20,
+                1.40, 1.50, 1.60, 1.80, 2.10, 2.50,
+              ])
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: ChoiceChip(
@@ -1197,7 +1200,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   ),
                 ),
               ),
-              for (final w in [0.60, 0.80, 0.90, 1.20, 1.40, 1.80, 2.00, 2.40])
+              for (final w in [
+                0.60, 0.80, 0.90, 1.00, 1.20,
+                1.40, 1.50, 1.80, 2.00, 2.40,
+              ])
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: ChoiceChip(
@@ -1230,7 +1236,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   ),
                 ),
               ),
-              for (final h in [0.60, 1.20, 1.40, 1.60, 1.80])
+              for (final h in [0.60, 0.90, 1.20, 1.40, 1.50, 1.60, 1.80])
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: ChoiceChip(

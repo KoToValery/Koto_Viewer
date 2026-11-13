@@ -7029,7 +7029,11 @@ class AppLocalizationsBg extends AppLocalizations {
   String get wallArcPickEnd => 'Посочи края на дъгата';
 
   @override
-  String get wallArcPickThrough => 'Посочи точка на извивката';
+  String get wallArcConfirmChord =>
+      'Потвърди дължината, после задай h и посока';
+
+  @override
+  String get wallArcPickThrough => 'Задай h и посока на дъгата';
 
   @override
   String get wallArcInvalidRadius => 'Радиусът е твърде малък за тази стена.';

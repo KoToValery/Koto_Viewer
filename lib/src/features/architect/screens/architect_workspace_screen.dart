@@ -6171,11 +6171,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         arcBulge: bulge,
 
-        continueChain: false,
+        continueChain: _wallMode == WallDraftingMode.chained,
 
       );
 
-      setState(() => _wallArcEnd = null);
+      setState(() {
+        _wallArcEnd = null;
+        _draftArcExactBulge = null;
+      });
 
     } on ArgumentError {
 
@@ -16865,10 +16868,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _repaintPreview();
   }
 
-  void _toggleExactWallCurve() {
-    setState(() => _wallCurved = !_wallCurved);
+  /// Switching segment shape keeps the chain and its pending chord intact.
+  void _setDraftWallCurve(bool curved) {
+    setState(() {
+      if (!curved && _wallArcEnd != null) {
+        _draftEnd = _wallArcEnd;
+        _wallArcEnd = null;
+        _draftArcExactBulge = null;
+        _wallDirectionLocked = true;
+      }
+      _wallCurved = curved;
+    });
     _repaintPreview();
   }
+
+  void _toggleExactWallCurve() => _setDraftWallCurve(!_wallCurved);
 
 
   void _adoptWallReference(ArchitectWallAttachment? attachment) {
@@ -30580,23 +30594,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   onArcWallSelected: () {
 
-                    _finishChainedWall();
-
-                    setState(() => _wallCurved = true);
+                    _setDraftWallCurve(true);
 
                   },
 
                   onWallModeChanged: (m) {
 
-                    _finishChainedWall();
-
-                    setState(() {
-
-                      _wallCurved = false;
-
-                      _wallMode = m;
-
-                    });
+                    _setDraftWallCurve(false);
+                    setState(() => _wallMode = m);
 
                   },
 
@@ -34479,13 +34484,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           ),
 
-                          onPressed: () {
-
-                            _finishChainedWall();
-
-                            setState(() => _wallCurved = !_wallCurved);
-
-                          },
+                          onPressed: _toggleExactWallCurve,
 
                         ),
 
@@ -34716,44 +34715,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               alignment: Alignment.topLeft,
 
-              child: DecoratedBox(
-
-                decoration: BoxDecoration(
-
-                  color: const Color(0xDD1E242C),
-
-                  borderRadius: BorderRadius.circular(5),
-
-                ),
-
-                child: Padding(
-
-                  padding: const EdgeInsets.symmetric(
-
-                    horizontal: 8,
-
-                    vertical: 4,
-
-                  ),
-
-                  child: Text(
-
-                    _draftStart == null
-
-                        ? context.l10n.wallArcPickStart
-
-                        : _wallArcEnd == null
-
-                        ? context.l10n.wallArcPickEnd
-
-                        : context.l10n.wallArcPickThrough,
-
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-
-                  ),
-
-                ),
-
+              child: ArchitectCanvasHint(
+                message: _draftStart == null
+                    ? context.l10n.wallArcPickStart
+                    : _wallArcEnd != null
+                    ? context.l10n.wallArcPickThrough
+                    : _wallDirectionLocked
+                    ? context.l10n.wallArcConfirmChord
+                    : context.l10n.wallArcPickEnd,
               ),
 
             ),

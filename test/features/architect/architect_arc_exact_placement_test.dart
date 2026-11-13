@@ -2,8 +2,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_elements.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
+import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_wall_arc_dimension_dialog.dart';
 import 'architect_arc_dimension_ui_test.dart' as arc_ui;
 import 'architect_editing_test.dart' as editing;
@@ -11,6 +13,82 @@ import 'architect_workspace_interaction_test.dart' as workspace;
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  for (final language in ['bg', 'en']) {
+    for (final curveControl in ['panel', 'toolbar', 'palette']) {
+      testWidgets(
+        'Straight-arc-straight chain preserves endpoints, hints and history ($language, $curveControl)',
+        (tester) async {
+          final model = editing.seeded(
+            const ArchitectStorey(id: 's', name: ''),
+          );
+          addTearDown(model.dispose);
+          await arc_ui.open(tester, model, language, const Size(390, 844));
+          await editing.selectTool(tester, 'wall');
+          await workspace.wallTap(tester, const Offset(-3, 0));
+          await workspace.wallTap(tester, const Offset(-1, 0));
+          await arc_ui.button(tester, 'wall-continue');
+          final first = model.project.activeStorey.walls.single;
+          await workspace.wallTap(tester, const Offset(2, 0));
+          final chordEnd = workspace.overlay(tester).activeDraftEnd;
+          if (curveControl == 'palette') {
+            await arc_ui.button(tester, 'wall-drawing-mode');
+            await arc_ui.button(tester, 'architect-wall-arc-mode');
+          } else {
+            await arc_ui.button(
+              tester,
+              curveControl == 'panel' ? 'wall-panel-curve' : 'wall-arc-toggle',
+            );
+          }
+          expect(workspace.overlay(tester).activeDraftStart, first.endPoint);
+          expect(workspace.overlay(tester).activeDraftEnd, chordEnd);
+          expect(model.undoCount, 1);
+          final l = AppLocalizations.of(
+            tester.element(find.byType(ArchitectWorkspaceScreen)),
+          )!;
+          expect(find.text(l.wallArcPickEnd), findsNothing);
+          expect(find.text(l.wallArcConfirmChord), findsOneWidget);
+          await arc_ui.button(tester, 'wall-end');
+          expect(find.text(l.wallArcPickThrough), findsOneWidget);
+          await workspace.wallTap(tester, const Offset(.5, 1));
+          await tester.pumpAndSettle();
+          expect(find.byType(ArchitectWallArcDimensionDialog), findsOneWidget);
+          await arc_ui.enter(tester, '.75');
+          await arc_ui.button(tester, 'wall-arc-dimension-save');
+          final arc = model.project.activeStorey.walls.last;
+          expect(model.project.activeStorey.walls, hasLength(2));
+          expect(arc.isCurved, isTrue);
+          expect(arc.arc!.sagitta, closeTo(.75, 1e-8));
+          expect(arc.startPoint, first.endPoint);
+          expect(arc.endPoint, chordEnd);
+          expect(workspace.overlay(tester).activeDraftStart, arc.endPoint);
+          expect(workspace.overlay(tester).activeWallArcEnd, isNull);
+          expect(model.undoCount, 2);
+          await arc_ui.button(tester, 'wall-arc-toggle');
+          expect(workspace.overlay(tester).activeDraftStart, arc.endPoint);
+          await workspace.wallTap(tester, const Offset(2, 2));
+          await arc_ui.button(tester, 'wall-end');
+          final walls = model.project.activeStorey.walls;
+          expect(walls, hasLength(3));
+          expect(walls.last.isCurved, isFalse);
+          expect(walls.last.startPoint, arc.endPoint);
+          expect(workspace.overlay(tester).activeDraftStart, isNull);
+          expect(model.undoCount, 3);
+          final saved = model.project.toJson();
+          final restored = ArchitectProject.fromJson(saved).activeStorey.walls;
+          expect(restored[1].arcBulge, arc.arcBulge);
+          expect(restored.last.startPoint, arc.endPoint);
+          model.undo();
+          expect(model.project.activeStorey.walls, hasLength(2));
+          model.undo();
+          expect(model.project.activeStorey.walls, hasLength(1));
+          model.redo();
+          model.redo();
+          expect(model.project.toJson(), saved);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
   for (final tool in ['wall', 'line', 'arc', 'polyline']) {
     for (final rise in ['0', '0.75']) {
       testWidgets(
@@ -181,6 +259,12 @@ void main() {
       await arc_ui.button(tester, 'wall-arc-dimension-cancel');
       expect(model.undoCount, 0);
       expect(workspace.overlay(tester).activeWallArcEnd, isNotNull);
+      final chordEnd = workspace.overlay(tester).activeWallArcEnd;
+      await arc_ui.button(tester, 'wall-arc-toggle');
+      expect(workspace.overlay(tester).activeWallArcEnd, isNull);
+      expect(workspace.overlay(tester).activeDraftStart, const Offset(-2, 0));
+      expect(workspace.overlay(tester).activeDraftEnd, chordEnd);
+      expect(find.byKey(const ValueKey('wall-length-input')), findsOneWidget);
       await arc_ui.button(tester, 'wall-stop-drawing');
       expect(workspace.overlay(tester).activeDraftStart, isNull);
       expect(model.undoCount, 0);

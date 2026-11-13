@@ -31,6 +31,7 @@ class ArchitectWallDraftControls extends StatelessWidget {
           key: const ValueKey('wall-panel-reference'),
           value: reference,
           onChanged: onReference,
+          inline: true,
         ),
       ),
       IconButton(
