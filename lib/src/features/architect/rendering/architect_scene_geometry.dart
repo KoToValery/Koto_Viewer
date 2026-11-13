@@ -1,3 +1,4 @@
+import '../services/architect_ellipse_geometry.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_project.dart';
@@ -42,7 +43,10 @@ class ArchitectSceneGeometry {
       for (final opening in s.openings) ...opening.boundary,
       for (final component in s.components)
         if (component.isVisible) ...component.worldPolygonCorners,
-      for (final stair in s.stairs) ...[stair.displayBounds.topLeft, stair.displayBounds.bottomRight],
+      for (final stair in s.stairs) ...[
+        stair.displayBounds.topLeft,
+        stair.displayBounds.bottomRight,
+      ],
       for (final dim in s.dimensions) ...[
         ...dim.witnessPoints,
         dim.lineStart,
@@ -58,7 +62,10 @@ class ArchitectSceneGeometry {
       ],
       for (final f in s.siteFences) ...f.points,
       for (final e in s.cadPrimitives) ...[
-        if (e.type == CadPrimitiveType.circle) ...[
+        if (e.type == CadPrimitiveType.ellipse) ...[
+          ArchitectEllipseGeometry.fromPrimitive(e).bounds.topLeft,
+          ArchitectEllipseGeometry.fromPrimitive(e).bounds.bottomRight,
+        ] else if (e.type == CadPrimitiveType.circle) ...[
           e.startPoint -
               Offset(
                 (e.endPoint - e.startPoint).distance,
@@ -91,7 +98,9 @@ class ArchitectSceneGeometry {
         boundsOf(points).inflate(math.max(margin, 1e-9)).overlaps(expanded);
     final s = project.activeStorey;
     final filtered = s.copyWith(
-      walls: s.walls.where((e) => wallBounds(e).inflate(1e-9).overlaps(expanded)).toList(),
+      walls: s.walls
+          .where((e) => wallBounds(e).inflate(1e-9).overlaps(expanded))
+          .toList(),
       zones: s.zones.where((e) => intersects(e.polygon)).toList(),
       columns: s.columns
           .where((e) => intersects([e.position], math.max(e.width, e.depth)))
@@ -101,7 +110,9 @@ class ArchitectSceneGeometry {
       roofs: s.roofs.where((e) => intersects(e.points)).toList(),
       floorDrains: s.floorDrains.where((e) => intersects(e.polygon)).toList(),
       openings: s.openings.where((e) => intersects(e.boundary)).toList(),
-      pathways: s.pathways.where((e) => intersects(e.points, e.totalWidth)).toList(),
+      pathways: s.pathways
+          .where((e) => intersects(e.points, e.totalWidth))
+          .toList(),
       vegetation: s.vegetation
           .where(
             (e) => e.points.isNotEmpty
@@ -109,9 +120,16 @@ class ArchitectSceneGeometry {
                 : intersects([e.position], e.crownDiameter),
           )
           .toList(),
-      siteFences: s.siteFences.where((e) => intersects(e.points, e.thickness)).toList(),
+      siteFences: s.siteFences
+          .where((e) => intersects(e.points, e.thickness))
+          .toList(),
       stairs: s.stairs
-          .where((e) => intersects([e.displayBounds.topLeft, e.displayBounds.bottomRight]))
+          .where(
+            (e) => intersects([
+              e.displayBounds.topLeft,
+              e.displayBounds.bottomRight,
+            ]),
+          )
           .toList(),
       dimensions: s.dimensions
           .where(
@@ -121,7 +139,11 @@ class ArchitectSceneGeometry {
       // Text can extend far beyond its anchor; leave it to canvas clipping.
       cadPrimitives: s.cadPrimitives
           .where(
-            (e) => e.type == CadPrimitiveType.circle
+            (e) => e.type == CadPrimitiveType.ellipse
+                ? ArchitectEllipseGeometry.fromPrimitive(
+                    e,
+                  ).bounds.inflate(1e-9).overlaps(expanded)
+                : e.type == CadPrimitiveType.circle
                 ? intersects([
                     e.startPoint,
                   ], (e.endPoint - e.startPoint).distance)

@@ -1,3 +1,4 @@
+import 'architect_ellipse_geometry.dart';
 import 'dart:math' as math;
 import '../models/architect_contour.dart';
 import '../models/architect_wall_type.dart';
@@ -2182,6 +2183,9 @@ class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) {
     primitive.lineStyle.validate();
+    if (primitive.type == CadPrimitiveType.ellipse) {
+      ArchitectEllipseGeometry.validate(primitive);
+    }
     ArchitectModelCommand.point(primitive.startPoint);
     ArchitectModelCommand.point(primitive.endPoint);
     ArchitectModelCommand.newId(project, primitive.id);

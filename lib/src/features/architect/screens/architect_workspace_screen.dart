@@ -5,6 +5,8 @@ import '../services/architect_underlay_service.dart';
 import '../services/architect_drag_controller.dart';
 import '../services/architect_wall_endpoint_snap.dart';
 import '../widgets/architect_wall_angle_control.dart';
+import '../widgets/architect_polygon_angle_control.dart';
+import '../widgets/architect_slab_draft_bar.dart';
 import '../services/architect_geodetic_detector.dart';
 import '../widgets/architect_underlay_bar.dart';
 import '../../bim_projects/services/bim_underlay_picker_helper.dart';
@@ -51,6 +53,8 @@ import '../widgets/architect_landscape_bar.dart';
 import '../models/architect_line_style.dart';
 
 import '../models/architect_hatch_pattern.dart';
+import '../models/architect_slab_assembly.dart';
+import '../services/architect_slab_assemblies.dart';
 import '../models/architect_drawing_color.dart';
 
 import '../widgets/architect_hatch_picker.dart';
@@ -255,6 +259,12 @@ import '../services/architect_polygon_geometry.dart';
 import '../widgets/architect_polygon_distance_overlay.dart';
 
 import '../widgets/architect_shape_dimension_panel.dart';
+import '../services/architect_ellipse_draft.dart';
+import '../widgets/architect_exact_input_overlay.dart';
+import '../services/architect_underlay_clip.dart';
+import '../widgets/architect_underlay_crop_overlay.dart';
+import '../widgets/architect_ellipse_draft_overlay.dart';
+import '../../bim_projects/services/bim_underlay_loader.dart';
 
 import '../services/architect_selection.dart';
 
@@ -347,11 +357,14 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-01-WIDGET]   Widget Declaration & Public Api
 // [SEC-02-STATE]   [TAG:STATE_FIELDS] State Declarations & Tool Flags
 //   ↳ [SUB]        [TAG:UNDERLAY_TOOLS] CAD Xref & Raster Underlay State & Handlers
+//   ↳ [SUB]        [TAG:UNDERLAY_CROP] Selected underlay edge-grip clipping
 //   ↳ [SUB]        [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG CONTROLLER
 //   ↳ [SUB]        [TAG:UNDERLAY_DRAG] UNDERLAY 2-POINT SNAP DRAG & SELECTION
 //   ↳ [SUB]        [TAG:CAD_INSERTION] CAD UNDERLAY INTERACTIVE PLACEMENT
 //   ↳ [SUB]        [TAG:ARC_EXACT_PLACEMENT] Chord input, shaping, exact rise, commit
 //   ↳ [SUB]        [TAG:WALL_ENDPOINT_ANGLE] Endpoint angle constraint and fine adjustment
+//   ↳ [SUB]        [TAG:POLYGON_ANGLE_LOCK] Temporary on-canvas contour angle constraint
+//   ↳ [SUB]        [TAG:SLAB_DRAFT_CONTROLS] Manual slab defaults and contour actions
 //   ↳ [SUB]        [TAG:STATE_LIFECYCLE] Lifecycle: initState & dispose
 // [SEC-03-XFORM]   [TAG:XFORM_COORDS] Screen <-> Model Space & Snapping
 // [SEC-04-TOUCH]   [TAG:TOUCH_DOWN] _onPointerDown Input Dispatch
@@ -375,6 +388,8 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-13-VIEW2D]  [TAG:CANVAS_2D] 2D CustomPainter Canvas, Viewport & Draft Overlays
 //   ↳ [SUB]        [TAG:DRAFT_DISTANCE_PANEL] One pending-segment panel and exclusive cancel ownership
 //   ↳ [SUB]        [TAG:CAD_EXPANSION_COMMITS] CAD EXPANSION COMMITS (ARC, MASK, SPLINE, ELLIPSE, LEADER, ROOF SLOP
+//   ↳ [SUB]        [TAG:ELLIPSE_DRAFT] Three-point axes, exact review and atomic placement
+//   ↳ [SUB]        [TAG:SHAPE_EXACT_INPUT] Shared bounded shape dimensions
 // [SEC-14-VIEW3D]  [TAG:VIEW_3D] 3D Solid Viewport & Publication Preview
 // ============================================================================
 
@@ -2002,14 +2017,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           (_acceptsAnySelection || _isElementAllowedForTool(id, _activeTool)),
     );
     if (_acceptsAnySelection && _commands.isPlan) {
-      if (_currentUnderlayDoc != null &&
-          _effectiveUnderlayFrame.rectToModel(_currentUnderlayDoc!.bounds).contains(point)) {
+      if (_cadUnderlayContains(point)) {
         if (!hits.contains('underlay_cad')) {
           hits.add('underlay_cad');
         }
       }
       for (final r in _project.rasterUnderlaysForStorey(_project.activeStorey.id)) {
-        if (r.containsLocalPoint(point)) {
+        if (_rasterUnderlayContains(r, point)) {
           final id = 'underlay_raster_${r.id}';
           if (!hits.contains(id)) {
             hits.add(id);
@@ -2125,11 +2139,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             axis.id,
         ?_hitSection(point),
         ?_hitElevation(point),
-        if (_currentUnderlayDoc != null &&
-            _effectiveUnderlayFrame.rectToModel(_currentUnderlayDoc!.bounds).contains(point))
+        if (_cadUnderlayContains(point))
           'underlay_cad',
         for (final r in _project.rasterUnderlaysForStorey(_project.activeStorey.id))
-          if (r.containsLocalPoint(point))
+          if (_rasterUnderlayContains(r, point))
             'underlay_raster_${r.id}',
       }.toList();
 
@@ -3909,7 +3922,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:UNDERLAY_TOOLS] CAD Xref & Raster Underlay State & Handlers ---
   // Underlays
   Map<String, DxfDocument> _underlaysByStorey = {};
-  final Map<String, bool> _underlayLayerVisibility = {};
+  final Map<String, Map<String, bool>> _underlayVisibilityByStorey = {};
+  Map<String, bool> get _underlayLayerVisibility => _underlayVisibilityByStorey
+      .putIfAbsent(_project.activeStoreyId, () => {});
+  final Set<String> _unavailableUnderlayStoreys = {};
+  int _underlayRestoreEpoch = 0;
+  BimCoordinateFrame? _restoredUnderlayFrame;
   bool _showUnderlay = true;
   bool _underlayBusy = false;
   String? _underlayBusyMessage;
@@ -3922,12 +3940,154 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   String? _draggingRasterId;
   Offset? _rasterDragStartModel;
   Offset? _rasterDragOriginalPos;
+  ArchitectRasterUnderlay? _rasterDragOriginal, _rasterDragPreview;
+  ArchitectProject? _rasterDragSource;
   bool _underlayMaskDrafting = false;
   String _underlayMaskMode = 'rect'; // 'rect' or 'polygon'
   bool _underlayMaskTargetIsCad = true;
   String? _underlayMaskTargetRasterId;
   List<Offset> _underlayMaskPoints = [];
   Offset? _underlayMaskDraftStart;
+
+  // --- SUBSECTION: [TAG:UNDERLAY_CROP] Selected underlay edge-grip clipping ---
+  final _underlayCropEditor = ArchitectPolygonEditor();
+  ArchitectProject? _underlayCropSource;
+  String? _underlayCropStoreyId;
+  String? _underlayCropRasterId;
+  bool _underlayCropCad = false;
+  String get _underlayOwnerId => widget.bimProject?.id ?? _project.id;
+
+  bool _cadUnderlayContains(Offset point) {
+    final doc = _currentUnderlayDoc;
+    return doc != null &&
+        _effectiveUnderlayFrame.rectToModel(doc.bounds).contains(point) &&
+        ArchitectUnderlayClip.contains(ArchitectUnderlayClip.of(_project), point);
+  }
+
+  bool _rasterUnderlayContains(ArchitectRasterUnderlay raster, Offset point) =>
+      _showUnderlay && _commands.isPlan && raster.visible &&
+      _project.isLayerVisible(ArchitectLayer.rasterUnderlayLayerId) &&
+      raster.containsLocalPoint(point) && ArchitectUnderlayClip.contains(
+          raster.hasActiveMask ? raster.maskPolygon : null, point);
+
+  List<Offset>? get _selectedUnderlayCrop {
+    if (!_commands.isPlan || _dragController.isActive || _draggingRasterId != null || _cadInsertionActive ||
+        _underlayMaskDrafting || _rasterCalibrationStep != 0) return null;
+    if (_underlayCropEditor.active) return _underlayCropEditor.preview;
+    if (_isCadUnderlaySelected && _currentUnderlayDoc != null) {
+      final cfg = _currentCadUnderlayConfig;
+      if (cfg == null) return null;
+      if (cfg?.hasActiveMask == true) return cfg!.maskPolygon;
+      final b = _effectiveUnderlayFrame.rectToModel(_currentUnderlayDoc!.bounds);
+      return [b.topLeft, b.topRight, b.bottomRight, b.bottomLeft];
+    }
+    final raster = _selectedRasterId == null ? null : _selectedRasterUnderlay;
+    if (raster != null && raster.visible && _showUnderlay &&
+        _project.isLayerVisible(ArchitectLayer.rasterUnderlayLayerId)) {
+      return raster.hasActiveMask ? raster.maskPolygon : raster.localCorners;
+    }
+    return null;
+  }
+
+  bool _startUnderlayCrop(Offset raw) {
+    final polygon = _selectedUnderlayCrop;
+    if (polygon == null || _draftStart != null || _commandPreview != null) return false;
+    int? edge;
+    var best = 24 / _currentScale;
+    for (var i = 0; i < polygon.length; i++) {
+      for (final grip in [
+        (polygon[i] + polygon[(i + 1) % polygon.length]) / 2,
+        if (_handleOffsetLength > 0) ArchitectPolygonEditor.offsetEdgeHandle(
+            polygon, i, _currentScale, _handleOffsetLength),
+      ]) {
+        final distance = (grip - raw).distance;
+        if (distance < best) { best = distance; edge = i; }
+      }
+    }
+    edge ??= ArchitectPolygonDimensions.hitEdge(polygon, raw, 10 / _currentScale);
+    if (edge == null || !_underlayCropEditor.startEdge(
+        'underlay-crop', polygon, edge, raw, _currentScale,
+        mode: ArchitectPolygonEdgeMode.extendCatheti)) return false;
+    _underlayCropSource = _project;
+    _underlayCropStoreyId = _project.activeStoreyId;
+    _underlayCropCad = _isCadUnderlaySelected;
+    _underlayCropRasterId = _selectedRasterId;
+    _isHandleEngaged = true;
+    setState(() {});
+    return true;
+  }
+
+  void _updateUnderlayCrop(Offset raw) {
+    _underlayCropEditor.update(raw, (point) => ArchitectSnapHelper.snapFree(
+      rawPoint: point, project: _project, tolerance: 12 / _currentScale,
+      magnetic: _magnetEnabled,
+    ), .001);
+    _handleMoved = true;
+    _repaintPreview();
+  }
+
+  void _finishUnderlayCrop() {
+    final source = _underlayCropSource;
+    final polygon = _underlayCropEditor.preview;
+    final valid = !_underlayCropEditor.invalid;
+    final original = _underlayCropEditor.original;
+    final changed = polygon != null && original != null &&
+        (polygon.length != original.length ||
+         List.generate(polygon.length, (i) => i >= original.length || polygon[i] != original[i]).any((v) => v));
+    final isCad = _underlayCropCad, rasterId = _underlayCropRasterId;
+    final storeyId = _underlayCropStoreyId;
+    _underlayCropEditor.cancel();
+    _underlayCropSource = null;
+    _isHandleEngaged = false;
+    if (!identical(source, _project) || storeyId != _project.activeStoreyId ||
+        polygon == null || !changed) { setState(() {}); return; }
+    if (!valid) { _operationError(); setState(() {}); return; }
+    if (isCad) {
+      final cfg = _project.cadUnderlays[storeyId];
+      if (cfg != null) {
+        _commands.commit(_project.copyWith(cadUnderlays: {
+          ..._project.cadUnderlays,
+          storeyId!: cfg.copyWith(maskPolygon: List.of(polygon), maskEnabled: true),
+        }));
+      }
+    } else {
+      _commands.commit(_project.copyWith(rasterUnderlays: [
+        for (final r in _project.rasterUnderlays)
+          if (r.id == rasterId) r.copyWith(maskPolygon: List.of(polygon), maskEnabled: true) else r,
+      ]));
+    }
+    _saveBiMProjectIfAttached();
+    setState(() {});
+  }
+
+  Widget _buildUnderlayCropOverlay() => Positioned.fill(
+    child: AnimatedBuilder(
+      animation: Listenable.merge([_viewport, _previewRevision]),
+      builder: (context, _) {
+        final polygon = _selectedUnderlayCrop;
+        return polygon == null ? const SizedBox.shrink() : ArchitectUnderlayCropOverlay(
+          key: const ValueKey('architect-underlay-crop'), polygon: polygon,
+          scale: _currentScale, translation: _viewport.translation,
+          handleLength: _handleOffsetLength,
+          activeEdge: _underlayCropEditor.active ? _underlayCropEditor.index : null,
+          invalid: _underlayCropEditor.invalid,
+        );
+      },
+    ),
+  );
+
+  ArchitectCadUnderlayConfig? get _paintCadUnderlayConfig {
+    final cfg = _currentCadUnderlayConfig;
+    return cfg != null && _underlayCropEditor.active && _underlayCropCad
+        ? cfg.copyWith(maskPolygon: _underlayCropEditor.preview, maskEnabled: true) : cfg;
+  }
+
+  List<ArchitectRasterUnderlay> get _paintRasterUnderlays => [
+    for (final r in _project.rasterUnderlaysForStorey(_project.activeStoreyId))
+      if (_rasterDragPreview?.id == r.id) _rasterDragPreview!
+      else if (_underlayCropEditor.active && !_underlayCropCad && r.id == _underlayCropRasterId)
+        r.copyWith(maskPolygon: _underlayCropEditor.preview, maskEnabled: true) else r,
+  ];
 
   // --- SUBSECTION: [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG CONTROLLER ---
   final ArchitectDragController _dragController = ArchitectDragController();
@@ -3989,7 +4149,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         unitsPerMeter: cfg.unitsPerMeter!,
       );
     }
-    return widget.underlayFrame;
+    return _restoredUnderlayFrame ?? widget.underlayFrame;
   }
 
   Map<String, bool> get _effectiveUnderlayLayerVisibility {
@@ -4025,61 +4185,82 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _restorePersistedUnderlays() async {
-    _cadFileWatcher ??= ArchitectCadFileWatcher(
-      onExternalFileModified: _onExternalCadModified,
-    );
-    _cadFileWatcher!.updateConfigs(_project.cadUnderlays);
-    final projId = widget.bimProject?.id ?? (_project.id.isNotEmpty ? _project.id : null);
-    for (final entry in _project.cadUnderlays.entries) {
-      final storeyId = entry.key;
-      final cfg = entry.value;
-      if (!_underlaysByStorey.containsKey(storeyId)) {
-        final doc = await ArchitectUnderlayService.instance
-            .loadSavedCadUnderlay(cfg, projectId: projId);
-        if (doc != null && mounted) {
-          setState(() {
-            _underlaysByStorey[storeyId] = doc;
-            for (final layerName in doc.layers.keys) {
-              _underlayLayerVisibility.putIfAbsent(
-                layerName,
-                () => !cfg.hiddenDxfLayers.contains(layerName),
-              );
-            }
-          });
+    final ownerId = _underlayOwnerId;
+    final epoch = ++_underlayRestoreEpoch;
+    bool current() => mounted && epoch == _underlayRestoreEpoch && ownerId == _underlayOwnerId;
+    final configs = Map<String, ArchitectCadUnderlayConfig>.of(_project.cadUnderlays);
+    for (final entry in configs.entries) {
+      final storeyId = entry.key, cfg = entry.value;
+      if (cfg.internalCopyPath.isEmpty && (cfg.kcadCachePath?.isEmpty ?? true) &&
+          _underlaysByStorey.containsKey(storeyId)) continue;
+      final doc = await ArchitectUnderlayService.instance
+          .loadSavedCadUnderlay(cfg, projectId: ownerId);
+      if (!current()) return;
+      if (_project.cadUnderlays[storeyId] != cfg) continue;
+      setState(() {
+        if (doc == null) {
+          _underlaysByStorey.remove(storeyId);
+          _unavailableUnderlayStoreys.add(storeyId);
+        } else {
+          _underlaysByStorey[storeyId] = doc;
+          _unavailableUnderlayStoreys.remove(storeyId);
+          _underlayVisibilityByStorey[storeyId] = {
+            for (final name in doc.layers.keys) name: !cfg.hiddenDxfLayers.contains(name),
+          };
+        }
+      });
+    }
+    if (widget.bimProject != null) {
+      final missing = widget.bimProject!.storeys.where((s) =>
+          s.hasUnderlay && !configs.containsKey(s.storeyId) &&
+          !_underlaysByStorey.containsKey(s.storeyId)).toList();
+      if (missing.isNotEmpty) {
+        final loaded = await BimUnderlayLoader.loadAndAlign(
+          project: widget.bimProject!,
+          mode: BimUnderlayLoadMode.architecturalOriginal,
+        );
+        if (!current()) return;
+        _restoredUnderlayFrame = BimCoordinateFrame(
+          origin: loaded.referenceControlPoint, unitsPerMeter: loaded.cadUnitsPerMeter);
+        for (final storey in missing) {
+          final doc = loaded.underlaysByStorey[storey.storeyId];
+          if (doc != null) _underlaysByStorey[storey.storeyId] = doc;
+          else _unavailableUnderlayStoreys.add(storey.storeyId);
+        }
+      }
+      // Capture the already aligned original so masks and future reloads use
+      // exactly the same coordinate frame, without structural working files.
+      for (final entry in Map<String, DxfDocument>.of(_underlaysByStorey).entries) {
+        if (_modelCommands.project.cadUnderlays.containsKey(entry.key)) continue;
+        try {
+          final cfg = await ArchitectUnderlayService.instance.captureCadSnapshot(
+            projectId: ownerId, storeyId: entry.key,
+            document: entry.value, frame: _restoredUnderlayFrame ?? widget.underlayFrame,
+          );
+          if (!current()) return;
+          final project = _modelCommands.project;
+          if (project.cadUnderlays.containsKey(entry.key)) continue;
+          _modelCommands.commit(project.copyWith(cadUnderlays: {
+            ...project.cadUnderlays, entry.key: cfg,
+          }));
+          _saveBiMProjectIfAttached();
+        } catch (error) {
+          debugPrint('[ArchitectWorkspace] Cannot capture original underlay: $error');
         }
       }
     }
-    if (widget.bimProject != null && projId != null) {
-      for (final s in widget.bimProject!.storeys) {
-        if (s.hasUnderlay && !_underlaysByStorey.containsKey(s.storeyId)) {
-          try {
-            final doc = await BimProjectLibraryService.instance.loadUnderlay(projId, s);
-            if (mounted) {
-              setState(() {
-                _underlaysByStorey[s.storeyId] = doc;
-                for (final layerName in doc.layers.keys) {
-                  _underlayLayerVisibility.putIfAbsent(layerName, () => true);
-                }
-              });
-            }
-          } catch (e) {
-            debugPrint('[ArchitectWorkspace] Failed to restore storey underlay: $e');
-          }
-        }
+    for (final raster in List<ArchitectRasterUnderlay>.of(_project.rasterUnderlays)) {
+      if (_rasterImages.containsKey(raster.id) || raster.internalImagePath.isEmpty) continue;
+      final image = await ArchitectUnderlayService.instance
+          .loadSavedRasterImage(raster, projectId: ownerId);
+      if (!current() || !_project.rasterUnderlays.any((r) => r.id == raster.id)) {
+        image?.dispose();
+        if (!current()) return;
+        continue;
       }
+      if (image != null) setState(() => _rasterImages[raster.id] = image);
     }
-    for (final raster in _project.rasterUnderlays) {
-      if (!_rasterImages.containsKey(raster.id) &&
-          raster.internalImagePath.isNotEmpty) {
-        final img = await ArchitectUnderlayService.instance
-            .loadSavedRasterImage(raster);
-        if (img != null && mounted) {
-          setState(() {
-            _rasterImages[raster.id] = img;
-          });
-        }
-      }
-    }
+    if (current()) setState(() {});
   }
 
   Future<void> _importOrReplaceCadUnderlay() async {
@@ -4122,6 +4303,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     required bool isAutoReload,
   }) async {
     if (!mounted) return;
+    final ownerId = _underlayOwnerId;
     final isDwg = sourceFile.path.toLowerCase().endsWith('.dwg');
     setState(() {
       _underlayBusy = true;
@@ -4133,14 +4315,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final existingCfg = _project.cadUnderlays[storeyId];
       final importRes = await ArchitectUnderlayService.instance
           .importOrReloadCadUnderlay(
-            projectId: widget.bimProject?.id ?? _project.name,
+            projectId: ownerId,
             storeyId: storeyId,
             sourceFile: sourceFile,
             existingConfig: existingCfg,
             existingSurvey: _project.geodeticSurvey,
             preserveExistingOrigin: existingCfg?.lockOrigin ?? true,
           );
-      if (!mounted) return;
+      if (!mounted || ownerId != _underlayOwnerId ||
+          !_project.storeys.any((s) => s.id == storeyId) ||
+          _project.cadUnderlays[storeyId] != existingCfg) return;
 
       final doc = importRes.document;
       final nextCfg = importRes.config;
@@ -4157,10 +4341,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       setState(() {
         _underlaysByStorey[storeyId] = doc;
-        for (final layerName in doc.layers.keys) {
-          _underlayLayerVisibility[layerName] = !nextCfg.hiddenDxfLayers
-              .contains(layerName);
-        }
+        _unavailableUnderlayStoreys.remove(storeyId);
+        _underlayVisibilityByStorey[storeyId] = {
+          for (final name in doc.layers.keys) name: !nextCfg.hiddenDxfLayers.contains(name),
+        };
         _commands.commit(
           _project.copyWith(
             cadUnderlays: updatedUnderlays,
@@ -4174,7 +4358,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       });
       _saveBiMProjectIfAttached();
 
-      if (!isAutoReload && existingCfg == null) {
+      if (!isAutoReload && existingCfg == null && _project.activeStoreyId == storeyId) {
         _initTransform();
       }
 
@@ -4198,7 +4382,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             duration: const Duration(seconds: 2),
           ),
         );
-        if (!isAutoReload) {
+        if (!isAutoReload && _project.activeStoreyId == storeyId) {
           setState(() {
             _isCadUnderlaySelected = true;
             _selectedRasterId = null;
@@ -4273,13 +4457,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _reloadCurrentCadUnderlayNow() async {
+    if (_underlayBusy) return;
     final cfg = _currentCadUnderlayConfig;
     if (cfg == null) return;
+    final ownerId = _underlayOwnerId;
     final extPath = cfg.externalSourcePath;
-    final sourceFile = (extPath != null && File(extPath).existsSync())
+    final sourceFile = (extPath != null && await File(extPath).exists())
         ? File(extPath)
-        : File(cfg.internalCopyPath);
-    if (!sourceFile.existsSync()) return;
+        : await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
+    if (sourceFile == null || !mounted || ownerId != _underlayOwnerId ||
+        _project.cadUnderlays[cfg.storeyId] != cfg) return;
     await _loadExternalCadFileForStorey(
       storeyId: cfg.storeyId,
       sourceFile: sourceFile,
@@ -4366,24 +4553,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           doc = loaded;
         }
       }
-      if (doc == null && widget.bimProject != null) {
-        final storey = widget.bimProject!.storeys.where((s) => s.storeyId == storeyId).firstOrNull;
-        if (storey != null && storey.hasUnderlay) {
-          try {
-            final loaded = await BimProjectLibraryService.instance.loadUnderlay(widget.bimProject!.id, storey);
-            if (mounted) {
-              setState(() => _underlaysByStorey[storeyId] = loaded);
-              doc = loaded;
-            }
-          } catch (_) {}
-        }
-      }
-      if (cfg == null && doc != null) {
-        cfg = ArchitectCadUnderlayConfig(
-          storeyId: storeyId,
-          fileName: 'underlay.kcad',
-          internalCopyPath: '',
-        );
+      if ((doc == null || cfg == null) && widget.bimProject != null) {
+        final owner = _underlayOwnerId;
+        await _restorePersistedUnderlays();
+        if (!mounted || owner != _underlayOwnerId || _project.activeStoreyId != storeyId) return;
+        cfg = _currentCadUnderlayConfig;
+        doc = _currentUnderlayDoc;
       }
       if (cfg == null || doc == null) return;
       final currentOrigin = cfg.hasLockedOrigin
@@ -4750,7 +4925,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _underlayBusyMessage = context.l10n.architectUnderlayConverting;
       });
       final centre = _viewport.visibleRect.center;
-      final projectId = widget.bimProject?.id ?? _project.name;
+      final projectId = _underlayOwnerId;
       final storeyId = _project.activeStorey.id;
       final ArchitectRasterImportResult loaded = isPdf
           ? await ArchitectUnderlayService.instance.importPdfPageAsRaster(
@@ -4766,10 +4941,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               sourceFile: File(pickedPath),
               initialCenter: centre,
             );
-      if (!mounted) return;
+      if (!mounted || projectId != _underlayOwnerId ||
+          !_project.storeys.any((s) => s.id == storeyId)) {
+        loaded.image.dispose();
+        if (mounted) setState(() {
+          _underlayBusy = false;
+          _underlayBusyMessage = null;
+        });
+        return;
+      }
       setState(() {
         _rasterImages[loaded.model.id] = loaded.image;
-        _selectedRasterId = loaded.model.id;
+        if (_project.activeStoreyId == storeyId) _selectedRasterId = loaded.model.id;
         _commands.commit(
           _project.copyWith(
             rasterUnderlays: [..._project.rasterUnderlays, loaded.model],
@@ -5410,6 +5593,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _pendingShape = null;
 
+    _ellipseDraft.cancel();
+
     _shapePanelAnchor = null;
 
     _selectionIds.clear();
@@ -5524,6 +5709,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final keepSingle = tool == ArchitectTool.select && !previousMode.isManualSelection
         ? _effectiveSelection.lastOrNull : null;
     _draftingSeed = null;
+    _slabDraftTemplate = null;
+    _slabDraftAssembly = null;
     _quickDrawingTool = null;
     _marqueeTool.cancel();
 
@@ -5603,6 +5790,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _midpointTracking.clear();
 
     _pendingShape = null;
+
+    _ellipseDraft.cancel();
 
     _shapePanelAnchor = null;
 
@@ -6190,11 +6379,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   CadPrimitiveType? _pendingShape;
 
+  final _ellipseDraft = ArchitectEllipseDraft();
+
   Offset? _shapePanelAnchor;
 
   final _polygonEditor = ArchitectPolygonEditor();
 
   ArchitectPolygonEdgeMode _polygonEdgeMode = ArchitectPolygonEdgeMode.move;
+
+  bool _polygonAnglesLocked = true;
+  bool _polygonPull = false;
+
+  ArchitectSlab? get _selectedSlab => _effectiveSelection.length == 1
+      ? _project.activeStorey.slabs.where((s) => s.id == _selectedElementId).firstOrNull
+      : null;
+
+  bool get _hatchOrSlabSelected => _selectedHatch != null || _selectedSlab != null;
+
+  ArchitectPolygonEdgeMode get _effectivePolygonEdgeMode => _hatchOrSlabSelected
+      ? _polygonPull ? ArchitectPolygonEdgeMode.pull
+          : _polygonAnglesLocked ? ArchitectPolygonEdgeMode.extendCatheti : ArchitectPolygonEdgeMode.move
+      : _polygonEdgeMode;
+
+  void _enterPolygonEditing(String id) {
+    if (_polygonEditId != id && _hatchOrSlabSelected) {
+      _polygonAnglesLocked = true;
+      _polygonPull = false;
+    }
+    _polygonEditId = id;
+  }
 
   String? _polygonEditId;
 
@@ -7040,6 +7253,36 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ArchitectProject? _wallSnapProject;
 
+  // --- SUBSECTION: [TAG:POLYGON_ANGLE_LOCK] Temporary on-canvas contour angle constraint ---
+  Widget _buildPolygonAngleOverlay() => Positioned.fill(child: AnimatedBuilder(
+    animation: Listenable.merge([_viewport, _previewRevision]),
+    builder: (context, _) {
+      final polygon = _editablePolygon;
+      if (!_commands.isPlan || _printPreview || !_hatchOrSlabSelected ||
+          polygon == null || polygon.length < 3 || _polygonPull ||
+          _radialMenuScreenPosition != null || _newPointTargetId != null ||
+          _moveSelection || _mirrorActive || _splitActive || _offsetOptions != null ||
+          _rotationSource != null || _duplicateMove != null || _curvingEdgeElementId != null) {
+        return const SizedBox.shrink();
+      }
+      var edge = _polygonSelectedEdge;
+      if (edge == null || edge >= polygon.length) {
+        edge = 0;
+        for (var i = 1; i < polygon.length; i++) {
+          if ((polygon[(i + 1) % polygon.length] - polygon[i]).distanceSquared >
+              (polygon[(edge! + 1) % polygon.length] - polygon[edge]).distanceSquared) edge = i;
+        }
+      }
+      return ArchitectPolygonAngleControl(
+        polygon: polygon, walls: _drawingProject.activeStorey.walls, edge: edge!,
+        locked: _polygonAnglesLocked, toScreen: _viewport.toScreen, toModel: _screenToModel,
+        scale: _currentScale, handleClearance: _handleOffsetLength,
+        onToggle: _polygonEditor.active || _polygonDistanceOpen || _isDraggingVertexOrHandle
+            ? null : () { setState(() => _polygonAnglesLocked = !_polygonAnglesLocked); HapticFeedback.selectionClick(); },
+      );
+    },
+  ));
+
   bool _wallDragStart = false;
 
   Offset _wallGrabOffset = Offset.zero;
@@ -7332,6 +7575,75 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _automaticHatch = false;
 
+  ArchitectSlab? _slabDraftTemplate;
+  ArchitectSlabAssembly? _slabDraftAssembly;
+
+  // --- SUBSECTION: [TAG:SLAB_DRAFT_CONTROLS] Manual slab defaults and contour actions ---
+  Widget _slabControl() => ArchitectSlabDraftBar(
+    pointCount: _elementTool.slabDraftPoints.length,
+    canFinish: ArchitectPolygonGeometry.valid(_elementTool.slabDraftPoints),
+    onUndo: () => setState(() {
+      if (_elementTool.slabDraftPoints.isNotEmpty) _elementTool.slabDraftPoints.removeLast();
+      _elementTool.slabCandidatePoint = null;
+    }),
+    onFinish: _commitSlabDraft,
+    onCancel: () => setState(_elementTool.cancelSlabDrafting),
+    onProperties: _showSlabDraftProperties,
+  );
+
+  void _commitSlabDraft() {
+    final result = _elementTool.commitSlab(
+      storey: _project.activeStorey,
+      template: _slabDraftTemplate,
+      label: context.l10n.architectSlabNumber(_project.activeStorey.slabs.length + 1),
+    );
+    if (result == null) return;
+    var next = _project.updateActiveStorey(result.$1);
+    if (_slabDraftAssembly case final assembly?) {
+      next = next.copyWith(slabAssemblies: [
+        ...next.slabAssemblies.where((a) => a.id != assembly.id), assembly,
+      ]);
+    }
+    setState(() => _commands.commit(next, applyDraftingDefaults: true));
+    _saveBiMProjectIfAttached();
+    HapticFeedback.mediumImpact();
+  }
+
+  void _showSlabDraftProperties() {
+    final document = _modelCommands.project;
+    final original = _commands.documentProject;
+    final id = ArchitectElementId.next('slab-draft');
+    var template = (_slabDraftTemplate ??
+      (_draftingSeed?.tool == ArchitectTool.slab ? ArchitectSlab.fromJson(_draftingSeed!.values) :
+        const ArchitectSlab(id: '', polygon: [], thickness: .16))).copyWith(
+          id: id, polygon: const [Offset.zero, Offset(4, 0), Offset(4, 4), Offset(0, 4)],
+          holes: const [], clearBulges: true, label: '',
+        );
+    final sourceAssembly = _slabDraftAssembly ?? ArchitectSlabAssemblies.of(original, template);
+    final assembly = sourceAssembly?.copyWith(id: ArchitectElementId.next('assembly'));
+    if (assembly != null) template = template.copyWith(assemblyId: assembly.id);
+    final temporary = original.updateActiveStorey(original.activeStorey.copyWith(slabs: [
+      ...original.activeStorey.slabs, template,
+    ])).copyWith(slabAssemblies: [...original.slabAssemblies, if (assembly != null) assembly]);
+    showArchitectProperties<void>(
+      context: context, onInsets: _insetProperties,
+      builder: (_) => ArchitectSlabLayersDialog(
+        project: temporary, slab: template,
+        isCurrent: () => identical(document, _modelCommands.project),
+        onApply: (next) {
+          if (!identical(document, _modelCommands.project)) return false;
+          final selected = next.activeStorey.slabs.firstWhere((s) => s.id == id);
+          setState(() {
+            _slabDraftTemplate = selected;
+            _slabDraftAssembly = ArchitectSlabAssemblies.of(next, selected);
+            _draftingSeed = null;
+          });
+          return true;
+        },
+      ),
+    );
+  }
+
   String? _cutOpeningTargetId;
 
   ArchitectHatchPattern _activeHatchPattern = ArchitectHatchPattern.diagonal;
@@ -7343,8 +7655,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _automaticHatch = v;
       _elementTool.cancelSlabDrafting();
     }),
-    precisionMode: _wallPrecisionMode,
-    onPrecisionToggle: () => setState(() => _wallPrecisionMode = !_wallPrecisionMode),
     pattern: _activeHatchPattern,
     color: _activeHatchColor,
     onColorChanged: (color) => setState(() => _activeHatchColor = color),
@@ -8166,6 +8476,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _polygonEditor.active ||
 
+      _underlayCropEditor.active ||
+
       _draggingElementId != null ||
 
       _zoneMoveStartPoint != null ||
@@ -8699,6 +9011,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerDown(PointerDownEvent event) {
     if (_commandReady) return;
     _dismissTouchCandidates();
+    if (_startUnderlayCrop(_screenToModel(event.localPosition))) {
+      _touchInput = event.kind == PointerDeviceKind.touch;
+      _handlePointerDown = event.localPosition;
+      _handleMoved = false;
+      return;
+    }
     if (_interactionMode == ArchitectInteractionMode.navigation &&
         !_terrainDrafting && !_dragController.isActive) {
       _touchInput = event.kind == PointerDeviceKind.touch;
@@ -8817,12 +9135,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _project.activeStorey.id,
       );
       for (final r in rasters.reversed) {
-        if (r.containsLocalPoint(rawModel)) {
+        if (_rasterUnderlayContains(r, rawModel)) {
           setState(() => _selectedRasterId = r.id);
           if (!r.locked) {
             _draggingRasterId = r.id;
             _rasterDragStartModel = rawModel;
             _rasterDragOriginalPos = r.position;
+            _rasterDragOriginal = r;
+            _rasterDragSource = _project;
             _isHandleEngaged = true;
           }
           return;
@@ -9091,9 +9411,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             (_polygonEditId != null &&
 
-                    (_polygonEdgeMode == ArchitectPolygonEdgeMode.move ||
+                    (_effectivePolygonEdgeMode == ArchitectPolygonEdgeMode.move ||
 
-                        _polygonEdgeMode ==
+                        _effectivePolygonEdgeMode ==
 
                             ArchitectPolygonEdgeMode.extendCatheti) ||
 
@@ -9151,7 +9471,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     ? ArchitectPolygonEdgeMode.extendCatheti
 
-                    : _polygonEdgeMode,
+                    : _effectivePolygonEdgeMode,
 
                 offsetLengthPx: _handleOffsetLength,
 
@@ -9175,9 +9495,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           ? ArchitectPolygonEdgeMode.extendCatheti
 
-                          : _polygonEdgeMode)
+                          : _effectivePolygonEdgeMode)
 
-                    : _polygonEdgeMode,
+                    : _effectivePolygonEdgeMode,
 
                 offsetLengthPx: _handleOffsetLength,
 
@@ -9811,6 +10131,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:TOUCH_MOVE] _onPointerMove Input Dispatch & Previews ---
   void _onPointerMove(PointerMoveEvent event) {
     if (_commandReady) return;
+    if (_underlayCropEditor.active) {
+      if (_handlePointerDown != null && !_handleMoved &&
+          (event.localPosition - _handlePointerDown!).distance < 6) return;
+      _updateUnderlayCrop(_screenToModel(event.localPosition));
+      return;
+    }
     if (_dragController.isActive) {
       if (_isHandleEngaged) {
         _updateDragAim(event.localPosition);
@@ -11127,17 +11453,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final delta = rawModel - _rasterDragStartModel!;
       final nextPos = _rasterDragOriginalPos! + delta;
       setState(() {
-        _commands.commit(
-          _project.copyWith(
-            rasterUnderlays: [
-              for (final r in _project.rasterUnderlays)
-                if (r.id == _draggingRasterId)
-                  r.copyWith(position: nextPos)
-                else
-                  r,
-            ],
-          ),
-        );
+        _rasterDragPreview = _rasterDragOriginal?.copyWith(position: nextPos,
+          maskPolygon: _rasterDragOriginal?.maskPolygon?.map((p) => p + delta).toList());
       });
       return;
     }
@@ -12154,6 +12471,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _draftEnd = snap.point;
 
+      if (_activeTool == ArchitectTool.cadEllipse) _ellipseDraft.aim(snap.point);
+
       _activeSnapLabel = snap.snapLabel;
 
       _repaintPreview();
@@ -12559,6 +12878,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:TOUCH_UP] _onPointerUp Input Dispatch & Tool Commits ---
   void _onPointerUp(PointerUpEvent event) {
     if (_commandReady) return;
+    if (_underlayCropEditor.active) {
+      if (_handleMoved) _updateUnderlayCrop(_screenToModel(event.localPosition));
+      _finishUnderlayCrop();
+      _handlePointerDown = null;
+      return;
+    }
     if (_dragController.isActive) {
       _updateDragAim(event.localPosition);
       if (_dragController.isPickingBasePoint) {
@@ -12799,6 +13124,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _cancelActiveDrags() {
+    _rasterDragOriginal = _rasterDragPreview = null;
+    _rasterDragSource = null;
+    _underlayCropEditor.cancel();
+    _underlayCropSource = null;
     if (_selectionBoxDragging) _marqueeTool.cancel();
     _selectionBoxDown = null;
     _selectionBoxDownScreen = null;
@@ -12959,10 +13288,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _commitActiveHandleDrag(Offset screenPos) {
 
     if (_draggingRasterId != null) {
-      _draggingRasterId = null;
-      _rasterDragStartModel = null;
-      _rasterDragOriginalPos = null;
-      _saveBiMProjectIfAttached();
+      final source = _rasterDragSource;
+      final preview = _rasterDragPreview, original = _rasterDragOriginal;
+      _cancelActiveDrags();
+      if (preview != null && original != null && identical(source, _project) &&
+          preview.position != original.position) {
+        _commands.commit(_project.copyWith(rasterUnderlays: [
+          for (final r in _project.rasterUnderlays)
+            if (r.id == preview.id) preview else r,
+        ]));
+        _saveBiMProjectIfAttached();
+      }
       HapticFeedback.selectionClick();
       return;
     }
@@ -13146,7 +13482,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final isCadContour = source.activeStorey.cadPrimitives
           .any((p) => p.id == id && p.isPolygon,
       );
-      final displacement = _polygonPrecisionMode && isCadContour && valid && changed
+      final isHatchOrSlab = source.activeStorey.slabs.any((s) => s.id == id) ||
+          source.activeStorey.cadPrimitives.any((p) => p.id == id && p.type == CadPrimitiveType.hatch);
+      final exactDrag = (_polygonEditor.edge && isHatchOrSlab) ||
+          (_polygonPrecisionMode && isCadContour);
+      final displacement = exactDrag && valid && changed
           ? ArchitectPolygonDisplacement.fromDrag(
               polygon: original, index: _polygonEditor.index!,
               edge: _polygonEditor.edge, target: _polygonEditor.editedPoint!,
@@ -14761,7 +15101,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _project.activeStorey.id,
       );
       for (final r in rasters.reversed) {
-        if (r.containsLocalPoint(rawModel)) {
+        if (_rasterUnderlayContains(r, rawModel)) {
           setState(() => _selectedRasterId = r.id);
           HapticFeedback.selectionClick();
           return;
@@ -15108,39 +15448,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         if (_activeTool == ArchitectTool.floorDrain) { _commitFloorDrain(); return; }
 
-        final res = _elementTool.commitSlab(storey: _project.activeStorey);
-
-        if (res != null) {
-
-          setState(() {
-
-            _commands.commit(_project.updateActiveStorey(res.$1), applyDraftingDefaults: true,
-            );
-
-          });
-
-          _saveBiMProjectIfAttached();
-
-          HapticFeedback.mediumImpact();
-
-        }
-
+        _commitSlabDraft();
       } else {
-        if (_activeTool == ArchitectTool.hatch &&
-            _wallPrecisionMode &&
-            _elementTool.slabDraftPoints.isNotEmpty) {
-          final lastPt = _elementTool.slabDraftPoints.last;
-          if ((pt - lastPt).distance >= .001) {
-            setState(() {
-              _draftStart = lastPt;
-              _draftEnd = pt;
-              _wallDirectionLocked = true;
-              _wallPanelAnchor = (lastPt + pt) / 2;
-            });
-            return;
-          }
-        }
-
         setState(() => _elementTool.addSlabPoint(pt));
 
         HapticFeedback.lightImpact();
@@ -15545,17 +15854,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 14c. In CAD Ellipse tool
     if (_activeTool == ArchitectTool.cadEllipse) {
-      if (_draftStart == null) {
-        final point = _snapElement(rawModel).point;
-        setState(() {
-          _draftStart = point;
-          _draftEnd = point;
-        });
-      } else {
-        final snap = _snapElement(rawModel, anchor: _draftStart);
-        _draftEnd = snap.point;
-        _commitCadEllipse();
-      }
+      if (_pendingShape != null) return;
+      final point = _snapElement(rawModel, anchor: _draftStart).point;
+      setState(() {
+        _ellipseDraft.pick(point);
+        _draftStart = _ellipseDraft.center;
+        _draftEnd = point;
+        if (_ellipseDraft.ready) {
+          _pendingShape = CadPrimitiveType.ellipse;
+          _shapePanelAnchor = point;
+        }
+      });
+      _repaintPreview();
       return;
     }
 
@@ -18033,7 +18343,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 left: 8,
 
-                right: _selectedHatch != null ? 8 : 64,
+                right: _hatchOrSlabSelected ? 8 : 64,
 
                 child: Material(
 
@@ -18058,7 +18368,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     children: [
 
-                      for (final mode in ArchitectPolygonEdgeMode.values)
+                      for (final mode in _hatchOrSlabSelected
+                          ? [ArchitectPolygonEdgeMode.pull, ArchitectPolygonEdgeMode.move]
+                          : ArchitectPolygonEdgeMode.values)
 
                         IconButton(
 
@@ -18088,7 +18400,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                             size: 20,
 
-                            color: _polygonEdgeMode == mode
+                            color: (_hatchOrSlabSelected && mode == ArchitectPolygonEdgeMode.move
+                                    ? !_polygonPull : _effectivePolygonEdgeMode == mode)
 
                                 ? Theme.of(context).colorScheme.primary
 
@@ -18103,7 +18416,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                               ? null
 
-                              : () => setState(() => _polygonEdgeMode = mode),
+                              : () => setState(() {
+                                  if (_hatchOrSlabSelected) {
+                                    _polygonPull = mode == ArchitectPolygonEdgeMode.pull;
+                                  } else {
+                                    _polygonEdgeMode = mode;
+                                  }
+                                }),
 
                         ),
 
@@ -18132,7 +18451,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       ),
                       Expanded(
 
-                        child: !selected && _selectedHatch == null
+                        child: !selected && !_hatchOrSlabSelected
 
                             ? Padding(
 
@@ -18164,7 +18483,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               )
 
                             : LayoutBuilder(builder: (context, constraints) {
-                                final hint = _selectedHatch == null
+                                final hint = !_hatchOrSlabSelected
                                     ? context.l10n.architectZoneOffset
                                     : context.l10n.architectOffsetContourHint;
                                 if (constraints.maxWidth < 110) {
@@ -18197,7 +18516,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                     : () => _editPolygonDistance(null),
 
                                 icon: Tooltip(
-                                  message: _selectedHatch == null
+                                  message: !_hatchOrSlabSelected
                                       ? context.l10n.architectZoneOffset
                                       : context.l10n.architectOffsetContourHint,
                                   child: const AppIcon(
@@ -18221,7 +18540,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ),
 
-                      if (_selectedHatch != null) ...[
+                      if (_hatchOrSlabSelected) ...[
                         IconButton(
                           constraints: const BoxConstraints.tightFor(width: 36, height: 44,
                           ),
@@ -18230,7 +18549,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           tooltip: context.l10n.bimNewPoint,
                           icon: const AppIcon(AppIconId.locationAdd, size: 20),
                           onPressed: _polygonDistanceOpen ? null
-                              : () => _startNewPointSession(_selectedHatch!.id),
+                              : () => _startNewPointSession((_selectedHatch?.id ?? _selectedSlab!.id)),
                         ),
                         IconButton(
                           constraints: const BoxConstraints.tightFor(width: 36, height: 44,
@@ -18431,7 +18750,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_polygonDistanceOpen) return;
 
     final polygon = _editablePolygon;
-    final wholeRing = dimension == null && _selectedHatch != null;
+    final wholeRing = dimension == null && _hatchOrSlabSelected;
     final edge = _polygonSelectedEdge ?? (wholeRing ? 0 : null);
 
     final id = _activePolygonDistanceElementId;
@@ -18447,7 +18766,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         ? ArchitectPolygonEdgeMode.extendCatheti
 
-        : _polygonEdgeMode;
+        : _effectivePolygonEdgeMode;
 
     final project = _project;
 
@@ -19685,7 +20004,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _project.activeStorey.id,
     );
     final hitRaster = storeyRasters.reversed
-        .where((r) => r.visible && r.containsLocalPoint(raw))
+        .where((r) => _rasterUnderlayContains(r, raw))
         .firstOrNull;
     if (hitRaster != null &&
         (_activeTool == ArchitectTool.rasterUnderlay ||
@@ -19710,8 +20029,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final isOverCad = cadCfg != null &&
         cadCfg.visible &&
         cadDoc != null &&
-        (_isCadUnderlaySelected ||
-            _effectiveUnderlayFrame.rectToModel(cadDoc.bounds).contains(raw));
+        _cadUnderlayContains(raw);
     if (isOverCad &&
         (_activeTool == ArchitectTool.cadUnderlay ||
             _activeTool == ArchitectTool.pan ||
@@ -22122,8 +22440,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _polygonContourElementId = targetId;
         _polygonContourIndex = holeIndex == null ? 0 : holeIndex + 1;
 
-        if (_polygonEditId != targetId && _selectedHatch != null) _polygonEdgeMode = ArchitectPolygonEdgeMode.pull;
-        _polygonEditId = targetId;
+        _enterPolygonEditing(targetId);
 
         _polygonSelectedEdge = hit.edge;
 
@@ -22362,7 +22679,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (action == ArchitectRadialAction.offset && _selectedHatch != null) {
       if (pick != null) _selectPolygonContour(pick);
-      setState(() => _polygonEditId = id);
+      setState(() => _enterPolygonEditing(id));
       _editPolygonDistance(null);
       return;
     }
@@ -22531,8 +22848,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           setState(() {
 
-            if (_polygonEditId != id && _selectedHatch != null) _polygonEdgeMode = ArchitectPolygonEdgeMode.pull;
-            _polygonEditId = id;
+            _enterPolygonEditing(id);
 
             _polygonSelectedEdge = _selectedPolygonHoleIndex == null
                 ? _selectedRoof?.safeEavesEdgeIndex : null;
@@ -23344,10 +23660,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     HapticFeedback.selectionClick();
 
     _selectPolygonContour(point);
-    if (_selectedHatch != null && !_multiSelect) {
+    if (_hatchOrSlabSelected && !_multiSelect) {
       setState(() {
-        if (_polygonEditId != id && _selectedHatch != null) _polygonEdgeMode = ArchitectPolygonEdgeMode.pull;
-            _polygonEditId = id;
+        _enterPolygonEditing(id);
         _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
           _selectedPolygon!, point, 18 / _currentScale,
         );
@@ -25820,7 +26135,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _selectedZoneId = zone.id;
           _zoneTool.startEditingZone(zone);
         }
-        if (_selectedHatch != null) { _polygonEdgeMode = ArchitectPolygonEdgeMode.pull; _polygonEditId = ids.single; }
+        if (_hatchOrSlabSelected) _enterPolygonEditing(ids.single);
       }
       // Area selection remains in the explicitly chosen Multi mode.
       _selectionCyclePoint = null;
@@ -32071,19 +32386,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (_activeTool == ArchitectTool.hatch) { _commitHatch(); return; }
 
-      final result = _elementTool.commitSlab(storey: _project.activeStorey);
-
-      if (result != null) {
-
-        setState(() => _commands.commit(_project.updateActiveStorey(result.$1), applyDraftingDefaults: true,
-          ),
-        );
-
-        _saveBiMProjectIfAttached();
-
-        HapticFeedback.mediumImpact();
-
-      }
+      _commitSlabDraft();
 
     } else if (_canConfirmZone) {
 
@@ -32106,8 +32409,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:DRAFT_DISTANCE_PANEL] One pending-segment panel and exclusive cancel ownership ---
   bool get _hasDistanceDraftPanel => _wallDirectionLocked &&
       _draftStart != null && _draftEnd != null &&
-      (_linearDraftTool ||
-          (_activeTool == ArchitectTool.hatch && _elementTool.slabDraftPoints.isNotEmpty));
+      _linearDraftTool;
 
   Rect? get _draftCancelRect {
 
@@ -32545,9 +32847,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     frame: _effectiveUnderlayFrame,
                     viewport: _viewport,
                     visibility: Map.of(_effectiveUnderlayLayerVisibility),
-                    rasterUnderlays: _project.rasterUnderlaysForStorey(
-                      _project.activeStorey.id,
-                    ),
+                    rasterUnderlays: _paintRasterUnderlays,
                     rasterImages: _rasterImages,
                     selectedRasterId: _selectedRasterUnderlay?.id,
                     isCadSelected: _isCadUnderlaySelected,
@@ -32602,7 +32902,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     calibrationCursor: _rasterCalibrationStep > 0
                         ? _cursorModel
                         : null,
-                    cadConfig: _currentCadUnderlayConfig,
+                    cadConfig: _paintCadUnderlayConfig,
                     maskDraftPoints: _underlayMaskPoints,
                     isMaskDrafting: _underlayMaskDrafting,
                     isPlacingCadUnderlay: _cadInsertionActive ||
@@ -33240,6 +33540,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _buildWallClearanceOverlay(),
         _buildWallArcDimensionOverlay(),
         _buildWallAngleOverlay(),
+        _buildPolygonAngleOverlay(),
       ],
 
       if (_placingDownpipe)
@@ -33295,9 +33596,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         Positioned(top: _offsetOptions == null ? 8 : 64, left: 8, right: 8, child: _groupEditBanner(),
         ),
 
+      _buildUnderlayCropOverlay(),
+
+      if (_unavailableUnderlayStoreys.contains(_project.activeStoreyId))
+        Positioned(top: 64, right: 8, child: IgnorePointer(child: ArchitectCanvasHint(
+          message: context.l10n.architectUnderlayUnavailable,
+        ))),
+
       _buildPolygonDistanceOverlay(),
 
       _buildHatchTransformHandle(),
+
+      if (_activeTool == ArchitectTool.cadEllipse && _effectiveSelection.isEmpty)
+        Positioned.fill(child: AnimatedBuilder(
+          animation: Listenable.merge([_viewport, _previewRevision]),
+          builder: (context, _) => ArchitectEllipseDraftOverlay(
+            draft: _ellipseDraft, toScreen: _viewport.toScreen,
+          ),
+        )),
 
       _buildShapeDimensionOverlay(),
 
@@ -33359,6 +33675,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
 
 
+
+      if (_activeTool == ArchitectTool.slab && _effectiveSelection.isEmpty && _cutOpeningTargetId == null)
+        Positioned(top: 8, left: 8, child: _slabControl()),
 
       if (_activeTool == ArchitectTool.hatch && _effectiveSelection.isEmpty)
 
@@ -34399,7 +34718,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         ),
 
-      if (_linearDraftTool || (_activeTool == ArchitectTool.hatch && _elementTool.slabDraftPoints.isNotEmpty))
+      if (_linearDraftTool)
 
         AnimatedBuilder(
 
@@ -34509,10 +34828,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                                   _project.units.fromUnit(value);
 
-                          if (_activeTool == ArchitectTool.hatch) {
-                            _elementTool.updateSlabCandidate(_draftEnd!);
-                          }
-
                           _activeSnapLabel = null;
 
                           _repaintPreview();
@@ -34522,20 +34837,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         onEnd: () {
                           if (_curvedDraftTool) {
                             _beginDraftArcShaping();
-                            return;
-                          }
-                          if (_activeTool == ArchitectTool.hatch) {
-                            final pt = _draftEnd!;
-                            setState(() {
-                              _elementTool.addSlabPoint(pt);
-                              _wallDirectionLocked = false;
-                              _wallPanelAnchor = null;
-                              _draftStart = null;
-                              _draftEnd = null;
-                            });
-                            if (_elementTool.slabDraftPoints.length >= 3) {
-                              _commitHatch();
-                            }
                             return;
                           }
                           _commitCurrentWallSegment(
@@ -34552,18 +34853,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             _beginDraftArcShaping();
                             return;
                           }
-                          if (_activeTool == ArchitectTool.hatch) {
-                            final pt = _draftEnd!;
-                            setState(() {
-                              _elementTool.addSlabPoint(pt);
-                              _draftStart = pt;
-                              _draftEnd = pt;
-                              _wallDirectionLocked = false;
-                              _wallPanelAnchor = null;
-                            });
-                            _repaintPreview();
-                            return;
-                          }
                           _commitCurrentWallSegment(
 
                             _draftEnd!,
@@ -34577,19 +34866,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                             setState(() => _wallDirectionLocked = false),
 
-                        onCancel: () {
-                          if (_activeTool == ArchitectTool.hatch) {
-                            setState(() {
-                              _wallDirectionLocked = false;
-                              _wallPanelAnchor = null;
-                              _draftStart = null;
-                              _draftEnd = null;
-                            });
-                            _repaintPreview();
-                            return;
-                          }
-                          _finishChainedWall();
-                        },
+                        onCancel: _finishChainedWall,
 
                           ),
                         ),
@@ -34825,6 +35102,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _cancelCadShape() => setState(() {
 
+    _ellipseDraft.cancel();
+
     _pendingShape = null;
 
     _shapePanelAnchor = null;
@@ -34900,30 +35179,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   // --- SUBSECTION: [TAG:CAD_EXPANSION_COMMITS] CAD EXPANSION COMMITS (ARC, MASK, SPLINE, ELLIPSE, LEADER, ROOF SLOPE) ---
+  // --- SUBSECTION: [TAG:ELLIPSE_DRAFT] Three-point axes, exact review and atomic placement ---
   void _commitCadEllipse() {
-    if (_draftStart == null || _draftEnd == null) return;
-    final center = _draftStart!;
-    final delta = _draftEnd! - center;
-    final rx = delta.distance;
-    if (rx < 1e-4) {
-      _cancelCadShape();
-      return;
-    }
-    final ry = rx * 0.6;
-    final rot = math.atan2(delta.dy, delta.dx) * 180 / math.pi;
+    final ellipse = _ellipseDraft.preview;
+    if (!_ellipseDraft.ready || ellipse == null) return;
     final id = ArchitectElementId.next('ellipse');
     try {
       _commands.execute(
         PlaceArchitectCadPrimitive(
           storeyId: _project.activeStoreyId,
-          primitive: ArchitectCadPrimitive(
+          primitive: ellipse.copyWith(
             id: id,
-            type: CadPrimitiveType.ellipse,
-            startPoint: center - Offset(rx, ry),
-            endPoint: center + Offset(rx, ry),
-            radiusX: rx,
-            radiusY: ry,
-            rotationDeg: rot,
             colorValue: 0xFF9E9E9E,
             lineStyle: _activeCadLineStyle,
           ),
@@ -35280,162 +35546,57 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  // --- SUBSECTION: [TAG:SHAPE_EXACT_INPUT] Shared bounded shape dimensions ---
   Widget _buildShapeDimensionOverlay() => Positioned.fill(
-
     child: ValueListenableBuilder<int>(
-
       valueListenable: _previewRevision,
-
       builder: (_, revision, child) {
-
         if (_pendingShape == null || _draftStart == null || _draftEnd == null) {
-
           return const SizedBox.shrink();
-
         }
-
-        return LayoutBuilder(
-
-          builder: (context, constraints) {
-
-            final position = _viewport.toScreen(
-
-              _shapePanelAnchor ?? _draftEnd!,
-
-            );
-
-            final width = math.min(260.0, constraints.maxWidth - 16);
-
-            final left = (position.dx + 16).clamp(
-
-              8.0,
-
-              math.max(8.0, constraints.maxWidth - width - 8),
-
-            );
-
-            final top = (position.dy + 24).clamp(
-
-              8.0,
-
-              math.max(8.0, constraints.maxHeight - 265),
-
-            );
-
-            final delta = _draftEnd! - _draftStart!;
-
-            final circle = _pendingShape == CadPrimitiveType.circle;
-
-            final values = circle
-
-                ? [delta.distance]
-
-                : [delta.dx.abs(), delta.dy.abs()];
-
-            return Stack(
-
-              children: [
-
-                Positioned(
-
-                  left: left.toDouble(),
-
-                  top: top.toDouble(),
-
-                  width: width,
-
-                  child: ArchitectShapeDimensionPanel(
-
-                    key: ValueKey((_draftStart, _pendingShape)),
-
-                    values: [for (final v in values) _project.units.toUnit(v)],
-
-                    labels: circle
-
-                        ? [context.l10n.architectRadius]
-
-                        : [
-
-                            context.l10n.architectShapeWidth,
-
-                            context.l10n.architectShapeHeight,
-
-                          ],
-
-                    unit: _project.units.symbol,
-
-                    decimals: _project.distanceDecimals,
-
-                    minimum: _project.units.toUnit(.001),
-
-                    onChanged: (index, value) {
-
-                      final meters = _project.units.fromUnit(value);
-
-                      final current = _draftEnd! - _draftStart!;
-
-                      if (circle) {
-
-                        final u = current.distance > .000001
-
-                            ? current / current.distance
-
-                            : const Offset(1, 0);
-
-                        _draftEnd = _draftStart! + u * meters;
-
-                      } else {
-
-                        _draftEnd =
-
-                            _draftStart! +
-
-                            Offset(
-
-                              index == 0
-
-                                  ? (current.dx < 0 ? -meters : meters)
-
-                                  : current.dx,
-
-                              index == 1
-
-                                  ? (current.dy < 0 ? -meters : meters)
-
-                                  : current.dy,
-
-                            );
-
-                      }
-
-                      _activeMagneticGuides = [];
-
-                      _activeSnapLabel = null;
-
-                      _repaintPreview();
-
-                    },
-
-                    onSave: () => _commitCadShape(_pendingShape!),
-
-                    onCancel: _cancelCadShape,
-
-                  ),
-
-                ),
-
-              ],
-
-            );
-
-          },
-
+        final delta = _draftEnd! - _draftStart!;
+        final circle = _pendingShape == CadPrimitiveType.circle;
+        final ellipse = _pendingShape == CadPrimitiveType.ellipse;
+        final values = circle ? [delta.distance]
+            : ellipse ? [_ellipseDraft.radiusX, _ellipseDraft.radiusY]
+            : [delta.dx.abs(), delta.dy.abs()];
+        return ArchitectExactInputOverlay(
+          anchor: _viewport.toScreen(_shapePanelAnchor ?? _draftEnd!),
+          child: ArchitectShapeDimensionPanel(
+            key: ValueKey((_draftStart, _pendingShape)),
+            values: [for (final v in values) _project.units.toUnit(v)],
+            labels: circle ? [context.l10n.architectRadius]
+                : ellipse ? [context.l10n.architectEllipseFirstRadius,
+                    context.l10n.architectEllipseSecondRadius]
+                : [context.l10n.architectShapeWidth, context.l10n.architectShapeHeight],
+            unit: _project.units.symbol,
+            decimals: _project.distanceDecimals,
+            minimum: _project.units.toUnit(.001),
+            onChanged: (index, value) {
+              final meters = _project.units.fromUnit(value);
+              final current = _draftEnd! - _draftStart!;
+              if (ellipse) {
+                _ellipseDraft.setRadius(index, meters);
+              } else if (circle) {
+                final u = current.distance > .000001
+                    ? current / current.distance : const Offset(1, 0);
+                _draftEnd = _draftStart! + u * meters;
+              } else {
+                _draftEnd = _draftStart! + Offset(
+                  index == 0 ? (current.dx < 0 ? -meters : meters) : current.dx,
+                  index == 1 ? (current.dy < 0 ? -meters : meters) : current.dy,
+                );
+              }
+              _activeMagneticGuides = [];
+              _activeSnapLabel = null;
+              _repaintPreview();
+            },
+            onSave: ellipse ? _commitCadEllipse : () => _commitCadShape(_pendingShape!),
+            onCancel: _cancelCadShape,
+          ),
         );
-
       },
-
     ),
-
   );
 
   Widget _buildOpeningDimensionOverlay() => Positioned.fill(
@@ -35445,66 +35606,41 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         if (_activeTool != ArchitectTool.opening || _draftStart == null || _draftEnd == null) {
           return const SizedBox.shrink();
         }
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final position = _viewport.toScreen(_draftEnd!);
-            final width = math.min(260.0, constraints.maxWidth - 16);
-            final left = (position.dx + 16).clamp(
-              8.0,
-              math.max(8.0, constraints.maxWidth - width - 8),
-            );
-            final top = (position.dy + 24).clamp(
-              8.0,
-              math.max(8.0, constraints.maxHeight - 265),
-            );
-            final delta = _draftEnd! - _draftStart!;
-            final circular = _elementTool.openingType == OpeningType.circular;
-            final values = circular
-                ? [math.max(delta.dx.abs(), delta.dy.abs())]
-                : [delta.dx.abs(), delta.dy.abs()];
-
-            return Stack(
-              children: [
-                Positioned(
-                  left: left.toDouble(),
-                  top: top.toDouble(),
-                  width: width,
-                  child: ArchitectShapeDimensionPanel(
-                    key: ValueKey((_draftStart, _elementTool.openingType)),
-                    values: [for (final v in values) _project.units.toUnit(v)],
-                    labels: circular
-                        ? [context.l10n.propertiesDiameter]
-                        : [
-                            context.l10n.architectShapeWidth,
-                            context.l10n.architectShapeHeight,
-                          ],
-                    unit: _project.units.symbol,
-                    decimals: _project.distanceDecimals,
-                    minimum: _project.units.toUnit(circular ? 0.02 : 0.15),
-                    onChanged: (index, value) {
-                      final meters = _project.units.fromUnit(value);
-                      final current = _draftEnd! - _draftStart!;
-                      if (circular) {
-                        final signX = current.dx < 0 ? -1.0 : 1.0;
-                        final signY = current.dy < 0 ? -1.0 : 1.0;
-                        _draftEnd = _draftStart! + Offset(signX * meters, signY * meters);
-                      } else {
-                        _draftEnd = _draftStart! + Offset(
-                          index == 0 ? (current.dx < 0 ? -meters : meters) : current.dx,
-                          index == 1 ? (current.dy < 0 ? -meters : meters) : current.dy,
-                        );
-                      }
-                      _activeMagneticGuides = [];
-                      _activeSnapLabel = null;
-                      _repaintPreview();
-                    },
-                    onSave: _commitOpeningPlacement,
-                    onCancel: _cancelDrafting,
-                  ),
-                ),
-              ],
-            );
-          },
+        final delta = _draftEnd! - _draftStart!;
+        final circular = _elementTool.openingType == OpeningType.circular;
+        final values = circular ? [math.max(delta.dx.abs(), delta.dy.abs())]
+            : [delta.dx.abs(), delta.dy.abs()];
+        return ArchitectExactInputOverlay(
+          anchor: _viewport.toScreen(_draftEnd!),
+          child: ArchitectShapeDimensionPanel(
+            key: ValueKey((_draftStart, _elementTool.openingType)),
+            values: [for (final v in values) _project.units.toUnit(v)],
+            labels: circular ? [context.l10n.propertiesDiameter]
+                : [context.l10n.architectShapeWidth, context.l10n.architectShapeHeight],
+            unit: _project.units.symbol,
+            decimals: _project.distanceDecimals,
+            minimum: _project.units.toUnit(circular ? 0.02 : 0.15),
+            onChanged: (index, value) {
+              final meters = _project.units.fromUnit(value);
+              final current = _draftEnd! - _draftStart!;
+              if (circular) {
+                _draftEnd = _draftStart! + Offset(
+                  (current.dx < 0 ? -meters : meters),
+                  (current.dy < 0 ? -meters : meters),
+                );
+              } else {
+                _draftEnd = _draftStart! + Offset(
+                  index == 0 ? (current.dx < 0 ? -meters : meters) : current.dx,
+                  index == 1 ? (current.dy < 0 ? -meters : meters) : current.dy,
+                );
+              }
+              _activeMagneticGuides = [];
+              _activeSnapLabel = null;
+              _repaintPreview();
+            },
+            onSave: _commitOpeningPlacement,
+            onCancel: _cancelDrafting,
+          ),
         );
       },
     ),
@@ -35941,6 +36077,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     activeWallRailing: _activeWallType?.railing,
     activeWallHeight: _activeWallType?.customHeight,
 
+    activeEllipsePreview: _activeTool == ArchitectTool.cadEllipse ? _ellipseDraft.preview : null,
     activeWallArcEnd: _wallArcEnd,
     activeWallArcBulge: _wallArcEnd == null ? null : _draftArcBulge,
     activeWallCurved: _wallCurved,

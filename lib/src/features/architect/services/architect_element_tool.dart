@@ -1,3 +1,4 @@
+import 'architect_ellipse_geometry.dart';
 import '../rendering/architect_annotation_layout.dart';
 import '../models/architect_contour.dart';
 import '../rendering/architect_special_wall_geometry.dart';
@@ -26,6 +27,7 @@ import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 import 'architect_wall_relations.dart';
 import 'architect_floor_drain_geometry.dart';
 import 'architect_mirror_geometry.dart';
+import 'architect_polygon_geometry.dart';
 
 // ============================================================================
 // MASTER ARCHITECT ELEMENT TOOL LLM SEARCH INDEX & TABLE OF CONTENTS
@@ -33,11 +35,11 @@ import 'architect_mirror_geometry.dart';
 // COMPANION MAP: See 'architect_element_tool.index.md' for reference patterns and symbols.
 // QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
 //
-// [SEC-01-ELEMENTS] [TAG:ELEMENT_TOOL] Drafting, picking and element operations
-// [SEC-02-TRANSFORMS] [TAG:ELEMENT_TRANSFORMS] Duplicate, rotate, flip and mirror
+// [SEC-01-ELEMENTS]  [Tag:Element_Tool] Drafting, Picking And Element Operations
+// [SEC-02-TRANSFORMS]  [Tag:Element_Transforms] Duplicate, Rotate, Flip And Mirror
 //   ↳ [SUB]        [TAG:ELEMENT_MIRROR] Model-space reflection and local handedness
 //   ↳ [SUB]        [TAG:ELEMENT_MIRROR_BATCH] Reflection with group and dimension associations
-// [SEC-03-HELPERS] [TAG:ELEMENT_HELPERS] Deletion, connected chains and distance
+// [SEC-03-HELPERS]  [Tag:Element_Helpers] Deletion, Connected Chains And Distance
 // ============================================================================
 
 // === SECTION: [SEC-01-ELEMENTS] [TAG:ELEMENT_TOOL] Drafting, picking and element operations ===
@@ -306,14 +308,19 @@ class ArchitectElementTool extends ChangeNotifier {
   (ArchitectStorey, ArchitectSlab)? commitSlab({
     required ArchitectStorey storey,
     double thickness = 0.16,
+    ArchitectSlab? template,
+    String? label,
   }) {
-    if (slabDraftPoints.length < 3) return null;
+    if (!ArchitectPolygonGeometry.valid(slabDraftPoints)) return null;
     final now = ArchitectElementId.next('element');
-    final newSlab = ArchitectSlab(
+    final newSlab = (template ?? ArchitectSlab(
+      id: '', polygon: const [], thickness: thickness,
+    )).copyWith(
       id: 'slab_$now',
       polygon: List<Offset>.from(slabDraftPoints),
-      thickness: thickness,
-      label: 'Slab ${storey.slabs.length + 1}',
+      holes: const [],
+      clearBulges: true,
+      label: label ?? '',
     );
 
     slabDraftPoints.clear();
@@ -802,17 +809,10 @@ class ArchitectElementTool extends ChangeNotifier {
           yield prim.id;
         }
       } else if (prim.type == CadPrimitiveType.ellipse) {
-        final rx = prim.radiusX ?? (prim.endPoint - prim.startPoint).distance;
-        final ry = prim.radiusY ?? (rx * 0.6);
-        if (rx > 1e-4 && ry > 1e-4) {
-          final rot = (prim.rotationDeg ?? 0) * math.pi / 180;
-          final delta = point - prim.startPoint;
-          final localX = delta.dx * math.cos(-rot) - delta.dy * math.sin(-rot);
-          final localY = delta.dx * math.sin(-rot) + delta.dy * math.cos(-rot);
-          final normD = (localX * localX) / (rx * rx) + (localY * localY) / (ry * ry);
-          if ((normD - 1.0).abs() <= (tolerance / math.min(rx, ry))) {
-            yield prim.id;
-          }
+        final ellipse = ArchitectEllipseGeometry.fromPrimitive(prim);
+        if (ellipse.bounds.inflate(tolerance).contains(point) &&
+            ellipse.distanceTo(point) <= tolerance) {
+          yield prim.id;
         }
       } else if (prim.isPolygon) {
         final points = prim.polygonCorners;

@@ -1,4 +1,5 @@
 import '../../bim_editing/geometry/bim_line_geometry.dart';
+import '../services/architect_underlay_clip.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../bim_editing/snapping/bim_snap_resolver.dart';
@@ -185,6 +186,7 @@ class ArchitectSnapHelper {
       return ArchitectSnapResult(point: precision(project).inputPoint(raw));
     }
     final geometry = ArchitectSnapGeometry.of(project);
+    final underlayMask = ArchitectUnderlayClip.of(project);
     final excludeJoints = project.activeStorey.walls.any(
       (w) => excludedIds.contains(w.id),
     );
@@ -268,12 +270,15 @@ class ArchitectSnapHelper {
     if (underlay != null && includedIds == null) {
       underlay.orBuildSpatialIndex;
       nearby.addAll(
-        DxfSegmentSnap.nearby(
-          document: underlay,
-          point: frame.toCad(raw),
-          radius: radius * frame.unitsPerMeter,
-          layerVisibility: visibility,
-        ).map((e) => (frame.toModel(e.$1), frame.toModel(e.$2))),
+        ArchitectUnderlayClip.segments(
+          DxfSegmentSnap.nearby(
+            document: underlay,
+            point: frame.toCad(raw),
+            radius: radius * frame.unitsPerMeter,
+            layerVisibility: visibility,
+          ).map((e) => (frame.toModel(e.$1), frame.toModel(e.$2))),
+          underlayMask,
+        ),
       );
     }
     for (final edge in nearby) {
@@ -307,32 +312,32 @@ class ArchitectSnapHelper {
       final u = edge.b - edge.a;
       final lenSq = u.dx * u.dx + u.dy * u.dy;
       if (lenSq < 1e-8) continue;
-      final cross = ((raw.dx - edge.a.dx) * u.dy - (raw.dy - edge.a.dy) * u.dx).abs();
+      final cross = ((raw.dx - edge.a.dx) * u.dy - (raw.dy - edge.a.dy) * u.dx)
+          .abs();
       if (cross * cross <= radius * radius * lenSq) {
         extendedCandidates.add((a: edge.a, b: edge.b, owner: edge.owner));
       }
     }
     if (underlay != null && includedIds == null) {
-      final cadTolerance = radius * frame.unitsPerMeter;
       final cadMaxExt = maxExtension * frame.unitsPerMeter;
       final cadRaw = frame.toCad(raw);
       var dxfIdx = 0;
-      for (final e in DxfSegmentSnap.nearby(
-        document: underlay,
-        point: cadRaw,
-        radius: cadMaxExt,
-        layerVisibility: visibility,
+      for (final e in ArchitectUnderlayClip.segments(
+        DxfSegmentSnap.nearby(
+          document: underlay,
+          point: cadRaw,
+          radius: cadMaxExt,
+          layerVisibility: visibility,
+        ).map((e) => (frame.toModel(e.$1), frame.toModel(e.$2))),
+        underlayMask,
       )) {
         final u = e.$2 - e.$1;
         final lenSq = u.dx * u.dx + u.dy * u.dy;
         if (lenSq < 1e-8) continue;
-        final cross = ((cadRaw.dx - e.$1.dx) * u.dy - (cadRaw.dy - e.$1.dy) * u.dx).abs();
-        if (cross * cross <= cadTolerance * cadTolerance * lenSq) {
-          extendedCandidates.add((
-            a: frame.toModel(e.$1),
-            b: frame.toModel(e.$2),
-            owner: '@dxf:${dxfIdx++}',
-          ));
+        final cross = ((raw.dx - e.$1.dx) * u.dy - (raw.dy - e.$1.dy) * u.dx)
+            .abs();
+        if (cross * cross <= radius * radius * lenSq) {
+          extendedCandidates.add((a: e.$1, b: e.$2, owner: '@dxf:${dxfIdx++}'));
         }
       }
     }
@@ -350,7 +355,10 @@ class ArchitectSnapHelper {
           (e2.a, e2.b),
           maxExtension: maxExtension,
         );
-        if (ext != null && (ext.point - raw).distance <= radius) {
+        if (ext != null &&
+            (ext.point - raw).distance <= radius &&
+            (!(e1.owner.startsWith('@dxf:') || e2.owner.startsWith('@dxf:')) ||
+                ArchitectUnderlayClip.contains(underlayMask, ext.point))) {
           apparentGuides[ext.point] = [
             if (ext.guide1 != null) ext.guide1!,
             if (ext.guide2 != null) ext.guide2!,

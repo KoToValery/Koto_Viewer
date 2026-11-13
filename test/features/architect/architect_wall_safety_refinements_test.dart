@@ -652,7 +652,7 @@ void main() {
       },
     );
     testWidgets(
-      'Phone Detach has one confirmation and Hatch starts in pull: $language',
+      'Phone Detach has one confirmation and Hatch starts with locked movement: $language',
       (tester) async {
         tester.view.physicalSize = const Size(360, 800);
         tester.view.devicePixelRatio = 1;
@@ -706,7 +706,7 @@ void main() {
           AppIconId.edgePull,
         );
         final ids = [
-          for (final mode in ['pull', 'move', 'extendCatheti'])
+          for (final mode in ['pull', 'move'])
             tester
                 .widget<AppIcon>(
                   find.descendant(
@@ -716,14 +716,23 @@ void main() {
                 )
                 .id,
         ];
-        expect(ids.toSet(), hasLength(3));
+        expect(ids.toSet(), hasLength(2));
+        expect(
+          find.byKey(const ValueKey('polygon-edge-extendCatheti')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-polygon-angle-lock')),
+          findsOneWidget,
+        );
+        final move = find.byKey(const ValueKey('polygon-edge-move'));
         expect(
           tester
               .widget<AppIcon>(
-                find.descendant(of: pull, matching: find.byType(AppIcon)),
+                find.descendant(of: move, matching: find.byType(AppIcon)),
               )
               .color,
-          Theme.of(tester.element(pull)).colorScheme.primary,
+          Theme.of(tester.element(move)).colorScheme.primary,
         );
         expect(tester.takeException(), isNull);
       },

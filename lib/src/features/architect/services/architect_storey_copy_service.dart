@@ -39,7 +39,42 @@ class ArchitectStoreyCopyService {
     bool shouldInclude(String id) =>
         selectedFilter == null || selectedFilter.contains(id);
 
-    var currentProject = project;
+    final knownStoreyIds = project.storeys.map((storey) => storey.id).toSet();
+    final additionalStoreys = [
+      for (final storey in options.additionalStoreys)
+        if (knownStoreyIds.add(storey.id)) storey,
+    ];
+    // A cancelled dialog never calls this service; an invalid copy must not
+    // publish the levels staged inside it either.
+    if (additionalStoreys.isNotEmpty &&
+        !options.elementTypes.any(
+          (type) =>
+              type.countInStorey(sourceStorey, filterIds: selectedFilter) > 0,
+        )) {
+      return (project, StoreyCopyResult.empty);
+    }
+    final currentProject = additionalStoreys.isEmpty
+        ? project
+        : project
+              .copyWith(
+                storeys: [
+                  ...project.storeys.where((storey) => !storey.isRoof),
+                  ...additionalStoreys,
+                  ...project.storeys.where((storey) => storey.isRoof),
+                ],
+              )
+              .syncRoofElevation();
+    final targetStoreyIds = currentProject.storeys
+        .where(
+          (storey) =>
+              storey.id != sourceStorey.id &&
+              options.targetStoreyIds.contains(storey.id),
+        )
+        .map((storey) => storey.id)
+        .toSet();
+    if (targetStoreyIds.isEmpty) {
+      return (project, StoreyCopyResult.empty);
+    }
     var updatedElementLayers = Map<String, String>.of(project.elementLayers);
     var updatedDocument = project.document;
 
@@ -48,9 +83,8 @@ class ArchitectStoreyCopyService {
 
     final updatedStoreys = <ArchitectStorey>[];
 
-    for (final storey in project.storeys) {
-      if (!options.targetStoreyIds.contains(storey.id) ||
-          storey.id == sourceStorey.id) {
+    for (final storey in currentProject.storeys) {
+      if (!targetStoreyIds.contains(storey.id)) {
         updatedStoreys.add(storey);
         continue;
       }
@@ -67,7 +101,8 @@ class ArchitectStoreyCopyService {
           final newWallId = ArchitectElementId.next('wall');
           idMap[wall.id] = newWallId;
 
-          final wallHeight = options.adjustWallHeights && wall.followStoreyHeight
+          final wallHeight =
+              options.adjustWallHeights && wall.followStoreyHeight
               ? wall.effectiveHeight(targetStorey.height)
               : wall.height;
 
@@ -113,19 +148,15 @@ class ArchitectStoreyCopyService {
           final newColId = ArchitectElementId.next('col');
           idMap[col.id] = newColId;
 
-          final colHeight = options.adjustWallHeights &&
+          final colHeight =
+              options.adjustWallHeights &&
                   ((col.height ?? sourceStorey.height) - sourceStorey.height)
                           .abs() <
                       0.05
               ? targetStorey.height
               : col.height;
 
-          clonedColumns.add(
-            col.copyWith(
-              id: newColId,
-              height: colHeight,
-            ),
-          );
+          clonedColumns.add(col.copyWith(id: newColId, height: colHeight));
         }
         breakdown[ArchitectStoreyElementType.columns] =
             (breakdown[ArchitectStoreyElementType.columns] ?? 0) +
@@ -205,7 +236,9 @@ class ArchitectStoreyCopyService {
 
       // 8. Dimensions
       final clonedDimensions = <ArchitectDimension>[];
-      if (options.elementTypes.contains(ArchitectStoreyElementType.dimensions)) {
+      if (options.elementTypes.contains(
+        ArchitectStoreyElementType.dimensions,
+      )) {
         for (final dim in sourceStorey.dimensions) {
           if (!shouldInclude(dim.id)) continue;
           final newDimId = ArchitectElementId.next('dim');
@@ -219,8 +252,9 @@ class ArchitectStoreyCopyService {
 
       // 9. Elevation Markers
       final clonedMarkers = <ArchitectElevationMarker>[];
-      if (options.elementTypes
-          .contains(ArchitectStoreyElementType.elevationMarkers)) {
+      if (options.elementTypes.contains(
+        ArchitectStoreyElementType.elevationMarkers,
+      )) {
         for (final marker in sourceStorey.elevationMarkers) {
           if (!shouldInclude(marker.id)) continue;
           final newMarkerId = ArchitectElementId.next('elev');
@@ -231,10 +265,7 @@ class ArchitectStoreyCopyService {
               : marker.elevation;
 
           clonedMarkers.add(
-            marker.copyWith(
-              id: newMarkerId,
-              elevation: shiftedElevation,
-            ),
+            marker.copyWith(id: newMarkerId, elevation: shiftedElevation),
           );
         }
         breakdown[ArchitectStoreyElementType.elevationMarkers] =
@@ -244,8 +275,9 @@ class ArchitectStoreyCopyService {
 
       // 10. Annotations
       final clonedAnnotations = <ArchitectAnnotation>[];
-      if (options.elementTypes
-          .contains(ArchitectStoreyElementType.annotations)) {
+      if (options.elementTypes.contains(
+        ArchitectStoreyElementType.annotations,
+      )) {
         for (final ann in sourceStorey.annotations) {
           if (!shouldInclude(ann.id)) continue;
           final newAnnId = ArchitectElementId.next('ann');
@@ -259,8 +291,9 @@ class ArchitectStoreyCopyService {
 
       // 11. CAD Primitives
       final clonedCadPrimitives = <ArchitectCadPrimitive>[];
-      if (options.elementTypes
-          .contains(ArchitectStoreyElementType.cadPrimitives)) {
+      if (options.elementTypes.contains(
+        ArchitectStoreyElementType.cadPrimitives,
+      )) {
         for (final prim in sourceStorey.cadPrimitives) {
           if (!shouldInclude(prim.id)) continue;
           final newCadId = ArchitectElementId.next('cad');
@@ -274,8 +307,9 @@ class ArchitectStoreyCopyService {
 
       // 12. Components (Furniture, fixtures)
       final clonedComponents = <ArchitectComponentInstance>[];
-      if (options.elementTypes
-          .contains(ArchitectStoreyElementType.components)) {
+      if (options.elementTypes.contains(
+        ArchitectStoreyElementType.components,
+      )) {
         for (final comp in sourceStorey.components) {
           if (!shouldInclude(comp.id)) continue;
           final newCompId = ArchitectElementId.next('comp');
@@ -289,8 +323,9 @@ class ArchitectStoreyCopyService {
 
       // 13. Floor Drains
       final clonedFloorDrains = <ArchitectFloorDrain>[];
-      if (options.elementTypes
-          .contains(ArchitectStoreyElementType.floorDrains)) {
+      if (options.elementTypes.contains(
+        ArchitectStoreyElementType.floorDrains,
+      )) {
         for (final drain in sourceStorey.floorDrains) {
           if (!shouldInclude(drain.id)) continue;
           final newDrainId = ArchitectElementId.next('drain');
@@ -304,8 +339,9 @@ class ArchitectStoreyCopyService {
 
       // 14. Decorative Elements
       final clonedDecorative = <ArchitectDecorativeElement>[];
-      if (options.elementTypes
-          .contains(ArchitectStoreyElementType.decorativeElements)) {
+      if (options.elementTypes.contains(
+        ArchitectStoreyElementType.decorativeElements,
+      )) {
         for (final decor in sourceStorey.decorativeElements) {
           if (!shouldInclude(decor.id)) continue;
           final newDecorId = ArchitectElementId.next('decor');
@@ -361,7 +397,8 @@ class ArchitectStoreyCopyService {
       // Document Overrides Remapping
       updatedDocument = updatedDocument.copyElementOverrides(idMap);
 
-      final totalOnThisTarget = clonedWalls.length +
+      final totalOnThisTarget =
+          clonedWalls.length +
           clonedColumns.length +
           clonedBeams.length +
           clonedSlabs.length +
@@ -385,99 +422,96 @@ class ArchitectStoreyCopyService {
           options.elementTypes.contains(t);
 
       final nextWalls = isTypeSelected(ArchitectStoreyElementType.walls)
-          ? (isReplace
-              ? clonedWalls
-              : [...targetStorey.walls, ...clonedWalls])
+          ? (isReplace ? clonedWalls : [...targetStorey.walls, ...clonedWalls])
           : targetStorey.walls;
 
       final nextColumns = isTypeSelected(ArchitectStoreyElementType.columns)
           ? (isReplace
-              ? clonedColumns
-              : [...targetStorey.columns, ...clonedColumns])
+                ? clonedColumns
+                : [...targetStorey.columns, ...clonedColumns])
           : targetStorey.columns;
 
       final nextBeams = isTypeSelected(ArchitectStoreyElementType.beams)
-          ? (isReplace
-              ? clonedBeams
-              : [...targetStorey.beams, ...clonedBeams])
+          ? (isReplace ? clonedBeams : [...targetStorey.beams, ...clonedBeams])
           : targetStorey.beams;
 
       final nextSlabs = isTypeSelected(ArchitectStoreyElementType.slabs)
-          ? (isReplace
-              ? clonedSlabs
-              : [...targetStorey.slabs, ...clonedSlabs])
+          ? (isReplace ? clonedSlabs : [...targetStorey.slabs, ...clonedSlabs])
           : targetStorey.slabs;
 
       final nextZones = isTypeSelected(ArchitectStoreyElementType.zones)
-          ? (isReplace
-              ? clonedZones
-              : [...targetStorey.zones, ...clonedZones])
+          ? (isReplace ? clonedZones : [...targetStorey.zones, ...clonedZones])
           : targetStorey.zones;
 
       final nextStairs = isTypeSelected(ArchitectStoreyElementType.stairs)
           ? (isReplace
-              ? clonedStairs
-              : [...targetStorey.stairs, ...clonedStairs])
+                ? clonedStairs
+                : [...targetStorey.stairs, ...clonedStairs])
           : targetStorey.stairs;
 
       final nextOpenings = isTypeSelected(ArchitectStoreyElementType.openings)
           ? (isReplace
-              ? clonedOpenings
-              : [...targetStorey.openings, ...clonedOpenings])
+                ? clonedOpenings
+                : [...targetStorey.openings, ...clonedOpenings])
           : targetStorey.openings;
 
-      final nextDimensions = isTypeSelected(ArchitectStoreyElementType.dimensions)
+      final nextDimensions =
+          isTypeSelected(ArchitectStoreyElementType.dimensions)
           ? (isReplace
-              ? clonedDimensions
-              : [...targetStorey.dimensions, ...clonedDimensions])
+                ? clonedDimensions
+                : [...targetStorey.dimensions, ...clonedDimensions])
           : targetStorey.dimensions;
 
-      final nextMarkers = isTypeSelected(ArchitectStoreyElementType.elevationMarkers)
+      final nextMarkers =
+          isTypeSelected(ArchitectStoreyElementType.elevationMarkers)
           ? (isReplace
-              ? clonedMarkers
-              : [...targetStorey.elevationMarkers, ...clonedMarkers])
+                ? clonedMarkers
+                : [...targetStorey.elevationMarkers, ...clonedMarkers])
           : targetStorey.elevationMarkers;
 
-      final nextAnnotations = isTypeSelected(ArchitectStoreyElementType.annotations)
+      final nextAnnotations =
+          isTypeSelected(ArchitectStoreyElementType.annotations)
           ? (isReplace
-              ? clonedAnnotations
-              : [...targetStorey.annotations, ...clonedAnnotations])
+                ? clonedAnnotations
+                : [...targetStorey.annotations, ...clonedAnnotations])
           : targetStorey.annotations;
 
-      final nextCadPrimitives = isTypeSelected(ArchitectStoreyElementType.cadPrimitives)
+      final nextCadPrimitives =
+          isTypeSelected(ArchitectStoreyElementType.cadPrimitives)
           ? (isReplace
-              ? clonedCadPrimitives
-              : [...targetStorey.cadPrimitives, ...clonedCadPrimitives])
+                ? clonedCadPrimitives
+                : [...targetStorey.cadPrimitives, ...clonedCadPrimitives])
           : targetStorey.cadPrimitives;
 
-      final nextComponents = isTypeSelected(ArchitectStoreyElementType.components)
+      final nextComponents =
+          isTypeSelected(ArchitectStoreyElementType.components)
           ? (isReplace
-              ? clonedComponents
-              : [...targetStorey.components, ...clonedComponents])
+                ? clonedComponents
+                : [...targetStorey.components, ...clonedComponents])
           : targetStorey.components;
 
-      final nextFloorDrains = isTypeSelected(ArchitectStoreyElementType.floorDrains)
+      final nextFloorDrains =
+          isTypeSelected(ArchitectStoreyElementType.floorDrains)
           ? (isReplace
-              ? clonedFloorDrains
-              : [...targetStorey.floorDrains, ...clonedFloorDrains])
+                ? clonedFloorDrains
+                : [...targetStorey.floorDrains, ...clonedFloorDrains])
           : targetStorey.floorDrains;
 
-      final nextDecorative = isTypeSelected(ArchitectStoreyElementType.decorativeElements)
+      final nextDecorative =
+          isTypeSelected(ArchitectStoreyElementType.decorativeElements)
           ? (isReplace
-              ? clonedDecorative
-              : [...targetStorey.decorativeElements, ...clonedDecorative])
+                ? clonedDecorative
+                : [...targetStorey.decorativeElements, ...clonedDecorative])
           : targetStorey.decorativeElements;
 
       final nextRoofs = isTypeSelected(ArchitectStoreyElementType.roofs)
-          ? (isReplace
-              ? clonedRoofs
-              : [...targetStorey.roofs, ...clonedRoofs])
+          ? (isReplace ? clonedRoofs : [...targetStorey.roofs, ...clonedRoofs])
           : targetStorey.roofs;
 
       final nextGroups = options.preserveGroups
           ? (isReplace
-              ? clonedGroups
-              : [...targetStorey.groups, ...clonedGroups])
+                ? clonedGroups
+                : [...targetStorey.groups, ...clonedGroups])
           : targetStorey.groups;
 
       updatedStoreys.add(
@@ -511,7 +545,7 @@ class ArchitectStoreyCopyService {
 
     final result = StoreyCopyResult(
       totalCopied: totalCopiedAcrossAllTargets,
-      targetStoreyCount: options.targetStoreyIds.length,
+      targetStoreyCount: targetStoreyIds.length,
       breakdown: breakdown,
     );
 

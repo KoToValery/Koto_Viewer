@@ -62,7 +62,10 @@ class DxfSnapHelper {
     if (dist < 1e-12) {
       return Offset(center.dx + radius, center.dy);
     }
-    return Offset(center.dx + radius * (dx / dist), center.dy + radius * (dy / dist));
+    return Offset(
+      center.dx + radius * (dx / dist),
+      center.dy + radius * (dy / dist),
+    );
   }
 
   /// Calculates the closest point on a circular arc curve from query point P.
@@ -115,9 +118,11 @@ class DxfSnapHelper {
     }
 
     // Closest endpoint
-    final double dStartSq = (p.dx - pStart.dx) * (p.dx - pStart.dx) +
+    final double dStartSq =
+        (p.dx - pStart.dx) * (p.dx - pStart.dx) +
         (p.dy - pStart.dy) * (p.dy - pStart.dy);
-    final double dEndSq = (p.dx - pEnd.dx) * (p.dx - pEnd.dx) +
+    final double dEndSq =
+        (p.dx - pEnd.dx) * (p.dx - pEnd.dx) +
         (p.dy - pEnd.dy) * (p.dy - pEnd.dy);
 
     return dStartSq <= dEndSq ? pStart : pEnd;
@@ -137,6 +142,7 @@ class DxfSnapHelper {
     Offset? basePoint,
     bool allowNearest = true,
     bool includeIntersections = false,
+    bool Function(Offset)? pointFilter,
   }) {
     if (toleranceCad <= 0) return null;
 
@@ -155,6 +161,7 @@ class DxfSnapHelper {
     double minNearestDistSq = maxDistSq;
 
     void testLandmark(Offset p, DxfSnapType type) {
+      if (pointFilter != null && !pointFilter(p)) return;
       final dx = p.dx - cadPoint.dx;
       final dy = p.dy - cadPoint.dy;
       final distSq = dx * dx + dy * dy;
@@ -181,6 +188,7 @@ class DxfSnapHelper {
     }
 
     void testPerpendicularPoint(Offset p) {
+      if (pointFilter != null && !pointFilter(p)) return;
       final dx = p.dx - cadPoint.dx;
       final dy = p.dy - cadPoint.dy;
       final distSq = dx * dx + dy * dy;
@@ -201,7 +209,8 @@ class DxfSnapHelper {
       final dy = pClosest.dy - cadPoint.dy;
       final distSq = dx * dx + dy * dy;
 
-      if (distSq <= minNearestDistSq) {
+      if (distSq <= minNearestDistSq &&
+          (pointFilter == null || pointFilter(pClosest))) {
         minNearestDistSq = distSq;
         bestNearestSnap = DxfSnapResult(
           point: pClosest,
@@ -235,7 +244,8 @@ class DxfSnapHelper {
       final dy = pClosest.dy - cadPoint.dy;
       final distSq = dx * dx + dy * dy;
 
-      if (distSq <= minNearestDistSq) {
+      if (distSq <= minNearestDistSq &&
+          (pointFilter == null || pointFilter(pClosest))) {
         minNearestDistSq = distSq;
         bestNearestSnap = DxfSnapResult(
           point: pClosest,
@@ -249,21 +259,39 @@ class DxfSnapHelper {
         final double bdy = basePoint.dy - center.dy;
         final double bdist = math.sqrt(bdx * bdx + bdy * bdy);
         if (bdist > 1e-6) {
-          final p1 = Offset(center.dx + radius * (bdx / bdist), center.dy + radius * (bdy / bdist));
-          final p2 = Offset(center.dx - radius * (bdx / bdist), center.dy - radius * (bdy / bdist));
+          final p1 = Offset(
+            center.dx + radius * (bdx / bdist),
+            center.dy + radius * (bdy / bdist),
+          );
+          final p2 = Offset(
+            center.dx - radius * (bdx / bdist),
+            center.dy - radius * (bdy / bdist),
+          );
           testPerpendicularPoint(p1);
           testPerpendicularPoint(p2);
         }
       }
     }
 
-    void testArcCurve(Offset center, double radius, double startAngleDeg, double endAngleDeg) {
-      final pClosest = closestPointOnArc(cadPoint, center, radius, startAngleDeg, endAngleDeg);
+    void testArcCurve(
+      Offset center,
+      double radius,
+      double startAngleDeg,
+      double endAngleDeg,
+    ) {
+      final pClosest = closestPointOnArc(
+        cadPoint,
+        center,
+        radius,
+        startAngleDeg,
+        endAngleDeg,
+      );
       final dx = pClosest.dx - cadPoint.dx;
       final dy = pClosest.dy - cadPoint.dy;
       final distSq = dx * dx + dy * dy;
 
-      if (distSq <= minNearestDistSq) {
+      if (distSq <= minNearestDistSq &&
+          (pointFilter == null || pointFilter(pClosest))) {
         minNearestDistSq = distSq;
         bestNearestSnap = DxfSnapResult(
           point: pClosest,
@@ -278,7 +306,10 @@ class DxfSnapHelper {
         final double bdist = math.sqrt(bdx * bdx + bdy * bdy);
         if (bdist > 1e-6) {
           void checkAngleAndTest(Offset p) {
-            double angleDeg = math.atan2(p.dy - center.dy, p.dx - center.dx) * 180.0 / math.pi;
+            double angleDeg =
+                math.atan2(p.dy - center.dy, p.dx - center.dx) *
+                180.0 /
+                math.pi;
             if (angleDeg < 0) angleDeg += 360.0;
             double normStart = startAngleDeg % 360.0;
             if (normStart < 0) normStart += 360.0;
@@ -293,8 +324,18 @@ class DxfSnapHelper {
             }
           }
 
-          checkAngleAndTest(Offset(center.dx + radius * (bdx / bdist), center.dy + radius * (bdy / bdist)));
-          checkAngleAndTest(Offset(center.dx - radius * (bdx / bdist), center.dy - radius * (bdy / bdist)));
+          checkAngleAndTest(
+            Offset(
+              center.dx + radius * (bdx / bdist),
+              center.dy + radius * (bdy / bdist),
+            ),
+          );
+          checkAngleAndTest(
+            Offset(
+              center.dx - radius * (bdx / bdist),
+              center.dy - radius * (bdy / bdist),
+            ),
+          );
         }
       }
     }
@@ -321,7 +362,10 @@ class DxfSnapHelper {
         testLandmark(entity.p1, DxfSnapType.endpoint);
         testLandmark(entity.p2, DxfSnapType.endpoint);
         testLandmark(
-          Offset((entity.p1.dx + entity.p2.dx) / 2, (entity.p1.dy + entity.p2.dy) / 2),
+          Offset(
+            (entity.p1.dx + entity.p2.dx) / 2,
+            (entity.p1.dy + entity.p2.dy) / 2,
+          ),
           DxfSnapType.midpoint,
         );
         testSegment(entity.p1, entity.p2);
@@ -329,10 +373,22 @@ class DxfSnapHelper {
         testLandmark(entity.point, DxfSnapType.point);
       } else if (entity is DxfCircle) {
         testLandmark(entity.center, DxfSnapType.center);
-        testLandmark(Offset(entity.center.dx + entity.radius, entity.center.dy), DxfSnapType.quadrant);
-        testLandmark(Offset(entity.center.dx, entity.center.dy + entity.radius), DxfSnapType.quadrant);
-        testLandmark(Offset(entity.center.dx - entity.radius, entity.center.dy), DxfSnapType.quadrant);
-        testLandmark(Offset(entity.center.dx, entity.center.dy - entity.radius), DxfSnapType.quadrant);
+        testLandmark(
+          Offset(entity.center.dx + entity.radius, entity.center.dy),
+          DxfSnapType.quadrant,
+        );
+        testLandmark(
+          Offset(entity.center.dx, entity.center.dy + entity.radius),
+          DxfSnapType.quadrant,
+        );
+        testLandmark(
+          Offset(entity.center.dx - entity.radius, entity.center.dy),
+          DxfSnapType.quadrant,
+        );
+        testLandmark(
+          Offset(entity.center.dx, entity.center.dy - entity.radius),
+          DxfSnapType.quadrant,
+        );
         testCircleCurve(entity.center, entity.radius);
       } else if (entity is DxfArc) {
         testLandmark(entity.center, DxfSnapType.center);
@@ -351,7 +407,8 @@ class DxfSnapHelper {
 
         double sweep = entity.endAngleDeg - entity.startAngleDeg;
         if (sweep <= 0) sweep += 360.0;
-        final midAngleRad = (entity.startAngleDeg + sweep / 2.0) * math.pi / 180.0;
+        final midAngleRad =
+            (entity.startAngleDeg + sweep / 2.0) * math.pi / 180.0;
         final pMid = Offset(
           entity.center.dx + entity.radius * math.cos(midAngleRad),
           entity.center.dy + entity.radius * math.sin(midAngleRad),
@@ -372,7 +429,12 @@ class DxfSnapHelper {
             );
           }
         }
-        testArcCurve(entity.center, entity.radius, entity.startAngleDeg, entity.endAngleDeg);
+        testArcCurve(
+          entity.center,
+          entity.radius,
+          entity.startAngleDeg,
+          entity.endAngleDeg,
+        );
       } else if (entity is DxfEllipse) {
         testLandmark(entity.center, DxfSnapType.center);
         final points = DxfMath.generateEllipsePoints(
@@ -395,7 +457,11 @@ class DxfSnapHelper {
           if (i + 1 < count || entity.isClosed) {
             final v2 = vertices[(i + 1) % count];
             if (v1.bulge.abs() > 1e-6) {
-              final arcPts = DxfMath.generateBulgeArcPoints(v1.offset, v2.offset, v1.bulge);
+              final arcPts = DxfMath.generateBulgeArcPoints(
+                v1.offset,
+                v2.offset,
+                v1.bulge,
+              );
               if (arcPts.length > 2) {
                 final midIdx = arcPts.length ~/ 2;
                 testLandmark(arcPts[midIdx], DxfSnapType.midpoint);
@@ -422,7 +488,11 @@ class DxfSnapHelper {
           if (i + 1 < count || entity.isClosed) {
             final v2 = vertices[(i + 1) % count];
             if (v1.bulge.abs() > 1e-6) {
-              final arcPts = DxfMath.generateBulgeArcPoints(v1.offset, v2.offset, v1.bulge);
+              final arcPts = DxfMath.generateBulgeArcPoints(
+                v1.offset,
+                v2.offset,
+                v1.bulge,
+              );
               if (arcPts.length > 2) {
                 final midIdx = arcPts.length ~/ 2;
                 testLandmark(arcPts[midIdx], DxfSnapType.midpoint);
@@ -448,7 +518,9 @@ class DxfSnapHelper {
         }
         final splinePoints = DxfMath.evaluateSpline(
           entity.degree,
-          entity.controlPoints.isNotEmpty ? entity.controlPoints : entity.fitPoints,
+          entity.controlPoints.isNotEmpty
+              ? entity.controlPoints
+              : entity.fitPoints,
           knots: entity.knots.isNotEmpty ? entity.knots : null,
           weights: entity.weights.isNotEmpty ? entity.weights : null,
         );
@@ -486,7 +558,10 @@ class DxfSnapHelper {
             final ly = (pt.dy - by) * entity.scaleY;
             final rx = lx * cosA - ly * sinA;
             final ry = lx * sinA + ly * cosA;
-            return Offset(entity.insertPoint.dx + rx, entity.insertPoint.dy + ry);
+            return Offset(
+              entity.insertPoint.dx + rx,
+              entity.insertPoint.dy + ry,
+            );
           }
 
           for (final child in block.entities) {
@@ -498,16 +573,27 @@ class DxfSnapHelper {
               final p2 = transformPt(child.p2);
               testLandmark(p1, DxfSnapType.endpoint);
               testLandmark(p2, DxfSnapType.endpoint);
-              testLandmark(Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2), DxfSnapType.midpoint);
+              testLandmark(
+                Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2),
+                DxfSnapType.midpoint,
+              );
               testSegment(p1, p2);
             } else if (child is DxfLwPolyline) {
-              final vertices = child.vertices.map((v) => transformPt(v.offset)).toList();
+              final vertices = child.vertices
+                  .map((v) => transformPt(v.offset))
+                  .toList();
               final count = vertices.length;
               for (int i = 0; i < count; i++) {
                 testLandmark(vertices[i], DxfSnapType.endpoint);
                 if (i + 1 < count || child.isClosed) {
                   final v2 = vertices[(i + 1) % count];
-                  testLandmark(Offset((vertices[i].dx + v2.dx) / 2, (vertices[i].dy + v2.dy) / 2), DxfSnapType.midpoint);
+                  testLandmark(
+                    Offset(
+                      (vertices[i].dx + v2.dx) / 2,
+                      (vertices[i].dy + v2.dy) / 2,
+                    ),
+                    DxfSnapType.midpoint,
+                  );
                   testSegment(vertices[i], v2);
                 }
               }
@@ -537,14 +623,27 @@ class DxfSnapHelper {
 
     if (includeIntersections) {
       final intersection = DxfSegmentSnap.nearestIntersection(
-        document: document, point: cadPoint, tolerance: toleranceCad);
+        document: document,
+        point: cadPoint,
+        tolerance: toleranceCad,
+        pointFilter: pointFilter,
+      );
       if (intersection != null) {
-        return DxfSnapResult(point: intersection, type: DxfSnapType.intersection,
-          distance: (intersection-cadPoint).distance);
+        return DxfSnapResult(
+          point: intersection,
+          type: DxfSnapType.intersection,
+          distance: (intersection - cadPoint).distance,
+        );
       }
       final ext = DxfSegmentSnap.nearestExtendedIntersection(
-        document: document, point: cadPoint, tolerance: toleranceCad);
-      if (ext != null && (bestEndpointSnap == null || bestEndpointSnap!.distance > (ext.point - cadPoint).distance)) {
+        document: document,
+        point: cadPoint,
+        tolerance: toleranceCad,
+        pointFilter: pointFilter,
+      );
+      if (ext != null &&
+          (bestEndpointSnap == null ||
+              bestEndpointSnap!.distance > (ext.point - cadPoint).distance)) {
         return DxfSnapResult(
           point: ext.point,
           type: DxfSnapType.apparentIntersection,
@@ -564,7 +663,8 @@ class DxfSnapHelper {
 
     // 2. If both landmark and nearest point coincide, always return landmark snap.
     if (bestLandmarkSnap != null && bestNearestSnap != null) {
-      final double diffSq = (bestNearestSnap!.point.dx - bestLandmarkSnap!.point.dx) *
+      final double diffSq =
+          (bestNearestSnap!.point.dx - bestLandmarkSnap!.point.dx) *
               (bestNearestSnap!.point.dx - bestLandmarkSnap!.point.dx) +
           (bestNearestSnap!.point.dy - bestLandmarkSnap!.point.dy) *
               (bestNearestSnap!.point.dy - bestLandmarkSnap!.point.dy);
@@ -575,7 +675,8 @@ class DxfSnapHelper {
 
     // 3. Prioritize landmark (midpoint/center)
     if (bestLandmarkSnap != null) {
-      if (bestNearestSnap == null || bestLandmarkSnap!.distance <= toleranceCad * 0.75) {
+      if (bestNearestSnap == null ||
+          bestLandmarkSnap!.distance <= toleranceCad * 0.75) {
         return bestLandmarkSnap;
       }
     }
@@ -583,7 +684,10 @@ class DxfSnapHelper {
     // 4. Perpendicular right-angle snap
     if (bestPerpendicularSnap != null) {
       if (bestPerpendicularSnap!.distance <= toleranceCad * 0.70 ||
-          (bestNearestSnap != null && (bestPerpendicularSnap!.point - bestNearestSnap!.point).distanceSquared < 1e-4)) {
+          (bestNearestSnap != null &&
+              (bestPerpendicularSnap!.point - bestNearestSnap!.point)
+                      .distanceSquared <
+                  1e-4)) {
         return bestPerpendicularSnap;
       }
     }
@@ -625,8 +729,19 @@ class DxfSnapHelper {
       }
     }
 
-    void checkArc(Offset center, double radius, double startAngleDeg, double endAngleDeg) {
-      final closestPoint = closestPointOnArc(cadPoint, center, radius, startAngleDeg, endAngleDeg);
+    void checkArc(
+      Offset center,
+      double radius,
+      double startAngleDeg,
+      double endAngleDeg,
+    ) {
+      final closestPoint = closestPointOnArc(
+        cadPoint,
+        center,
+        radius,
+        startAngleDeg,
+        endAngleDeg,
+      );
       final double dist = (cadPoint - closestPoint).distance;
       if (dist <= minDistance) {
         minDistance = dist;
@@ -666,7 +781,12 @@ class DxfSnapHelper {
       if (entity is DxfCircle) {
         checkCircle(entity.center, entity.radius);
       } else if (entity is DxfArc) {
-        checkArc(entity.center, entity.radius, entity.startAngleDeg, entity.endAngleDeg);
+        checkArc(
+          entity.center,
+          entity.radius,
+          entity.startAngleDeg,
+          entity.endAngleDeg,
+        );
       } else if (entity is DxfInsert) {
         final block = document.blocks[entity.blockName];
         if (block != null && block.entities.isNotEmpty) {
@@ -681,7 +801,10 @@ class DxfSnapHelper {
             final ly = (pt.dy - by) * entity.scaleY;
             final rx = lx * cosA - ly * sinA;
             final ry = lx * sinA + ly * cosA;
-            return Offset(entity.insertPoint.dx + rx, entity.insertPoint.dy + ry);
+            return Offset(
+              entity.insertPoint.dx + rx,
+              entity.insertPoint.dy + ry,
+            );
           }
 
           for (final child in block.entities) {
@@ -693,7 +816,12 @@ class DxfSnapHelper {
               checkCircle(c, child.radius * entity.scaleX.abs());
             } else if (child is DxfArc) {
               final c = transformPt(child.center);
-              checkArc(c, child.radius * entity.scaleX.abs(), child.startAngleDeg, child.endAngleDeg);
+              checkArc(
+                c,
+                child.radius * entity.scaleX.abs(),
+                child.startAngleDeg,
+                child.endAngleDeg,
+              );
             }
           }
         }
@@ -739,7 +867,13 @@ class DxfSnapHelper {
         final distCenter = (cadPoint - entity.center).distance;
         dist = (distCenter - entity.radius).abs();
       } else if (entity is DxfArc) {
-        final p = closestPointOnArc(cadPoint, entity.center, entity.radius, entity.startAngleDeg, entity.endAngleDeg);
+        final p = closestPointOnArc(
+          cadPoint,
+          entity.center,
+          entity.radius,
+          entity.startAngleDeg,
+          entity.endAngleDeg,
+        );
         dist = (cadPoint - p).distance;
       } else if (entity is DxfLwPolyline) {
         final pts = entity.vertices.map((v) => Offset(v.x, v.y)).toList();
@@ -791,7 +925,11 @@ class DxfSnapHelper {
         if (entity.vertices.length >= 2) {
           double minL = double.infinity;
           for (int i = 0; i < entity.vertices.length - 1; i++) {
-            final p = closestPointOnSegment(cadPoint, entity.vertices[i], entity.vertices[i + 1]);
+            final p = closestPointOnSegment(
+              cadPoint,
+              entity.vertices[i],
+              entity.vertices[i + 1],
+            );
             final d = (cadPoint - p).distance;
             if (d < minL) minL = d;
           }
@@ -803,8 +941,14 @@ class DxfSnapHelper {
           if (box.contains(cadPoint)) {
             dist = 0.0;
           } else {
-            final dx = math.max(0.0, math.max(box.left - cadPoint.dx, cadPoint.dx - box.right));
-            final dy = math.max(0.0, math.max(box.top - cadPoint.dy, cadPoint.dy - box.bottom));
+            final dx = math.max(
+              0.0,
+              math.max(box.left - cadPoint.dx, cadPoint.dx - box.right),
+            );
+            final dy = math.max(
+              0.0,
+              math.max(box.top - cadPoint.dy, cadPoint.dy - box.bottom),
+            );
             dist = math.sqrt(dx * dx + dy * dy);
           }
         }
@@ -842,4 +986,3 @@ class DxfCircleArcResult {
     required this.distance,
   });
 }
-

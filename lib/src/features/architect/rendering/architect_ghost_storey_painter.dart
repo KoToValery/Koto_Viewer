@@ -1,3 +1,4 @@
+import '../services/architect_ellipse_geometry.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
@@ -108,7 +109,10 @@ class ArchitectGhostStoreyPainter extends CustomPainter {
           case CadPrimitiveType.line:
             canvas.drawLine(primitive.startPoint, primitive.endPoint, stroke);
           case CadPrimitiveType.polyline:
-            canvas.drawPath(Path()..addPolygon(primitive.linePoints, false), stroke);
+            canvas.drawPath(
+              Path()..addPolygon(primitive.linePoints, false),
+              stroke,
+            );
           case CadPrimitiveType.rect:
           case CadPrimitiveType.hatch:
             polygon(primitive.polygonCorners);
@@ -129,17 +133,15 @@ class ArchitectGhostStoreyPainter extends CustomPainter {
             polygon(primitive.polygonCorners);
           case CadPrimitiveType.spline:
             canvas.drawPath(
-              ArchitectSplineGeometry.generatePath(primitive.linePoints, closed: primitive.closed == true),
+              ArchitectSplineGeometry.generatePath(
+                primitive.linePoints,
+                closed: primitive.closed == true,
+              ),
               stroke,
             );
           case CadPrimitiveType.ellipse:
-            final center = (primitive.startPoint + primitive.endPoint) * 0.5;
-            canvas.drawOval(
-              Rect.fromCenter(
-                center: center,
-                width: (primitive.radiusX ?? 1.0) * 2,
-                height: (primitive.radiusY ?? 0.6) * 2,
-              ),
+            canvas.drawPath(
+              ArchitectEllipseGeometry.fromPrimitive(primitive).path,
               stroke,
             );
         }

@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/icons/app_icon.dart';
 import '../properties/bim_numeric_rule.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import 'bim_numeric_keypad.dart';
 
-/// Project-unit values; this panel never opens the platform keyboard.
+/// Project-unit values with a local keypad and optional physical-key input.
 class BimShapeDimensionPanel extends StatefulWidget {
   final List<double> values;
   final List<String> labels;
   final String unit;
   final int decimals;
   final double minimum;
-  final bool canSave, signed;
+  final bool canSave, signed, keypadInitiallyOpen;
   final void Function(int index, double value) onChanged;
   final VoidCallback onSave, onCancel;
   const BimShapeDimensionPanel({
@@ -23,21 +24,33 @@ class BimShapeDimensionPanel extends StatefulWidget {
     required this.minimum,
     this.canSave = true,
     this.signed = false,
+    this.keypadInitiallyOpen = true,
     required this.onChanged,
     required this.onSave,
     required this.onCancel,
-  });
+  }) : assert(values.length == labels.length && values.length > 0);
   @override
   State<BimShapeDimensionPanel> createState() => _BimShapeDimensionPanelState();
 }
 
 class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
   late List<String?> input;
+  late bool keypad;
   int active = 0;
   @override
   void initState() {
     super.initState();
     input = List.filled(widget.values.length, null);
+    keypad = widget.keypadInitiallyOpen;
+  }
+
+  @override
+  void didUpdateWidget(covariant BimShapeDimensionPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.values.length != widget.values.length) {
+      input = List.filled(widget.values.length, null);
+      active = 0;
+    }
   }
 
   double? value(int i) => input[i] == null
@@ -45,7 +58,13 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
       : const BimNumericRule().parse(input[i]!);
   bool valid(int i) =>
       value(i) != null && value(i)!.isFinite && value(i)! >= widget.minimum;
+  bool get canSave =>
+      widget.canSave && List.generate(input.length, valid).every((v) => v);
+
   void key(String key) => setState(() {
+    if (key == '±') {
+      input[active] ??= widget.values[active].toStringAsFixed(widget.decimals);
+    }
     input[active] = BimNumericKeypad.edit(
       input[active],
       key,
@@ -53,148 +72,232 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
     );
     if (valid(active)) widget.onChanged(active, value(active)!);
   });
+
+  KeyEventResult onKey(KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final character = event.character;
+    if (character != null && RegExp(r'^[0-9.,]$').hasMatch(character)) {
+      key(character == ',' ? '.' : character);
+      return KeyEventResult.handled;
+    }
+    if (widget.signed && (character == '-' || character == '+')) {
+      final negative = (input[active] ?? widget.values[active].toString())
+          .startsWith('-');
+      if (negative != (character == '-')) {
+        input[active] ??= widget.values[active].toStringAsFixed(
+          widget.decimals,
+        );
+        key('±');
+      }
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.backspace) {
+      key('⌫');
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      setState(
+        () => active =
+            (active +
+                (HardwareKeyboard.instance.isShiftPressed
+                    ? input.length - 1
+                    : 1)) %
+            input.length,
+      );
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      if (canSave) widget.onSave();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      widget.onCancel();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
-  Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.surfaceContainerHigh,
-    elevation: 8,
-    borderRadius: BorderRadius.circular(12),
-    child: Padding(
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme, l = context.l10n;
+    return Focus(
+      autofocus: true,
+      onKeyEvent: (_, event) => onKey(event),
+      child: Material(
+        key: const ValueKey('bim-shape-dimension-panel'),
+        color: colors.surface,
+        elevation: 1,
+        shadowColor: Colors.black12,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: colors.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              for (var i = 0; i < widget.values.length; i++)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(3),
-                    child: InkWell(
-                      key: ValueKey('shape-input-$i'),
-                      onTap: () => setState(() => active = i),
-                      child: Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: !valid(i)
-                                ? Theme.of(context).colorScheme.error
-                                : active == i
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.outline,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.labels[i],
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                                fontSize: 11,
+              Row(
+                children: [
+                  for (var i = 0; i < widget.values.length; i++)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Tooltip(
+                          message: l.bimExactDistanceInputHelp,
+                          child: InkWell(
+                            key: ValueKey('shape-input-$i'),
+                            onTap: () => setState(() {
+                              active = i;
+                              keypad = true;
+                            }),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              constraints: const BoxConstraints(minHeight: 44),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
                               ),
-                            ),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                '${input[i] ?? widget.values[i].toStringAsFixed(widget.decimals)} ${widget.unit}',
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
-                                  fontSize: 16,
+                              decoration: BoxDecoration(
+                                color: colors.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: !valid(i)
+                                      ? colors.error
+                                      : active == i
+                                      ? colors.primary
+                                      : colors.outlineVariant,
                                 ),
                               ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.labels[i],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: colors.onSurfaceVariant,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '${input[i] ?? widget.values[i].toStringAsFixed(widget.decimals)} ${widget.unit}',
+                                      style: TextStyle(
+                                        color: valid(i)
+                                            ? colors.onSurface
+                                            : colors.error,
+                                        fontSize: 18,
+                                        height: 1.15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
+                    ),
+                ],
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    key: const ValueKey('shape-keypad-toggle'),
+                    tooltip: l.bimExactDistanceInputHelp,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 44,
+                      height: 44,
+                    ),
+                    padding: EdgeInsets.zero,
+                    onPressed: () => setState(() => keypad = !keypad),
+                    icon: AppIcon(
+                      keypad ? AppIconId.expandLess : AppIconId.layoutGrid,
+                      size: 20,
+                      color: colors.primary,
+                    ),
+                  ),
+                  if (widget.signed)
+                    TextButton(
+                      key: const ValueKey('shape-sign'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(44, 44),
+                        padding: EdgeInsets.zero,
+                      ),
+                      onPressed: () => key('±'),
+                      child: const Text('±'),
+                    ),
+                  const Spacer(),
+                  Tooltip(
+                    message: l.save,
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: FilledButton(
+                        key: const ValueKey('shape-save'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: canSave ? widget.onSave : null,
+                        child: const AppIcon(AppIconId.confirm, size: 20),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    key: const ValueKey('shape-cancel'),
+                    tooltip: l.cancel,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 44,
+                      height: 44,
+                    ),
+                    padding: EdgeInsets.zero,
+                    onPressed: widget.onCancel,
+                    icon: AppIcon(
+                      AppIconId.close,
+                      size: 20,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              if (!widget.canSave)
+                Text(
+                  l.architectOperationRejected,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.error, fontSize: 11),
+                ),
+              if (keypad)
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: SingleChildScrollView(
+                    key: const ValueKey('shape-keypad-scroll'),
+                    padding: const EdgeInsets.only(top: 4),
+                    child: BimNumericKeypad(
+                      decimals: widget.decimals,
+                      keyPrefix: 'shape-key',
+                      onKey: key,
                     ),
                   ),
                 ),
             ],
           ),
-          if (widget.signed)
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.onSurface,
-              ),
-              onPressed: () => key('±'),
-              child: const Text('±'),
-            ),
-          BimNumericKeypad(
-            decimals: widget.decimals,
-            keyPrefix: 'shape-key',
-            onKey: key,
-          ),
-          if (!widget.canSave)
-            Text(
-              context.l10n.architectOperationRejected,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 11,
-              ),
-            ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                key: const ValueKey('shape-cancel'),
-                tooltip: context.l10n.cancel,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 36,
-                  height: 36,
-                ),
-                style: IconButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.error,
-                  backgroundColor: Theme.of(context).colorScheme.error.withValues(alpha: 0.12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    side: BorderSide(color: Theme.of(context).colorScheme.error, width: 1.5),
-                  ),
-                ),
-                onPressed: widget.onCancel,
-                icon: AppIcon(
-                  AppIconId.close,
-                  color: Theme.of(context).colorScheme.error,
-                  size: 20,
-                ),
-              ),
-              IconButton(
-                key: const ValueKey('shape-save'),
-                tooltip: context.l10n.save,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 36,
-                  height: 36,
-                ),
-                style: IconButton.styleFrom(
-                  foregroundColor: const Color(0xFF00E676),
-                  backgroundColor: const Color(0xFF00E676).withValues(alpha: 0.15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    side: const BorderSide(color: Color(0xFF00E676), width: 1.5),
-                  ),
-                ),
-                onPressed:
-                    widget.canSave &&
-                        List.generate(input.length, valid).every((v) => v)
-                    ? widget.onSave
-                    : null,
-                icon: const AppIcon(
-                  AppIconId.confirm,
-                  color: Color(0xFF00E676),
-                  size: 20,
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

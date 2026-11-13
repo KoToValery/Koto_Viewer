@@ -1,3 +1,4 @@
+import '../models/architect_elements.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../bim_editing/geometry/bim_transform_2d.dart';
@@ -146,6 +147,9 @@ class ArchitectRotation {
                   : e.polygon?.map(turn).toList(),
               holes: holes(e.holes),
               hatchAngle: e.hatchAngle + radians * 180 / math.pi,
+              rotationDeg: e.type == CadPrimitiveType.ellipse
+                  ? ((e.rotationDeg ?? 0) + radians * 180 / math.pi) % 360
+                  : null,
             )
           else
             e,

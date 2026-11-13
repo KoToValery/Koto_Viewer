@@ -1,3 +1,4 @@
+import '../services/architect_underlay_clip.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
@@ -183,12 +184,15 @@ class ArchitectWallSnap {
     if (magnetic && underlay != null) {
       underlay.orBuildSpatialIndex;
       segments.addAll(
-        DxfSegmentSnap.nearby(
-          document: underlay,
-          point: frame.toCad(raw),
-          radius: radius * frame.unitsPerMeter,
-          layerVisibility: visibility,
-        ).map((s) => (frame.toModel(s.$1), frame.toModel(s.$2))),
+        ArchitectUnderlayClip.segments(
+          DxfSegmentSnap.nearby(
+            document: underlay,
+            point: frame.toCad(raw),
+            radius: radius * frame.unitsPerMeter,
+            layerVisibility: visibility,
+          ).map((s) => (frame.toModel(s.$1), frame.toModel(s.$2))),
+          ArchitectUnderlayClip.of(project),
+        ),
       );
     }
     final nearby = <(Offset, Offset)>[];

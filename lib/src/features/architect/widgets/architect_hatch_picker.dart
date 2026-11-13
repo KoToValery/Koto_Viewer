@@ -131,7 +131,9 @@ class ArchitectHatchPicker extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: ArchitectHatchSample(pattern: p, color: colorValue == null ? null : Color(colorValue!),
+                  trailing: ArchitectHatchSample(
+                    pattern: p,
+                    color: colorValue == null ? null : Color(colorValue!),
                   ),
                   selected: p == value,
                   onTap: () => Navigator.pop(ctx, p),
@@ -148,7 +150,9 @@ class ArchitectHatchPicker extends StatelessWidget {
               final result = await showDialog<ArchitectHatchPattern>(
                 context: ctx,
                 builder: (_) => ArchitectHatchGenerator(
-                  initial: value == null || value!.isSolid ? ArchitectHatchPattern.diagonal : value!,
+                  initial: value == null || value!.isSolid
+                      ? ArchitectHatchPattern.diagonal
+                      : value!,
                   lineStyles: lineStyles,
                 ),
               );
@@ -199,7 +203,9 @@ class ArchitectHatchPicker extends StatelessWidget {
       ),
       trailing: value == null
           ? const Text('—')
-          : ArchitectHatchSample(pattern: value!, color: colorValue == null ? null : Color(colorValue!),
+          : ArchitectHatchSample(
+              pattern: value!,
+              color: colorValue == null ? null : Color(colorValue!),
             ),
       onTap: () => _choose(context),
     );
@@ -223,100 +229,192 @@ class ArchitectHatchEditor extends StatefulWidget {
 class ArchitectHatchGenerator extends StatefulWidget {
   final ArchitectHatchPattern initial;
   final List<ArchitectLineStyle> lineStyles;
-  const ArchitectHatchGenerator({super.key,required this.initial,this.lineStyles=const [],
+  const ArchitectHatchGenerator({
+    super.key,
+    required this.initial,
+    this.lineStyles = const [],
   });
   @override
-  State<ArchitectHatchGenerator> createState()=>_HatchGeneratorState();
+  State<ArchitectHatchGenerator> createState() => _HatchGeneratorState();
 }
 
 class _HatchGeneratorState extends State<ArchitectHatchGenerator> {
-  late final TextEditingController name=TextEditingController(
-    text:widget.initial.isPreset?'':widget.initial.name,
+  late final TextEditingController name = TextEditingController(
+    text: widget.initial.isPreset ? '' : widget.initial.name,
   );
-  List<List<Offset>> strokes=[];
-  double size=3, across=6, along=7, angle=0;
+  List<List<Offset>> strokes = [];
+  double size = 3, across = 6, along = 7, angle = 0;
   @override
   void initState() {
     super.initState();
-    final layer=widget.initial.layers.firstOrNull ?? const ArchitectHatchLayer();
-    final symbol=layer.lineStyle.symbol;
-    if(widget.initial.layers.length==1 && layer.symbolsOnly &&
-        symbol?.shape==ArchitectLineSymbolShape.custom) {
-      strokes=symbol!.strokes;size=symbol.sizeMm;
-      across=layer.spacingMm;along=symbol.spacingMm;angle=layer.angleDeg;
+    final layer =
+        widget.initial.layers.firstOrNull ?? const ArchitectHatchLayer();
+    final symbol = layer.lineStyle.symbol;
+    if (widget.initial.layers.length == 1 &&
+        layer.symbolsOnly &&
+        symbol?.shape == ArchitectLineSymbolShape.custom) {
+      strokes = symbol!.strokes;
+      size = symbol.sizeMm;
+      across = layer.spacingMm;
+      along = symbol.spacingMm;
+      angle = layer.angleDeg;
     }
   }
+
   @override
-  void dispose(){name.dispose();super.dispose();}
-  ArchitectHatchPattern pattern({String id='preview'})=>ArchitectHatchPattern(
-    id:id,name:name.text.trim().isEmpty?'_':name.text.trim(),layers:[
-      ArchitectHatchLayer(angleDeg:angle,spacingMm:across,symbolsOnly:true,
-        lineStyle:ArchitectLineStyle(id:'$id-motif',name:'_',segmentsMm:[],
-          symbol:ArchitectLineSymbol(shape:ArchitectLineSymbolShape.custom,
-            strokes:strokes,sizeMm:size,spacingMm:along,clearLine:false,
+  void dispose() {
+    name.dispose();
+    super.dispose();
+  }
+
+  ArchitectHatchPattern pattern({String id = 'preview'}) =>
+      ArchitectHatchPattern(
+        id: id,
+        name: name.text.trim().isEmpty ? '_' : name.text.trim(),
+        layers: [
+          ArchitectHatchLayer(
+            angleDeg: angle,
+            spacingMm: across,
+            symbolsOnly: true,
+            lineStyle: ArchitectLineStyle(
+              id: '$id-motif',
+              name: '_',
+              segmentsMm: [],
+              symbol: ArchitectLineSymbol(
+                shape: ArchitectLineSymbolShape.custom,
+                strokes: strokes,
+                sizeMm: size,
+                spacingMm: along,
+                clearLine: false,
               ),
             ),
           ),
-    ],
+        ],
       );
-  Widget slider(String label,double value,double min,double max,ValueChanged<double> change,
-  )=>
-    Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Text('$label: ${value.toStringAsFixed(1)}${max==180?'°':' mm'}'),
-      Slider(value:value.clamp(min,max),min:min,max:max,onChanged:(v)=>setState(()=>change(v)),
+  Widget slider(
+    String label,
+    double value,
+    double min,
+    double max,
+    ValueChanged<double> change,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('$label: ${value.toStringAsFixed(1)}${max == 180 ? '°' : ' mm'}'),
+      Slider(
+        value: value.clamp(min, max),
+        min: min,
+        max: max,
+        onChanged: (v) => setState(() => change(v)),
       ),
     ],
   );
   @override
   Widget build(BuildContext context) {
-    final l=context.l10n;
-    return architectAlertDialog(title:Text(l.architectHatchGenerator),content:SizedBox(width:320,
-      child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
-        TextField(key:const ValueKey('hatch-generator-name'),controller:name,
-          decoration:InputDecoration(labelText:l.architectPropertyName),onChanged:(_)=>setState((){}),
+    final l = context.l10n;
+    return architectAlertDialog(
+      title: Text(l.architectHatchGenerator),
+      content: SizedBox(
+        width: 320,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                key: const ValueKey('hatch-generator-name'),
+                controller: name,
+                decoration: InputDecoration(labelText: l.architectPropertyName),
+                onChanged: (_) => setState(() {}),
               ),
-        const SizedBox(height:8),Text(l.architectHatchGeneratorHint),
-        TextButton.icon(key:const ValueKey('hatch-generator-draw'),icon:const AppIcon(AppIconId.polyline),
-          label:Text(l.architectLineSymbolCustom),onPressed:() async {
-            final result=await showDialog<List<List<Offset>>>(context:context,
-              builder:(_)=>ArchitectLineSymbolSketch(initial:strokes,tilePreview:true,
-                previewSizeMm:size,previewSpacingMm:along,previewRowSpacingMm:across,previewAngleDeg:angle,
+              const SizedBox(height: 8),
+              Text(l.architectHatchGeneratorHint),
+              TextButton.icon(
+                key: const ValueKey('hatch-generator-draw'),
+                icon: const AppIcon(AppIconId.polyline),
+                label: Text(l.architectLineSymbolCustom),
+                onPressed: () async {
+                  final result = await showDialog<List<List<Offset>>>(
+                    context: context,
+                    builder: (_) => ArchitectLineSymbolSketch(
+                      initial: strokes,
+                      tilePreview: true,
+                      previewSizeMm: size,
+                      previewSpacingMm: along,
+                      previewRowSpacingMm: across,
+                      previewAngleDeg: angle,
                     ),
                   );
-            if(result!=null && mounted) setState(()=>strokes=result);
-          },
+                  if (result != null && mounted)
+                    setState(() => strokes = result);
+                },
               ),
-        if(strokes.isNotEmpty) ...[
-          LayoutBuilder(builder:(_,c)=>ArchitectHatchSample(pattern:pattern(),width:c.maxWidth,height:130,
+              if (strokes.isNotEmpty) ...[
+                LayoutBuilder(
+                  builder: (_, c) => ArchitectHatchSample(
+                    pattern: pattern(),
+                    width: c.maxWidth,
+                    height: 130,
                   ),
                 ),
-          slider(l.architectPropertySize,size,.5,20,(v){size=v;if(along<size*1.5)along=size*1.5;}),
-          slider(l.architectLineSymbolSpacing,along,size*1.5,100,(v)=>along=v,
+                slider(l.architectPropertySize, size, .5, 20, (v) {
+                  size = v;
+                  if (along < size * 1.5) along = size * 1.5;
+                }),
+                slider(
+                  l.architectLineSymbolSpacing,
+                  along,
+                  size * 1.5,
+                  100,
+                  (v) => along = v,
                 ),
-          slider(l.architectHatchSpacing,across,.5,100,(v)=>across=v,
+                slider(
+                  l.architectHatchSpacing,
+                  across,
+                  .5,
+                  100,
+                  (v) => across = v,
                 ),
-          slider(l.architectPropertyAngle,angle,-180,180,(v)=>angle=v,
+                slider(
+                  l.architectPropertyAngle,
+                  angle,
+                  -180,
+                  180,
+                  (v) => angle = v,
                 ),
-        ],
-        TextButton.icon(icon:const AppIcon(AppIconId.properties),label:Text(l.architectLineSymbolSettings),
-          onPressed:() async {
-            final result=await showDialog<ArchitectHatchPattern>(context:context,
-              builder:(_)=>ArchitectHatchEditor(initial:widget.initial,lineStyles:widget.lineStyles,
+              ],
+              TextButton.icon(
+                icon: const AppIcon(AppIconId.properties),
+                label: Text(l.architectLineSymbolSettings),
+                onPressed: () async {
+                  final result = await showDialog<ArchitectHatchPattern>(
+                    context: context,
+                    builder: (_) => ArchitectHatchEditor(
+                      initial: widget.initial,
+                      lineStyles: widget.lineStyles,
                     ),
                   );
-            if(result!=null && context.mounted) Navigator.pop(context,result);
-          },
+                  if (result != null && context.mounted)
+                    Navigator.pop(context, result);
+                },
               ),
-      ],
+            ],
           ),
         ),
-      ),actions:[
-        TextButton(onPressed:()=>Navigator.pop(context),child:Text(l.cancel),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
         ),
-        FilledButton(key:const ValueKey('hatch-generator-save'),
-          onPressed:strokes.isEmpty||name.text.trim().isEmpty?null:()=>Navigator.pop(context,
-            pattern(id:'hatch-${DateTime.now().microsecondsSinceEpoch}'),
-                ),child:Text(l.save),
+        FilledButton(
+          key: const ValueKey('hatch-generator-save'),
+          onPressed: strokes.isEmpty || name.text.trim().isEmpty
+              ? null
+              : () => Navigator.pop(
+                  context,
+                  pattern(id: 'hatch-${DateTime.now().microsecondsSinceEpoch}'),
+                ),
+          child: Text(l.save),
         ),
       ],
     );
@@ -334,8 +432,6 @@ class ArchitectHatchDraftBar extends StatelessWidget {
   final ValueChanged<bool>? onAutomaticChanged;
   final ArchitectDrawingColor color;
   final ValueChanged<ArchitectDrawingColor>? onColorChanged;
-  final bool precisionMode;
-  final VoidCallback? onPrecisionToggle;
   const ArchitectHatchDraftBar({
     super.key,
     required this.pattern,
@@ -350,16 +446,18 @@ class ArchitectHatchDraftBar extends StatelessWidget {
     this.onAutomaticChanged,
     this.color = ArchitectDrawingColor.ink,
     this.onColorChanged,
-    this.precisionMode = false,
-    this.onPrecisionToggle,
   });
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
     return Theme(
-      data: ThemeData.dark().copyWith(iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(
-        minimumSize: const Size(40, 40), maximumSize: const Size(40, 40), padding: const EdgeInsets.all(8),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      data: ThemeData.dark().copyWith(
+        iconButtonTheme: IconButtonThemeData(
+          style: IconButton.styleFrom(
+            minimumSize: const Size(40, 40),
+            maximumSize: const Size(40, 40),
+            padding: const EdgeInsets.all(8),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ),
       ),
@@ -384,17 +482,6 @@ class ArchitectHatchDraftBar extends StatelessWidget {
                 icon: const AppIcon(AppIconId.polyline, size: 20),
                 onPressed: () => onAutomaticChanged!(false),
               ),
-              IconButton(
-                key: const ValueKey('hatch-dimension-mode'),
-                tooltip: l.architectWallLength,
-                isSelected: precisionMode,
-                icon: AppIcon(
-                  AppIconId.measure,
-                  size: 20,
-                  color: precisionMode ? Colors.cyanAccent : Colors.white70,
-                ),
-                onPressed: onPrecisionToggle,
-              ),
             ],
             ArchitectHatchPicker(
               key: const ValueKey('architect-draft-hatch'),
@@ -405,9 +492,12 @@ class ArchitectHatchDraftBar extends StatelessWidget {
               lineStyles: lineStyles,
               onChanged: onChanged,
             ),
-            if (onColorChanged != null) ArchitectDrawingColorPicker(
-              key: const ValueKey('architect-draft-hatch-color'), value: color,
-              compact: true, onChanged: onColorChanged!,
+            if (onColorChanged != null)
+              ArchitectDrawingColorPicker(
+                key: const ValueKey('architect-draft-hatch-color'),
+                value: color,
+                compact: true,
+                onChanged: onColorChanged!,
               ),
             if (pointCount > 0) ...[
               IconButton(
@@ -430,11 +520,15 @@ class ArchitectHatchDraftBar extends StatelessWidget {
               ),
             ] else
               Tooltip(
-                message: automatic ? l.architectHatchAutoHint : l.architectHatchDrawHint,
+                message: automatic
+                    ? l.architectHatchAutoHint
+                    : l.architectHatchDrawHint,
                 child: Padding(
                   padding: EdgeInsets.only(right: 12),
                   child: AppIcon.fromMaterial(
-                    automatic ? Icons.format_color_fill : Icons.polyline_outlined,
+                    automatic
+                        ? Icons.format_color_fill
+                        : Icons.polyline_outlined,
                     color: Colors.white70,
                     size: 20,
                   ),
@@ -456,7 +550,10 @@ class _ArchitectHatchEditorState extends State<ArchitectHatchEditor> {
     _name = TextEditingController(
       text: widget.initial.isPreset ? '' : widget.initial.name,
     );
-    _layers = List.of(widget.initial.isSolid ? ArchitectHatchPattern.diagonal.layers : widget.initial.layers,
+    _layers = List.of(
+      widget.initial.isSolid
+          ? ArchitectHatchPattern.diagonal.layers
+          : widget.initial.layers,
     );
   }
 

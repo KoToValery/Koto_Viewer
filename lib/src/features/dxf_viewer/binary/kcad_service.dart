@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../core/services/dwg_converter_service.dart';
 import '../models/dxf_models.dart';
 import 'kcad_reader.dart';
 import 'kcad_writer.dart';
@@ -24,49 +26,48 @@ class KcadService {
 
   /// Returns the corresponding `.kcad` cache file path.
   /// If [originalFile] is provided (e.g. the original DWG before conversion to DXF),
-  /// the cache is keyed to the original file's size and modification time for 100% stable caching!
-  static Future<String> getCachePath(File sourceFile, {File? originalFile}) async {
-    final effectiveSource = (originalFile != null && await originalFile.exists())
+  /// the cache is keyed to its content, so equal names and timestamps cannot collide.
+  static Future<String> getCachePath(
+    File sourceFile, {
+    File? originalFile,
+  }) async {
+    final effectiveSource =
+        (originalFile != null && await originalFile.exists())
         ? originalFile
         : sourceFile;
 
-    final stat = await effectiveSource.stat();
+    final fingerprint = (await sha256.bind(effectiveSource.openRead()).first)
+        .toString();
+    final converterVersion = effectiveSource.path.toLowerCase().endsWith('.dwg')
+        ? '_c${DwgConverterService.cacheVersion}'
+        : '';
     Directory tempDir;
     try {
       tempDir = await getTemporaryDirectory();
     } catch (_) {
       tempDir = Directory.systemTemp;
     }
-    final cacheDir = Directory('${tempDir.path}${Platform.pathSeparator}$_cacheFolder');
+    final cacheDir = Directory(
+      '${tempDir.path}${Platform.pathSeparator}$_cacheFolder',
+    );
     if (!await cacheDir.exists()) {
       await cacheDir.create(recursive: true);
     }
 
-    final fileName = effectiveSource.path.split(RegExp(r'[/\\]')).last;
-    final baseName = fileName.contains('.')
-        ? fileName.substring(0, fileName.lastIndexOf('.'))
-        : fileName;
-
-    // If sourceFile is an internal converted DXF from DwgConverterService (e.g. +9.30 (OVK)_7275639_1790145006000_v6.dxf),
-    // its filename already encodes the source DWG size and mtime!
-    // Storing it as companion .kcad prevents double-hashing ephemeral DXF timestamps!
-    if (originalFile == null &&
-        sourceFile.path.toLowerCase().endsWith('.dxf') &&
-        RegExp(r'_\d+_\d+_v\d+$', caseSensitive: false).hasMatch(baseName)) {
-      final cleanBase = baseName.replaceAll(RegExp(r'_v\d+$', caseSensitive: false), '');
-      return '${cacheDir.path}${Platform.pathSeparator}$cleanBase$_kcadVersion.kcad';
-    }
-
-    final cachedFileName =
-        '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}$_kcadVersion.kcad';
-    return '${cacheDir.path}${Platform.pathSeparator}$cachedFileName';
+    return '${cacheDir.path}${Platform.pathSeparator}$fingerprint$converterVersion$_kcadVersion.kcad';
   }
 
   /// Attempts to load a pre-compiled `.kcad` cache file for [sourceFile] / [originalFile].
   /// Returns null if no valid cache exists or if it's corrupted/outdated.
-  static Future<DxfDocument?> tryLoadCachedKcad(File sourceFile, {File? originalFile}) async {
+  static Future<DxfDocument?> tryLoadCachedKcad(
+    File sourceFile, {
+    File? originalFile,
+  }) async {
     try {
-      final cachePath = await getCachePath(sourceFile, originalFile: originalFile);
+      final cachePath = await getCachePath(
+        sourceFile,
+        originalFile: originalFile,
+      );
       final cacheFile = File(cachePath);
       if (!await cacheFile.exists()) {
         return null;
@@ -89,7 +90,9 @@ class KcadService {
         }
         final version = headerBytes[4] | (headerBytes[5] << 8);
         if (version != KcadWriter.currentVersion) {
-          debugPrint('KcadService: Stale cache version $version != ${KcadWriter.currentVersion}, invalidating.');
+          debugPrint(
+            'KcadService: Stale cache version $version != ${KcadWriter.currentVersion}, invalidating.',
+          );
           return null; // Stale version, fast fail without isolate cost!
         }
       } finally {
@@ -100,7 +103,9 @@ class KcadService {
       final bytes = await cacheFile.readAsBytes();
       final doc = await compute(_kcadReadIsolate, bytes);
       sw.stop();
-      debugPrint('KcadService: Loaded binary cache in ${sw.elapsedMilliseconds} ms (${doc.entities.length} entities) -> $cachePath');
+      debugPrint(
+        'KcadService: Loaded binary cache in ${sw.elapsedMilliseconds} ms (${doc.entities.length} entities) -> $cachePath',
+      );
       return doc;
     } catch (e, stack) {
       debugPrint('KcadService: Cache hit failed or corrupted: $e\n$stack');
@@ -117,18 +122,50 @@ class KcadService {
   }) async {
     File? tmpFile;
     try {
-      final cachePath = await getCachePath(sourceFile, originalFile: originalFile);
+      // Capture before hashing yields: callers may filter their mutable view.
+      final snapshot = DxfDocument(
+        layers: {
+          for (final e in document.layers.entries) e.key: e.value.copyWith(),
+        },
+        entities: List.of(document.entities),
+        blocks: {
+          for (final e in document.blocks.entries)
+            e.key: DxfBlock(
+              name: e.value.name,
+              basePoint: e.value.basePoint,
+              entities: List.of(e.value.entities),
+            ),
+        },
+        headerVars: Map.of(document.headerVars),
+        textStyles: document.textStyles,
+        bounds: document.bounds,
+        entityStats: document.entityStats,
+        lineTypes: document.lineTypes,
+        dimStyles: document.dimStyles,
+        layouts: List.of(document.layouts),
+        layoutEntities: {
+          for (final e in document.layoutEntities.entries)
+            e.key: List.of(e.value),
+        },
+        layoutBounds: document.layoutBounds,
+      );
+      final cachePath = await getCachePath(
+        sourceFile,
+        originalFile: originalFile,
+      );
       final cacheFile = File(cachePath);
       final tmpPath = '$cachePath.tmp_${DateTime.now().microsecondsSinceEpoch}';
       tmpFile = File(tmpPath);
 
-      final safeDoc = document.toIsolateSafe();
+      final safeDoc = snapshot.toIsolateSafe();
       final bytes = await compute(_kcadWriteIsolate, safeDoc);
       await tmpFile.writeAsBytes(bytes, flush: true);
 
       // Atomic rename on the same filesystem
       await tmpFile.rename(cacheFile.path);
-      debugPrint('KcadService: Saved binary cache (${(bytes.length / 1024 / 1024).toStringAsFixed(2)} MB) -> $cachePath');
+      debugPrint(
+        'KcadService: Saved binary cache (${(bytes.length / 1024 / 1024).toStringAsFixed(2)} MB) -> $cachePath',
+      );
 
       // Eviction: Clean up any older/stale .kcad files for this base drawing
       _evictStaleKcadFiles(cacheFile);
@@ -142,12 +179,15 @@ class KcadService {
     }
   }
 
-  /// Evicts older .kcad cache files for the same drawing base name.
+  /// Evicts old binary versions of the same content and conversion revision.
   static void _evictStaleKcadFiles(File currentCacheFile) {
     try {
       final parentDir = currentCacheFile.parent;
       final currentName = currentCacheFile.path.split(RegExp(r'[/\\]')).last;
-      final match = RegExp(r'^(.*)_\d+_\d+_v\d+\.kcad$', caseSensitive: false).firstMatch(currentName);
+      final match = RegExp(
+        r'^([a-f0-9]{64}(?:_c\d+)?)_v\d+\.kcad$',
+        caseSensitive: false,
+      ).firstMatch(currentName);
       if (match == null) return;
       final basePrefix = '${match.group(1)}_';
 
@@ -157,7 +197,9 @@ class KcadService {
           if (name != currentName && name.startsWith(basePrefix)) {
             try {
               entity.deleteSync();
-              debugPrint('KcadService: Evicted stale cache version -> ${entity.path}');
+              debugPrint(
+                'KcadService: Evicted stale cache version -> ${entity.path}',
+              );
             } catch (_) {}
           }
         }
@@ -173,12 +215,17 @@ class KcadService {
     final bytes = await file.readAsBytes();
     final doc = await compute(_kcadReadIsolate, bytes);
     sw.stop();
-    debugPrint('KcadService: Loaded binary file in ${sw.elapsedMilliseconds} ms (${doc.entities.length} entities) -> ${file.path}');
+    debugPrint(
+      'KcadService: Loaded binary file in ${sw.elapsedMilliseconds} ms (${doc.entities.length} entities) -> ${file.path}',
+    );
     return doc;
   }
 
   /// Exports [document] directly to a standalone `.kcad` file at [outputPath].
-  static Future<void> exportKcadFile(DxfDocument document, String outputPath) async {
+  static Future<void> exportKcadFile(
+    DxfDocument document,
+    String outputPath,
+  ) async {
     final safeDoc = document.toIsolateSafe();
     final bytes = await compute(_kcadWriteIsolate, safeDoc);
     final file = File(outputPath);

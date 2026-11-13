@@ -95,9 +95,13 @@ class ArchitectUnderlayPainter extends CustomPainter {
         (geodeticContours.isNotEmpty || geodeticPoints.isNotEmpty);
     final hasCalibration = calibrationP1 != null || calibrationCursor != null;
     final hasMaskDraft =
-        isMaskDrafting && maskDraftPoints != null && maskDraftPoints!.isNotEmpty;
+        isMaskDrafting &&
+        maskDraftPoints != null &&
+        maskDraftPoints!.isNotEmpty;
     final hasGhostCad =
-        isPlacingCadUnderlay && ghostCadDocument != null && ghostCadFrame != null;
+        isPlacingCadUnderlay &&
+        ghostCadDocument != null &&
+        ghostCadFrame != null;
 
     if (!hasCad &&
         !hasRaster &&
@@ -164,7 +168,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
           ..filterQuality = FilterQuality.medium;
         canvas.drawImageRect(img, srcRect, dstRect, imgPaint);
 
-        if (raster.id == selectedRasterId) {
+        if (raster.id == selectedRasterId && !raster.hasActiveMask) {
           final borderPaint = Paint()
             ..color = const Color(0xFF0288D1)
             ..style = PaintingStyle.stroke
@@ -457,7 +461,8 @@ class ArchitectUnderlayPainter extends CustomPainter {
           viewport.scale >= 6.0 &&
           contour.points.length >= 2) {
         final midIdx = contour.points.length ~/ 2;
-        final pA = contour.points[(midIdx - 1).clamp(0, contour.points.length - 1)];
+        final pA =
+            contour.points[(midIdx - 1).clamp(0, contour.points.length - 1)];
         final pB = contour.points[midIdx];
         final mid = Offset((pA.dx + pB.dx) * 0.5, (pA.dy + pB.dy) * 0.5);
         var angle = math.atan2(pB.dy - pA.dy, pB.dx - pA.dx);
@@ -571,10 +576,15 @@ class ArchitectUnderlayPainter extends CustomPainter {
           .where((r) => r.id == selectedRasterId)
           .firstOrNull;
       final img = raster != null ? rasterImages[raster.id] : null;
-      if (raster != null && img != null && raster.containsLocalPoint(cursorModel)) {
+      if (raster != null &&
+          img != null &&
+          raster.containsLocalPoint(cursorModel)) {
         final px = raster.localToPixel(cursorModel);
         const loupeRadius = 54.0;
-        final loupeCenter = Offset(size.width - loupeRadius - 20, loupeRadius + 68);
+        final loupeCenter = Offset(
+          size.width - loupeRadius - 20,
+          loupeRadius + 68,
+        );
         const sampleHalfPx = 28.0;
         final srcRect = Rect.fromLTRB(
           (px.dx - sampleHalfPx).clamp(0.0, img.width.toDouble()),
@@ -673,30 +683,20 @@ class ArchitectUnderlayPainter extends CustomPainter {
 
     final double dashWidth = 6.0 / viewport.scale;
     final double dashSpace = 4.0 / viewport.scale;
-    _drawDashedRect(canvas, modelBounds, borderPaint, dashWidth, dashSpace);
-
-    final handlePaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..style = PaintingStyle.fill;
-    final handleStroke = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 / viewport.scale;
-
-    final double hSize = 7.0 / viewport.scale;
-    final corners = [
-      modelBounds.topLeft,
-      modelBounds.topRight,
-      modelBounds.bottomRight,
-      modelBounds.bottomLeft,
-    ];
-    for (final c in corners) {
-      final r = Rect.fromCenter(center: c, width: hSize, height: hSize);
-      canvas.drawRect(r, handlePaint);
-      canvas.drawRect(r, handleStroke);
+    if (cadConfig?.hasActiveMask != true) {
+      _drawDashedRect(canvas, modelBounds, borderPaint, dashWidth, dashSpace);
     }
+    // The crop overlay owns the actual edge grips. Do not draw inert source
+    // corners or a full-source frame outside the visible crop.
 
     final originModel = frame.toModel(Offset.zero);
+    if (cadConfig?.hasActiveMask == true &&
+        !(Path()..addPolygon(cadConfig!.maskPolygon!, true)).contains(
+          originModel,
+        )) {
+      canvas.restore();
+      return;
+    }
     final originPaint = Paint()
       ..color = const Color(0xFFFFB300)
       ..style = PaintingStyle.stroke
@@ -722,17 +722,31 @@ class ArchitectUnderlayPainter extends CustomPainter {
     canvas.translate(viewport.translation.dx, viewport.translation.dy);
     canvas.scale(viewport.scale);
 
-    if (!isDragPickingBase && ghostRasterPosition != null && draggingRasterId != null) {
+    if (!isDragPickingBase &&
+        ghostRasterPosition != null &&
+        draggingRasterId != null) {
       final img = rasterImages[draggingRasterId];
-      final raster = rasterUnderlays.where((r) => r.id == draggingRasterId).firstOrNull;
+      final raster = rasterUnderlays
+          .where((r) => r.id == draggingRasterId)
+          .firstOrNull;
       if (img != null && raster != null) {
         canvas.save();
         canvas.translate(ghostRasterPosition!.dx, ghostRasterPosition!.dy);
         if (raster.rotationRad.abs() > 1e-7) {
           canvas.rotate(raster.rotationRad);
         }
-        final srcRect = Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
-        final dstRect = Rect.fromLTWH(0, 0, raster.widthMeters, raster.heightMeters);
+        final srcRect = Rect.fromLTWH(
+          0,
+          0,
+          img.width.toDouble(),
+          img.height.toDouble(),
+        );
+        final dstRect = Rect.fromLTWH(
+          0,
+          0,
+          raster.widthMeters,
+          raster.heightMeters,
+        );
         final imgPaint = Paint()
           ..color = const Color.fromRGBO(255, 255, 255, 0.45)
           ..filterQuality = FilterQuality.low;
@@ -768,14 +782,20 @@ class ArchitectUnderlayPainter extends CustomPainter {
 
       canvas.drawCircle(pt, 9.0 / viewport.scale, fillPaint);
       canvas.drawCircle(pt, 9.0 / viewport.scale, ringPaint);
-      canvas.drawCircle(pt, 2.0 / viewport.scale, Paint()..color = Colors.white);
+      canvas.drawCircle(
+        pt,
+        2.0 / viewport.scale,
+        Paint()..color = Colors.white,
+      );
 
       if (dragIsSnapped && dragSnapLabel != null) {
         _drawBadge(canvas, pt, dragSnapLabel!, const Color(0xFF00E5FF));
       }
     }
 
-    if (!isDragPickingBase && dragBasePoint != null && dragCurrentPoint != null) {
+    if (!isDragPickingBase &&
+        dragBasePoint != null &&
+        dragCurrentPoint != null) {
       final base = dragBasePoint!;
       final target = dragCurrentPoint!;
 
@@ -794,18 +814,30 @@ class ArchitectUnderlayPainter extends CustomPainter {
         ..style = PaintingStyle.fill;
       canvas.drawCircle(base, 8.0 / viewport.scale, anchorFill);
       canvas.drawCircle(base, 8.0 / viewport.scale, anchorOuter);
-      canvas.drawCircle(base, 2.5 / viewport.scale, Paint()..color = Colors.white);
+      canvas.drawCircle(
+        base,
+        2.5 / viewport.scale,
+        Paint()..color = Colors.white,
+      );
 
       final targetRing = Paint()
-        ..color = dragIsSnapped ? const Color(0xFF00E676) : const Color(0xFF00E5FF)
+        ..color = dragIsSnapped
+            ? const Color(0xFF00E676)
+            : const Color(0xFF00E5FF)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.2 / viewport.scale;
       final targetGlow = Paint()
-        ..color = (dragIsSnapped ? const Color(0xFF00E676) : const Color(0xFF00E5FF)).withValues(alpha: 0.25)
+        ..color =
+            (dragIsSnapped ? const Color(0xFF00E676) : const Color(0xFF00E5FF))
+                .withValues(alpha: 0.25)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(target, 10.0 / viewport.scale, targetGlow);
       canvas.drawCircle(target, 10.0 / viewport.scale, targetRing);
-      canvas.drawCircle(target, 2.5 / viewport.scale, Paint()..color = Colors.white);
+      canvas.drawCircle(
+        target,
+        2.5 / viewport.scale,
+        Paint()..color = Colors.white,
+      );
 
       if (dragIsSnapped && dragSnapLabel != null) {
         _drawBadge(canvas, target, dragSnapLabel!, const Color(0xFF00E676));
@@ -814,21 +846,63 @@ class ArchitectUnderlayPainter extends CustomPainter {
       final mid = Offset((base.dx + target.dx) / 2, (base.dy + target.dy) / 2);
       final dist = dragDistanceMeters ?? (target - base).distance;
       final deg = dragAngleDeg ?? 0.0;
-      final distText = 'L=${dist.toStringAsFixed(2)}m  ${deg.toStringAsFixed(0)}°';
+      final distText =
+          'L=${dist.toStringAsFixed(2)}m  ${deg.toStringAsFixed(0)}°';
       _drawBadge(canvas, mid, distText, const Color(0xFFFFB300));
     }
 
     canvas.restore();
   }
 
-  void _drawDashedRect(Canvas canvas, Rect rect, Paint paint, double dashWidth, double dashSpace) {
-    _drawDashedLine(canvas, rect.topLeft, rect.topRight, paint, dashWidth, dashSpace);
-    _drawDashedLine(canvas, rect.topRight, rect.bottomRight, paint, dashWidth, dashSpace);
-    _drawDashedLine(canvas, rect.bottomRight, rect.bottomLeft, paint, dashWidth, dashSpace);
-    _drawDashedLine(canvas, rect.bottomLeft, rect.topLeft, paint, dashWidth, dashSpace);
+  void _drawDashedRect(
+    Canvas canvas,
+    Rect rect,
+    Paint paint,
+    double dashWidth,
+    double dashSpace,
+  ) {
+    _drawDashedLine(
+      canvas,
+      rect.topLeft,
+      rect.topRight,
+      paint,
+      dashWidth,
+      dashSpace,
+    );
+    _drawDashedLine(
+      canvas,
+      rect.topRight,
+      rect.bottomRight,
+      paint,
+      dashWidth,
+      dashSpace,
+    );
+    _drawDashedLine(
+      canvas,
+      rect.bottomRight,
+      rect.bottomLeft,
+      paint,
+      dashWidth,
+      dashSpace,
+    );
+    _drawDashedLine(
+      canvas,
+      rect.bottomLeft,
+      rect.topLeft,
+      paint,
+      dashWidth,
+      dashSpace,
+    );
   }
 
-  void _drawDashedLine(Canvas canvas, Offset p1, Offset p2, Paint paint, double dashWidth, double dashSpace) {
+  void _drawDashedLine(
+    Canvas canvas,
+    Offset p1,
+    Offset p2,
+    Paint paint,
+    double dashWidth,
+    double dashSpace,
+  ) {
     final double dx = p2.dx - p1.dx;
     final double dy = p2.dy - p1.dy;
     final double dist = math.sqrt(dx * dx + dy * dy);
@@ -847,7 +921,12 @@ class ArchitectUnderlayPainter extends CustomPainter {
     }
   }
 
-  void _drawBadge(Canvas canvas, Offset modelPoint, String text, Color accentColor) {
+  void _drawBadge(
+    Canvas canvas,
+    Offset modelPoint,
+    String text,
+    Color accentColor,
+  ) {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
@@ -879,7 +958,10 @@ class ArchitectUnderlayPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0 / viewport.scale;
 
-    final rrect = RRect.fromRectAndRadius(badgeRect, Radius.circular(3.0 / viewport.scale));
+    final rrect = RRect.fromRectAndRadius(
+      badgeRect,
+      Radius.circular(3.0 / viewport.scale),
+    );
     canvas.drawRRect(rrect, bgPaint);
     canvas.drawRRect(rrect, borderPaint);
 

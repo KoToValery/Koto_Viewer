@@ -1,3 +1,4 @@
+import '../services/architect_ellipse_geometry.dart';
 import '../services/architect_spline_geometry.dart';
 import 'architect_annotation_layout.dart';
 import 'architect_line_presentation.dart';
@@ -146,9 +147,11 @@ class ArchitectElementsPainterHelper {
               ..style = PaintingStyle.stroke)
           : slabBorderPaint;
 
-      final path = ArchitectContour.path(slab.polygon,
-          ArchitectSlabGeometry.holes(storey, slab, project: project),
-          bulges: slab.bulges);
+      final path = ArchitectContour.path(
+        slab.polygon,
+        ArchitectSlabGeometry.holes(storey, slab, project: project),
+        bulges: slab.bulges,
+      );
 
       if (isSelected) canvas.drawPath(path, slabFillPaint);
       canvas.drawPath(path, border);
@@ -312,35 +315,63 @@ class ArchitectElementsPainterHelper {
   }) {
     final borderPaint = Paint()
       ..color = palette.foreground(ArchitectPaperStyle.ink)
-      ..strokeWidth = ArchitectLinePresentation.stroke(zoomScale, .25,
-          pixels: 1.2, canvas: canvas)
+      ..strokeWidth = ArchitectLinePresentation.stroke(
+        zoomScale,
+        .25,
+        pixels: 1.2,
+        canvas: canvas,
+      )
       ..style = PaintingStyle.stroke;
     final markPaint = Paint()
       ..color = palette.foreground(ArchitectPaperStyle.rule)
-      ..strokeWidth = ArchitectLinePresentation.stroke(zoomScale, .13,
-          pixels: .65, canvas: canvas)
+      ..strokeWidth = ArchitectLinePresentation.stroke(
+        zoomScale,
+        .13,
+        pixels: .65,
+        canvas: canvas,
+      )
       ..style = PaintingStyle.stroke;
     for (final opening in storey.openings) {
       if (opening.boundary.length < 3) continue;
       architectDrawingSources(canvas, {opening.id}, 'openings');
       final path = Path()..addPolygon(opening.boundary, true);
       final selected = opening.id == selectedElementId;
-      canvas.drawPath(path, Paint()..color =
-          ArchitectLinePresentation.paper(canvas) ? Colors.white : palette.background);
-      canvas.drawPath(path, selected
-          ? (Paint()..color = const Color(0xff00e5ff)
-              ..style = PaintingStyle.stroke..strokeWidth = 2 / zoomScale)
-          : borderPaint);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = ArchitectLinePresentation.paper(canvas)
+              ? Colors.white
+              : palette.background,
+      );
+      canvas.drawPath(
+        path,
+        selected
+            ? (Paint()
+                ..color = const Color(0xff00e5ff)
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 2 / zoomScale)
+            : borderPaint,
+      );
       final bounds = path.getBounds();
       canvas.save();
       canvas.clipPath(path);
       if (opening.type == OpeningType.circular) {
         final center = bounds.center;
         final r = math.min(bounds.width, bounds.height) * .18;
-        canvas.drawLine(center - Offset(r, 0), center + Offset(r, 0), markPaint);
-        canvas.drawLine(center - Offset(0, r), center + Offset(0, r), markPaint);
+        canvas.drawLine(
+          center - Offset(r, 0),
+          center + Offset(r, 0),
+          markPaint,
+        );
+        canvas.drawLine(
+          center - Offset(0, r),
+          center + Offset(0, r),
+          markPaint,
+        );
       } else {
-        final inset = bounds.deflate(math.min(bounds.width, bounds.height) * .12);
+        final inset = bounds.deflate(
+          math.min(bounds.width, bounds.height) * .12,
+        );
         canvas.drawLine(inset.topLeft, inset.bottomRight, markPaint);
         canvas.drawLine(inset.topRight, inset.bottomLeft, markPaint);
       }
@@ -776,7 +807,9 @@ class ArchitectElementsPainterHelper {
         final landingPt = ann.leaderLandingPoint ?? ann.position;
         final leaderVec = landingPt - arrowPt;
         final leaderDist = leaderVec.distance;
-        final unitDir = leaderDist > 1e-4 ? leaderVec / leaderDist : const Offset(1, 0);
+        final unitDir = leaderDist > 1e-4
+            ? leaderVec / leaderDist
+            : const Offset(1, 0);
 
         final leaderPaint = Paint()
           ..color = textPaintColor
@@ -799,16 +832,15 @@ class ArchitectElementsPainterHelper {
         );
 
         // Horizontal shoulder line
-        final shoulderLen = (ann.leaderLandingLength.clamp(0.4, 3.0) * 12.0) / zoomScale;
+        final shoulderLen =
+            (ann.leaderLandingLength.clamp(0.4, 3.0) * 12.0) / zoomScale;
         final textOnRight = ann.position.dx >= landingPt.dx;
-        final shoulderEnd = landingPt + Offset(textOnRight ? shoulderLen : -shoulderLen, 0);
+        final shoulderEnd =
+            landingPt + Offset(textOnRight ? shoulderLen : -shoulderLen, 0);
         canvas.drawLine(landingPt, shoulderEnd, leaderPaint);
       }
 
-      final tp = ArchitectAnnotationLayout.painter(
-        ann,
-        color: textPaintColor,
-      );
+      final tp = ArchitectAnnotationLayout.painter(ann, color: textPaintColor);
       canvas.save();
       canvas.translate(ann.position.dx, ann.position.dy);
       canvas.rotate(ann.rotationDeg * math.pi / 180);
@@ -857,7 +889,11 @@ class ArchitectElementsPainterHelper {
         ..style = PaintingStyle.stroke;
 
       if (prim.type == CadPrimitiveType.mask) {
-        final boundary = ArchitectContour.path(prim.polygonCorners, prim.holes, bulges: prim.bulges);
+        final boundary = ArchitectContour.path(
+          prim.polygonCorners,
+          prim.holes,
+          bulges: prim.bulges,
+        );
         canvas.drawPath(
           boundary,
           Paint()
@@ -876,7 +912,11 @@ class ArchitectElementsPainterHelper {
           );
         }
       } else if (prim.type == CadPrimitiveType.hatch) {
-        final boundary = ArchitectContour.path(prim.polygonCorners, prim.holes, bulges: prim.bulges);
+        final boundary = ArchitectContour.path(
+          prim.polygonCorners,
+          prim.holes,
+          bulges: prim.bulges,
+        );
         final color = Color(prim.colorValue);
         // Keep fill interiors below walls and draw only an outline in the
         // selection layer, without compounding their transparency.
@@ -1025,7 +1065,9 @@ class ArchitectElementsPainterHelper {
         final polyPaint = (prim.customWidth != null && prim.customWidth! > 0)
             ? (Paint()
                 ..color = paint.color
-                ..strokeWidth = (isSelected ? 2.4 : (prim.customWidth! * unitsPerMm))
+                ..strokeWidth = (isSelected
+                    ? 2.4
+                    : (prim.customWidth! * unitsPerMm))
                 ..style = PaintingStyle.stroke)
             : paint;
         canvas.drawPath(
@@ -1069,29 +1111,17 @@ class ArchitectElementsPainterHelper {
           paint,
         );
       } else if (prim.type == CadPrimitiveType.ellipse) {
-        final rx = prim.radiusX ?? (prim.endPoint - prim.startPoint).distance;
-        final ry = prim.radiusY ?? (rx * 0.6);
-        if (rx > 1e-4 && ry > 1e-4) {
-          canvas.save();
-          canvas.translate(prim.startPoint.dx, prim.startPoint.dy);
-          if (prim.rotationDeg != null && prim.rotationDeg != 0) {
-            canvas.rotate(prim.rotationDeg! * math.pi / 180);
-          }
-          final ovalRect = Rect.fromCenter(
-            center: Offset.zero,
-            width: rx * 2,
-            height: ry * 2,
+        final ellipse = ArchitectEllipseGeometry.fromPrimitive(prim);
+        if (ellipse.isValid) {
+          canvas.drawPath(
+            ArchitectLinePattern.path(
+              ellipse.path,
+              prim.lineStyle,
+              patternUnits,
+              visibleBounds: visible,
+            ),
+            paint,
           );
-          if (prim.isArc == true) {
-            final start = (prim.startAngleDeg ?? 0) * math.pi / 180;
-            final end = (prim.endAngleDeg ?? 360) * math.pi / 180;
-            var sweep = end - start;
-            if (sweep <= 0) sweep += 2 * math.pi;
-            canvas.drawArc(ovalRect, start, sweep, false, paint);
-          } else {
-            canvas.drawOval(ovalRect, paint);
-          }
-          canvas.restore();
         }
       } else if (prim.type == CadPrimitiveType.rect) {
         canvas.drawPath(
@@ -1124,18 +1154,28 @@ class ArchitectElementsPainterHelper {
     Set<String> selectedElementIds = const {},
     bool layerVisible = true,
   }) {
-    final ownedIds = project == null ? const <String>{} : {
-      for (final floor in project.storeys.where((s) => s.id == storey.id))
-        for (final c in floor.components) c.id,
-    };
-    final components = project == null ? storey.components : [
-      ...storey.components.where((c) => !c.isServiceComponent),
-      ...ArchitectServiceGeometry.componentsOnLevel(project, storey).where((c) =>
-          !ownedIds.contains(c.id) ||
-          storey.components.any((own) => own.id == c.id)),
-    ];
+    final ownedIds = project == null
+        ? const <String>{}
+        : {
+            for (final floor in project.storeys.where((s) => s.id == storey.id))
+              for (final c in floor.components) c.id,
+          };
+    final components = project == null
+        ? storey.components
+        : [
+            ...storey.components.where((c) => !c.isServiceComponent),
+            ...ArchitectServiceGeometry.componentsOnLevel(
+              project,
+              storey,
+            ).where(
+              (c) =>
+                  !ownedIds.contains(c.id) ||
+                  storey.components.any((own) => own.id == c.id),
+            ),
+          ];
     for (final comp in components) {
-      if (!comp.isVisible || !layerVisible && !comp.isServiceComponent) continue;
+      if (!comp.isVisible || !layerVisible && !comp.isServiceComponent)
+        continue;
       architectDrawingSources(canvas, {comp.id}, 'components');
       final def = ComponentLibraryService.instance.findDefinition(
         comp.definitionId,
@@ -1153,8 +1193,13 @@ class ArchitectElementsPainterHelper {
       canvas.rotate(comp.rotation);
 
       if (comp.isServiceComponent) {
-        canvas.drawPath(geo.block2d.boundsMask, Paint()..color =
-            ArchitectLinePresentation.paper(canvas) ? Colors.white : palette.background);
+        canvas.drawPath(
+          geo.block2d.boundsMask,
+          Paint()
+            ..color = ArchitectLinePresentation.paper(canvas)
+                ? Colors.white
+                : palette.background,
+        );
       }
 
       // 2. Outer outline
@@ -1288,10 +1333,14 @@ class ArchitectElementsPainterHelper {
         final anchor = stairPreview.placementCorner;
         final first = stairPreview.plan.nosings.first;
         canvas.drawLine(
-          first.$1, first.$2, previewPaint..strokeWidth = 2 / zoomScale,
+          first.$1,
+          first.$2,
+          previewPaint..strokeWidth = 2 / zoomScale,
         );
         canvas.drawCircle(
-          anchor, 4 / zoomScale, Paint()..color = const Color(0xFF00897B),
+          anchor,
+          4 / zoomScale,
+          Paint()..color = const Color(0xFF00897B),
         );
       }
     } else if (activeTool == ArchitectTool.dimension) {

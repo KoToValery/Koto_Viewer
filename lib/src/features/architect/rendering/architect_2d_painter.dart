@@ -167,6 +167,7 @@ class Architect2dPainter extends CustomPainter {
   final bool activeWallCurved;
   final Offset? activeDraftStart;
   final Offset? activeDraftEnd;
+  final ArchitectCadPrimitive? activeEllipsePreview;
   final ArchitectStair? stairPreview;
   final double activeWallThickness;
   final WallReferenceLine activeWallReference;
@@ -315,6 +316,7 @@ class Architect2dPainter extends CustomPainter {
     this.activeWallCurved = false,
     this.activeDraftStart,
     this.activeDraftEnd,
+    this.activeEllipsePreview,
     this.stairPreview,
     this.activeWallThickness = 0.25,
     this.activeWallReference = WallReferenceLine.center,
@@ -2209,33 +2211,18 @@ class Architect2dPainter extends CustomPainter {
       }
     }
 
-    if (activeTool == ArchitectTool.cadEllipse &&
-        activeDraftStart != null &&
-        activeDraftEnd != null) {
-      final center = activeDraftStart!;
-      final delta = activeDraftEnd! - center;
-      final rx = delta.distance;
-      if (rx >= 1e-4) {
-        final ry = rx * 0.6;
-        final rot = math.atan2(delta.dy, delta.dx) * 180 / math.pi;
-        final prim = ArchitectCadPrimitive(
-          id: 'ellipse-preview',
-          type: CadPrimitiveType.ellipse,
-          startPoint: center - Offset(rx, ry),
-          endPoint: center + Offset(rx, ry),
-          radiusX: rx,
-          radiusY: ry,
-          rotationDeg: rot,
-          colorValue: 0xFF00E5FF,
-          lineStyle: ArchitectLineStyle.dashed,
-        );
-        ArchitectElementsPainterHelper.drawCadPrimitives(
-          canvas: canvas,
-          storey: ArchitectStorey(id: 'preview', name: '', cadPrimitives: [prim]),
-          zoomScale: zoomScale,
-          dimensionScale: _project.dimensionScale,
-        );
-      }
+    if (activeTool == ArchitectTool.cadEllipse && activeEllipsePreview != null) {
+      ArchitectElementsPainterHelper.drawCadPrimitives(
+        canvas: canvas,
+        storey: ArchitectStorey(id: 'preview', name: '', cadPrimitives: [
+          activeEllipsePreview!.copyWith(
+            colorValue: 0xFF00E5FF,
+            lineStyle: ArchitectLineStyle.dashed,
+          ),
+        ]),
+        zoomScale: zoomScale,
+        dimensionScale: _project.dimensionScale,
+      );
     }
 
     if (activeTool == ArchitectTool.leader &&
@@ -2414,6 +2401,7 @@ class Architect2dPainter extends CustomPainter {
       showUpperOverhangs != oldDelegate.showUpperOverhangs ||
       showFurniture != oldDelegate.showFurniture ||
       componentPreview != oldDelegate.componentPreview ||
+      activeEllipsePreview != oldDelegate.activeEllipsePreview ||
       upperOverhangs != oldDelegate.upperOverhangs ||
       isZoneTableSelected != oldDelegate.isZoneTableSelected ||
       zoneTableDragPreviewOrigin != oldDelegate.zoneTableDragPreviewOrigin ||

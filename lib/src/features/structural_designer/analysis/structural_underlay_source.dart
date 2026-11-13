@@ -60,6 +60,21 @@ class StructuralUnderlaySource {
       },
       bounds: document.bounds,
       entityStats: document.entityStats,
+      textStyles: document.textStyles,
+      lineTypes: document.lineTypes,
+      dimStyles: document.dimStyles,
+      layouts: List<String>.from(document.layouts),
+      layoutBounds: document.layoutBounds,
+      layoutEntities: {
+        for (final entry in document.layoutEntities.entries)
+          entry.key: entry.value
+              .where(
+                (e) =>
+                    !owned.contains(e.layer) &&
+                    !(e is DxfInsert && blocks.contains(e.blockName)),
+              )
+              .toList(),
+      },
     );
   }
 }

@@ -17,6 +17,7 @@
 | [SEC-01-WIDGET] | Screen API and widget declaration |
 | [TAG:STATE_FIELDS] | Tool flags, drafting state, caches, and preview state |
 | [TAG:UNDERLAY_TOOLS] | CAD/raster underlay handlers and related state |
+| [TAG:UNDERLAY_CROP] | Selected CAD/raster clipping grips, isolated preview and one-release commit |
 | [TAG:CAD_INSERTION] | Interactive CAD underlay placement |
 | [TAG:UNDERLAY_DRAG] | Underlay snap and repositioning |
 | [TAG:DRAG_TOOL] | Two-point drag and element relocation |
@@ -43,6 +44,10 @@
 | [TAG:LOGGER_UI] | Diagnostic logs UI |
 | [TAG:CANVAS_2D] | 2D viewport, painter stack, and draft overlays |
 | [TAG:CAD_EXPANSION_COMMITS] | CAD primitive commit handlers |
+| [TAG:ELLIPSE_DRAFT] | Centre/first semi-axis/second semi-axis drafting and exact review |
+| [TAG:SHAPE_EXACT_INPUT] | Shared size panel bounded to the available canvas above the palette |
+| [TAG:SLAB_DRAFT_CONTROLS] | Manual slab toolbar and staged composition defaults |
+| [TAG:POLYGON_ANGLE_LOCK] | Selected Hatch/slab on-canvas angle constraint |
 | [TAG:VIEW_3D] | 3D viewport and publication preview |
 
 ## 3. Tool archetypes and reference flows
@@ -155,9 +160,10 @@ Persistent dimension chains have their independent measurement convention.
 Chamfer/Fillet initial input and parameter changes share
 `BimDistanceDraftingPanel`, project units/decimals and one final command preview.
 The second-wall HUD excludes the generic HUD until a result is ready.
-Hatch edit entry initializes `ArchitectPolygonEdgeMode.pull`; subsequent explicit
-mode choices survive within that edit. Dedicated `edgePull`, `edgeMove` and
-`edgeExtend` SVG IDs and independent ARB tooltips describe the three operations.
+Hatch and slab edit entry initializes angle-preserving movement (`extendCatheti`).
+The contextual padlock switches between that constraint and free `move` for the
+current element. Explicit `pull` remains a separate extrusion operation and hides
+the padlock. Other CAD contours retain their existing three operation choices.
 
 Regression coverage: `architect_wall_safety_refinements_test.dart`,
 `architect_wall_core_operations_phone_test.dart`, `architect_mirror_elements_test.dart`,
@@ -257,7 +263,7 @@ polyline/contour segments use `UpdateArchitectBulges`, preserving existing IDs.
 ### Compact distance checkpoint and corner command identities
 
 `[TAG:DRAFT_DISTANCE_PANEL]`: `_hasDistanceDraftPanel` is the shared visibility
-predicate for the pending wall, CAD line/arc/polyline and manual Hatch segment.
+predicate for the pending wall and CAD line/arc/polyline segment.
 Snapping never hides the editable distance or chooses another confirmation flow.
 The panel starts collapsed, including arc chord input. Tapping its value opens
 the existing in-app keypad immediately. Continue/End/Cancel keep the established
@@ -277,3 +283,40 @@ entries use canonical command IDs. `BimEditActions.icon` and all direct corner
 controls share the dedicated `chamfer` and `fillet` SVG IDs; Curve keeps its own
 symbol. Coverage: `architect_compact_drafting_panel_test.dart`,
 `architect_arc_exact_placement_test.dart` and `command_icons_test.dart`.
+
+### Shape dimensions, ellipse and selected contours
+
+`[TAG:SHAPE_EXACT_INPUT]` places `BimShapeDimensionPanel` through
+`ArchitectExactInputOverlay`: bottom-centred on phones and bounded near the
+anchor on desktop. Actions precede the collapsible/scrollable local keypad.
+`ArchitectEllipseDraft` owns centre -> first semi-axis -> perpendicular second
+semi-axis; review is frozen until exact Apply/Cancel. `ArchitectEllipseGeometry`
+defines the persisted centre/radii/rotation contract for all consumers. Existing
+visible centres are preserved. Placement publishes one creation command.
+
+`[TAG:SLAB_DRAFT_CONTROLS]` stages slab properties in a temporary model until
+manual contour completion; it never creates a placeholder in the real project.
+`[TAG:POLYGON_ANGLE_LOCK]` uses the wall badge archetype. Edge release for Hatch
+and slabs opens `_editPolygonDisplacement` automatically; vertices retain their
+separate precision option. Manual Hatch points are accepted immediately with
+snaps and never enter the wall distance checkpoint.
+
+### Project snapshots and editable underlay crops
+
+`_underlayOwnerId` is the attached manifest ID or standalone model ID.
+`_restorePersistedUnderlays` prefers saved architectural snapshots over supplied
+fallback documents. Architectural opening uses
+`BimUnderlayLoadMode.architecturalOriginal`; aligned fallback originals are
+captured once into owner-local assets with their effective coordinate frame.
+Visibility caches are per storey. External changes require explicit Refresh.
+
+`[TAG:UNDERLAY_CROP]` reuses polygon edge geometry with `extendCatheti`, but owns
+a separate preview editor. Grip routing precedes raster/selection input. Only
+release commits masks through `_commands.commit`; cancellation/navigation drops
+the preview. `ArchitectUnderlayClip` supplies inclusive mask hits and clipped
+CAD segments for shared/wall/endpoint snaps. Cropped areas cannot steal selection
+or snaps; selected boundary grips remain available for expansion. Raster direct
+drag also previews without mutation, translating its mask in the same final edit.
+Regression coverage: `architect_drawing_controls_revision_test.dart`,
+`architect_ellipse_geometry_test.dart`, `architect_underlay_mask_snap_test.dart`
+and `architect_underlay_snapshot_test.dart`.

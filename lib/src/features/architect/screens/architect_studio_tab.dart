@@ -85,11 +85,11 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
         try {
           final res = await ArchitectUnderlayService.instance
               .importOrReloadCadUnderlay(
-            projectId: bimProject.id,
-            storeyId: entry.key,
-            sourceFile: file,
-            existingConfig: null,
-          );
+                projectId: bimProject.id,
+                storeyId: entry.key,
+                sourceFile: file,
+                existingConfig: null,
+              );
           configs[entry.key] = res.config;
           await _library.attachUnderlayFile(bimProject.id, entry.key, file);
         } catch (e) {
@@ -107,22 +107,24 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
     refreshProjects();
 
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ArchitectWorkspaceScreen(
-          initialProject: updatedArchProject,
-          bimProject: bimProject,
-        ),
-      ),
-    ).then((_) => refreshProjects());
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => ArchitectWorkspaceScreen(
+              initialProject: updatedArchProject,
+              bimProject: bimProject,
+            ),
+          ),
+        )
+        .then((_) => refreshProjects());
   }
 
   void _openBlankWorkspace() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ArchitectWorkspaceScreen(),
-      ),
-    ).then((_) => refreshProjects());
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(builder: (_) => const ArchitectWorkspaceScreen()),
+        )
+        .then((_) => refreshProjects());
   }
 
   Future<void> _openProject(BimWorkProject project) async {
@@ -130,23 +132,28 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
     LoadedBimUnderlays? underlays;
     if (project.hasUnderlays) {
       try {
-        underlays = await BimUnderlayLoader.loadAndAlign(project: project);
+        underlays = await BimUnderlayLoader.loadAndAlign(
+          project: project,
+          mode: BimUnderlayLoadMode.architecturalOriginal,
+        );
       } catch (_) {}
     }
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ArchitectWorkspaceScreen(
-          initialProject: archProject,
-          bimProject: project,
-          underlaysByStorey: underlays?.underlaysByStorey,
-          underlayFrame: BimCoordinateFrame(
-            origin: underlays?.referenceControlPoint ?? Offset.zero,
-            unitsPerMeter: underlays?.cadUnitsPerMeter ?? 1,
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => ArchitectWorkspaceScreen(
+              initialProject: archProject,
+              bimProject: project,
+              underlaysByStorey: underlays?.underlaysByStorey,
+              underlayFrame: BimCoordinateFrame(
+                origin: underlays?.referenceControlPoint ?? Offset.zero,
+                unitsPerMeter: underlays?.cadUnitsPerMeter ?? 1,
+              ),
+            ),
           ),
-        ),
-      ),
-    ).then((_) => refreshProjects());
+        )
+        .then((_) => refreshProjects());
   }
 
   Future<void> _confirmDeleteProject(BimWorkProject project) async {
@@ -194,9 +201,12 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
             autofocus: true,
             decoration: InputDecoration(
               labelText: l10n.bimProjectName,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            validator: (v) => (v == null || v.trim().isEmpty) ? l10n.bimProjectName : null,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? l10n.bimProjectName : null,
           ),
         ),
         actions: [
@@ -293,9 +303,8 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                             const SizedBox(width: 8),
                             Text(
                               l10n.architectProjectsTitle,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const Spacer(),
                             Text(
@@ -322,7 +331,8 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (context, index) => _buildProjectCard(context, _projects[index]),
+                        (context, index) =>
+                            _buildProjectCard(context, _projects[index]),
                         childCount: _projects.length,
                       ),
                     ),
@@ -408,7 +418,10 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFFB300),
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 10,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -425,7 +438,10 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                     child: Text(l10n.architectBlankWorkspace),
                   ),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 10,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -463,18 +479,18 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
             const SizedBox(height: 18),
             Text(
               l10n.architectProjectsTitle,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               l10n.architectNoProjects,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).hintColor,
-                    height: 1.4,
-                  ),
+                color: Theme.of(context).hintColor,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -483,7 +499,10 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFB300),
                 foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -511,11 +530,7 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
           width: 1.2,
         ),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
         ],
       ),
       child: Padding(
@@ -621,7 +636,10 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(8),
@@ -641,7 +659,10 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                 if (project.hasUnderlays) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -676,7 +697,10 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                 icon: const AppIcon(AppIconId.visible, size: 16),
                 label: Text(
                   l10n.bimProjectOpen,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFB300),

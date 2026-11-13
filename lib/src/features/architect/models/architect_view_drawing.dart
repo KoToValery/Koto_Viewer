@@ -1,3 +1,4 @@
+import '../services/architect_mirror_geometry.dart';
 import 'architect_elements.dart';
 import 'dart:ui';
 
@@ -43,20 +44,27 @@ class ArchitectViewDrawing {
       ],
       cadPrimitives: [
         for (final p in cadPrimitives)
-          p.copyWith(
-            startPoint: point(p.startPoint),
-            endPoint: point(p.endPoint),
-            polygon: p.type == CadPrimitiveType.polyline
-                ? p.linePoints.map(point).toList()
-                : p.polygon?.map(point).toList().reversed.toList(),
-            holes: [
-              for (final hole in p.holes)
-                hole.map(point).toList().reversed.toList(),
-            ],
-            hatchAngle: p.hatchAngle < 0
-                ? -180 - p.hatchAngle
-                : 180 - p.hatchAngle,
-          ),
+          p.type == CadPrimitiveType.ellipse
+              ? ArchitectMirrorGeometry.cad(
+                  p,
+                  id: p.id,
+                  origin: Offset(span / 2, 0),
+                  direction: const Offset(0, 1),
+                )
+              : p.copyWith(
+                  startPoint: point(p.startPoint),
+                  endPoint: point(p.endPoint),
+                  polygon: p.type == CadPrimitiveType.polyline
+                      ? p.linePoints.map(point).toList()
+                      : p.polygon?.map(point).toList().reversed.toList(),
+                  holes: [
+                    for (final hole in p.holes)
+                      hole.map(point).toList().reversed.toList(),
+                  ],
+                  hatchAngle: p.hatchAngle < 0
+                      ? -180 - p.hatchAngle
+                      : 180 - p.hatchAngle,
+                ),
       ],
     );
   }

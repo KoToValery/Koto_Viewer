@@ -129,6 +129,9 @@ class StoreyCopyOptions {
   final Set<String> targetStoreyIds;
   final Set<ArchitectStoreyElementType> elementTypes;
   final Set<String>? selectedElementIds;
+
+  /// Storeys staged in the copy dialog and committed with the copies in one edit.
+  final List<ArchitectStorey> additionalStoreys;
   final StoreyCopyMode mode;
   final bool adjustWallHeights;
   final bool adjustLevelMarkers;
@@ -139,6 +142,7 @@ class StoreyCopyOptions {
     required this.targetStoreyIds,
     this.elementTypes = ArchitectStoreyElementType.defaultTypicalCategories,
     this.selectedElementIds,
+    this.additionalStoreys = const [],
     this.mode = StoreyCopyMode.replace,
     this.adjustWallHeights = true,
     this.adjustLevelMarkers = true,
@@ -153,24 +157,25 @@ class StoreyCopyOptions {
     Set<String>? targetStoreyIds,
     Set<ArchitectStoreyElementType>? elementTypes,
     Set<String>? selectedElementIds,
+    List<ArchitectStorey>? additionalStoreys,
     bool clearSelectedElementIds = false,
     StoreyCopyMode? mode,
     bool? adjustWallHeights,
     bool? adjustLevelMarkers,
     bool? preserveGroups,
-  }) =>
-      StoreyCopyOptions(
-        sourceStoreyId: sourceStoreyId ?? this.sourceStoreyId,
-        targetStoreyIds: targetStoreyIds ?? this.targetStoreyIds,
-        elementTypes: elementTypes ?? this.elementTypes,
-        selectedElementIds: clearSelectedElementIds
-            ? null
-            : (selectedElementIds ?? this.selectedElementIds),
-        mode: mode ?? this.mode,
-        adjustWallHeights: adjustWallHeights ?? this.adjustWallHeights,
-        adjustLevelMarkers: adjustLevelMarkers ?? this.adjustLevelMarkers,
-        preserveGroups: preserveGroups ?? this.preserveGroups,
-      );
+  }) => StoreyCopyOptions(
+    sourceStoreyId: sourceStoreyId ?? this.sourceStoreyId,
+    targetStoreyIds: targetStoreyIds ?? this.targetStoreyIds,
+    elementTypes: elementTypes ?? this.elementTypes,
+    selectedElementIds: clearSelectedElementIds
+        ? null
+        : (selectedElementIds ?? this.selectedElementIds),
+    additionalStoreys: additionalStoreys ?? this.additionalStoreys,
+    mode: mode ?? this.mode,
+    adjustWallHeights: adjustWallHeights ?? this.adjustWallHeights,
+    adjustLevelMarkers: adjustLevelMarkers ?? this.adjustLevelMarkers,
+    preserveGroups: preserveGroups ?? this.preserveGroups,
+  );
 }
 
 /// Result summary of the storey copying execution.

@@ -105,3 +105,11 @@
 - Associations: `ArchitectMirrorGeometry.dimensionReferences` rebinds copied witnesses to copied hosts, remaps polygon vertices/edges, reverses wall-face sides, and detaches a reflected dimension from untransformed hosts. `ArchitectDimensionChain.resolve` then uses the existing transaction preparation path.
 - History and persistence: the existing `ArchitectCommandController` transaction and workspace save path remain in use. `ArchitectStair`, `ArchitectCadPrimitive`, `ArchitectWall`, and decorative model JSON already store the transformed fields.
 - Regression coverage: `architect_mirror_geometry_regression_test.dart` checks sampled curves, physical surfaces, handedness, dimensions, serialization, and undo/redo. `architect_mirror_elements_test.dart` checks snapping, preview, cancellation, and commit.
+
+## Ellipse reference pattern
+
+`hitTestElements` uses `ArchitectEllipseGeometry.bounds` and `distanceTo` for
+rotated full and partial ellipses. The helper preserves the persisted
+`startPoint` centre contract and the previous renderer's missing-radius defaults.
+Placement validation belongs to `PlaceArchitectCadPrimitive`; the workspace
+owns three-point drafting and the explicit painter preview.

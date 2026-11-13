@@ -1,19 +1,12 @@
-// === SECTION: ARCHITECT COPY STOREY DIALOG ===
-// Table of Contents:
-// 1. DIALOG CONTAINER & STATE
-// 2. SOURCE & SELECTION MODE SECTION
-// 3. CATEGORY CHIP SELECTORS WITH ELEMENT COUNTS
-// 4. TARGET STOREYS MULTI-SELECT & BATCH ADDER
-// 5. CONFLICT RESOLUTION (Replace vs Merge) & HEIGHT ADAPTATION OPTIONS
-// 6. ACTION FOOTER & DISPATCH
-
 import 'package:flutter/material.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
+
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_storey_copy_types.dart';
-import '../services/architect_command_controller.dart';
+import 'architect_dialog.dart';
 
+/// Transfer form with local staging; the workspace owns command execution.
 class ArchitectCopyStoreyDialog extends StatefulWidget {
   final ArchitectProject project;
   final String initialSourceStoreyId;
@@ -33,18 +26,15 @@ class ArchitectCopyStoreyDialog extends StatefulWidget {
     required ArchitectProject project,
     required String initialSourceStoreyId,
     Set<String>? selectedElementIds,
-  }) {
-    return showDialog<StoreyCopyOptions>(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => ArchitectCopyStoreyDialog(
-        project: project,
-        initialSourceStoreyId: initialSourceStoreyId,
-        selectedElementIds: selectedElementIds,
-        onCopyRequested: (options) => Navigator.of(context).pop(options),
-      ),
-    );
-  }
+  }) => showDialog<StoreyCopyOptions>(
+    context: context,
+    builder: (context) => ArchitectCopyStoreyDialog(
+      project: project,
+      initialSourceStoreyId: initialSourceStoreyId,
+      selectedElementIds: selectedElementIds,
+      onCopyRequested: (options) => Navigator.of(context).pop(options),
+    ),
+  );
 
   @override
   State<ArchitectCopyStoreyDialog> createState() =>
@@ -52,716 +42,910 @@ class ArchitectCopyStoreyDialog extends StatefulWidget {
 }
 
 class _ArchitectCopyStoreyDialogState extends State<ArchitectCopyStoreyDialog> {
+  // One row owns every enum represented by its localized category label.
+  static const _categoryGroups = [
+    [ArchitectStoreyElementType.walls],
+    [ArchitectStoreyElementType.columns],
+    [ArchitectStoreyElementType.beams],
+    [ArchitectStoreyElementType.slabs],
+    [ArchitectStoreyElementType.zones],
+    [ArchitectStoreyElementType.stairs, ArchitectStoreyElementType.openings],
+    [
+      ArchitectStoreyElementType.dimensions,
+      ArchitectStoreyElementType.elevationMarkers,
+    ],
+    [
+      ArchitectStoreyElementType.annotations,
+      ArchitectStoreyElementType.cadPrimitives,
+    ],
+    [
+      ArchitectStoreyElementType.components,
+      ArchitectStoreyElementType.floorDrains,
+      ArchitectStoreyElementType.decorativeElements,
+    ],
+  ];
+
+  late ArchitectProject _workingProject = widget.project;
   late String _sourceStoreyId;
-  late Set<String> _targetStoreyIds;
-  late Set<ArchitectStoreyElementType> _selectedCategories;
-  late StoreyCopyMode _mode;
-  late bool _adjustWallHeights;
-  late bool _adjustLevelMarkers;
-  late bool _preserveGroups;
+  Set<String> _targetStoreyIds = {};
+  final _selectedCategories = Set.of(
+    ArchitectStoreyElementType.defaultTypicalCategories,
+  );
+  StoreyCopyMode _mode = StoreyCopyMode.replace;
+  bool _adjustWallHeights = true;
+  bool _adjustLevelMarkers = true;
+  bool _preserveGroups = true;
   late bool _copyOnlySelection;
 
-  bool _showBatchAdder = false;
-  int _batchCount = 3;
-  double _batchHeight = 2.80;
-  late ArchitectProject _workingProject;
+  List<ArchitectStorey> get _normalStoreys =>
+      _workingProject.storeys.where((s) => !s.isRoof).toList()
+        ..sort((a, b) => b.elevation.compareTo(a.elevation));
+
+  ArchitectStorey? get _sourceStorey =>
+      _workingProject.storeys.where((s) => s.id == _sourceStoreyId).firstOrNull;
+
+  bool get _hasSelection =>
+      _sourceStoreyId == widget.initialSourceStoreyId &&
+      (widget.selectedElementIds?.isNotEmpty ?? false);
+
+  Set<String>? get _selectionFilter =>
+      _hasSelection && _copyOnlySelection ? widget.selectedElementIds : null;
 
   @override
   void initState() {
     super.initState();
-    _workingProject = widget.project;
-    _sourceStoreyId = widget.initialSourceStoreyId;
-    _copyOnlySelection = widget.selectedElementIds != null &&
-        widget.selectedElementIds!.isNotEmpty;
-    _mode = StoreyCopyMode.replace;
-    _adjustWallHeights = true;
-    _adjustLevelMarkers = true;
-    _preserveGroups = true;
-
-    _selectedCategories = Set.of(
-      ArchitectStoreyElementType.defaultTypicalCategories,
-    );
-
-    // Default target storeys: all normal storeys above the source storey
-    _targetStoreyIds = _defaultTargetStoreys();
+    final normal = _normalStoreys;
+    _sourceStoreyId = normal.any((s) => s.id == widget.initialSourceStoreyId)
+        ? widget.initialSourceStoreyId
+        : normal.firstOrNull?.id ?? '';
+    _copyOnlySelection = _hasSelection;
+    _targetStoreyIds = _defaultTargets();
   }
 
-  Set<String> _defaultTargetStoreys() {
-    final source = _workingProject.storeys
-        .where((s) => s.id == _sourceStoreyId)
-        .firstOrNull;
-    if (source == null) return {};
+  Set<String> _targetsAbove() => {
+    for (final s in _normalStoreys)
+      if (s.id != _sourceStoreyId &&
+          s.elevation > (_sourceStorey?.elevation ?? double.infinity))
+        s.id,
+  };
 
-    final targets = _workingProject.storeys
-        .where((s) => !s.isRoof && s.elevation > source.elevation)
-        .map((s) => s.id)
-        .toSet();
+  Set<String> _allTargets() => {
+    for (final s in _normalStoreys)
+      if (s.id != _sourceStoreyId) s.id,
+  };
 
-    if (targets.isEmpty) {
-      // If none above, pick all other normal storeys
-      return _workingProject.storeys
-          .where((s) => !s.isRoof && s.id != _sourceStoreyId)
-          .map((s) => s.id)
-          .toSet();
-    }
-    return targets;
+  Set<String> _defaultTargets() {
+    final above = _targetsAbove();
+    return above.isEmpty ? _allTargets() : above;
   }
 
-  ArchitectStorey? get _sourceStorey => _workingProject.storeys
-      .where((s) => s.id == _sourceStoreyId)
-      .firstOrNull;
+  int _count(
+    ArchitectStorey? storey,
+    Iterable<ArchitectStoreyElementType> types, {
+    Set<String>? filter,
+  }) => storey == null
+      ? 0
+      : types.fold(
+          0,
+          (total, type) =>
+              total + type.countInStorey(storey, filterIds: filter),
+        );
 
-  void _selectAllAbove() {
-    final source = _sourceStorey;
-    if (source == null) return;
+  int get _elementCount =>
+      _count(_sourceStorey, _selectedCategories, filter: _selectionFilter);
+
+  int get _replacementCount => _workingProject.storeys
+      .where((s) => _targetStoreyIds.contains(s.id))
+      .fold(0, (total, s) => total + _count(s, _selectedCategories));
+
+  void _changeSource(String? id) {
+    if (id == null || id == _sourceStoreyId) return;
     setState(() {
-      _targetStoreyIds = _workingProject.storeys
-          .where((s) => !s.isRoof && s.elevation > source.elevation)
-          .map((s) => s.id)
-          .toSet();
+      _sourceStoreyId = id;
+      _copyOnlySelection = false;
+      _targetStoreyIds = _defaultTargets();
     });
-  }
-
-  void _selectAllStoreys() {
-    setState(() {
-      _targetStoreyIds = _workingProject.storeys
-          .where((s) => !s.isRoof && s.id != _sourceStoreyId)
-          .map((s) => s.id)
-          .toSet();
-    });
-  }
-
-  void _batchAddTypicalStoreys() {
-    if (_batchCount <= 0) return;
-    setState(() {
-      _workingProject = _workingProject.batchAddTypicalStoreys(
-        count: _batchCount,
-        typicalHeight: _batchHeight,
-      );
-      _targetStoreyIds = _defaultTargetStoreys();
-      _showBatchAdder = false;
-    });
-  }
-
-  int _countElementsToCopy() {
-    final source = _sourceStorey;
-    if (source == null) return 0;
-    final filter = _copyOnlySelection ? widget.selectedElementIds : null;
-    var count = 0;
-    for (final cat in _selectedCategories) {
-      count += cat.countInStorey(source, filterIds: filter);
-    }
-    return count;
   }
 
   void _submit() {
-    final l = context.l10n;
-    if (_targetStoreyIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l.architectNoTargetStoreysSelected),
-          backgroundColor: Colors.amber[900],
-        ),
-      );
-      return;
-    }
-
-    final total = _countElementsToCopy();
-    if (total == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l.architectNoElementsSelected),
-          backgroundColor: Colors.amber[900],
-        ),
-      );
-      return;
-    }
-
+    if (_targetStoreyIds.isEmpty || _elementCount == 0) return;
+    final originalIds = widget.project.storeys.map((s) => s.id).toSet();
     final options = StoreyCopyOptions(
       sourceStoreyId: _sourceStoreyId,
-      targetStoreyIds: _targetStoreyIds,
-      elementTypes: _selectedCategories,
-      selectedElementIds:
-          _copyOnlySelection ? widget.selectedElementIds : null,
+      targetStoreyIds: Set.of(_targetStoreyIds),
+      elementTypes: Set.of(_selectedCategories),
+      selectedElementIds: _selectionFilter == null
+          ? null
+          : Set.of(_selectionFilter!),
+      additionalStoreys: [
+        for (final s in _workingProject.storeys)
+          if (!originalIds.contains(s.id)) s,
+      ],
       mode: _mode,
       adjustWallHeights: _adjustWallHeights,
       adjustLevelMarkers: _adjustLevelMarkers,
       preserveGroups: _preserveGroups,
     );
-
-    if (widget.onCopyRequested != null) {
-      widget.onCopyRequested!(options);
+    if (widget.onCopyRequested case final callback?) {
+      callback(options);
     } else {
       Navigator.of(context).pop(options);
     }
   }
 
+  Future<void> _addStoreys() async {
+    final l = context.l10n;
+    final form = GlobalKey<FormState>();
+    var count = 3;
+    var height = _sourceStorey?.height ?? 2.8;
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (context) => architectAlertDialog(
+        title: Text(l.architectCopyNewStoreys),
+        content: SizedBox(
+          width: 340,
+          child: Form(
+            key: form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  key: const ValueKey('architect-copy-batch-count'),
+                  initialValue: '$count',
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: l.architectBatchAddCount,
+                  ),
+                  validator: (value) {
+                    final parsed = int.tryParse(value?.trim() ?? '');
+                    return parsed == null || parsed < 1 || parsed > 100
+                        ? l.architectCopyBatchInvalid
+                        : null;
+                  },
+                  onSaved: (value) => count = int.parse(value!.trim()),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: const ValueKey('architect-copy-batch-height'),
+                  initialValue: height.toStringAsFixed(2),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: l.architectBatchAddHeight,
+                  ),
+                  validator: (value) {
+                    final parsed = double.tryParse(
+                      value?.trim().replaceAll(',', '.') ?? '',
+                    );
+                    return parsed == null || !parsed.isFinite || parsed <= 0
+                        ? l.architectCopyBatchInvalid
+                        : null;
+                  },
+                  onSaved: (value) =>
+                      height = double.parse(value!.trim().replaceAll(',', '.')),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+          ),
+          FilledButton(
+            key: const ValueKey('architect-copy-batch-submit'),
+            onPressed: () {
+              if (!form.currentState!.validate()) return;
+              form.currentState!.save();
+              Navigator.pop(context, true);
+            },
+            child: Text(l.architectBatchAddButton),
+          ),
+        ],
+      ),
+    );
+    if (added != true || !mounted) return;
+    setState(() {
+      final originalIds = _workingProject.storeys.map((s) => s.id).toSet();
+      for (var i = 0; i < count; i++) {
+        _workingProject = _workingProject.addStoreyAbove(
+          name: l.architectCopyStoreyName(_normalStoreys.length + 1),
+          height: height,
+        );
+      }
+      _targetStoreyIds.addAll({
+        for (final s in _normalStoreys)
+          if (!originalIds.contains(s.id)) s.id,
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final l = context.l10n;
-    final normalStoreys = _workingProject.storeys
-        .where((s) => !s.isRoof)
-        .toList()
-      ..sort((a, b) => b.elevation.compareTo(a.elevation));
-
-    final source = _sourceStorey;
-    final elementsCount = _countElementsToCopy();
-    final targetCount = _targetStoreyIds.length;
-
-    return Dialog(
-      backgroundColor: const Color(0xFF1E1E26),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Colors.white12, width: 1),
+    final base = Theme.of(context);
+    final dark = base.brightness == Brightness.dark;
+    // Use the same neutral form surfaces as the architectural property editors.
+    final scheme = base.colorScheme.copyWith(
+      surface: dark ? const Color(0xff20242b) : Colors.white,
+      onSurface: dark ? const Color(0xffe6e8eb) : const Color(0xff20252d),
+      onSurfaceVariant: dark
+          ? const Color(0xffb3bac5)
+          : const Color(0xff586270),
+      outlineVariant: dark ? const Color(0xff3c444f) : const Color(0xffe1e5eb),
+      surfaceContainerLow: dark
+          ? const Color(0xff262b33)
+          : const Color(0xfff7f8fa),
+      surfaceTint: Colors.transparent,
+    );
+    final theme = base.copyWith(
+      colorScheme: scheme,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: const Size(48, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+        ),
       ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 780),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
-              child: Row(
-                children: [
-                  const AppIcon(
-                    AppIconId.duplicate,
-                    color: Color(0xFF00E5FF),
-                    size: 22,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l.architectCopyElementsByStorey,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          l.architectStoreysScreenTitle,
-                          style: const TextStyle(
-                            color: Colors.white60,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const AppIcon(AppIconId.close, color: Colors.white70),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: Colors.white12),
-
-            // Scrollable Body
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 16,
-                ),
-                children: [
-                  // Scope Toggle (if selection exists)
-                  if (widget.selectedElementIds != null &&
-                      widget.selectedElementIds!.isNotEmpty) ...[
-                    SegmentedButton<bool>(
-                      segments: [
-                        ButtonSegment(
-                          value: false,
-                          label: Text(l.architectCopyAllStoreyElements),
-                          icon: const Icon(Icons.layers_rounded, size: 16),
-                        ),
-                        ButtonSegment(
-                          value: true,
-                          label: Text(
-                            l.architectCopySelectedOnly(
-                              widget.selectedElementIds!.length,
-                            ),
-                          ),
-                          icon: const Icon(Icons.check_box_rounded, size: 16),
-                        ),
-                      ],
-                      selected: {_copyOnlySelection},
-                      onSelectionChanged: (set) =>
-                          setState(() => _copyOnlySelection = set.first),
-                      style: SegmentedButton.styleFrom(
-                        backgroundColor: const Color(0xFF282834),
-                        selectedBackgroundColor: const Color(0xFF00E5FF),
-                        selectedForegroundColor: Colors.black,
-                        foregroundColor: Colors.white70,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // 1. Source Storey Selection
-                  Row(
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: scheme.surfaceContainerLow,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+      ),
+    );
+    return Theme(
+      data: theme,
+      child: Builder(
+        builder: (context) => Dialog(
+          backgroundColor: scheme.surface,
+          surfaceTintColor: Colors.transparent,
+          clipBehavior: Clip.antiAlias,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 16,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: scheme.outlineVariant),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 980, maxHeight: 850),
+            child: RepaintBoundary(
+              key: const ValueKey('architect-copy-surface'),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide =
+                      constraints.maxWidth >= 760 &&
+                      MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        l.architectCopySourceStorey,
-                        style: const TextStyle(
-                          color: Color(0xFF00E5FF),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
+                      _header(context),
+                      Divider(height: 1, color: scheme.outlineVariant),
                       Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF282834),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.white12),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _sourceStoreyId,
-                              isExpanded: true,
-                              dropdownColor: const Color(0xFF282834),
-                              items: [
-                                for (final s in normalStoreys)
-                                  DropdownMenuItem(
-                                    value: s.id,
-                                    child: Text(
-                                      '${s.name} (${s.elevationLabel})',
-                                      style:
-                                          const TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                              ],
-                              onChanged: (id) {
-                                if (id == null) return;
-                                setState(() {
-                                  _sourceStoreyId = id;
-                                  _targetStoreyIds = _defaultTargetStoreys();
-                                });
-                              },
-                            ),
-                          ),
-                        ),
+                        child: wide
+                            ? _wideBody(context)
+                            : _compactBody(context),
                       ),
+                      Divider(height: 1, color: scheme.outlineVariant),
+                      _footer(context, wide: wide),
                     ],
-                  ),
-                  const SizedBox(height: 18),
-
-                  // 2. Categories Filter
-                  Row(
-                    children: [
-                      const Text(
-                        'Категории елементи',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () => setState(() {
-                          _selectedCategories = Set.of(
-                            ArchitectStoreyElementType.defaultTypicalCategories,
-                          );
-                        }),
-                        child: Text(l.architectSelectAllStoreys),
-                      ),
-                      TextButton(
-                        onPressed: () =>
-                            setState(() => _selectedCategories.clear()),
-                        child: Text(l.architectClearStoreySelection),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final cat
-                          in ArchitectStoreyElementType.defaultTypicalCategories)
-                        _buildCategoryChip(cat, source),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // 3. Target Storeys Section
-                  Row(
-                    children: [
-                      Text(
-                        l.architectCopyTargetStoreys,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: _selectAllAbove,
-                        child: Text(l.architectSelectAllAbove),
-                      ),
-                      TextButton(
-                        onPressed: _selectAllStoreys,
-                        child: Text(l.architectSelectAllStoreys),
-                      ),
-                      TextButton(
-                        onPressed: () =>
-                            setState(() => _targetStoreyIds.clear()),
-                        child: Text(l.architectClearStoreySelection),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF282834),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: Material(
-                      type: MaterialType.transparency,
-                      child: Column(
-                      children: [
-                        for (final s in normalStoreys)
-                          if (s.id != _sourceStoreyId)
-                            CheckboxListTile(
-                              dense: true,
-                              activeColor: const Color(0xFF00E5FF),
-                              checkColor: Colors.black,
-                              value: _targetStoreyIds.contains(s.id),
-                              onChanged: (checked) {
-                                setState(() {
-                                  if (checked == true) {
-                                    _targetStoreyIds.add(s.id);
-                                  } else {
-                                    _targetStoreyIds.remove(s.id);
-                                  }
-                                });
-                              },
-                              title: Text(
-                                '${s.name} · ${s.elevationLabel}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              subtitle: Text(
-                                'H = ${s.height.toStringAsFixed(2)} m · ${l.architectStoreyElementsCount(s.walls.length + s.columns.length + s.slabs.length + s.zones.length)}',
-                                style: const TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                      ],
-                    ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Batch Storey Generator Expansion
-                  if (!_showBatchAdder)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.add_circle_outline, size: 16),
-                        label: Text(l.architectBatchAddStoreys),
-                        onPressed: () => setState(() => _showBatchAdder = true),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF00E5FF),
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      margin: const EdgeInsets.only(top: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF242430),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: _batchCount.toString(),
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: l.architectBatchAddCount,
-                                isDense: true,
-                                border: const OutlineInputBorder(),
-                              ),
-                              onChanged: (v) =>
-                                  _batchCount = int.tryParse(v) ?? 1,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: _batchHeight.toStringAsFixed(2),
-                              keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
-                              decoration: InputDecoration(
-                                labelText: l.architectBatchAddHeight,
-                                isDense: true,
-                                border: const OutlineInputBorder(),
-                              ),
-                              onChanged: (v) =>
-                                  _batchHeight = double.tryParse(v) ?? 2.80,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: _batchAddTypicalStoreys,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF00E5FF),
-                              foregroundColor: Colors.black,
-                            ),
-                            child: Text(l.architectBatchAddButton),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () =>
-                                setState(() => _showBatchAdder = false),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-
-                  // 4. Mode & Adaptation Settings
-                  Text(
-                    l.architectCopyModeTitle,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF282834),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: Material(
-                      type: MaterialType.transparency,
-                      child: Column(
-                      children: [
-                        RadioListTile<StoreyCopyMode>(
-                          dense: true,
-                          activeColor: const Color(0xFF00E5FF),
-                          value: StoreyCopyMode.replace,
-                          groupValue: _mode,
-                          onChanged: (m) => setState(() => _mode = m!),
-                          title: Text(
-                            l.architectCopyModeReplace,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          subtitle: Text(
-                            l.architectCopyModeReplaceHelp,
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                        RadioListTile<StoreyCopyMode>(
-                          dense: true,
-                          activeColor: const Color(0xFF00E5FF),
-                          value: StoreyCopyMode.merge,
-                          groupValue: _mode,
-                          onChanged: (m) => setState(() => _mode = m!),
-                          title: Text(
-                            l.architectCopyModeMerge,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          subtitle: Text(
-                            l.architectCopyModeMergeHelp,
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                        const Divider(color: Colors.white12),
-                        SwitchListTile(
-                          dense: true,
-                          activeColor: const Color(0xFF00E5FF),
-                          value: _adjustWallHeights,
-                          onChanged: (v) =>
-                              setState(() => _adjustWallHeights = v),
-                          title: Text(
-                            l.architectAdjustWallHeightsToStorey,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        SwitchListTile(
-                          dense: true,
-                          activeColor: const Color(0xFF00E5FF),
-                          value: _adjustLevelMarkers,
-                          onChanged: (v) =>
-                              setState(() => _adjustLevelMarkers = v),
-                          title: Text(
-                            l.architectAdjustElevationMarkers,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        SwitchListTile(
-                          dense: true,
-                          activeColor: const Color(0xFF00E5FF),
-                          value: _preserveGroups,
-                          onChanged: (v) =>
-                              setState(() => _preserveGroups = v),
-                          title: Text(
-                            l.architectPreserveGroups,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
-
-            // Footer
-            const Divider(height: 1, color: Colors.white12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF282834),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: Text(
-                      '$elementsCount ел. ➔ $targetCount ет.',
-                      style: const TextStyle(
-                        color: Color(0xFF00E5FF),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      MaterialLocalizations.of(context).cancelButtonLabel,
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: targetCount > 0 && elementsCount > 0
-                        ? _submit
-                        : null,
-                    icon: const AppIcon(
-                      AppIconId.duplicate,
-                      size: 16,
-                      color: Colors.black,
-                    ),
-                    label: Text(
-                      l.architectCopyElementsButton,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00E5FF),
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCategoryChip(
-    ArchitectStoreyElementType cat,
-    ArchitectStorey? source,
-  ) {
-    final count = source != null
-        ? cat.countInStorey(
-            source,
-            filterIds: _copyOnlySelection ? widget.selectedElementIds : null,
-          )
-        : 0;
-    final isSelected = _selectedCategories.contains(cat);
+  Widget _header(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 8, 14),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: AppIcon(
+              AppIconId.duplicate,
+              size: 22,
+              color: scheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              context.l10n.architectCopyDialogTitle,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const AppIcon(AppIconId.close, size: 20),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return FilterChip(
-      selected: isSelected,
-      showCheckmark: false,
-      avatar: isSelected
-          ? const Icon(Icons.check, size: 14, color: Colors.black)
-          : null,
-      label: Text('${cat.localizedLabel(context.l10n)} ($count)'),
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.black : Colors.white70,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        fontSize: 12,
+  Widget _wideBody(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Expanded(
+        child: SingleChildScrollView(
+          primary: false,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _sourceSection(context),
+              const SizedBox(height: 20),
+              _categoriesSection(context),
+            ],
+          ),
+        ),
       ),
-      backgroundColor: const Color(0xFF282834),
-      selectedColor: const Color(0xFF00E5FF),
-      side: BorderSide(
-        color: isSelected ? const Color(0xFF00E5FF) : Colors.white12,
+      VerticalDivider(
+        width: 1,
+        color: Theme.of(context).colorScheme.outlineVariant,
       ),
-      onSelected: (selected) {
-        setState(() {
-          if (selected) {
-            _selectedCategories.add(cat);
-          } else {
-            _selectedCategories.remove(cat);
-          }
-        });
-      },
+      Expanded(
+        child: SingleChildScrollView(
+          primary: false,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _targetsSection(context),
+              const SizedBox(height: 24),
+              _settingsSection(context),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _compactBody(BuildContext context) => SingleChildScrollView(
+    key: const ValueKey('architect-copy-scroll'),
+    padding: const EdgeInsets.all(20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sourceSection(context),
+        const SizedBox(height: 28),
+        _categoriesSection(context),
+        const SizedBox(height: 28),
+        _targetsSection(context),
+        const SizedBox(height: 24),
+        _settingsSection(context),
+      ],
+    ),
+  );
+
+  Widget _sectionTitle(BuildContext context, int number, String title) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLow,
+              shape: BoxShape.circle,
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            child: Text('$number', style: theme.textTheme.labelMedium),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sourceSection(BuildContext context) {
+    final l = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(context, 1, l.architectCopyFrom),
+        DropdownButtonFormField<String>(
+          key: const ValueKey('architect-copy-source'),
+          initialValue: _sourceStorey?.id,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: l.architectCopySourceStorey,
+            floatingLabelBehavior: FloatingLabelBehavior.never,
+          ),
+          // Newly staged levels are empty destinations, never source templates.
+          items: [
+            for (final storey in _normalStoreys.where(
+              (s) =>
+                  widget.project.storeys.any((original) => original.id == s.id),
+            ))
+              DropdownMenuItem(
+                value: storey.id,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        storey.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      storey.elevationLabel,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+          onChanged: _changeSource,
+        ),
+        if (_sourceStorey case final source?) ...[
+          const SizedBox(height: 10),
+          Text(
+            '${l.architectStoreyHeightLabel}: ${source.height.toStringAsFixed(2)} m',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        if (_hasSelection) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              ChoiceChip(
+                key: const ValueKey('architect-copy-scope-all'),
+                label: Text(l.architectCopyScopeAll),
+                selected: !_copyOnlySelection,
+                onSelected: (_) => setState(() => _copyOnlySelection = false),
+              ),
+              ChoiceChip(
+                key: const ValueKey('architect-copy-scope-selection'),
+                label: Text(
+                  l.architectCopyScopeSelection(
+                    widget.selectedElementIds!.length,
+                  ),
+                ),
+                selected: _copyOnlySelection,
+                onSelected: (_) => setState(() => _copyOnlySelection = true),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _quickAction(String key, String label, VoidCallback action) =>
+      TextButton(key: ValueKey(key), onPressed: action, child: Text(label));
+
+  Widget _categoriesSection(BuildContext context) {
+    final l = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(context, 2, l.architectCopyWhat),
+        Wrap(
+          spacing: 4,
+          children: [
+            _quickAction(
+              'architect-copy-categories-all',
+              l.architectCopyAll,
+              () => setState(
+                () => _selectedCategories.addAll(
+                  ArchitectStoreyElementType.defaultTypicalCategories,
+                ),
+              ),
+            ),
+            _quickAction(
+              'architect-copy-categories-none',
+              l.architectCopyNone,
+              () => setState(_selectedCategories.clear),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        _outlinedGroup(context, [
+          for (final types in _categoryGroups) _categoryRow(context, types),
+        ]),
+      ],
+    );
+  }
+
+  Widget _categoryRow(
+    BuildContext context,
+    List<ArchitectStoreyElementType> types,
+  ) {
+    final count = _count(_sourceStorey, types, filter: _selectionFilter);
+    final selected = types.every(_selectedCategories.contains);
+    return CheckboxListTile(
+      key: ValueKey('architect-copy-category-${types.first.name}'),
+      value: selected,
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      visualDensity: VisualDensity.compact,
+      title: Text(
+        types.first.localizedLabel(context.l10n),
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+      secondary: _countBadge(context, count),
+      onChanged: (checked) => setState(() {
+        checked == true
+            ? _selectedCategories.addAll(types)
+            : _selectedCategories.removeAll(types);
+      }),
+    );
+  }
+
+  Widget _countBadge(BuildContext context, int count) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      constraints: const BoxConstraints(minWidth: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '$count',
+        textAlign: TextAlign.center,
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+      ),
+    );
+  }
+
+  Widget _outlinedGroup(BuildContext context, List<Widget> rows) =>
+      DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Column(
+            children: [
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                rows[i],
+              ],
+            ],
+          ),
+        ),
+      );
+
+  Widget _targetsSection(BuildContext context) {
+    final l = context.l10n;
+    final targets = _normalStoreys
+        .where((s) => s.id != _sourceStoreyId)
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(context, 3, l.architectCopyTo),
+        if (targets.isNotEmpty) ...[
+          Wrap(
+            spacing: 4,
+            children: [
+              _quickAction(
+                'architect-copy-targets-above',
+                l.architectCopyAbove,
+                () => setState(() => _targetStoreyIds = _targetsAbove()),
+              ),
+              _quickAction(
+                'architect-copy-targets-all',
+                l.architectCopyAll,
+                () => setState(() => _targetStoreyIds = _allTargets()),
+              ),
+              _quickAction(
+                'architect-copy-targets-none',
+                l.architectCopyNone,
+                () => setState(_targetStoreyIds.clear),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          _outlinedGroup(context, [
+            for (final storey in targets)
+              CheckboxListTile(
+                key: ValueKey('architect-copy-target-${storey.id}'),
+                value: _targetStoreyIds.contains(storey.id),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                selected: _targetStoreyIds.contains(storey.id),
+                selectedTileColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: .04),
+                title: Text(
+                  storey.name,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  l.architectStoreyElementsCount(
+                    _count(
+                      storey,
+                      ArchitectStoreyElementType.defaultTypicalCategories,
+                    ),
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                secondary: Text(
+                  storey.elevationLabel,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                onChanged: (checked) => setState(() {
+                  checked == true
+                      ? _targetStoreyIds.add(storey.id)
+                      : _targetStoreyIds.remove(storey.id);
+                }),
+              ),
+          ]),
+        ] else
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Text(
+              l.architectCopyTargetsEmpty,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            key: const ValueKey('architect-copy-new-storeys'),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: Tooltip(
+              message: l.architectCopyNewStoreysHelp,
+              child: Text(l.architectCopyNewStoreys),
+            ),
+            onPressed: _addStoreys,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _settingsSection(BuildContext context) {
+    final l = context.l10n;
+    return _outlinedGroup(context, [
+      ExpansionTile(
+        key: const ValueKey('architect-copy-settings'),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+        childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        title: Text(
+          l.architectCopySettings,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        subtitle: Text(
+          _mode == StoreyCopyMode.replace
+              ? l.architectCopyReplace
+              : l.architectCopyMerge,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final mode in StoreyCopyMode.values)
+                      Tooltip(
+                        message: mode == StoreyCopyMode.replace
+                            ? l.architectCopyModeReplaceHelp
+                            : l.architectCopyModeMergeHelp,
+                        child: ChoiceChip(
+                          key: ValueKey('architect-copy-mode-${mode.name}'),
+                          label: Text(
+                            mode == StoreyCopyMode.replace
+                                ? l.architectCopyReplace
+                                : l.architectCopyMerge,
+                          ),
+                          selected: _mode == mode,
+                          onSelected: (_) => setState(() => _mode = mode),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _mode == StoreyCopyMode.replace
+                      ? l.architectCopyModeReplaceHelp
+                      : l.architectCopyModeMergeHelp,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+          _setting(
+            context,
+            'architect-copy-adjust-walls',
+            l.architectCopyWallHeights,
+            l.architectAdjustWallHeightsToStorey,
+            _adjustWallHeights,
+            (value) => setState(() => _adjustWallHeights = value),
+          ),
+          _setting(
+            context,
+            'architect-copy-adjust-levels',
+            l.architectCopyLevelMarkers,
+            l.architectAdjustElevationMarkers,
+            _adjustLevelMarkers,
+            (value) => setState(() => _adjustLevelMarkers = value),
+          ),
+          _setting(
+            context,
+            'architect-copy-adjust-groups',
+            l.architectCopyGroups,
+            l.architectPreserveGroups,
+            _preserveGroups,
+            (value) => setState(() => _preserveGroups = value),
+          ),
+        ],
+      ),
+    ]);
+  }
+
+  Widget _setting(
+    BuildContext context,
+    String key,
+    String label,
+    String help,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) => Tooltip(
+    message: help,
+    child: SwitchListTile(
+      key: ValueKey(key),
+      value: value,
+      onChanged: onChanged,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      title: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+    ),
+  );
+
+  Widget _footer(BuildContext context, {required bool wide}) {
+    final l = context.l10n;
+    final theme = Theme.of(context);
+    final elements = _elementCount;
+    final canCopy = elements > 0 && _targetStoreyIds.isNotEmpty;
+    final replaced = _replacementCount;
+    final originalIds = widget.project.storeys.map((s) => s.id).toSet();
+    final newCount = _workingProject.storeys
+        .where((s) => !originalIds.contains(s.id))
+        .length;
+    final summary = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          l.architectCopySummary(elements, _targetStoreyIds.length),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (newCount > 0) ...[
+          const SizedBox(height: 4),
+          Text(
+            l.architectCopyNewStoreysSummary(newCount),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        if (canCopy && _mode == StoreyCopyMode.replace && replaced > 0) ...[
+          const SizedBox(height: 4),
+          Text(
+            l.architectCopyReplaceImpact(replaced),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
+    final submit = ElevatedButton.icon(
+      key: const ValueKey('architect-copy-submit'),
+      onPressed: canCopy ? _submit : null,
+      icon: const AppIcon(AppIconId.duplicate, size: 18),
+      label: Text(l.architectCopyAction),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 0,
+        minimumSize: const Size(132, 48),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: wide ? 24 : 20, vertical: 16),
+      child: wide
+          ? Row(
+              children: [
+                Expanded(child: summary),
+                const SizedBox(width: 16),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    MaterialLocalizations.of(context).cancelButtonLabel,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                submit,
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [summary, const SizedBox(height: 12), submit],
+            ),
     );
   }
 }

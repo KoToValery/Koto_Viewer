@@ -14,6 +14,7 @@ import '../models/bim_work_project.dart';
 import 'bim_project_library_service.dart';
 import 'bim_underlay_loader.dart';
 import 'bim_underlay_conversion_service.dart';
+import 'bim_project_asset_service.dart';
 
 /// Service responsible for exporting individual storey DXF drawings (with original
 /// CAD coordinates, preserved layer states, and structural BiM layers) and full-project ZIP packages.
@@ -379,7 +380,12 @@ class BimExportService {
 
     void add(String path, List<int> bytes, String role) {
       final name = _packagePath(path);
-      if (files.keys.any((p) => p.toLowerCase() == name.toLowerCase())) {
+      final existing = files.keys
+          .where((p) => p.toLowerCase() == name.toLowerCase())
+          .firstOrNull;
+      if (existing != null) {
+        if (files[existing]!['sha256'] == sha256.convert(bytes).toString())
+          return;
         throw StateError('Duplicate ZIP path: $name');
       }
       archive.addFile(ArchiveFile(name, bytes.length, bytes));
@@ -397,24 +403,84 @@ class BimExportService {
       role,
     );
 
-    // 1. Add project manifest
-    json('project.json', project.toJson(), 'projectManifest');
+    final root = await lib.getProjectDirectory(project.id);
+    Future<String?> asset(
+      String stored,
+      String role, {
+      bool required = true,
+    }) async {
+      final file = await BimProjectAssetService.resolve(root, stored);
+      if (file == null) {
+        if (required)
+          throw FileSystemException('Missing project asset', stored);
+        return null;
+      }
+      final relative = BimProjectAssetService.relativePath(root, file);
+      add(relative, await file.readAsBytes(), role);
+      return relative;
+    }
 
-    // 2. Add architectural model
-    json('architectural.json', architect.toJson(), 'architecturalModel');
-
-    // 3. Add any underlay files
-    for (final s in project.storeys) {
-      if (s.hasUnderlay) {
-        final path = s.underlayFileName!;
-        final file = await lib.getUnderlayFile(project.id, path);
-        if (file != null && await file.exists()) {
-          try {
-            add(_packagePath(path), await file.readAsBytes(), 'underlaySource');
-          } catch (_) {}
+    final portableArchitect =
+        (jsonDecode(jsonEncode(architect.toJson())) as Map<String, dynamic>)
+          ..['id'] = project.id;
+    for (final value
+        in (portableArchitect['cadUnderlays'] as Map? ?? {}).values) {
+      final config = value as Map;
+      config['internalCopyPath'] = await asset(
+        config['internalCopyPath'] as String,
+        'underlaySource',
+      );
+      final cache = config['kcadCachePath'] as String?;
+      final portableCache = cache == null
+          ? null
+          : await asset(cache, 'underlayCache', required: false);
+      if (portableCache == null) {
+        config.remove('kcadCachePath');
+      } else {
+        config['kcadCachePath'] = portableCache;
+      }
+      config.remove('externalSourcePath');
+      config['autoReload'] = false;
+    }
+    for (final value in portableArchitect['rasterUnderlays'] as List? ?? []) {
+      final raster = value as Map;
+      raster['internalImagePath'] = await asset(
+        raster['internalImagePath'] as String,
+        'rasterUnderlay',
+      );
+      final pdf = raster['sourcePdfPath'] as String?;
+      final portablePdf = pdf == null
+          ? null
+          : await asset(pdf, 'pdfSource', required: false);
+      if (portablePdf == null) {
+        raster.remove('sourcePdfPath');
+      } else {
+        raster['sourcePdfPath'] = portablePdf;
+      }
+    }
+    final portableManifest =
+        jsonDecode(jsonEncode(project.toJson())) as Map<String, dynamic>;
+    for (final value in portableManifest['storeys'] as List? ?? []) {
+      final storey = value as Map;
+      if (storey['underlayFileName'] is String) {
+        storey['underlayFileName'] = await asset(
+          storey['underlayFileName'] as String,
+          'underlayWorking',
+        );
+      }
+      final processing = storey['processing'] as Map?;
+      if (processing != null) {
+        for (final key in ['source', 'pure', 'dxf']) {
+          if (processing[key] is String)
+            processing[key] = await asset(
+              processing[key] as String,
+              'underlayDependency',
+            );
         }
       }
     }
+    json('project.json', portableManifest, 'projectManifest');
+    json('architectural.json', portableArchitect, 'architecturalModel');
 
     // 4. Add package inventory
     json('package.json', {

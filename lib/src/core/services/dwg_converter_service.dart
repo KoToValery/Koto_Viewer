@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -22,14 +23,16 @@ class DwgConversionException implements Exception {
 
 /// Specialized exception thrown when conversion is killed by the OS due to excessive memory usage.
 class DwgMemoryLimitException extends DwgConversionException {
-  const DwgMemoryLimitException([String message = 'DWG requires excessive memory'])
-      : super(message, errorCode: -999);
+  const DwgMemoryLimitException([
+    String message = 'DWG requires excessive memory',
+  ]) : super(message, errorCode: -999);
 }
 
 /// Service to handle DWG -> DXF conversion and cache management.
 class DwgConverterService {
   static const String _cacheFolder = 'dwg_cache';
-  static const String _cacheVersion = '_v6';
+  static const int cacheVersion = 6;
+  static const String _cacheVersion = '_v$cacheVersion';
 
   /// Locates the bundled or installed dwg2dxf executable on Windows.
   static String? _findWindowsDwg2DxfExe() {
@@ -92,11 +95,19 @@ class DwgConverterService {
         await sink.close();
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService._streamToTargetWithComment.fs');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'DwgConverterService._streamToTargetWithComment.fs',
+      );
       debugPrint('DwgConverterService: Failed to stream with comment: $e');
       rethrow;
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService._streamToTargetWithComment');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'DwgConverterService._streamToTargetWithComment',
+      );
       debugPrint('DwgConverterService: Failed to stream with comment: $e');
       rethrow;
     }
@@ -108,7 +119,9 @@ class DwgConverterService {
     required File dxfFile,
     required String layerStatesString,
   }) async {
-    final tempSibling = File('${dxfFile.path}.tmp_${DateTime.now().microsecondsSinceEpoch}');
+    final tempSibling = File(
+      '${dxfFile.path}.tmp_${DateTime.now().microsecondsSinceEpoch}',
+    );
     try {
       await _streamToTargetWithComment(
         sourceFile: dxfFile,
@@ -120,7 +133,11 @@ class DwgConverterService {
       }
       await tempSibling.rename(dxfFile.path);
     } catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService._prependCommentInPlace');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'DwgConverterService._prependCommentInPlace',
+      );
       debugPrint('DwgConverterService: Failed to prepend comment in-place: $e');
       if (await tempSibling.exists()) {
         try {
@@ -136,18 +153,18 @@ class DwgConverterService {
     required File sourceFile,
     required File targetFile,
     String? layerStatesString,
-  }) =>
-      _streamToTargetWithComment(
-        sourceFile: sourceFile,
-        targetFile: targetFile,
-        layerStatesString: layerStatesString,
-      );
+  }) => _streamToTargetWithComment(
+    sourceFile: sourceFile,
+    targetFile: targetFile,
+    layerStatesString: layerStatesString,
+  );
 
   /// Returns a temporary directory guaranteed to use an ASCII path on Windows,
   /// avoiding issues with native C runtimes opening non-ASCII / Cyrillic paths.
   static Directory _getSafeTempDir() {
     if (Platform.isWindows) {
-      final publicDir = Platform.environment['PUBLIC'] ??
+      final publicDir =
+          Platform.environment['PUBLIC'] ??
           Platform.environment['ALLUSERSPROFILE'];
       if (publicDir != null && !RegExp(r'[^\x00-\x7F]').hasMatch(publicDir)) {
         final dir = Directory('$publicDir${Platform.pathSeparator}KotoTemp');
@@ -160,8 +177,9 @@ class DwgConverterService {
     return Directory.systemTemp;
   }
 
-  static const MethodChannel _androidChannel =
-      MethodChannel('com.koto.kotoviewer/dwg_converter');
+  static const MethodChannel _androidChannel = MethodChannel(
+    'com.koto.kotoviewer/dwg_converter',
+  );
 
   /// Returns true if native LibreDWG converter library or CLI tool is loaded and ready.
   static bool get isNativeSupported {
@@ -186,21 +204,18 @@ class DwgConverterService {
       throw DwgConversionException('DWG file does not exist: $dwgPath');
     }
 
-    final stat = await dwgFile.stat();
+    final fingerprint = (await sha256.bind(dwgFile.openRead()).first)
+        .toString();
     final tempDir = await getTemporaryDirectory();
-    final cacheDir = Directory('${tempDir.path}${Platform.pathSeparator}$_cacheFolder');
+    final cacheDir = Directory(
+      '${tempDir.path}${Platform.pathSeparator}$_cacheFolder',
+    );
     if (!await cacheDir.exists()) {
       await cacheDir.create(recursive: true);
     }
 
-    final fileName = dwgPath.split(Platform.pathSeparator).last;
-    final baseName = fileName.contains('.')
-        ? fileName.substring(0, fileName.lastIndexOf('.'))
-        : fileName;
-
-    // Cache file name includes size, modified timestamp, and engine version for cache validation
-    final cachedFileName =
-        '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}$_cacheVersion.dxf';
+    // Content identity keeps unrelated same-name project snapshots separate.
+    final cachedFileName = '$fingerprint$_cacheVersion.dxf';
     final targetDxfPath =
         '${cacheDir.path}${Platform.pathSeparator}$cachedFileName';
     final targetDxfFile = File(targetDxfPath);
@@ -264,17 +279,20 @@ class DwgConverterService {
           final layersExe = _findWindowsDwgLayersExe();
           if (layersExe != null) {
             try {
-              final layersRes = await Process.run(
-                layersExe,
-                ['-f', effectiveInputPath],
-                stdoutEncoding: null,
-              );
+              final layersRes = await Process.run(layersExe, [
+                '-f',
+                effectiveInputPath,
+              ], stdoutEncoding: null);
               if (layersRes.exitCode == 0 && layersRes.stdout is List<int>) {
-                final decodedOutput = UniversalEncodingService.decodeBytes(layersRes.stdout as List<int>);
+                final decodedOutput = UniversalEncodingService.decodeBytes(
+                  layersRes.stdout as List<int>,
+                );
                 final lines = LineSplitter.split(decodedOutput);
                 final List<String> encodedStates = [];
                 for (final line in lines) {
-                  final match = RegExp(r'^([ f])([+\-])([ l])\s+(.+)$').firstMatch(line.trimRight());
+                  final match = RegExp(
+                    r'^([ f])([+\-])([ l])\s+(.+)$',
+                  ).firstMatch(line.trimRight());
                   if (match != null) {
                     final isFrozen = match.group(1) == 'f';
                     final isOff = match.group(2) == '-';
@@ -293,10 +311,18 @@ class DwgConverterService {
                 }
               }
             } on ProcessException catch (e, stack) {
-              AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.dwglayers.process');
+              AppErrorHandler.recordError(
+                e,
+                stack,
+                context: 'DwgConverterService.dwglayers.process',
+              );
               debugPrint('DwgConverterService: dwglayers process error: $e');
             } on Exception catch (e, stack) {
-              AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.dwglayers');
+              AppErrorHandler.recordError(
+                e,
+                stack,
+                context: 'DwgConverterService.dwglayers',
+              );
               debugPrint('DwgConverterService: dwglayers extraction error: $e');
             }
           }
@@ -309,7 +335,8 @@ class DwgConverterService {
               targetFile: File(targetDxfPath),
               layerStatesString: layerStatesString,
             );
-          } else if (layerStatesString != null && layerStatesString.isNotEmpty) {
+          } else if (layerStatesString != null &&
+              layerStatesString.isNotEmpty) {
             await _prependCommentInPlace(
               dxfFile: outResultFile,
               layerStatesString: layerStatesString,
@@ -323,15 +350,27 @@ class DwgConverterService {
           result = processResult.exitCode != 0 ? processResult.exitCode : -1;
         }
       } on ProcessException catch (e, stack) {
-        AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.cli.process');
+        AppErrorHandler.recordError(
+          e,
+          stack,
+          context: 'DwgConverterService.cli.process',
+        );
         debugPrint('DwgConverterService: Windows CLI process error: $e');
         result = -1;
       } on FileSystemException catch (e, stack) {
-        AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.cli.fs');
+        AppErrorHandler.recordError(
+          e,
+          stack,
+          context: 'DwgConverterService.cli.fs',
+        );
         debugPrint('DwgConverterService: Windows CLI file error: $e');
         result = -1;
       } on Exception catch (e, stack) {
-        AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.cli');
+        AppErrorHandler.recordError(
+          e,
+          stack,
+          context: 'DwgConverterService.cli',
+        );
         debugPrint('DwgConverterService: Windows CLI conversion error: $e');
         result = -1;
       } finally {
@@ -366,7 +405,9 @@ class DwgConverterService {
         });
         result = res ?? -1;
       } on PlatformException catch (e) {
-        debugPrint('DwgConverterService: Android isolated service error: ${e.code} ${e.message}');
+        debugPrint(
+          'DwgConverterService: Android isolated service error: ${e.code} ${e.message}',
+        );
         if (e.code == 'OOM_KILLED') {
           throw const DwgMemoryLimitException();
         }
@@ -437,15 +478,25 @@ class DwgConverterService {
   static Future<void> clearCache() async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final cacheDir = Directory('${tempDir.path}${Platform.pathSeparator}$_cacheFolder');
+      final cacheDir = Directory(
+        '${tempDir.path}${Platform.pathSeparator}$_cacheFolder',
+      );
       if (await cacheDir.exists()) {
         await cacheDir.delete(recursive: true);
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.clearCache.fs');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'DwgConverterService.clearCache.fs',
+      );
       debugPrint('DwgConverterService: Error clearing cache: $e');
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.clearCache');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'DwgConverterService.clearCache',
+      );
       debugPrint('DwgConverterService: Error clearing cache: $e');
     }
   }
@@ -455,7 +506,9 @@ class DwgConverterService {
   static Future<void> clearCacheForFile(String dwgPath) async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final cacheDir = Directory('${tempDir.path}${Platform.pathSeparator}$_cacheFolder');
+      final cacheDir = Directory(
+        '${tempDir.path}${Platform.pathSeparator}$_cacheFolder',
+      );
       if (!await cacheDir.exists()) return;
 
       final fileName = dwgPath.split(Platform.pathSeparator).last;
@@ -466,7 +519,8 @@ class DwgConverterService {
       // Delete all cache entries whose name starts with this base name
       // (they encode size + timestamp in the filename, so there may be stale versions).
       await for (final entity in cacheDir.list()) {
-        if (entity is File && entity.uri.pathSegments.last.startsWith('${baseName}_')) {
+        if (entity is File &&
+            entity.uri.pathSegments.last.startsWith('${baseName}_')) {
           try {
             await entity.delete();
             debugPrint('DwgConverterService: Deleted cache for $baseName');
@@ -478,10 +532,18 @@ class DwgConverterService {
         }
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.clearCacheForFile.fs');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'DwgConverterService.clearCacheForFile.fs',
+      );
       debugPrint('DwgConverterService: Error clearing cache for $dwgPath: $e');
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.clearCacheForFile');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'DwgConverterService.clearCacheForFile',
+      );
       debugPrint('DwgConverterService: Error clearing cache for $dwgPath: $e');
     }
   }
@@ -504,7 +566,8 @@ class DwgConverterService {
       await for (final entity in safeDir.list()) {
         if (entity is File) {
           final fileName = entity.uri.pathSegments.last;
-          if (fileName.startsWith('dwg_in_') || fileName.startsWith('dwg_out_')) {
+          if (fileName.startsWith('dwg_in_') ||
+              fileName.startsWith('dwg_out_')) {
             bool shouldDelete = isStartup;
             if (!shouldDelete) {
               try {
@@ -528,10 +591,16 @@ class DwgConverterService {
         }
       }
       if (deletedCount > 0) {
-        debugPrint('DwgConverterService: Cleaned up $deletedCount stale temp files from ${safeDir.path}');
+        debugPrint(
+          'DwgConverterService: Cleaned up $deletedCount stale temp files from ${safeDir.path}',
+        );
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.cleanupStaleTempFiles');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'DwgConverterService.cleanupStaleTempFiles',
+      );
       debugPrint('DwgConverterService: Error cleaning stale temp files: $e');
     }
   }
@@ -549,7 +618,9 @@ class DwgConverterService {
         cacheDir = customCacheDir;
       } else {
         final tempDir = await getTemporaryDirectory();
-        cacheDir = Directory('${tempDir.path}${Platform.pathSeparator}$_cacheFolder');
+        cacheDir = Directory(
+          '${tempDir.path}${Platform.pathSeparator}$_cacheFolder',
+        );
       }
       if (!await cacheDir.exists()) return;
 
@@ -568,7 +639,11 @@ class DwgConverterService {
               prunedCount++;
               continue;
             }
-            entries.add((file: entity, size: stat.size, modified: stat.modified));
+            entries.add((
+              file: entity,
+              size: stat.size,
+              modified: stat.modified,
+            ));
             totalSize += stat.size;
           } on FileSystemException catch (_) {
             // Skip unreadable files
@@ -597,7 +672,11 @@ class DwgConverterService {
         );
       }
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.pruneCache');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'DwgConverterService.pruneCache',
+      );
       debugPrint('DwgConverterService: Error pruning cache: $e');
     }
   }
@@ -607,10 +686,7 @@ class _ConversionParams {
   final String inputDwgPath;
   final String outputDxfPath;
 
-  _ConversionParams({
-    required this.inputDwgPath,
-    required this.outputDxfPath,
-  });
+  _ConversionParams({required this.inputDwgPath, required this.outputDxfPath});
 }
 
 int _runConversionInIsolate(_ConversionParams params) {

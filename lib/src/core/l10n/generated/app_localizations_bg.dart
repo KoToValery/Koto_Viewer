@@ -12274,7 +12274,7 @@ class AppLocalizationsBg extends AppLocalizations {
       'Запазва базовата точка при обновяване или замяна на подложката, за да не се размества';
 
   @override
-  String get architectCadUnderlayReloadNow => 'Презареди';
+  String get architectCadUnderlayReloadNow => 'Обнови';
 
   @override
   String get architectCadUnderlayLayersFilter => 'DXF Слоеве';
@@ -12901,4 +12901,150 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get bimExactDistanceInputHelp =>
       'Докосни стойността за точно разстояние.';
+
+  @override
+  String get architectPolygonAngleUnlockHelp =>
+      'Ъглите на съседните страни се запазват. Докосни за свободна промяна.';
+
+  @override
+  String get architectPolygonAngleLockHelp =>
+      'Докосни за запазване на ъглите на съседните страни при преместване на ръба.';
+
+  @override
+  String get architectPolygonAngleLocked => 'Заключени ъгли';
+
+  @override
+  String get architectPolygonAngleFree => 'Свободни ъгли';
+
+  @override
+  String architectSlabNumber(int number) {
+    return 'Плоча $number';
+  }
+
+  @override
+  String get architectEllipseFirstRadius => 'Първи радиус';
+
+  @override
+  String get architectEllipseSecondRadius => 'Втори радиус';
+
+  @override
+  String get architectEllipsePickCenter => 'Посочи център';
+
+  @override
+  String get architectEllipsePickFirstAxis => 'Посочи първа полуос';
+
+  @override
+  String get architectEllipsePickSecondAxis => 'Посочи втора полуос';
+
+  @override
+  String get architectUnderlayUnavailable => 'Файлът на подложката липсва';
+
+  @override
+  String get architectCopyDialogTitle => 'Копиране по етажи';
+
+  @override
+  String get architectCopyFrom => 'От етаж';
+
+  @override
+  String get architectCopyWhat => 'Елементи';
+
+  @override
+  String get architectCopyTo => 'Към етажи';
+
+  @override
+  String get architectCopyAll => 'Всички';
+
+  @override
+  String get architectCopyAbove => 'Над изходния';
+
+  @override
+  String get architectCopyNone => 'Нито един';
+
+  @override
+  String get architectCopyScopeAll => 'Целият етаж';
+
+  @override
+  String architectCopyScopeSelection(int count) {
+    return 'Избрани ($count)';
+  }
+
+  @override
+  String get architectCopySettings => 'Настройки';
+
+  @override
+  String get architectCopyReplace => 'Замени';
+
+  @override
+  String get architectCopyMerge => 'Добави';
+
+  @override
+  String get architectCopyWallHeights => 'Напасни височините на стените';
+
+  @override
+  String get architectCopyLevelMarkers => 'Преизчисли котите';
+
+  @override
+  String get architectCopyGroups => 'Запази групите';
+
+  @override
+  String get architectCopyNewStoreys => 'Нови етажи';
+
+  @override
+  String get architectCopyTargetsEmpty =>
+      'Добавете етаж, към който да копирате.';
+
+  @override
+  String architectCopySummary(int elements, int storeys) {
+    String _temp0 = intl.Intl.pluralLogic(
+      elements,
+      locale: localeName,
+      other: '$elements елемента',
+      one: '1 елемент',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      storeys,
+      locale: localeName,
+      other: '$storeys етажа',
+      one: '1 етаж',
+    );
+    return '$_temp0 → $_temp1';
+  }
+
+  @override
+  String architectCopyReplaceImpact(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Ще бъдат заменени $count съществуващи елемента.',
+      one: 'Ще бъде заменен 1 съществуващ елемент.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get architectCopyBatchInvalid =>
+      'Въведете цял брой от 1 до 100 и височина над нула.';
+
+  @override
+  String get architectCopyAction => 'Копирай';
+
+  @override
+  String architectCopyStoreyName(int number) {
+    return 'Етаж $number';
+  }
+
+  @override
+  String get architectCopyNewStoreysHelp =>
+      'Новите етажи се създават при копиране, включително неизбраните като цел.';
+
+  @override
+  String architectCopyNewStoreysSummary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Ще бъдат създадени $count нови етажа',
+      one: 'Ще бъде създаден 1 нов етаж',
+    );
+    return '$_temp0';
+  }
 }

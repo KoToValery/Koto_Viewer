@@ -22263,7 +22263,7 @@ abstract class AppLocalizations {
   /// Button to manually reload external CAD file
   ///
   /// In en, this message translates to:
-  /// **'Reload'**
+  /// **'Refresh'**
   String get architectCadUnderlayReloadNow;
 
   /// Button to open DXF layers filter sheet
@@ -23405,6 +23405,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap the value to enter an exact distance.'**
   String get bimExactDistanceInputHelp;
+
+  /// No description provided for @architectPolygonAngleUnlockHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep adjacent side angles. Tap to allow angle changes.'**
+  String get architectPolygonAngleUnlockHelp;
+
+  /// No description provided for @architectPolygonAngleLockHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to keep adjacent side angles when moving this edge.'**
+  String get architectPolygonAngleLockHelp;
+
+  /// No description provided for @architectPolygonAngleLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Angles locked'**
+  String get architectPolygonAngleLocked;
+
+  /// No description provided for @architectPolygonAngleFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Angles free'**
+  String get architectPolygonAngleFree;
+
+  /// No description provided for @architectSlabNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Slab {number}'**
+  String architectSlabNumber(int number);
+
+  /// No description provided for @architectEllipseFirstRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'First radius'**
+  String get architectEllipseFirstRadius;
+
+  /// No description provided for @architectEllipseSecondRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Second radius'**
+  String get architectEllipseSecondRadius;
+
+  /// No description provided for @architectEllipsePickCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick centre'**
+  String get architectEllipsePickCenter;
+
+  /// No description provided for @architectEllipsePickFirstAxis.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick first semi-axis'**
+  String get architectEllipsePickFirstAxis;
+
+  /// No description provided for @architectEllipsePickSecondAxis.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick second semi-axis'**
+  String get architectEllipsePickSecondAxis;
+
+  /// No description provided for @architectUnderlayUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay file unavailable'**
+  String get architectUnderlayUnavailable;
+
+  /// Title of the dialog for copying elements between building storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Copy between storeys'**
+  String get architectCopyDialogTitle;
+
+  /// Short heading for the source storey
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get architectCopyFrom;
+
+  /// Short heading for element categories to copy
+  ///
+  /// In en, this message translates to:
+  /// **'Elements'**
+  String get architectCopyWhat;
+
+  /// Short heading for destination storeys
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get architectCopyTo;
+
+  /// Select all available items in the copy dialog
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get architectCopyAll;
+
+  /// Select destination storeys above the source storey
+  ///
+  /// In en, this message translates to:
+  /// **'Above'**
+  String get architectCopyAbove;
+
+  /// Clear selected items in the copy dialog
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get architectCopyNone;
+
+  /// Copy scope covering all elements on the source storey
+  ///
+  /// In en, this message translates to:
+  /// **'Entire storey'**
+  String get architectCopyScopeAll;
+
+  /// Copy scope limited to the current element selection
+  ///
+  /// In en, this message translates to:
+  /// **'Selected ({count})'**
+  String architectCopyScopeSelection(int count);
+
+  /// Heading for copy mode and adaptation settings
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get architectCopySettings;
+
+  /// Copy mode replacing existing elements of selected categories
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get architectCopyReplace;
+
+  /// Copy mode adding copies while preserving existing elements
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get architectCopyMerge;
+
+  /// Adapt copied wall heights to the destination storey
+  ///
+  /// In en, this message translates to:
+  /// **'Fit wall heights'**
+  String get architectCopyWallHeights;
+
+  /// Recalculate copied elevation markers for the destination storey
+  ///
+  /// In en, this message translates to:
+  /// **'Update levels'**
+  String get architectCopyLevelMarkers;
+
+  /// Preserve element grouping when copying between storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Keep groups'**
+  String get architectCopyGroups;
+
+  /// Action to create destination storeys in the copy dialog
+  ///
+  /// In en, this message translates to:
+  /// **'New storeys'**
+  String get architectCopyNewStoreys;
+
+  /// Empty state when no destination storeys are available
+  ///
+  /// In en, this message translates to:
+  /// **'Add a storey to choose a destination.'**
+  String get architectCopyTargetsEmpty;
+
+  /// Summary of source elements and destination storeys before copying
+  ///
+  /// In en, this message translates to:
+  /// **'{elements, plural, one{1 element} other{{elements} elements}} → {storeys, plural, one{1 storey} other{{storeys} storeys}}'**
+  String architectCopySummary(int elements, int storeys);
+
+  /// Number of existing elements affected by replace mode on destination storeys
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 existing element will be replaced.} other{{count} existing elements will be replaced.}}'**
+  String architectCopyReplaceImpact(int count);
+
+  /// Validation error for the count and height of new destination storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a whole number from 1 to 100 and a height greater than zero.'**
+  String get architectCopyBatchInvalid;
+
+  /// Short primary action to copy elements between storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get architectCopyAction;
+
+  /// Default name for a newly created destination storey
+  ///
+  /// In en, this message translates to:
+  /// **'Storey {number}'**
+  String architectCopyStoreyName(int number);
+
+  /// Tooltip explaining that all staged storeys are created when copying
+  ///
+  /// In en, this message translates to:
+  /// **'New storeys are created when you copy, including those not selected as destinations.'**
+  String get architectCopyNewStoreysHelp;
+
+  /// Summary of all staged storeys to be created when copying
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Creates 1 new storey} other{Creates {count} new storeys}}'**
+  String architectCopyNewStoreysSummary(int count);
 }
 
 class _AppLocalizationsDelegate

@@ -1,10 +1,15 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'dart:convert';
+import 'dart:io';
+import '../../../core/services/dwg_converter_service.dart';
+import '../../dxf_viewer/binary/kcad_service.dart';
+import '../../dxf_viewer/parser/dxf_parser.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/rendering/dxf_quadtree.dart';
 import 'bim_underlay_conversion_service.dart';
 import '../../structural_designer/analysis/structural_underlay_filter.dart';
+import '../../structural_designer/analysis/structural_underlay_source.dart';
 import '../models/bim_work_project.dart';
 import 'bim_project_library_service.dart';
 import 'dxf_document_transformer.dart';
@@ -23,6 +28,8 @@ class LoadedBimUnderlays {
     required this.cadUnitsPerMeter,
   });
 }
+
+enum BimUnderlayLoadMode { structural, architecturalOriginal }
 
 /// Service that parses, scales, aligns, and configures all floor underlays
 /// for a BiM work project into a common project coordinate space.
@@ -47,12 +54,47 @@ class BimUnderlayLoader {
     required BimWorkProject project,
     BimProjectLibraryService? libraryService,
     bool isBulgarian = true,
+    BimUnderlayLoadMode mode = BimUnderlayLoadMode.structural,
   }) async {
     final lib = libraryService ?? BimProjectLibraryService.instance;
     final rawDocs = <String, DxfDocument>{};
 
-    project = await lib.prepareUnderlays(project, loadedDocuments: rawDocs);
-    return alignDocuments(project: project, rawDocuments: rawDocs);
+    if (mode == BimUnderlayLoadMode.architecturalOriginal) {
+      for (final storey in project.storeys.where((s) => s.hasUnderlay)) {
+        final candidates = <String>{
+          if (storey.processing['pure'] is String)
+            storey.processing['pure'] as String,
+          if (storey.processing['source'] is String)
+            storey.processing['source'] as String,
+          storey.underlayFileName!,
+        };
+        for (final stored in candidates) {
+          final file = await lib.getUnderlayFile(project.id, stored);
+          if (file == null) continue;
+          try {
+            final ext = file.path.split('.').last.toLowerCase();
+            final doc = ext == 'kcad'
+                ? await KcadService.loadKcadFile(file)
+                : await DxfParser.parseFromFile(
+                    ext == 'dwg'
+                        ? File(
+                            await DwgConverterService.convertDwgToDxf(
+                              file.path,
+                            ),
+                          )
+                        : file,
+                  );
+            rawDocs[storey.storeyId] = StructuralUnderlaySource.original(doc);
+            break;
+          } catch (_) {
+            // Recover only from another exact source reference of this storey.
+          }
+        }
+      }
+    } else {
+      project = await lib.prepareUnderlays(project, loadedDocuments: rawDocs);
+    }
+    return alignDocuments(project: project, rawDocuments: rawDocs, mode: mode);
   }
 
   /// Read-only alignment of an already captured revision, also used by export.
@@ -60,6 +102,7 @@ class BimUnderlayLoader {
   static LoadedBimUnderlays alignDocuments({
     required BimWorkProject project,
     required Map<String, DxfDocument> rawDocuments,
+    BimUnderlayLoadMode mode = BimUnderlayLoadMode.structural,
   }) {
     final rawDocs = rawDocuments;
     if (rawDocs.isEmpty) {
@@ -116,33 +159,39 @@ class BimUnderlayLoader {
         scale: scale,
       );
 
-      BimUnderlayMetadata.ensureDynamicLayers(transformed);
-      final dynamicNames = BimUnderlayMetadata.dynamicLayers(transformed);
-      final hasDynamicPreferences = storey.layerVisibility.containsKey(dynamicNames['axes']);
-
-      // Restore layer visibility if saved; if not saved yet (initial startup),
-      // apply automatic underlay filter to all storeys so every layout starts filtered!
-      if (storey.layerVisibility.isNotEmpty) {
-        for (final entry in storey.layerVisibility.entries) {
-          if (!hasDynamicPreferences && dynamicNames.values.contains(entry.key)) continue;
-          if (transformed.layers.containsKey(entry.key)) {
-            transformed.layers[entry.key]!.isVisible = entry.value;
-          }
-        }
-      } else if (BimUnderlayMetadata.read(transformed) == null) {
-        // Initial start: apply automatic filtering to all floor layouts
-        final visibleLayerNames = StructuralUnderlayFilter.filterLayers(
-          layers: transformed.layers.values,
-          entities: transformed.entities,
-          blocks: transformed.blocks,
+      if (mode == BimUnderlayLoadMode.structural) {
+        BimUnderlayMetadata.ensureDynamicLayers(transformed);
+        final dynamicNames = BimUnderlayMetadata.dynamicLayers(transformed);
+        final hasDynamicPreferences = storey.layerVisibility.containsKey(
+          dynamicNames['axes'],
         );
-        if (visibleLayerNames.isNotEmpty) {
-          for (final layer in transformed.layers.values) {
-            layer.isVisible = visibleLayerNames.contains(layer.name);
+
+        // Restore layer visibility if saved; if not saved yet (initial startup),
+        // apply automatic underlay filter to all storeys so every layout starts filtered!
+        if (storey.layerVisibility.isNotEmpty) {
+          for (final entry in storey.layerVisibility.entries) {
+            if (!hasDynamicPreferences &&
+                dynamicNames.values.contains(entry.key))
+              continue;
+            if (transformed.layers.containsKey(entry.key)) {
+              transformed.layers[entry.key]!.isVisible = entry.value;
+            }
           }
+        } else if (BimUnderlayMetadata.read(transformed) == null) {
+          // Initial start: apply automatic filtering to all floor layouts
+          final visibleLayerNames = StructuralUnderlayFilter.filterLayers(
+            layers: transformed.layers.values,
+            entities: transformed.entities,
+            blocks: transformed.blocks,
+          );
+          if (visibleLayerNames.isNotEmpty) {
+            for (final layer in transformed.layers.values) {
+              layer.isVisible = visibleLayerNames.contains(layer.name);
+            }
+          }
+        } else {
+          BimUnderlayMetadata.setFiltered(transformed, true);
         }
-      } else {
-        BimUnderlayMetadata.setFiltered(transformed, true);
       }
 
       final metadata = BimUnderlayMetadata.read(transformed);

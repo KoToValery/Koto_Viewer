@@ -1,3 +1,4 @@
+import 'architect_ellipse_geometry.dart';
 import '../rendering/architect_annotation_layout.dart';
 import 'dart:math' as math;
 import 'package:flutter/painting.dart';
@@ -279,6 +280,30 @@ class ArchitectMarqueeTool {
         }
       } else if (primitive.isPolygon) {
         if (contour(primitive.polygonCorners, primitive.holes)) {
+          selected.add(primitive.id);
+        }
+      } else if (primitive.type == CadPrimitiveType.ellipse) {
+        final ellipse = ArchitectEllipseGeometry.fromPrimitive(primitive);
+        final hits = <bool>[];
+        if (ellipse.isArc) {
+          for (var i = 0; i < 128; i++) {
+            hits.add(
+              segment(
+                ellipse.pointAt(
+                  ellipse.startAngle + ellipse.sweepAngle * i / 128,
+                ),
+                ellipse.pointAt(
+                  ellipse.startAngle + ellipse.sweepAngle * (i + 1) / 128,
+                ),
+              ),
+            );
+          }
+        }
+        if (ellipse.isArc
+            ? relation == ArchitectSelectionRelation.contained
+                  ? hits.every((hit) => hit)
+                  : hits.any((hit) => hit)
+            : region(ellipse.path)) {
           selected.add(primitive.id);
         }
       } else if (primitive.type == CadPrimitiveType.circle) {

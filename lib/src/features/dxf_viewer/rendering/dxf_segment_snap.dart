@@ -119,7 +119,7 @@ class DxfSegmentSnap {
   /// Infinite line intersection between two segments that do not physically touch.
   /// Returns null if parallel, coincident, or if the intersection is already finite on both segments.
   static ({Offset point, (Offset, Offset)? guide1, (Offset, Offset)? guide2})?
-      extendedIntersection(
+  extendedIntersection(
     (Offset, Offset) first,
     (Offset, Offset) second, {
     double maxExtension = 25.0,
@@ -159,11 +159,12 @@ class DxfSegmentSnap {
   }
 
   static ({Offset point, (Offset, Offset)? guide1, (Offset, Offset)? guide2})?
-      nearestExtendedIntersection({
+  nearestExtendedIntersection({
     required DxfDocument document,
     required Offset point,
     required double tolerance,
     double? maxExtension,
+    bool Function(Offset)? pointFilter,
     Map<String, bool> layerVisibility = const {},
   }) {
     final effectiveMaxExt = maxExtension ?? math.max(25.0, tolerance * 15.0);
@@ -173,7 +174,8 @@ class DxfSegmentSnap {
       radius: effectiveMaxExt,
       layerVisibility: layerVisibility,
     );
-    ({Offset point, (Offset, Offset)? guide1, (Offset, Offset)? guide2})? result;
+    ({Offset point, (Offset, Offset)? guide1, (Offset, Offset)? guide2})?
+    result;
     var best = tolerance;
     for (var i = 0; i < segments.length; i++) {
       final s1 = segments[i];
@@ -194,7 +196,8 @@ class DxfSegmentSnap {
         if (cross2 * cross2 > tolerance * tolerance * lenSq2) continue;
 
         final ext = extendedIntersection(s1, s2, maxExtension: effectiveMaxExt);
-        if (ext == null) continue;
+        if (ext == null || (pointFilter != null && !pointFilter(ext.point)))
+          continue;
         final distance = (ext.point - point).distance;
         if (distance <= best) {
           best = distance;
@@ -209,6 +212,7 @@ class DxfSegmentSnap {
     required DxfDocument document,
     required Offset point,
     required double tolerance,
+    bool Function(Offset)? pointFilter,
   }) {
     final segments = nearby(
       document: document,
@@ -220,7 +224,7 @@ class DxfSegmentSnap {
     for (var i = 0; i < segments.length; i++) {
       for (var j = i + 1; j < segments.length; j++) {
         final p = intersection(segments[i], segments[j]);
-        if (p == null) continue;
+        if (p == null || (pointFilter != null && !pointFilter(p))) continue;
         final distance = (p - point).distance;
         if (distance <= best) {
           best = distance;

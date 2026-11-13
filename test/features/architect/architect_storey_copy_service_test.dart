@@ -59,12 +59,7 @@ void main() {
 
       final slab1 = const ArchitectSlab(
         id: 'slab_1',
-        polygon: [
-          Offset(0, 0),
-          Offset(6, 0),
-          Offset(6, 4),
-          Offset(0, 4),
-        ],
+        polygon: [Offset(0, 0), Offset(6, 0), Offset(6, 4), Offset(0, 4)],
         thickness: 0.20,
       );
 
@@ -72,12 +67,7 @@ void main() {
         id: 'zone_1',
         name: 'Дневна с трапезария',
         category: ArchitectZoneCategory.living,
-        polygon: [
-          Offset(0, 0),
-          Offset(6, 0),
-          Offset(6, 4),
-          Offset(0, 4),
-        ],
+        polygon: [Offset(0, 0), Offset(6, 0), Offset(6, 4), Offset(0, 4)],
       );
 
       final marker1 = const ArchitectElevationMarker(
@@ -138,8 +128,10 @@ void main() {
         preserveGroups: true,
       );
 
-      final (updatedProject, result) =
-          ArchitectStoreyCopyService.copyElements(testProject, options);
+      final (updatedProject, result) = ArchitectStoreyCopyService.copyElements(
+        testProject,
+        options,
+      );
 
       expect(result.targetStoreyCount, 2);
       expect(result.totalCopied, greaterThan(0));
@@ -175,48 +167,58 @@ void main() {
       expect(s3.slabs.length, 1);
     });
 
-    test('wall height adapts when followStoreyHeight is true and target height differs', () {
-      final options = const StoreyCopyOptions(
-        sourceStoreyId: 'storey_1',
-        targetStoreyIds: {'storey_2'},
-        mode: StoreyCopyMode.replace,
-        adjustWallHeights: true,
-      );
+    test(
+      'wall height adapts when followStoreyHeight is true and target height differs',
+      () {
+        final options = const StoreyCopyOptions(
+          sourceStoreyId: 'storey_1',
+          targetStoreyIds: {'storey_2'},
+          mode: StoreyCopyMode.replace,
+          adjustWallHeights: true,
+        );
 
-      final (updatedProject, _) =
-          ArchitectStoreyCopyService.copyElements(testProject, options);
+        final (updatedProject, _) = ArchitectStoreyCopyService.copyElements(
+          testProject,
+          options,
+        );
 
-      final s2 = updatedProject.storeys.firstWhere((s) => s.id == 'storey_2');
+        final s2 = updatedProject.storeys.firstWhere((s) => s.id == 'storey_2');
 
-      // Wall 1 had followStoreyHeight: true, so height should match storey_2 (3.20m)
-      final wall1Copy = s2.walls.firstWhere((w) => w.followStoreyHeight);
-      expect(wall1Copy.height, 3.20);
+        // Wall 1 had followStoreyHeight: true, so height should match storey_2 (3.20m)
+        final wall1Copy = s2.walls.firstWhere((w) => w.followStoreyHeight);
+        expect(wall1Copy.height, 3.20);
 
-      // Parapet wall had followStoreyHeight: false, so height should stay 1.10m
-      final parapetCopy = s2.walls.firstWhere((w) => !w.followStoreyHeight);
-      expect(parapetCopy.height, 1.10);
-    });
+        // Parapet wall had followStoreyHeight: false, so height should stay 1.10m
+        final parapetCopy = s2.walls.firstWhere((w) => !w.followStoreyHeight);
+        expect(parapetCopy.height, 1.10);
+      },
+    );
 
-    test('elevation markers shift by delta Z to reflect target storey elevation', () {
-      final options = const StoreyCopyOptions(
-        sourceStoreyId: 'storey_1',
-        targetStoreyIds: {'storey_2', 'storey_3'},
-        adjustLevelMarkers: true,
-      );
+    test(
+      'elevation markers shift by delta Z to reflect target storey elevation',
+      () {
+        final options = const StoreyCopyOptions(
+          sourceStoreyId: 'storey_1',
+          targetStoreyIds: {'storey_2', 'storey_3'},
+          adjustLevelMarkers: true,
+        );
 
-      final (updatedProject, _) =
-          ArchitectStoreyCopyService.copyElements(testProject, options);
+        final (updatedProject, _) = ArchitectStoreyCopyService.copyElements(
+          testProject,
+          options,
+        );
 
-      final s2 = updatedProject.storeys.firstWhere((s) => s.id == 'storey_2');
-      final s3 = updatedProject.storeys.firstWhere((s) => s.id == 'storey_3');
+        final s2 = updatedProject.storeys.firstWhere((s) => s.id == 'storey_2');
+        final s3 = updatedProject.storeys.firstWhere((s) => s.id == 'storey_3');
 
-      // Source marker was 0.00 on storey 0.00
-      // Target 2 elevation is 2.80 -> marker should be 2.80
-      expect(s2.elevationMarkers.single.elevation, 2.80);
+        // Source marker was 0.00 on storey 0.00
+        // Target 2 elevation is 2.80 -> marker should be 2.80
+        expect(s2.elevationMarkers.single.elevation, 2.80);
 
-      // Target 3 elevation is 6.00 -> marker should be 6.00
-      expect(s3.elevationMarkers.single.elevation, 6.00);
-    });
+        // Target 3 elevation is 6.00 -> marker should be 6.00
+        expect(s3.elevationMarkers.single.elevation, 6.00);
+      },
+    );
 
     test('element groups are preserved with mapped member IDs', () {
       final options = const StoreyCopyOptions(
@@ -225,8 +227,10 @@ void main() {
         preserveGroups: true,
       );
 
-      final (updatedProject, _) =
-          ArchitectStoreyCopyService.copyElements(testProject, options);
+      final (updatedProject, _) = ArchitectStoreyCopyService.copyElements(
+        testProject,
+        options,
+      );
 
       final s2 = updatedProject.storeys.firstWhere((s) => s.id == 'storey_2');
       expect(s2.groups.length, 1);
@@ -246,8 +250,10 @@ void main() {
         selectedElementIds: {'col_1'}, // Only column, no walls or slabs
       );
 
-      final (updatedProject, _) =
-          ArchitectStoreyCopyService.copyElements(testProject, options);
+      final (updatedProject, _) = ArchitectStoreyCopyService.copyElements(
+        testProject,
+        options,
+      );
 
       final s2 = updatedProject.storeys.firstWhere((s) => s.id == 'storey_2');
       expect(s2.columns.length, 1);
@@ -256,72 +262,75 @@ void main() {
       expect(s2.zones, isEmpty);
     });
 
-    test('replace mode clears existing category elements; merge mode appends', () {
-      // Give storey_2 an existing column and wall
-      final oldStorey2 = testProject.storeys
-          .firstWhere((s) => s.id == 'storey_2')
-          .copyWith(
-            columns: const [
-              ArchitectColumn(
-                id: 'old_col',
-                position: Offset(10, 10),
-                width: 0.40,
-                depth: 0.40,
-              ),
-            ],
-            walls: const [
-              ArchitectWall(
-                id: 'old_wall',
-                startPoint: Offset(10, 10),
-                endPoint: Offset(12, 10),
-              ),
-            ],
-          );
+    test(
+      'replace mode clears existing category elements; merge mode appends',
+      () {
+        // Give storey_2 an existing column and wall
+        final oldStorey2 = testProject.storeys
+            .firstWhere((s) => s.id == 'storey_2')
+            .copyWith(
+              columns: const [
+                ArchitectColumn(
+                  id: 'old_col',
+                  position: Offset(10, 10),
+                  width: 0.40,
+                  depth: 0.40,
+                ),
+              ],
+              walls: const [
+                ArchitectWall(
+                  id: 'old_wall',
+                  startPoint: Offset(10, 10),
+                  endPoint: Offset(12, 10),
+                ),
+              ],
+            );
 
-      final projWithExisting = testProject.copyWith(
-        storeys: [
-          testProject.storeys[0],
-          oldStorey2,
-          testProject.storeys[2],
-        ],
-      );
+        final projWithExisting = testProject.copyWith(
+          storeys: [testProject.storeys[0], oldStorey2, testProject.storeys[2]],
+        );
 
-      // 1. Replace mode with walls only
-      final replaceOptions = const StoreyCopyOptions(
-        sourceStoreyId: 'storey_1',
-        targetStoreyIds: {'storey_2'},
-        elementTypes: {ArchitectStoreyElementType.walls},
-        mode: StoreyCopyMode.replace,
-      );
+        // 1. Replace mode with walls only
+        final replaceOptions = const StoreyCopyOptions(
+          sourceStoreyId: 'storey_1',
+          targetStoreyIds: {'storey_2'},
+          elementTypes: {ArchitectStoreyElementType.walls},
+          mode: StoreyCopyMode.replace,
+        );
 
-      final (afterReplace, _) = ArchitectStoreyCopyService.copyElements(
-        projWithExisting,
-        replaceOptions,
-      );
-      final s2Replaced = afterReplace.storeys.firstWhere((s) => s.id == 'storey_2');
-      // old_wall was replaced with 2 cloned walls
-      expect(s2Replaced.walls.any((w) => w.id == 'old_wall'), isFalse);
-      expect(s2Replaced.walls.length, 2);
-      // columns was NOT in elementTypes, so old_col remains!
-      expect(s2Replaced.columns.any((c) => c.id == 'old_col'), isTrue);
+        final (afterReplace, _) = ArchitectStoreyCopyService.copyElements(
+          projWithExisting,
+          replaceOptions,
+        );
+        final s2Replaced = afterReplace.storeys.firstWhere(
+          (s) => s.id == 'storey_2',
+        );
+        // old_wall was replaced with 2 cloned walls
+        expect(s2Replaced.walls.any((w) => w.id == 'old_wall'), isFalse);
+        expect(s2Replaced.walls.length, 2);
+        // columns was NOT in elementTypes, so old_col remains!
+        expect(s2Replaced.columns.any((c) => c.id == 'old_col'), isTrue);
 
-      // 2. Merge mode
-      final mergeOptions = const StoreyCopyOptions(
-        sourceStoreyId: 'storey_1',
-        targetStoreyIds: {'storey_2'},
-        elementTypes: {ArchitectStoreyElementType.walls},
-        mode: StoreyCopyMode.merge,
-      );
+        // 2. Merge mode
+        final mergeOptions = const StoreyCopyOptions(
+          sourceStoreyId: 'storey_1',
+          targetStoreyIds: {'storey_2'},
+          elementTypes: {ArchitectStoreyElementType.walls},
+          mode: StoreyCopyMode.merge,
+        );
 
-      final (afterMerge, _) = ArchitectStoreyCopyService.copyElements(
-        projWithExisting,
-        mergeOptions,
-      );
-      final s2Merged = afterMerge.storeys.firstWhere((s) => s.id == 'storey_2');
-      // old_wall is still present, plus 2 cloned walls -> 3 walls total
-      expect(s2Merged.walls.any((w) => w.id == 'old_wall'), isTrue);
-      expect(s2Merged.walls.length, 3);
-    });
+        final (afterMerge, _) = ArchitectStoreyCopyService.copyElements(
+          projWithExisting,
+          mergeOptions,
+        );
+        final s2Merged = afterMerge.storeys.firstWhere(
+          (s) => s.id == 'storey_2',
+        );
+        // old_wall is still present, plus 2 cloned walls -> 3 walls total
+        expect(s2Merged.walls.any((w) => w.id == 'old_wall'), isTrue);
+        expect(s2Merged.walls.length, 3);
+      },
+    );
 
     test('Undo and Redo via ArchitectCommandController', () {
       final controller = ArchitectCommandController(testProject);
@@ -344,9 +353,7 @@ void main() {
       // Undo
       controller.undo();
       expect(
-        controller.project.storeys
-            .firstWhere((s) => s.id == 'storey_2')
-            .walls,
+        controller.project.storeys.firstWhere((s) => s.id == 'storey_2').walls,
         isEmpty,
       );
 
@@ -359,6 +366,107 @@ void main() {
             .length,
         2,
       );
+    });
+
+    test('staged storeys and their copies commit in one undo step', () {
+      final original = testProject.ensureRoofStorey();
+      final controller = ArchitectCommandController(original);
+      addTearDown(controller.dispose);
+      final baseline = controller.project;
+      final staged = baseline.batchAddTypicalStoreys(
+        count: 2,
+        typicalHeight: 3.00,
+        namePrefix: 'Typical floor',
+      );
+      final originalIds = baseline.storeys.map((storey) => storey.id).toSet();
+      final added = staged.storeys
+          .where((storey) => !originalIds.contains(storey.id))
+          .toList();
+      final options = StoreyCopyOptions(
+        sourceStoreyId: 'storey_1',
+        targetStoreyIds: added.map((storey) => storey.id).toSet(),
+        additionalStoreys: [
+          baseline.storeys.first.copyWith(name: 'Must not replace the source'),
+          ...added,
+          ...added,
+        ],
+      ).copyWith(adjustLevelMarkers: false);
+
+      // Staging (including abandoning the dialog here) leaves the model and
+      // history untouched. Only executing the copy publishes either change.
+      expect(controller.project, same(baseline));
+      expect(controller.undoCount, 0);
+      expect(baseline.storeys.length, original.storeys.length);
+
+      controller.execute(CopyArchitectElementsAcrossStoreys(options));
+      expect(controller.undoCount, 1);
+      expect(controller.project.storeys.length, baseline.storeys.length + 2);
+      expect(
+        controller.project.storeys.first.name,
+        baseline.storeys.first.name,
+      );
+      for (final addedStorey in added) {
+        final copied = controller.project.storeys.firstWhere(
+          (storey) => storey.id == addedStorey.id,
+        );
+        expect(copied.name, addedStorey.name);
+        expect(copied.walls.length, 2);
+        expect(copied.columns.length, 1);
+        expect(copied.elevationMarkers.single.elevation, 0);
+        expect(
+          copied.walls.singleWhere((wall) => wall.followStoreyHeight).height,
+          3.00,
+        );
+      }
+      expect(controller.project.roofStorey!.elevation, closeTo(14.80, 1e-4));
+      final committed = controller.project.toJson();
+
+      controller.undo();
+      expect(controller.project.toJson(), baseline.toJson());
+      expect(controller.canUndo, isFalse);
+      controller.redo();
+      expect(controller.project.toJson(), committed);
+    });
+
+    test('invalid copies never publish staged storeys', () {
+      final staged = testProject.batchAddTypicalStoreys(
+        count: 1,
+        namePrefix: 'Typical floor',
+      );
+      final added = staged.storeys.last;
+      final options = StoreyCopyOptions(
+        sourceStoreyId: 'storey_1',
+        targetStoreyIds: {added.id},
+        additionalStoreys: [added],
+      );
+
+      for (final invalid in [
+        options.copyWith(sourceStoreyId: 'missing'),
+        options.copyWith(targetStoreyIds: {}),
+        options.copyWith(targetStoreyIds: {'storey_1', 'missing'}),
+        options.copyWith(elementTypes: {}),
+        options.copyWith(selectedElementIds: {'missing'}),
+      ]) {
+        final (unchanged, result) = ArchitectStoreyCopyService.copyElements(
+          testProject,
+          invalid,
+        );
+        expect(unchanged, same(testProject));
+        expect(result, same(StoreyCopyResult.empty));
+      }
+    });
+
+    test('copy summary counts only existing target storeys', () {
+      final (_, result) = ArchitectStoreyCopyService.copyElements(
+        testProject,
+        const StoreyCopyOptions(
+          sourceStoreyId: 'storey_1',
+          targetStoreyIds: {'storey_1', 'storey_2', 'missing'},
+          elementTypes: {ArchitectStoreyElementType.columns},
+        ),
+      );
+      expect(result.targetStoreyCount, 1);
+      expect(result.totalCopied, 1);
     });
 
     test('batchAddTypicalStoreys stacks elevations accurately', () {

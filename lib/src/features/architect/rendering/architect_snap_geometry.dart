@@ -1,3 +1,4 @@
+import '../services/architect_ellipse_geometry.dart';
 import '../services/architect_roof_junctions.dart';
 import 'architect_path_solid.dart';
 import 'dart:math' as math;
@@ -363,15 +364,19 @@ class ArchitectSnapGeometry {
             if (i > 0) edge(pts[i - 1], pts[i], primitive.id);
           }
         case CadPrimitiveType.ellipse:
-          final center = (primitive.startPoint + primitive.endPoint) * 0.5;
-          point(center, 'Center', primitive.id);
+          final ellipse = ArchitectEllipseGeometry.fromPrimitive(primitive);
+          point(ellipse.center, 'Center', primitive.id);
+          for (final p in ellipse.axisPoints) {
+            point(p, 'Endpoint', primitive.id);
+          }
       }
     }
     final cadSegments = <(Offset, Offset)>[];
     for (final primitive in floor.cadPrimitives) {
       if (primitive.type == CadPrimitiveType.line) {
         cadSegments.add((primitive.startPoint, primitive.endPoint));
-      } else if (primitive.type == CadPrimitiveType.polyline || primitive.type == CadPrimitiveType.mask) {
+      } else if (primitive.type == CadPrimitiveType.polyline ||
+          primitive.type == CadPrimitiveType.mask) {
         final pts = primitive.linePoints;
         for (var i = 1; i < pts.length; i++) {
           cadSegments.add((pts[i - 1], pts[i]));

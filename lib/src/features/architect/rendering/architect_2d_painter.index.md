@@ -59,3 +59,11 @@ primitive whenever the draft bulge is zero, including the CAD arc tool's chord
 stage and sagitta-0 previews. Only a nonzero bulge uses arc tessellation; a
 zero-bulge circle has no finite radius. Input and commit ownership remain in
 `[TAG:ARC_EXACT_PLACEMENT]` in the workspace screen.
+
+### Ellipse placement preview
+
+`activeEllipsePreview` supplies explicit independent radii and rotation to
+`_drawActiveDrafting`. The workspace owns the centre/first-axis/second-axis
+session; no fixed ratio is inferred by the painter. `ArchitectEllipseGeometry`
+shares `startPoint`-as-centre paths and bounds across drawing, selection, snaps,
+hit tests, ghost floors, marquee and culling. Existing saved centres are retained.

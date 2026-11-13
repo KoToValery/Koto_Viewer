@@ -1,3 +1,4 @@
+import 'architect_underlay_clip.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -114,13 +115,16 @@ class ArchitectWallEndpointSnap {
       }
       if (underlay != null) {
         underlay.orBuildSpatialIndex;
-        for (final edge in DxfSegmentSnap.nearby(
-          document: underlay,
-          point: frame.toCad(projected),
-          radius: radius * frame.unitsPerMeter,
-          layerVisibility: visibility,
+        for (final edge in ArchitectUnderlayClip.segments(
+          DxfSegmentSnap.nearby(
+            document: underlay,
+            point: frame.toCad(projected),
+            radius: radius * frame.unitsPerMeter,
+            layerVisibility: visibility,
+          ).map((edge) => (frame.toModel(edge.$1), frame.toModel(edge.$2))),
+          ArchitectUnderlayClip.of(snapProject),
         )) {
-          final a = frame.toModel(edge.$1), b = frame.toModel(edge.$2);
+          final a = edge.$1, b = edge.$2;
           consider(a, 'Endpoint', 0);
           consider(b, 'Endpoint', 0);
           crossing(a, b, 'Intersection');

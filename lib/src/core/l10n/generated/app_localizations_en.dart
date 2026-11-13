@@ -12228,7 +12228,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Keep reference origin fixed when updating or replacing underlay so geometry never shifts';
 
   @override
-  String get architectCadUnderlayReloadNow => 'Reload';
+  String get architectCadUnderlayReloadNow => 'Refresh';
 
   @override
   String get architectCadUnderlayLayersFilter => 'DXF Layers';
@@ -12850,4 +12850,150 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bimExactDistanceInputHelp =>
       'Tap the value to enter an exact distance.';
+
+  @override
+  String get architectPolygonAngleUnlockHelp =>
+      'Keep adjacent side angles. Tap to allow angle changes.';
+
+  @override
+  String get architectPolygonAngleLockHelp =>
+      'Tap to keep adjacent side angles when moving this edge.';
+
+  @override
+  String get architectPolygonAngleLocked => 'Angles locked';
+
+  @override
+  String get architectPolygonAngleFree => 'Angles free';
+
+  @override
+  String architectSlabNumber(int number) {
+    return 'Slab $number';
+  }
+
+  @override
+  String get architectEllipseFirstRadius => 'First radius';
+
+  @override
+  String get architectEllipseSecondRadius => 'Second radius';
+
+  @override
+  String get architectEllipsePickCenter => 'Pick centre';
+
+  @override
+  String get architectEllipsePickFirstAxis => 'Pick first semi-axis';
+
+  @override
+  String get architectEllipsePickSecondAxis => 'Pick second semi-axis';
+
+  @override
+  String get architectUnderlayUnavailable => 'Underlay file unavailable';
+
+  @override
+  String get architectCopyDialogTitle => 'Copy between storeys';
+
+  @override
+  String get architectCopyFrom => 'From';
+
+  @override
+  String get architectCopyWhat => 'Elements';
+
+  @override
+  String get architectCopyTo => 'To';
+
+  @override
+  String get architectCopyAll => 'All';
+
+  @override
+  String get architectCopyAbove => 'Above';
+
+  @override
+  String get architectCopyNone => 'None';
+
+  @override
+  String get architectCopyScopeAll => 'Entire storey';
+
+  @override
+  String architectCopyScopeSelection(int count) {
+    return 'Selected ($count)';
+  }
+
+  @override
+  String get architectCopySettings => 'Settings';
+
+  @override
+  String get architectCopyReplace => 'Replace';
+
+  @override
+  String get architectCopyMerge => 'Add';
+
+  @override
+  String get architectCopyWallHeights => 'Fit wall heights';
+
+  @override
+  String get architectCopyLevelMarkers => 'Update levels';
+
+  @override
+  String get architectCopyGroups => 'Keep groups';
+
+  @override
+  String get architectCopyNewStoreys => 'New storeys';
+
+  @override
+  String get architectCopyTargetsEmpty =>
+      'Add a storey to choose a destination.';
+
+  @override
+  String architectCopySummary(int elements, int storeys) {
+    String _temp0 = intl.Intl.pluralLogic(
+      elements,
+      locale: localeName,
+      other: '$elements elements',
+      one: '1 element',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      storeys,
+      locale: localeName,
+      other: '$storeys storeys',
+      one: '1 storey',
+    );
+    return '$_temp0 → $_temp1';
+  }
+
+  @override
+  String architectCopyReplaceImpact(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count existing elements will be replaced.',
+      one: '1 existing element will be replaced.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get architectCopyBatchInvalid =>
+      'Enter a whole number from 1 to 100 and a height greater than zero.';
+
+  @override
+  String get architectCopyAction => 'Copy';
+
+  @override
+  String architectCopyStoreyName(int number) {
+    return 'Storey $number';
+  }
+
+  @override
+  String get architectCopyNewStoreysHelp =>
+      'New storeys are created when you copy, including those not selected as destinations.';
+
+  @override
+  String architectCopyNewStoreysSummary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Creates $count new storeys',
+      one: 'Creates 1 new storey',
+    );
+    return '$_temp0';
+  }
 }

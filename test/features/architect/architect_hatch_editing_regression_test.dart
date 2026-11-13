@@ -238,9 +238,16 @@ void main() {
         ),
       );
       await workspace.open(tester, model);
-      await editing.hold(tester, const Offset(1, 1));
+      await workspace.wallTap(tester, const Offset(1, 1));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('polygon-edge-pull')));
+      await tester.pumpAndSettle();
       await drag(tester, const Offset(8, 3), const Offset(9, 3));
+      await tester.tap(find.byKey(const ValueKey('shape-save')));
+      await tester.pumpAndSettle();
       await drag(tester, const Offset(9, 3), const Offset(7, 3));
+      await tester.tap(find.byKey(const ValueKey('shape-save')));
+      await tester.pumpAndSettle();
       final poly = slab
           ? model.project.activeStorey.slabs.single.polygon
           : model.project.activeStorey.cadPrimitives.single.polygonCorners;
@@ -427,11 +434,19 @@ void main() {
         final a = fg.computeLuminance(), b = bg.computeLuminance();
         final ratio = (a > b ? (a + .05) / (b + .05) : (b + .05) / (a + .05));
         expect(ratio, greaterThanOrEqualTo(4.5));
-        final button = tester.widget<FilledButton>(
+        final button = tester.widget<Widget>(
           find.byKey(ValueKey(shape ? 'shape-save' : 'wall-continue')),
         );
-        final actionFg = button.style!.foregroundColor!.resolve({})!;
-        final actionBg = button.style!.backgroundColor!.resolve({})!;
+        final colors = theme.colorScheme;
+        final style = button is FilledButton
+            ? button.style
+            : (button as IconButton).style;
+        final actionFg =
+            style?.foregroundColor?.resolve({}) ??
+            (shape ? colors.onPrimary : colors.primary);
+        final actionBg =
+            style?.backgroundColor?.resolve({}) ??
+            (shape ? colors.primary : colors.surfaceContainerLow);
         final light = actionFg.computeLuminance(),
             dark = actionBg.computeLuminance();
         expect(

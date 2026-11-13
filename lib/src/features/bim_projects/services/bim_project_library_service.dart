@@ -9,6 +9,7 @@ import '../../dxf_viewer/binary/kcad_service.dart';
 import '../../dxf_viewer/parser/dxf_parser.dart';
 import 'bim_underlay_conversion_service.dart';
 import 'bim_underlay_loader.dart';
+import 'bim_project_asset_service.dart';
 import 'bim_structural_seed_sync.dart';
 import '../../structural_designer/models/structural_element.dart';
 import '../../architect/models/architect_project.dart';
@@ -380,7 +381,14 @@ class BimProjectLibraryService {
 
       final content = await archFile.readAsString();
       final jsonMap = jsonDecode(content) as Map<String, dynamic>;
-      final arch = ArchitectProject.fromJson(jsonMap);
+      final arch = await BimProjectAssetService.adoptArchitect(
+        projDir,
+        projectId,
+        ArchitectProject.fromJson(jsonMap),
+      );
+      if (jsonEncode(arch.toJson()) != jsonEncode(jsonMap)) {
+        await saveArchitectProject(projectId, arch);
+      }
       if (manifest == null || manifest.storeys.isEmpty) return arch;
 
       // Sync storeys with manifest elevations
@@ -409,15 +417,16 @@ class BimProjectLibraryService {
         arch.storeys.where((s) => s.isRoof && !manifestIds.contains(s.id)),
       );
 
-      final activeExists = syncedStoreys.any((s) => s.id == arch.activeStoreyId);
+      final activeExists = syncedStoreys.any(
+        (s) => s.id == arch.activeStoreyId,
+      );
       final activeId = activeExists
           ? arch.activeStoreyId
           : (syncedStoreys.isNotEmpty ? syncedStoreys.first.id : 'default');
 
-      return arch.copyWith(
-        storeys: syncedStoreys,
-        activeStoreyId: activeId,
-      ).syncRoofElevation();
+      return arch
+          .copyWith(storeys: syncedStoreys, activeStoreyId: activeId)
+          .syncRoofElevation();
     } catch (e) {
       debugPrint('Error loading architectural project for $projectId: $e');
       return null;
@@ -436,6 +445,11 @@ class BimProjectLibraryService {
   ) async {
     try {
       final projDir = await getProjectDirectory(projectId);
+      project = await BimProjectAssetService.adoptArchitect(
+        projDir,
+        projectId,
+        project,
+      );
       final archFile = File('${projDir.path}/architectural.json');
       final tmpFile = File(
         '${projDir.path}/architectural.json.tmp_${DateTime.now().microsecondsSinceEpoch}',
@@ -730,11 +744,11 @@ class BimProjectLibraryService {
     String underlayRelativePath,
   ) async {
     final projDir = await getProjectDirectory(projectId);
-    final file = File('${projDir.path}/$underlayRelativePath');
-    if (await file.exists()) {
-      return file;
-    }
-    return null;
+    return BimProjectAssetService.resolve(
+      projDir,
+      underlayRelativePath,
+      adoptLegacy: false,
+    );
   }
 
   /// Deletes the entire project directory.

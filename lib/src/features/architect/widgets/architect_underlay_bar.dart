@@ -154,19 +154,6 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Tooltip(
-                  message: l.architectCadUnderlayAutoReloadTooltip,
-                  child: FilterChip(
-                    selected: cfg.autoReload,
-                    onSelected: isBusy ? null : onToggleAutoReload,
-                    label: Text(
-                      l.architectCadUnderlayAutoReload,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    avatar: const AppIcon(AppIconId.sync, size: 15),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Tooltip(
                   message: l.architectCadUnderlayOriginLockedTooltip,
                   child: FilterChip(
                     selected: cfg.lockOrigin,
@@ -251,9 +238,9 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
                     onPressed: isBusy
                         ? null
                         : () {
-                            final box =
-                                btnCtx.findRenderObject() as RenderBox?;
-                            final pos = box?.localToGlobal(
+                            final box = btnCtx.findRenderObject() as RenderBox?;
+                            final pos =
+                                box?.localToGlobal(
                                   Offset(0, box.size.height),
                                 ) ??
                                 Offset.zero;
@@ -262,8 +249,7 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
                     icon: AppIcon(
                       cfg.hasActiveMask ? AppIconId.crop : AppIconId.cutOpening,
                       size: 15,
-                      color:
-                          cfg.hasActiveMask ? const Color(0xFF00E5FF) : null,
+                      color: cfg.hasActiveMask ? const Color(0xFF00E5FF) : null,
                     ),
                     label: Text(
                       cfg.hasActiveMask
@@ -279,9 +265,9 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
                     onPressed: isBusy
                         ? null
                         : () {
-                            final box =
-                                btnCtx.findRenderObject() as RenderBox?;
-                            final pos = box?.localToGlobal(
+                            final box = btnCtx.findRenderObject() as RenderBox?;
+                            final pos =
+                                box?.localToGlobal(
                                   Offset(0, box.size.height),
                                 ) ??
                                 Offset.zero;
@@ -470,10 +456,7 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
                   const SizedBox(width: 10),
                   Text(
                     '${l.architectRasterOpacityLabel}: ${(sel.opacity * 100).round()}%',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                   SizedBox(
                     width: 110,
@@ -529,7 +512,8 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
                           : () {
                               final box =
                                   btnCtx.findRenderObject() as RenderBox?;
-                              final pos = box?.localToGlobal(
+                              final pos =
+                                  box?.localToGlobal(
                                     Offset(0, box.size.height),
                                   ) ??
                                   Offset.zero;
@@ -560,7 +544,8 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
                           : () {
                               final box =
                                   btnCtx.findRenderObject() as RenderBox?;
-                              final pos = box?.localToGlobal(
+                              final pos =
+                                  box?.localToGlobal(
                                     Offset(0, box.size.height),
                                   ) ??
                                   Offset.zero;
@@ -783,11 +768,7 @@ Future<String?> showArchitectUnderlayContextMenu({
         value: 'position',
         child: Row(
           children: [
-            const AppIcon(
-              AppIconId.move,
-              size: 18,
-              color: Color(0xFF00E5FF),
-            ),
+            const AppIcon(AppIconId.move, size: 18, color: Color(0xFF00E5FF)),
             const SizedBox(width: 8),
             Text(l.architectUnderlayPositionAction),
           ],
@@ -839,11 +820,7 @@ Future<String?> showArchitectUnderlayContextMenu({
         value: 'mask',
         child: Row(
           children: [
-            const AppIcon(
-              AppIconId.crop,
-              size: 18,
-              color: Color(0xFF00E5FF),
-            ),
+            const AppIcon(AppIconId.crop, size: 18, color: Color(0xFF00E5FF)),
             const SizedBox(width: 8),
             Text(l.architectUnderlayMask),
           ],
@@ -854,11 +831,7 @@ Future<String?> showArchitectUnderlayContextMenu({
         value: 'remove',
         child: Row(
           children: [
-            const AppIcon(
-              AppIconId.delete,
-              size: 18,
-              color: Colors.redAccent,
-            ),
+            const AppIcon(AppIconId.delete, size: 18, color: Colors.redAccent),
             const SizedBox(width: 8),
             Text(l.delete),
           ],
@@ -889,11 +862,7 @@ Future<String?> showArchitectUnderlayMaskMenu({
         value: 'mask_rect',
         child: Row(
           children: [
-            const AppIcon(
-              AppIconId.crop,
-              size: 18,
-              color: Color(0xFF00E5FF),
-            ),
+            const AppIcon(AppIconId.crop, size: 18, color: Color(0xFF00E5FF)),
             const SizedBox(width: 8),
             Text(l.architectUnderlayMaskRect),
           ],
@@ -903,11 +872,7 @@ Future<String?> showArchitectUnderlayMaskMenu({
         value: 'mask_polygon',
         child: Row(
           children: [
-            const AppIcon(
-              AppIconId.spline,
-              size: 18,
-              color: Color(0xFF38BDF8),
-            ),
+            const AppIcon(AppIconId.spline, size: 18, color: Color(0xFF38BDF8)),
             const SizedBox(width: 8),
             Text(l.architectUnderlayMaskPolygon),
           ],
@@ -958,7 +923,8 @@ Future<double?> showArchitectCadScaleDialog({
   final customController = TextEditingController(
     text: currentUnitsPerMeter.toStringAsFixed(2),
   );
-  var isCustom = (currentUnitsPerMeter - 1.0).abs() > 0.001 &&
+  var isCustom =
+      (currentUnitsPerMeter - 1.0).abs() > 0.001 &&
       (currentUnitsPerMeter - 1000.0).abs() > 0.001 &&
       (currentUnitsPerMeter - 100.0).abs() > 0.001 &&
       (currentUnitsPerMeter - 39.37).abs() > 0.05;
@@ -1122,12 +1088,7 @@ Future<void> showArchitectUnderlayEditDialog({
               color: Color(0xFFB388FF),
             ),
             const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                title,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+            Expanded(child: Text(title, overflow: TextOverflow.ellipsis)),
           ],
         ),
         content: SingleChildScrollView(
@@ -1162,19 +1123,6 @@ Future<void> showArchitectUnderlayEditDialog({
                   label: Text(l.architectCadUnderlayLayersFilter),
                 ),
                 const SizedBox(height: 12),
-              ],
-              if (isAutoReload != null && onToggleAutoReload != null) ...[
-                SwitchListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l.architectCadUnderlayAutoReload),
-                  subtitle: Text(l.architectCadUnderlayAutoReloadTooltip),
-                  value: isAutoReload,
-                  onChanged: (v) {
-                    onToggleAutoReload(v);
-                    Navigator.of(dialogCtx).pop();
-                  },
-                ),
               ],
               if (isLockOrigin != null && onToggleLockOrigin != null) ...[
                 SwitchListTile(

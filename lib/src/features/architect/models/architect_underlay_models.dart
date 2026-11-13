@@ -4,11 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 /// Alignment / deskew mode for 2-point raster calibration.
-enum ArchitectRasterAlignMode {
-  keepAngle,
-  horizontal,
-  vertical,
-}
+enum ArchitectRasterAlignMode { keepAngle, horizontal, vertical }
 
 /// Persistent configuration for a storey's CAD (DWG/DXF) Xref underlay.
 class ArchitectCadUnderlayConfig {
@@ -37,7 +33,7 @@ class ArchitectCadUnderlayConfig {
     this.externalSourcePath,
     required this.internalCopyPath,
     this.kcadCachePath,
-    this.autoReload = true,
+    this.autoReload = false,
     this.lockOrigin = true,
     this.lastModifiedMs,
     this.lockedCadOriginX,
@@ -90,7 +86,7 @@ class ArchitectCadUnderlayConfig {
         : (externalSourcePath ?? this.externalSourcePath),
     internalCopyPath: internalCopyPath ?? this.internalCopyPath,
     kcadCachePath: kcadCachePath ?? this.kcadCachePath,
-    autoReload: autoReload ?? this.autoReload,
+    autoReload: false,
     lockOrigin: lockOrigin ?? this.lockOrigin,
     lastModifiedMs: lastModifiedMs ?? this.lastModifiedMs,
     lockedCadOriginX: lockedCadOriginX ?? this.lockedCadOriginX,
@@ -111,14 +107,13 @@ class ArchitectCadUnderlayConfig {
     if (externalSourcePath != null) 'externalSourcePath': externalSourcePath,
     'internalCopyPath': internalCopyPath,
     if (kcadCachePath != null) 'kcadCachePath': kcadCachePath,
-    'autoReload': autoReload,
+    'autoReload': false,
     'lockOrigin': lockOrigin,
     if (lastModifiedMs != null) 'lastModifiedMs': lastModifiedMs,
     if (lockedCadOriginX != null) 'lockedCadOriginX': lockedCadOriginX,
     if (lockedCadOriginY != null) 'lockedCadOriginY': lockedCadOriginY,
     if (unitsPerMeter != null) 'unitsPerMeter': unitsPerMeter,
-    if (hiddenDxfLayers.isNotEmpty)
-      'hiddenDxfLayers': hiddenDxfLayers.toList(),
+    if (hiddenDxfLayers.isNotEmpty) 'hiddenDxfLayers': hiddenDxfLayers.toList(),
     if (isGeodetic) 'isGeodetic': true,
     if (detectedCrsName != null) 'detectedCrsName': detectedCrsName,
     'opacity': opacity,
@@ -137,7 +132,7 @@ class ArchitectCadUnderlayConfig {
         externalSourcePath: json['externalSourcePath'] as String?,
         internalCopyPath: json['internalCopyPath'] as String? ?? '',
         kcadCachePath: json['kcadCachePath'] as String?,
-        autoReload: json['autoReload'] != false,
+        autoReload: false,
         lockOrigin: json['lockOrigin'] != false,
         lastModifiedMs: (json['lastModifiedMs'] as num?)?.toInt(),
         lockedCadOriginX: (json['lockedCadOriginX'] as num?)?.toDouble(),

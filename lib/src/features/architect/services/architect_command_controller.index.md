@@ -21,3 +21,12 @@
 | Polygon / vertex editing | `InsertArchitectElementPoint` | Polygon edge insertion, vertex dragging, hole updates |
 | Multi-storey & landscape | `CopyArchitectElementsAcrossStoreys`, `UpdateArchitectLandscapeProject` (`[TAG:CMD_LANDSCAPE]`) | Cross-storey copy and landscape project updates |
 | Controller stack | `ArchitectCommandController` | Undo/redo stack management (`undo()`, `redo()`) |
+
+## Ellipse placement
+
+`PlaceArchitectCadPrimitive.apply` delegates radius/rotation validation to
+`ArchitectEllipseGeometry.validate`. Ellipses keep the existing JSON fields and
+`startPoint` centre contract; new drafts use `endPoint` for the first-axis end.
+`ArchitectRotation` updates ellipse orientation, while `ArchitectMirrorGeometry`
+reflects orientation and partial sweeps. The regular command history/save path
+is unchanged.

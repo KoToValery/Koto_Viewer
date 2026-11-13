@@ -1,3 +1,4 @@
+import 'architect_ellipse_geometry.dart';
 import 'architect_spline_geometry.dart';
 import '../rendering/architect_annotation_layout.dart';
 import '../widgets/architect_elevation_labels.dart';
@@ -237,6 +238,11 @@ class ArchitectSelection {
     if (e['startPoint'] != null || e['start'] != null) {
       final a = point(e['startPoint'] ?? e['start']),
           b = point(e['endPoint'] ?? e['end']);
+      if (e['type'] == 'ellipse') {
+        return ArchitectEllipseGeometry.fromPrimitive(
+          ArchitectCadPrimitive.fromJson(e),
+        ).bounds;
+      }
       if (e['type'] == 'circle') {
         return Rect.fromCircle(center: a, radius: (a - b).distance);
       }
@@ -307,7 +313,8 @@ class ArchitectSelection {
     }
     for (final w in s.walls) {
       if (w.id == id) {
-        if (w.railing != null) return ArchitectRailingSelection.envelope(w, s.walls);
+        if (w.railing != null)
+          return ArchitectRailingSelection.envelope(w, s.walls);
         return path..addPolygon(
           ArchitectSpecialWallGeometry.physicalPlanCorners(w, s.walls),
           true,
@@ -403,7 +410,8 @@ class ArchitectSelection {
       }
       for (final sp in surface.spots) {
         if (sp.id == id) {
-          return path..addOval(Rect.fromCircle(center: sp.position, radius: .2));
+          return path
+            ..addOval(Rect.fromCircle(center: sp.position, radius: .2));
         }
       }
     }
@@ -441,11 +449,7 @@ class ArchitectSelection {
         );
       }
       if (p.id == id && p.type == CadPrimitiveType.ellipse) {
-        final rx = p.radiusX ?? (p.endPoint - p.startPoint).distance;
-        final ry = p.radiusY ?? (rx * 0.6);
-        return path..addOval(
-          Rect.fromCenter(center: p.startPoint, width: rx * 2, height: ry * 2),
-        );
+        return ArchitectEllipseGeometry.fromPrimitive(p).path;
       }
       if (p.id == id && p.isPolygon) {
         return ArchitectContour.path(p.polygonCorners, p.holes);

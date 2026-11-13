@@ -1,3 +1,4 @@
+import 'architect_underlay_clip.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
@@ -191,8 +192,19 @@ class ArchitectDragController extends ChangeNotifier {
     _showBaseHandle = showHandle;
 
     final tolerance = (22.0 / math.max(scale, 1e-4)).clamp(0.08, 0.60);
+    final baseMask = !_isUnderlay
+        ? null
+        : _isCadUnderlay
+        ? ArchitectUnderlayClip.of(project)
+        : raster != null && raster.hasActiveMask
+        ? raster.maskPolygon
+        : null;
     if (snapToDefaultGrip &&
         _defaultHandleGrip != null &&
+        ArchitectUnderlayClip.contains(
+          baseMask,
+          _defaultHandleAnchor ?? _defaultHandleGrip!,
+        ) &&
         (rawModelPoint - _defaultHandleGrip!).distance <= tolerance) {
       _currentPointModel = _defaultHandleAnchor ?? _defaultHandleGrip;
       _currentSnapLabel = 'Grip';
@@ -205,6 +217,7 @@ class ArchitectDragController extends ChangeNotifier {
     if (_isUnderlay) {
       _resolveUnderlayBaseSnap(
         rawModelPoint,
+        project: project,
         dxfDoc: dxfDoc,
         frame: frame ?? const BimCoordinateFrame(),
         raster: raster,
@@ -273,6 +286,7 @@ class ArchitectDragController extends ChangeNotifier {
 
   void _resolveUnderlayBaseSnap(
     Offset rawModelPoint, {
+    required ArchitectProject project,
     DxfDocument? dxfDoc,
     required BimCoordinateFrame frame,
     ArchitectRasterUnderlay? raster,
@@ -281,8 +295,11 @@ class ArchitectDragController extends ChangeNotifier {
     final tolModel = (22.0 / math.max(scale, 1e-4)).clamp(0.08, 0.60);
 
     if (_isCadUnderlay && dxfDoc != null) {
+      final mask = ArchitectUnderlayClip.of(project);
+      bool visible(Offset point) => ArchitectUnderlayClip.contains(mask, point);
       final originModel = frame.toModel(Offset.zero);
-      if ((rawModelPoint - originModel).distance <= tolModel) {
+      if (visible(originModel) &&
+          (rawModelPoint - originModel).distance <= tolModel) {
         _currentPointModel = originModel;
         _currentSnapLabel = 'Origin (0,0)';
         _isSnapped = true;
@@ -290,7 +307,8 @@ class ArchitectDragController extends ChangeNotifier {
         return;
       }
       final centerModel = frame.toModel(dxfDoc.bounds.center);
-      if ((rawModelPoint - centerModel).distance <= tolModel) {
+      if (visible(centerModel) &&
+          (rawModelPoint - centerModel).distance <= tolModel) {
         _currentPointModel = centerModel;
         _currentSnapLabel = 'Center';
         _isSnapped = true;
@@ -304,6 +322,7 @@ class ArchitectDragController extends ChangeNotifier {
         cadPoint: cadPoint,
         toleranceCad: tolCad,
         includeIntersections: true,
+        pointFilter: (point) => visible(frame.toModel(point)),
       );
       if (snap != null) {
         _currentPointModel = frame.toModel(snap.point);
@@ -313,6 +332,7 @@ class ArchitectDragController extends ChangeNotifier {
         return;
       }
     } else if (!_isCadUnderlay && raster != null) {
+      final mask = raster.hasActiveMask ? raster.maskPolygon : null;
       final corners = [
         ...raster.localCorners,
         raster.pixelToLocal(
@@ -321,7 +341,8 @@ class ArchitectDragController extends ChangeNotifier {
       ];
       final labels = ['Corner', 'Corner', 'Corner', 'Corner', 'Center'];
       for (var i = 0; i < corners.length; i++) {
-        if ((rawModelPoint - corners[i]).distance <= tolModel) {
+        if (ArchitectUnderlayClip.contains(mask, corners[i]) &&
+            (rawModelPoint - corners[i]).distance <= tolModel) {
           _currentPointModel = corners[i];
           _currentSnapLabel = labels[i];
           _isSnapped = true;
@@ -329,8 +350,10 @@ class ArchitectDragController extends ChangeNotifier {
           return;
         }
       }
-      for (var i = 0; i < 4; i++) {
-        final a = corners[i], b = corners[(i + 1) % 4];
+      for (final edge in ArchitectUnderlayClip.segments([
+        for (var i = 0; i < 4; i++) (corners[i], corners[(i + 1) % 4]),
+      ], mask)) {
+        final a = edge.$1, b = edge.$2;
         final midpoint = (a + b) / 2;
         final nearest = BimLineGeometry.closest(rawModelPoint, a, b);
         final atMidpoint = (rawModelPoint - midpoint).distance <= tolModel;

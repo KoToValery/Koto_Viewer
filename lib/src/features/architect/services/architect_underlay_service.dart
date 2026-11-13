@@ -11,6 +11,8 @@ import 'package:pdfrx/pdfrx.dart';
 import '../../../core/services/dwg_converter_service.dart';
 import '../../../core/services/universal_encoding_service.dart';
 import '../../bim_projects/services/bim_project_library_service.dart';
+import '../../bim_projects/services/bim_project_asset_service.dart';
+import '../../bim_editing/geometry/bim_coordinate_frame.dart';
 import '../../dxf_viewer/binary/kcad_service.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/parser/dxf_parser.dart';
@@ -33,22 +35,62 @@ class ArchitectRasterImportResult {
   final ArchitectRasterUnderlay model;
   final ui.Image image;
 
-  const ArchitectRasterImportResult({
-    required this.model,
-    required this.image,
-  });
+  const ArchitectRasterImportResult({required this.model, required this.image});
 }
 
 /// Manages internal project storage (`<AppDocs>/KotoBim/projects/<projectId>/underlays/...`),
-/// DWG/DXF conversion, live Xref file watching, and Raster/PDF underlay preparation.
+/// DWG/DXF conversion and project-owned CAD/raster/PDF snapshots.
 class ArchitectUnderlayService {
-  ArchitectUnderlayService._();
-  static final ArchitectUnderlayService instance = ArchitectUnderlayService._();
+  final BimProjectLibraryService _library;
+  ArchitectUnderlayService({BimProjectLibraryService? libraryService})
+    : _library = libraryService ?? BimProjectLibraryService.instance;
+  static final ArchitectUnderlayService instance = ArchitectUnderlayService();
+
+  Future<File?> resolveOwnedAsset(
+    String projectId,
+    String storedPath, {
+    bool adoptLegacy = true,
+  }) async => BimProjectAssetService.resolve(
+    await _library.getProjectDirectory(projectId),
+    storedPath,
+    adoptLegacy: adoptLegacy,
+  );
+
+  Future<String> projectRelativePath(String projectId, File file) async =>
+      BimProjectAssetService.relativePath(
+        await _library.getProjectDirectory(projectId),
+        file,
+      );
+
+  /// Captures an aligned original document without changing its coordinate frame.
+  Future<ArchitectCadUnderlayConfig> captureCadSnapshot({
+    required String projectId,
+    required String storeyId,
+    required DxfDocument document,
+    required BimCoordinateFrame frame,
+  }) async {
+    final directory = await getCadUnderlayDir(projectId);
+    final revision = await directory.createTemp(
+      '${_sanitizeFileName(storeyId)}_revision_',
+    );
+    final file = File('${revision.path}/snapshot.kcad');
+    await KcadService.exportKcadFile(document, file.path);
+    await KcadService.loadKcadFile(file);
+    final relative = await projectRelativePath(projectId, file);
+    return ArchitectCadUnderlayConfig(
+      storeyId: storeyId,
+      fileName: '$storeyId.kcad',
+      internalCopyPath: relative,
+      kcadCachePath: relative,
+      lockedCadOriginX: frame.origin.dx,
+      lockedCadOriginY: frame.origin.dy,
+      unitsPerMeter: frame.unitsPerMeter,
+      autoReload: false,
+    );
+  }
 
   Future<Directory> getCadUnderlayDir(String projectId) async {
-    final projDir = await BimProjectLibraryService.instance.getProjectDirectory(
-      projectId,
-    );
+    final projDir = await _library.getProjectDirectory(projectId);
     final dir = Directory('${projDir.path}/underlays/cad');
     if (!await dir.exists()) {
       await dir.create(recursive: true);
@@ -57,9 +99,7 @@ class ArchitectUnderlayService {
   }
 
   Future<Directory> getRasterUnderlayDir(String projectId) async {
-    final projDir = await BimProjectLibraryService.instance.getProjectDirectory(
-      projectId,
-    );
+    final projDir = await _library.getProjectDirectory(projectId);
     final dir = Directory('${projDir.path}/underlays/raster');
     if (!await dir.exists()) {
       await dir.create(recursive: true);
@@ -93,7 +133,10 @@ class ArchitectUnderlayService {
 
     final safeStorey = _sanitizeFileName(storeyId);
     final safeName = _sanitizeFileName(fileName);
-    final internalCopy = File('${cadDir.path}/${safeStorey}_$safeName');
+    // A revision is published only through its returned config after parsing.
+    // Failed refreshes therefore never overwrite the currently displayed snapshot.
+    final revision = await cadDir.createTemp('${safeStorey}_revision_');
+    final internalCopy = File('${revision.path}/$safeName');
     if (sourceFile.absolute.path != internalCopy.absolute.path) {
       await sourceFile.copy(internalCopy.path);
     }
@@ -126,7 +169,7 @@ class ArchitectUnderlayService {
       existingSurvey: existingSurvey,
     );
 
-    final kcadCache = File('${cadDir.path}/$safeStorey.kcad');
+    final kcadCache = File('${revision.path}/snapshot.kcad');
     try {
       await KcadService.exportKcadFile(doc, kcadCache.path);
     } catch (e) {
@@ -137,9 +180,11 @@ class ArchitectUnderlayService {
       storeyId: storeyId,
       fileName: fileName,
       externalSourcePath: sourceFile.path,
-      internalCopyPath: internalCopy.path,
-      kcadCachePath: kcadCache.path,
-      autoReload: existingConfig?.autoReload ?? true,
+      internalCopyPath: await projectRelativePath(projectId, internalCopy),
+      kcadCachePath: await kcadCache.exists()
+          ? await projectRelativePath(projectId, kcadCache)
+          : null,
+      autoReload: false,
       lockOrigin: existingConfig?.lockOrigin ?? true,
       lastModifiedMs: lastModMs,
       lockedCadOriginX: geodeticResult.frame.origin.dx,
@@ -150,6 +195,8 @@ class ArchitectUnderlayService {
       detectedCrsName: geodeticResult.coordinateSystem.name,
       opacity: existingConfig?.opacity ?? 0.42,
       visible: existingConfig?.visible ?? true,
+      maskPolygon: existingConfig?.maskPolygon,
+      maskEnabled: existingConfig?.maskEnabled ?? true,
     );
 
     return ArchitectCadImportResult(
@@ -164,101 +211,32 @@ class ArchitectUnderlayService {
     ArchitectCadUnderlayConfig config, {
     String? projectId,
   }) async {
-    try {
-      if (config.kcadCachePath != null) {
-        final kcadFile = File(config.kcadCachePath!);
-        if (await kcadFile.exists()) {
-          return await KcadService.loadKcadFile(kcadFile);
-        }
+    for (final stored in [config.kcadCachePath, config.internalCopyPath]) {
+      if (stored == null || stored.isEmpty) continue;
+      try {
+        final file = projectId == null
+            ? File(stored)
+            : await resolveOwnedAsset(projectId, stored);
+        if (file == null || !await file.exists()) continue;
+        return await _parseCadFile(
+          file,
+          file.path.split('.').last.toLowerCase(),
+        );
+      } catch (e) {
+        // A broken derived cache can still recover from the exact owned source.
+        debugPrint('[ArchitectUnderlayService] CAD snapshot load failed: $e');
       }
-      final internalFile = File(config.internalCopyPath);
-      if (await internalFile.exists()) {
-        final ext = internalFile.path.split('.').last.toLowerCase();
-        return await _parseCadFile(internalFile, ext);
-      }
-      if (config.externalSourcePath != null) {
-        final extFile = File(config.externalSourcePath!);
-        if (await extFile.exists()) {
-          final ext = extFile.path.split('.').last.toLowerCase();
-          return await _parseCadFile(extFile, ext);
-        }
-      }
-
-      // Fallback: Resolve relative paths inside the project directory
-      if (projectId != null && projectId.isNotEmpty) {
-        final projDir = await BimProjectLibraryService.instance.getProjectDirectory(projectId);
-        if (await projDir.exists()) {
-          final candidatePaths = <String>[
-            if (config.kcadCachePath != null) config.kcadCachePath!,
-            config.internalCopyPath,
-            if (config.externalSourcePath != null) config.externalSourcePath!,
-          ];
-          for (final raw in candidatePaths) {
-            final underlayIdx = raw.indexOf('underlays');
-            if (underlayIdx != -1) {
-              final rel = raw.substring(underlayIdx).replaceAll('\\', '/');
-              final f = File('${projDir.path}/$rel');
-              if (await f.exists()) {
-                final ext = f.path.split('.').last.toLowerCase();
-                return await _parseCadFile(f, ext);
-              }
-            }
-          }
-          final underlaysDir = Directory('${projDir.path}/underlays');
-          if (await underlaysDir.exists()) {
-            await for (final entity in underlaysDir.list(recursive: true)) {
-              if (entity is File) {
-                final name = entity.path.split(RegExp(r'[/\\]')).last.toLowerCase();
-                if (name.endsWith('.kcad') || name.endsWith('.dwg') || name.endsWith('.dxf')) {
-                  if (name.contains(config.storeyId.toLowerCase()) ||
-                      name == config.fileName.toLowerCase()) {
-                    final ext = entity.path.split('.').last.toLowerCase();
-                    return await _parseCadFile(entity, ext);
-                  }
-                }
-              }
-            }
-            final allKcad = <File>[];
-            await for (final entity in underlaysDir.list(recursive: true)) {
-              if (entity is File && entity.path.toLowerCase().endsWith('.kcad')) {
-                allKcad.add(entity);
-              }
-            }
-            if (allKcad.length == 1) {
-              return await KcadService.loadKcadFile(allKcad.first);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[ArchitectUnderlayService] Failed to load CAD underlay: $e');
     }
     return null;
   }
 
   Future<DxfDocument> _parseCadFile(File file, String ext) async {
-    if (ext == 'kcad') {
-      return KcadService.loadKcadFile(file);
-    }
-    String dxfPath = file.path;
-    File? tempConverted;
-    try {
-      if (ext == 'dwg') {
-        dxfPath = await DwgConverterService.convertDwgToDxf(
-          file.uri.toFilePath(),
-        );
-        tempConverted = File(dxfPath);
-      }
-      return await compute(_parseDxfIsolate, dxfPath);
-    } finally {
-      if (tempConverted != null &&
-          tempConverted.path != file.path &&
-          await tempConverted.exists()) {
-        try {
-          await tempConverted.delete();
-        } catch (_) {}
-      }
-    }
+    if (ext == 'kcad') return KcadService.loadKcadFile(file);
+    final dxfPath = ext == 'dwg'
+        ? await DwgConverterService.convertDwgToDxf(file.uri.toFilePath())
+        : file.path;
+    // Converted DXFs belong to the shared content cache and may have readers.
+    return compute(_parseDxfIsolate, dxfPath);
   }
 
   /// Imports a raster image file (PNG, JPG, WEBP, BMP) into the project's
@@ -298,7 +276,7 @@ class ArchitectUnderlayService {
       id: id,
       storeyId: storeyId,
       fileName: fileName,
-      internalImagePath: internalFile.path,
+      internalImagePath: await projectRelativePath(projectId, internalFile),
       imageWidthPx: widthPx,
       imageHeightPx: heightPx,
       position: topLeft,
@@ -333,7 +311,11 @@ class ArchitectUnderlayService {
         ? pdfFile.uri.pathSegments.last
         : pdfFile.path.split(RegExp(r'[/\\]')).last;
 
-    final doc = await PdfDocument.openFile(pdfFile.path);
+    final ownedPdf = File(
+      '${rasterDir.path}/pdf_${DateTime.now().microsecondsSinceEpoch}_$fileName',
+    );
+    await pdfFile.copy(ownedPdf.path);
+    final doc = await PdfDocument.openFile(ownedPdf.path);
     try {
       if (doc.pages.isEmpty) {
         throw const FormatException('PDF has no pages');
@@ -388,8 +370,8 @@ class ArchitectUnderlayService {
           id: id,
           storeyId: storeyId,
           fileName: '$fileName (p.${clampedIndex + 1})',
-          internalImagePath: internalPng.path,
-          sourcePdfPath: pdfFile.path,
+          internalImagePath: await projectRelativePath(projectId, internalPng),
+          sourcePdfPath: await projectRelativePath(projectId, ownedPdf),
           pdfPageNumber: clampedIndex + 1,
           imageWidthPx: widthPx,
           imageHeightPx: heightPx,
@@ -408,11 +390,14 @@ class ArchitectUnderlayService {
 
   /// Loads and decodes a saved raster underlay image from disk.
   Future<ui.Image?> loadSavedRasterImage(
-    ArchitectRasterUnderlay underlay,
-  ) async {
+    ArchitectRasterUnderlay underlay, {
+    String? projectId,
+  }) async {
     try {
-      final file = File(underlay.internalImagePath);
-      if (!await file.exists()) return null;
+      final file = projectId == null
+          ? File(underlay.internalImagePath)
+          : await resolveOwnedAsset(projectId, underlay.internalImagePath);
+      if (file == null || !await file.exists()) return null;
       final bytes = await file.readAsBytes();
       return await decodeUiImage(bytes);
     } catch (e) {
@@ -435,71 +420,11 @@ DxfDocument _parseDxfIsolate(String path) {
   return DxfParser.parseString(content).toIsolateSafe();
 }
 
-/// Watches external DWG/DXF files for modifications and triggers automatic
-/// Xref reloading without shifting coordinates.
+/// Compatibility shell for existing callers. Project snapshots never watch files.
 class ArchitectCadFileWatcher {
-  final void Function(String storeyId, File externalFile) onExternalFileModified;
-  Timer? _pollTimer;
-  final Map<String, int> _lastSeenModifiedMs = {};
-  final Set<String> _reloadingStoreys = {};
-  Map<String, ArchitectCadUnderlayConfig> _configs = const {};
-
+  final void Function(String storeyId, File externalFile)
+  onExternalFileModified;
   ArchitectCadFileWatcher({required this.onExternalFileModified});
-
-  void updateConfigs(Map<String, ArchitectCadUnderlayConfig> configs) {
-    _configs = Map.of(configs);
-    for (final entry in _configs.entries) {
-      final mod = entry.value.lastModifiedMs;
-      if (mod != null) {
-        _lastSeenModifiedMs.putIfAbsent(entry.key, () => mod);
-      }
-    }
-    final hasActiveWatch = _configs.values.any(
-      (c) => c.autoReload && c.externalSourcePath != null,
-    );
-    if (hasActiveWatch && _pollTimer == null) {
-      _pollTimer = Timer.periodic(
-        const Duration(milliseconds: 2500),
-        (_) => _checkExternalFiles(),
-      );
-    } else if (!hasActiveWatch && _pollTimer != null) {
-      _pollTimer?.cancel();
-      _pollTimer = null;
-    }
-  }
-
-  Future<void> _checkExternalFiles() async {
-    for (final entry in _configs.entries) {
-      final storeyId = entry.key;
-      final cfg = entry.value;
-      if (!cfg.autoReload || cfg.externalSourcePath == null) continue;
-      if (_reloadingStoreys.contains(storeyId)) continue;
-
-      final file = File(cfg.externalSourcePath!);
-      try {
-        if (!await file.exists()) continue;
-        final stat = await file.stat();
-        if (stat.size <= 0) continue;
-        final currentMs = stat.modified.millisecondsSinceEpoch;
-        final previousMs = _lastSeenModifiedMs[storeyId] ?? cfg.lastModifiedMs;
-        if (previousMs != null && currentMs > previousMs) {
-          _lastSeenModifiedMs[storeyId] = currentMs;
-          _reloadingStoreys.add(storeyId);
-          // Debounce 450ms so external CAD save completes writing
-          await Future<void>.delayed(const Duration(milliseconds: 450));
-          onExternalFileModified(storeyId, file);
-          _reloadingStoreys.remove(storeyId);
-        } else if (previousMs == null) {
-          _lastSeenModifiedMs[storeyId] = currentMs;
-        }
-      } catch (_) {
-        _reloadingStoreys.remove(storeyId);
-      }
-    }
-  }
-
-  void dispose() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
-  }
+  void updateConfigs(Map<String, ArchitectCadUnderlayConfig> configs) {}
+  void dispose() {}
 }
