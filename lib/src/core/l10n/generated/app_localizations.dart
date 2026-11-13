@@ -23627,6 +23627,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, one{Creates 1 new storey} other{Creates {count} new storeys}}'**
   String architectCopyNewStoreysSummary(int count);
+
+  /// Return to the drawing workspace with the selected storey
+  ///
+  /// In en, this message translates to:
+  /// **'Back to drawing'**
+  String get architectStoreyReturnDrawing;
+
+  /// Add one storey above the building
+  ///
+  /// In en, this message translates to:
+  /// **'Add storey'**
+  String get architectStoreyAdd;
+
+  /// Create several consecutive storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Add several'**
+  String get architectStoreyAddSeveral;
+
+  /// Edit the name and height of a storey
+  ///
+  /// In en, this message translates to:
+  /// **'Edit storey'**
+  String get architectStoreyEdit;
+
+  /// Validation for an empty storey name
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get architectStoreyNameRequired;
+
+  /// Validation for the height of a storey
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a height greater than zero.'**
+  String get architectStoreyHeightInvalid;
+
+  /// Explanation of automatic elevation updates after a height edit
+  ///
+  /// In en, this message translates to:
+  /// **'Changing the height updates the storeys above.'**
+  String get architectStoreyLevelsHelp;
+
+  /// Explanation of the automatic roof level
+  ///
+  /// In en, this message translates to:
+  /// **'The roof level follows the highest storey.'**
+  String get architectStoreyRoofAuto;
+
+  /// Preserve source CAD entity and layer colors in an underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Original colors'**
+  String get architectUnderlayOriginalColors;
+
+  /// Preserve source CAD entity and layer lineweights in an underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Original lineweights'**
+  String get architectUnderlayOriginalLineweights;
+
+  /// Rotate the underlay counterclockwise by 90 degrees
+  ///
+  /// In en, this message translates to:
+  /// **'90° left'**
+  String get architectUnderlayRotateLeft;
+
+  /// Rotate the underlay clockwise by 90 degrees
+  ///
+  /// In en, this message translates to:
+  /// **'90° right'**
+  String get architectUnderlayRotateRight;
+
+  /// Short title of the storey manager
+  ///
+  /// In en, this message translates to:
+  /// **'Storeys'**
+  String get architectStoreyManagerTitle;
 }
 
 class _AppLocalizationsDelegate

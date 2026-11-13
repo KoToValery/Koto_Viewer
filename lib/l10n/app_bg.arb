@@ -4472,5 +4472,31 @@
   "@architectCopyNewStoreysSummary": {
     "description": "Summary of all staged storeys to be created when copying",
     "placeholders": { "count": { "type": "int" } }
-  }
+  },
+  "architectStoreyReturnDrawing": "Към чертежа",
+  "@architectStoreyReturnDrawing": { "description": "Return to the drawing workspace with the selected storey" },
+  "architectStoreyAdd": "Добави етаж",
+  "@architectStoreyAdd": { "description": "Add one storey above the building" },
+  "architectStoreyAddSeveral": "Няколко етажа",
+  "@architectStoreyAddSeveral": { "description": "Create several consecutive storeys" },
+  "architectStoreyEdit": "Редакция",
+  "@architectStoreyEdit": { "description": "Edit the name and height of a storey" },
+  "architectStoreyNameRequired": "Въведете име.",
+  "@architectStoreyNameRequired": { "description": "Validation for an empty storey name" },
+  "architectStoreyHeightInvalid": "Въведете височина над нула.",
+  "@architectStoreyHeightInvalid": { "description": "Validation for the height of a storey" },
+  "architectStoreyLevelsHelp": "Промяната на височината преизчислява котите на горните етажи.",
+  "@architectStoreyLevelsHelp": { "description": "Explanation of automatic elevation updates after a height edit" },
+  "architectStoreyRoofAuto": "Котата на покрива следва най-горния етаж.",
+  "@architectStoreyRoofAuto": { "description": "Explanation of the automatic roof level" },
+  "architectUnderlayOriginalColors": "Оригинални цветове",
+  "@architectUnderlayOriginalColors": { "description": "Preserve source CAD entity and layer colors in an underlay" },
+  "architectUnderlayOriginalLineweights": "Оригинални дебелини",
+  "@architectUnderlayOriginalLineweights": { "description": "Preserve source CAD entity and layer lineweights in an underlay" },
+  "architectUnderlayRotateLeft": "90° наляво",
+  "@architectUnderlayRotateLeft": { "description": "Rotate the underlay counterclockwise by 90 degrees" },
+  "architectUnderlayRotateRight": "90° надясно",
+  "@architectUnderlayRotateRight": { "description": "Rotate the underlay clockwise by 90 degrees" },
+  "architectStoreyManagerTitle": "Етажи",
+  "@architectStoreyManagerTitle": { "description": "Short title of the storey manager" }
 }

@@ -63,6 +63,28 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Multi-step geometry modification | Wall split: [TAG:WALL_SPLIT]. Chamfer/fillet and edge-curving: [TAG:FLOATING_HUD]; _startChamferFilletSession, _buildChamferFilletFloatingOverlay | Session state, preview/rubber band, pan and gesture arbitration, confirm/cancel controls, model command and history |
 | CAD/raster underlay placement or repositioning | [TAG:UNDERLAY_DRAG], [TAG:CAD_INSERTION], [TAG:DRAG_TOOL]; _startUnderlaySnapDrag, _confirmDragPlacement | Import/configuration, shared drag lifecycle, calibration, preview, commit and persistence |
 
+### CAD underlay display settings
+
+`_openCadEditDialog` uses `_updateCadPresentation` to commit opacity, source
+colors and source lineweights through the existing model/history/autosave path.
+`ArchitectUnderlayPainter` passes the active config into `drawUnderlay`;
+`ArchitectUnderlayPresentation` resolves display pens without mutating the CAD
+document. Its opacity applies to both uniform tint and original colors. Raster
+images retain their existing image-opacity controls; CAD-specific style toggles
+are omitted for raster inputs. Underlay masks, hit testing and snap geometry
+are unchanged by these display settings.
+
+### Storey management and return to drawing
+
+`_manageWorkspaceViews(plan)` opens `ArchitectStoreysScreen` with the shared
+model controller. The manager returns its selected storey ID through the route;
+the explicit Back/Return controls reopen it through `_selectWorkspaceView`,
+preserving the workspace's camera/navigation lifecycle. Storey edits use the
+existing command history and the workspace model listener's save debounce.
+The manager's copy action opens `ArchitectCopyStoreyDialog` and executes
+`CopyArchitectElementsAcrossStoreys`; no separate copy controls or category
+state are maintained in the manager.
+
 ### Layer visibility menu
 
 Layer visibility menu: `_openLayersDialog` under `[TAG:SELECTION_BAR]` follows

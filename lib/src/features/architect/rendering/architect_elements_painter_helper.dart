@@ -10,6 +10,7 @@ import 'architect_vector_scene.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import 'architect_stair_plan_painter.dart';
 import 'architect_canvas_palette.dart';
+import 'architect_underlay_presentation.dart';
 // === SECTION: ARCHITECTURAL ELEMENTS PAINTER HELPER ===
 import 'dart:math' as math;
 import 'architect_polygon_painter.dart';
@@ -44,13 +45,17 @@ class ArchitectElementsPainterHelper {
     required double zoomScale,
     required Map<String, bool> layerVisibility,
     Rect? visibleRect,
+    double? opacity,
+    bool useOriginalColors = false,
+    bool useOriginalLineweights = false,
   }) {
     if (underlayDoc == null || underlayDoc.entities.isEmpty) return;
 
-    final underlayPaint = Paint()
-      ..color = palette.underlay
-      ..strokeWidth = 0.8 / zoomScale
-      ..style = PaintingStyle.stroke;
+    final presentation = ArchitectUnderlayPresentation(
+      palette: palette, zoomScale: zoomScale, opacity: opacity,
+      useOriginalColors: useOriginalColors,
+      useOriginalLineweights: useOriginalLineweights,
+    );
 
     final entities = visibleRect == null
         ? underlayDoc.entities
@@ -68,6 +73,8 @@ class ArchitectElementsPainterHelper {
               underlayDoc.layers[entity.layer]?.isVisible == false)) {
         continue;
       }
+
+      final underlayPaint = presentation.pen(entity, underlayDoc.layers[entity.layer]);
 
       if (entity is DxfLine) {
         canvas.drawLine(entity.p1, entity.p2, underlayPaint);

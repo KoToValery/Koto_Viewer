@@ -7151,5 +7151,31 @@
   "@architectCopyNewStoreysSummary": {
     "description": "Summary of all staged storeys to be created when copying",
     "placeholders": { "count": { "type": "int" } }
-  }
+  },
+  "architectStoreyReturnDrawing": "Back to drawing",
+  "@architectStoreyReturnDrawing": { "description": "Return to the drawing workspace with the selected storey" },
+  "architectStoreyAdd": "Add storey",
+  "@architectStoreyAdd": { "description": "Add one storey above the building" },
+  "architectStoreyAddSeveral": "Add several",
+  "@architectStoreyAddSeveral": { "description": "Create several consecutive storeys" },
+  "architectStoreyEdit": "Edit storey",
+  "@architectStoreyEdit": { "description": "Edit the name and height of a storey" },
+  "architectStoreyNameRequired": "Enter a name.",
+  "@architectStoreyNameRequired": { "description": "Validation for an empty storey name" },
+  "architectStoreyHeightInvalid": "Enter a height greater than zero.",
+  "@architectStoreyHeightInvalid": { "description": "Validation for the height of a storey" },
+  "architectStoreyLevelsHelp": "Changing the height updates the storeys above.",
+  "@architectStoreyLevelsHelp": { "description": "Explanation of automatic elevation updates after a height edit" },
+  "architectStoreyRoofAuto": "The roof level follows the highest storey.",
+  "@architectStoreyRoofAuto": { "description": "Explanation of the automatic roof level" },
+  "architectUnderlayOriginalColors": "Original colors",
+  "@architectUnderlayOriginalColors": { "description": "Preserve source CAD entity and layer colors in an underlay" },
+  "architectUnderlayOriginalLineweights": "Original lineweights",
+  "@architectUnderlayOriginalLineweights": { "description": "Preserve source CAD entity and layer lineweights in an underlay" },
+  "architectUnderlayRotateLeft": "90° left",
+  "@architectUnderlayRotateLeft": { "description": "Rotate the underlay counterclockwise by 90 degrees" },
+  "architectUnderlayRotateRight": "90° right",
+  "@architectUnderlayRotateRight": { "description": "Rotate the underlay clockwise by 90 degrees" },
+  "architectStoreyManagerTitle": "Storeys",
+  "@architectStoreyManagerTitle": { "description": "Short title of the storey manager" }
 }

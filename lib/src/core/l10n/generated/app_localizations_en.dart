@@ -13002,4 +13002,46 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get architectStoreyReturnDrawing => 'Back to drawing';
+
+  @override
+  String get architectStoreyAdd => 'Add storey';
+
+  @override
+  String get architectStoreyAddSeveral => 'Add several';
+
+  @override
+  String get architectStoreyEdit => 'Edit storey';
+
+  @override
+  String get architectStoreyNameRequired => 'Enter a name.';
+
+  @override
+  String get architectStoreyHeightInvalid =>
+      'Enter a height greater than zero.';
+
+  @override
+  String get architectStoreyLevelsHelp =>
+      'Changing the height updates the storeys above.';
+
+  @override
+  String get architectStoreyRoofAuto =>
+      'The roof level follows the highest storey.';
+
+  @override
+  String get architectUnderlayOriginalColors => 'Original colors';
+
+  @override
+  String get architectUnderlayOriginalLineweights => 'Original lineweights';
+
+  @override
+  String get architectUnderlayRotateLeft => '90° left';
+
+  @override
+  String get architectUnderlayRotateRight => '90° right';
+
+  @override
+  String get architectStoreyManagerTitle => 'Storeys';
 }

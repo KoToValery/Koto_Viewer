@@ -98,10 +98,17 @@ void main() {
         projectId: 'a',
         storeyId: 's',
         sourceFile: await source('changed', 10),
-        existingConfig: a.config.copyWith(maskPolygon: crop, opacity: .7),
+        existingConfig: a.config.copyWith(
+          maskPolygon: crop,
+          opacity: .7,
+          useOriginalColors: true,
+          useOriginalLineweights: true,
+        ),
       );
       expect(refreshed.config.maskPolygon, crop);
       expect(refreshed.config.opacity, .7);
+      expect(refreshed.config.useOriginalColors, isTrue);
+      expect(refreshed.config.useOriginalLineweights, isTrue);
       expect(refreshed.config.autoReload, isFalse);
       expect(
         (await service.loadSavedCadUnderlay(

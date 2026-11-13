@@ -1062,6 +1062,10 @@ Future<void> showArchitectUnderlayEditDialog({
   required String title,
   required double initialOpacity,
   required ValueChanged<double> onOpacityChanged,
+  bool initialUseOriginalColors = false,
+  bool initialUseOriginalLineweights = false,
+  ValueChanged<bool>? onUseOriginalColorsChanged,
+  ValueChanged<bool>? onUseOriginalLineweightsChanged,
   VoidCallback? onOpenLayers,
   bool? isAutoReload,
   ValueChanged<bool>? onToggleAutoReload,
@@ -1075,11 +1079,14 @@ Future<void> showArchitectUnderlayEditDialog({
 }) {
   final l = context.l10n;
   var opacity = initialOpacity;
+  var originalColors = initialUseOriginalColors;
+  var originalLineweights = initialUseOriginalLineweights;
 
   return showDialog<void>(
     context: context,
     builder: (dialogCtx) => StatefulBuilder(
       builder: (ctx, setDialogState) => AlertDialog(
+        key: const ValueKey('architect-underlay-properties'),
         title: Row(
           children: [
             const AppIcon(
@@ -1104,6 +1111,7 @@ Future<void> showArchitectUnderlayEditDialog({
                 ),
               ),
               Slider(
+                key: const ValueKey('architect-underlay-opacity'),
                 value: opacity.clamp(0.05, 1.0),
                 min: 0.05,
                 max: 1.0,
@@ -1112,6 +1120,30 @@ Future<void> showArchitectUnderlayEditDialog({
                   onOpacityChanged(v);
                 },
               ),
+              if (onUseOriginalColorsChanged != null)
+                SwitchListTile(
+                  key: const ValueKey('architect-underlay-original-colors'),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.architectUnderlayOriginalColors),
+                  value: originalColors,
+                  onChanged: (value) {
+                    setDialogState(() => originalColors = value);
+                    onUseOriginalColorsChanged(value);
+                  },
+                ),
+              if (onUseOriginalLineweightsChanged != null)
+                SwitchListTile(
+                  key: const ValueKey(
+                    'architect-underlay-original-lineweights',
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.architectUnderlayOriginalLineweights),
+                  value: originalLineweights,
+                  onChanged: (value) {
+                    setDialogState(() => originalLineweights = value);
+                    onUseOriginalLineweightsChanged(value);
+                  },
+                ),
               const Divider(height: 24),
               if (onOpenLayers != null) ...[
                 OutlinedButton.icon(
@@ -1146,7 +1178,7 @@ Future<void> showArchitectUnderlayEditDialog({
                           onRotateCcw();
                         },
                         icon: const AppIcon(AppIconId.rotateLeft, size: 16),
-                        label: const Text('90° CCW'),
+                        label: Text(l.architectUnderlayRotateLeft),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1156,7 +1188,7 @@ Future<void> showArchitectUnderlayEditDialog({
                           onRotateCw();
                         },
                         icon: const AppIcon(AppIconId.rotate, size: 16),
-                        label: const Text('90° CW'),
+                        label: Text(l.architectUnderlayRotateRight),
                       ),
                     ),
                   ],

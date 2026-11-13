@@ -239,6 +239,9 @@ class ArchitectUnderlayPainter extends CustomPainter {
         canvas: canvas,
         palette: palette,
         underlayDoc: document,
+        opacity: cadConfig?.opacity,
+        useOriginalColors: cadConfig?.useOriginalColors ?? false,
+        useOriginalLineweights: cadConfig?.useOriginalLineweights ?? false,
         zoomScale: viewport.scale / frame.unitsPerMeter,
         layerVisibility: visibility,
         visibleRect: frame
@@ -323,6 +326,9 @@ class ArchitectUnderlayPainter extends CustomPainter {
       canvas: canvas,
       palette: ghostPalette,
       underlayDoc: ghostCadDocument,
+      opacity: cadConfig?.opacity,
+      useOriginalColors: cadConfig?.useOriginalColors ?? false,
+      useOriginalLineweights: cadConfig?.useOriginalLineweights ?? false,
       zoomScale: viewport.scale / ghostCadFrame!.unitsPerMeter,
       layerVisibility: visibility,
       visibleRect: ghostCadFrame!

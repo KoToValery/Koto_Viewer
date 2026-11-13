@@ -23,6 +23,8 @@ class ArchitectCadUnderlayConfig {
   final bool isGeodetic;
   final String? detectedCrsName;
   final double opacity;
+  final bool useOriginalColors;
+  final bool useOriginalLineweights;
   final bool visible;
   final List<Offset>? maskPolygon;
   final bool maskEnabled;
@@ -43,6 +45,8 @@ class ArchitectCadUnderlayConfig {
     this.isGeodetic = false,
     this.detectedCrsName,
     this.opacity = 0.42,
+    this.useOriginalColors = false,
+    this.useOriginalLineweights = false,
     this.visible = true,
     this.maskPolygon,
     this.maskEnabled = true,
@@ -74,6 +78,8 @@ class ArchitectCadUnderlayConfig {
     bool? isGeodetic,
     String? detectedCrsName,
     double? opacity,
+    bool? useOriginalColors,
+    bool? useOriginalLineweights,
     bool? visible,
     List<Offset>? maskPolygon,
     bool clearMask = false,
@@ -96,6 +102,9 @@ class ArchitectCadUnderlayConfig {
     isGeodetic: isGeodetic ?? this.isGeodetic,
     detectedCrsName: detectedCrsName ?? this.detectedCrsName,
     opacity: (opacity ?? this.opacity).clamp(0.05, 1.0),
+    useOriginalColors: useOriginalColors ?? this.useOriginalColors,
+    useOriginalLineweights:
+        useOriginalLineweights ?? this.useOriginalLineweights,
     visible: visible ?? this.visible,
     maskPolygon: clearMask ? null : (maskPolygon ?? this.maskPolygon),
     maskEnabled: maskEnabled ?? this.maskEnabled,
@@ -117,6 +126,8 @@ class ArchitectCadUnderlayConfig {
     if (isGeodetic) 'isGeodetic': true,
     if (detectedCrsName != null) 'detectedCrsName': detectedCrsName,
     'opacity': opacity,
+    if (useOriginalColors) 'useOriginalColors': true,
+    if (useOriginalLineweights) 'useOriginalLineweights': true,
     if (!visible) 'visible': false,
     if (maskPolygon != null && maskPolygon!.isNotEmpty)
       'maskPolygon': [
@@ -129,6 +140,8 @@ class ArchitectCadUnderlayConfig {
       ArchitectCadUnderlayConfig(
         storeyId: json['storeyId'] as String? ?? 'default',
         fileName: json['fileName'] as String? ?? '',
+        useOriginalColors: json['useOriginalColors'] == true,
+        useOriginalLineweights: json['useOriginalLineweights'] == true,
         externalSourcePath: json['externalSourcePath'] as String?,
         internalCopyPath: json['internalCopyPath'] as String? ?? '',
         kcadCachePath: json['kcadCachePath'] as String?,

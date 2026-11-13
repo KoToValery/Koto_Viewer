@@ -13053,4 +13053,45 @@ class AppLocalizationsBg extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get architectStoreyReturnDrawing => 'Към чертежа';
+
+  @override
+  String get architectStoreyAdd => 'Добави етаж';
+
+  @override
+  String get architectStoreyAddSeveral => 'Няколко етажа';
+
+  @override
+  String get architectStoreyEdit => 'Редакция';
+
+  @override
+  String get architectStoreyNameRequired => 'Въведете име.';
+
+  @override
+  String get architectStoreyHeightInvalid => 'Въведете височина над нула.';
+
+  @override
+  String get architectStoreyLevelsHelp =>
+      'Промяната на височината преизчислява котите на горните етажи.';
+
+  @override
+  String get architectStoreyRoofAuto =>
+      'Котата на покрива следва най-горния етаж.';
+
+  @override
+  String get architectUnderlayOriginalColors => 'Оригинални цветове';
+
+  @override
+  String get architectUnderlayOriginalLineweights => 'Оригинални дебелини';
+
+  @override
+  String get architectUnderlayRotateLeft => '90° наляво';
+
+  @override
+  String get architectUnderlayRotateRight => '90° надясно';
+
+  @override
+  String get architectStoreyManagerTitle => 'Етажи';
 }

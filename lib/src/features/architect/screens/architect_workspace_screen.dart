@@ -1177,15 +1177,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _cancelDrafting();
 
     if (type == ArchitectWorkspaceView.plan) {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
+      final selectedStoreyId = await Navigator.of(context).push<String>(
+        MaterialPageRoute<String>(
           builder: (_) => ArchitectStoreysScreen(
             controller: _modelCommands,
             initialSelectedStoreyId: _modelCommands.project.activeStoreyId,
           ),
         ),
       );
-      setState(() {});
+      if (!mounted) return;
+      if (selectedStoreyId != null) {
+        _selectWorkspaceView(ArchitectWorkspaceView.plan, selectedStoreyId);
+      } else {
+        setState(() {});
+      }
       return;
     }
 
@@ -5213,6 +5218,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _saveBiMProjectIfAttached();
   }
 
+  void _updateCadPresentation({
+    double? opacity,
+    bool? useOriginalColors,
+    bool? useOriginalLineweights,
+  }) {
+    final current = _currentCadUnderlayConfig;
+    if (current == null) return;
+    final updated = current.copyWith(
+      opacity: opacity,
+      useOriginalColors: useOriginalColors,
+      useOriginalLineweights: useOriginalLineweights,
+    );
+    final map = Map<String, ArchitectCadUnderlayConfig>.from(
+      _project.cadUnderlays,
+    )..[current.storeyId] = updated;
+    setState(() => _commands.commit(_project.copyWith(cadUnderlays: map)));
+  }
+
   void _openCadEditDialog() {
     final cfg = _currentCadUnderlayConfig;
     if (cfg == null) return;
@@ -5220,15 +5243,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       context: context,
       title: '${context.l10n.architectUnderlayEditDialogTitle}: ${cfg.fileName}',
       initialOpacity: cfg.opacity,
-      onOpacityChanged: (val) {
-        final current = _currentCadUnderlayConfig;
-        if (current == null) return;
-        final updated = current.copyWith(opacity: val);
-        final map = Map<String, ArchitectCadUnderlayConfig>.from(
-          _project.cadUnderlays,
-        )..[current.storeyId] = updated;
-        setState(() => _commands.commit(_project.copyWith(cadUnderlays: map)));
-      },
+      onOpacityChanged: (value) => _updateCadPresentation(opacity: value),
+      initialUseOriginalColors: cfg.useOriginalColors,
+      onUseOriginalColorsChanged: (value) => _updateCadPresentation(useOriginalColors: value),
+      initialUseOriginalLineweights: cfg.useOriginalLineweights,
+      onUseOriginalLineweightsChanged: (value) => _updateCadPresentation(useOriginalLineweights: value),
       onOpenLayers: _openCadDxfLayersSheet,
       isAutoReload: cfg.autoReload,
       onToggleAutoReload: _toggleCadAutoReload,

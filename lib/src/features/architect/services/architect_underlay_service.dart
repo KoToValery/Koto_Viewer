@@ -194,6 +194,8 @@ class ArchitectUnderlayService {
       isGeodetic: geodeticResult.isGeodetic,
       detectedCrsName: geodeticResult.coordinateSystem.name,
       opacity: existingConfig?.opacity ?? 0.42,
+      useOriginalColors: existingConfig?.useOriginalColors ?? false,
+      useOriginalLineweights: existingConfig?.useOriginalLineweights ?? false,
       visible: existingConfig?.visible ?? true,
       maskPolygon: existingConfig?.maskPolygon,
       maskEnabled: existingConfig?.maskEnabled ?? true,

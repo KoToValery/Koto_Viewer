@@ -451,24 +451,14 @@ void main() {
       expect(find.text('Етаж 2'), findsWidgets);
       expect(find.text('Етаж 3'), findsWidgets);
 
-      // Scroll until bottom copy button is visible and tap
-      final copyAction = find.byKey(
-        const ValueKey('architect-storeys-execute-copy'),
-      );
-      await tester.scrollUntilVisible(
-        copyAction,
-        300.0,
-        scrollable: find
-            .byWidgetPredicate(
-              (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
-            )
-            .last,
-      );
-      await tester.pumpAndSettle();
-
+      // The manager delegates to the shared copy dialog; opening it is read-only.
+      final copyAction = find.byKey(const ValueKey('architect-storeys-copy'));
       expect(copyAction, findsOneWidget);
-
       await tester.tap(copyAction);
+      await tester.pumpAndSettle();
+      expect(find.byType(ArchitectCopyStoreyDialog), findsOneWidget);
+      expect(controller.undoCount, 0);
+      await tester.tap(find.byKey(const ValueKey('architect-copy-submit')));
       await tester.pumpAndSettle();
 
       // Verify copy succeeded: storey_2 and storey_3 now have the walls and columns copied!
@@ -483,6 +473,7 @@ void main() {
       expect(s2.columns.length, 1);
       expect(s3.walls.length, 1);
       expect(s3.columns.length, 1);
+      expect(controller.undoCount, 1);
     },
   );
 }
