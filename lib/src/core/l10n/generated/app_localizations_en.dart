@@ -13044,4 +13044,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectStoreyManagerTitle => 'Storeys';
+
+  @override
+  String get architectComponentReplace => 'Replace';
+
+  @override
+  String get architectComponentReplaceHelp =>
+      'Replace from the library, keeping position and rotation.';
+
+  @override
+  String get architectComponentPlacementHelp =>
+      'Tap to position, then confirm to place. Tap Object again to finish; select an object to move it.';
 }

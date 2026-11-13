@@ -181,6 +181,7 @@ import '../../bim_projects/models/bim_coordinate_frame.dart';
 import "../models/architect_component_definition.dart";
 
 import "../services/component_library_service.dart";
+import "../services/architect_component_placement.dart";
 
 import "../widgets/architect_component_library_dialog.dart";
 
@@ -370,11 +371,13 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-03-XFORM]   [TAG:XFORM_COORDS] Screen <-> Model Space & Snapping
 // [SEC-04-TOUCH]   [TAG:TOUCH_DOWN] _onPointerDown Input Dispatch
 //   ↳ [SUB]        [TAG:TOUCH_MOVE] _onPointerMove Input Dispatch & Previews
+//   ↳ [SUB]        [TAG:OBJECT_PLACEMENT] Exclusive preview, review and commit
 //   ↳ [SUB]        [TAG:TOUCH_UP] _onPointerUp Input Dispatch & Tool Commits
 // [SEC-05-ZONES]   [TAG:ZONE_LOGIC] Zone Updates, Schedules & Presets
 // [SEC-06-WALLS]   [TAG:WALL_DRAFT] Wall Concept Drafting & Chain Grouping
 // [SEC-07-SPLIT]   [TAG:WALL_SPLIT] Wall Splitting, Cut Sessions & Clearances
 // [SEC-08-FENEST]  [TAG:FENEST_RADIAL] Door/Window Placement & Radial Context Menus
+//   ↳ [SUB]        [TAG:OBJECT_REPLACEMENT] Atomic catalog replacement retaining identity
 //   ↳ [SUB]        [TAG:FLOATING_HUD] Contextual Floating Command Overlays & Interactive Edge Curving
 //   ↳ [SUB]        [TAG:CURVING_EXACT_INPUT] Existing element: exact h, side preview, final Apply/Cancel
 //   ↳ [SUB]        [TAG:CURVING_FEEDBACK] Compact neutral rise/snap feedback outside edited geometry
@@ -5668,7 +5671,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _activeTool == ArchitectTool.column ||
 
-        _activeTool == ArchitectTool.services ||
+        _activeTool.usesComponent ||
 
         _activeTool == ArchitectTool.opening) {
 
@@ -5678,7 +5681,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _columnPreviewPoint = null;
 
-      _servicePreviewPoint = null;
+      _componentPlacementPoint = null;
 
     }
 
@@ -5696,7 +5699,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _columnPreviewPoint = null;
 
-      _servicePreviewPoint = null;
+      _componentPlacementPoint = null;
 
     });
 
@@ -5821,7 +5824,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _columnPreviewPoint = null;
 
     _columnPreviewRotation = 0.0;
-
+    _componentPlacementPoint = null;
     _cursorModel = null;
 
     _resetWallDraft();
@@ -8197,9 +8200,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   double _columnPreviewRotation = 0.0;
 
-  Offset? _servicePreviewPoint;
+  Offset? _componentPlacementPoint;
 
-  double _servicePreviewRotation = 0.0;
+  double _componentPlacementRotation = 0.0;
 
   bool get _columnPreviewIsOccupied =>
 
@@ -10117,7 +10120,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _effectiveSelection.isNotEmpty &&
 
         (_moveSelection ||
-
+            (_effectiveSelection.length == 1 && _project.activeStorey.components.any(
+              (c) => _effectiveSelection.contains(c.id) && !c.isLocked)) ||
             _activeTool != ArchitectTool.select ||
 
             _project.activeStorey.dimensions.any(
@@ -10527,8 +10531,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    if (_activeTool == ArchitectTool.services && _servicePreviewPoint != null) {
-      return _servicePreviewPoint;
+    if (_activeTool.usesComponent && _componentPlacementPoint != null) {
+      return _componentPlacementPoint;
     }
 
     if (_activeTool == ArchitectTool.column && _columnPreviewPoint != null) {
@@ -10712,8 +10716,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ) {
 
     if (def.category == ArchitectComponentCategory.services || def is ServiceComponentDefinition) {
-      if (_servicePreviewPoint != null) {
-        return (_servicePreviewPoint!, _servicePreviewRotation * math.pi / 180.0);
+      if (_componentPlacementPoint != null) {
+        return (_componentPlacementPoint!, _componentPlacementRotation * math.pi / 180.0);
       }
       final activeParams = ComponentLibraryService.instance.activeParameters;
       final (w, d) = def is ServiceComponentDefinition
@@ -10724,67 +10728,44 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         project: _project,
         width: w,
         depth: d,
-        currentRotationDeg: _servicePreviewRotation,
+        currentRotationDeg: _componentPlacementRotation,
         tolerance: (_touchInput ? 16 : 10) / _currentScale,
         magnetic: _magnetEnabled,
         underlay: _currentUnderlayDoc,
         frame: _effectiveUnderlayFrame,
       );
-      return (snap.point, (snap.angleDeg ?? _servicePreviewRotation) * math.pi / 180.0);
+      _activeSnapLabel = snap.snapLabel;
+      _activeMagneticGuides = snap.magneticGuides;
+      return (snap.point, (snap.angleDeg ?? _componentPlacementRotation) * math.pi / 180.0);
     }
 
-    if (def.placementMode == ComponentPlacementMode.wallAttached) {
-
-      const snapDistance = 0.50;
-
-      for (final wall in _project.activeStorey.walls) {
-
-        final p1 = wall.startPoint;
-
-        final p2 = wall.endPoint;
-
-        final lineVec = p2 - p1;
-
-        final lineLen = lineVec.distance;
-
-        if (lineLen < 1e-4) continue;
-
-        final u = lineVec / lineLen;
-
-        final toPt = rawModel - p1;
-
-        final projDist = toPt.dx * u.dx + toPt.dy * u.dy;
-
-        if (projDist < 0.0 || projDist > lineLen) continue;
-
-        final n = Offset(-u.dy, u.dx);
-
-        final distToBaseline = (toPt.dx * n.dx + toPt.dy * n.dy).abs();
-
-        if (distToBaseline <= snapDistance + wall.thickness / 2.0) {
-
-          final baseProj = p1 + u * projDist;
-
-          final side = (toPt.dx * n.dx + toPt.dy * n.dy) >= 0 ? 1.0 : -1.0;
-
-          final wallFaceNormal = n * side;
-
-          final snapPos = baseProj + wallFaceNormal * (wall.thickness / 2.0);
-
-          final rot = math.atan2(wallFaceNormal.dy, wallFaceNormal.dx) - (math.pi / 2.0);
-
-          return (snapPos, rot);
-
-        }
-
-      }
-
-    }
-
-    return (rawModel, _componentRotation);
-
+    _activeSnapLabel = null;
+    _activeMagneticGuides = const [];
+    return ArchitectComponentPlacement.resolve(
+      raw: rawModel,
+      definition: def,
+      walls: _project.activeStorey.walls,
+      rotation: _componentRotation,
+      tolerance: math.min(18 / _currentScale, .25),
+      magnetic: _magnetEnabled,
+    );
   }
 
+  // --- SUBSECTION: [TAG:OBJECT_PLACEMENT] Exclusive preview, review and commit ---
+  bool get _placingComponent => _activeTool.usesComponent &&
+      _interactionMode == ArchitectInteractionMode.drawing &&
+      _effectiveSelection.isEmpty && _dragController.isIdle &&
+      _commandPreview == null;
+
+  void _updateComponentPlacement(Offset raw) {
+    final definition = ComponentLibraryService.instance.activeDefinition;
+    _componentPlacementPoint = null;
+    final (point, rotation) = _snapComponent(raw, definition);
+    _componentPlacementPoint = point;
+    _componentPlacementRotation = rotation * 180 / math.pi;
+    _cursorModel = point;
+    _repaintPreview();
+  }
 
 
   ArchitectSnapResult _snapColumn(Offset raw) {
@@ -11925,33 +11906,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    if (_activeTool == ArchitectTool.services && !_isActivelyDraggingHandle) {
-      final activeDef = ComponentLibraryService.instance.activeDefinition;
-      final activeParams = ComponentLibraryService.instance.activeParameters;
-      final (w, d) = activeDef is ServiceComponentDefinition
-          ? activeDef.footprint(activeParams)
-          : (0.4, 0.4);
-      final snap = ArchitectServiceSnap.resolve(
-        raw: rawModel,
-        project: _project,
-        width: w,
-        depth: d,
-        currentRotationDeg: _servicePreviewRotation,
-        tolerance: (_touchInput ? 16 : 10) / _currentScale,
-        magnetic: _magnetEnabled,
-        underlay: _currentUnderlayDoc,
-        frame: _effectiveUnderlayFrame,
-      );
-      _servicePreviewPoint = snap.point;
-      _servicePreviewRotation = snap.angleDeg ?? 0.0;
-      _activeSnapLabel = snap.snapLabel;
-      _activeMagneticGuides = snap.magneticGuides;
-      _cursorModel = _servicePreviewPoint;
-      _repaintPreview();
+    if (_placingComponent && !_isActivelyDraggingHandle) {
+      _updateComponentPlacement(rawModel);
       return;
     }
-
-
 
     if (_groupDragIds.isNotEmpty &&
 
@@ -14499,6 +14457,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _effectiveSelection.isEmpty &&
 
         _activeTool != ArchitectTool.select &&
+        !_activeTool.usesComponent &&
 
         _activeTool != ArchitectTool.door &&
 
@@ -15249,96 +15208,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 7. In Column tool
 
-    // 6B. In Component tool
-
-    if (_activeTool.usesComponent) {
-      final hitComp = _project.activeStorey.components.reversed.where((c) {
-        if (!c.isVisible) return false;
-        return c.containsPoint(rawModel);
-      }).firstOrNull;
-
-      if (hitComp != null) {
-        _selectAt(rawModel);
-        return;
-      }
-
-      if (_activeTool == ArchitectTool.services) {
-        final activeDef = ComponentLibraryService.instance.activeDefinition;
-        final activeParams = ComponentLibraryService.instance.activeParameters;
-        final (w, d) = activeDef is ServiceComponentDefinition
-            ? activeDef.footprint(activeParams)
-            : (0.4, 0.4);
-        final snap = ArchitectServiceSnap.resolve(
-          raw: rawModel,
-          project: _project,
-          width: w,
-          depth: d,
-          currentRotationDeg: _servicePreviewRotation,
-          tolerance: (_touchInput ? 16 : 10) / _currentScale,
-          magnetic: _magnetEnabled,
-          underlay: _currentUnderlayDoc,
-          frame: _effectiveUnderlayFrame,
-        );
-        setState(() {
-          _servicePreviewPoint = snap.point;
-          _servicePreviewRotation = snap.angleDeg ?? 0.0;
-          _cursorModel = snap.point;
-        });
-        _repaintPreview();
-        return;
-      }
-
-      final activeDef = ComponentLibraryService.instance.activeDefinition;
-
-      final activeParams = ComponentLibraryService.instance.activeParameters;
-
-      final (pos, rot) = _snapComponent(rawModel, activeDef);
-
-      final newComp = ArchitectComponentInstance(
-
-        id: "comp_${DateTime.now().millisecondsSinceEpoch}",
-
-        definitionId: activeDef.id,
-
-        position: pos,
-
-        rotation: rot,
-
-        parameters: Map.of(activeParams),
-
-      );
-
-      final updatedComponents = [..._project.activeStorey.components, newComp];
-
-      final updatedStorey = _project.activeStorey.copyWith(components: updatedComponents,
-      );
-
-      setState(() {
-
-        _commands.commit(_project.copyWith(
-
-          storeys: [
-
-            for (final s in _project.storeys)
-
-              if (s.id == updatedStorey.id) updatedStorey else s,
-
-          ],
-
-        ), applyDraftingDefaults: true,
-        );
-
-      });
-
-      _saveBiMProjectIfAttached();
-
-      HapticFeedback.lightImpact();
-
+    // Explicit Object placement never silently changes to selection.
+    if (_placingComponent) {
+      setState(() => _updateComponentPlacement(rawModel));
       return;
-
     }
-
-
 
     if (_activeTool == ArchitectTool.column) {
       if (_project.activeStorey.columns.any(
@@ -20801,6 +20675,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    if (_project.activeStorey.components.any((c) => _effectiveSelection.contains(c.id))) {
+      items.removeWhere((item) => item.action == ArchitectRadialAction.mirrorMove ||
+          item.action == ArchitectRadialAction.mirrorCopy || item.action == ArchitectRadialAction.flip);
+    }
     return items;
 
   }
@@ -21130,6 +21008,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ArchitectRadialAction.rotate,ArchitectRadialAction.duplicate,
         ArchitectRadialAction.properties,ArchitectRadialAction.mirrorMove]) {
         items.add(_radialItem(action:action,color:const Color(0xFF00E5FF)));
+      }
+    } else if (storey.components.any((c) => c.id == elementId)) {
+      final component = storey.components.firstWhere((c) => c.id == elementId);
+      if (!component.isLocked) {
+        for (final action in [ArchitectRadialAction.move, ArchitectRadialAction.rotate,
+          ArchitectRadialAction.duplicate, ArchitectRadialAction.replace,
+          ArchitectRadialAction.properties]) {
+          items.add(_radialItem(action: action, color: const Color(0xFF80CBC4)));
+        }
       }
     } else if (isCol || isBeam) {
 
@@ -21663,7 +21550,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    if (!isDoor && !isWindow && !isAxis) {
+    if (!isDoor && !isWindow && !isAxis &&
+        !storey.components.any((c) => c.id == elementId)) {
 
       items.add(
 
@@ -22903,6 +22791,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     switch (action) {
 
+      case ArchitectRadialAction.replace:
+        _replaceComponentFromLibrary(id);
+        break;
       case ArchitectRadialAction.openView:
         _openSectionOrElevationView(id);
         break;
@@ -24660,6 +24551,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  // --- SUBSECTION: [TAG:OBJECT_REPLACEMENT] Atomic catalog replacement retaining identity ---
+  Future<void> _replaceComponentFromLibrary(String id) async {
+    _discardGeometryCommand();
+    _cancelActiveDrags();
+    final source = _commands.documentProject;
+    final document = _modelCommands.project;
+    final component = source.activeStorey.components.where((c) => c.id == id).firstOrNull;
+    if (component == null || component.isLocked) return;
+    await ArchitectComponentLibraryDialog.show(
+      context,
+      replaceSelection: true,
+      initialCategory: ComponentLibraryService.instance.findDefinition(component.definitionId)?.category,
+      selectedDefinitionId: component.definitionId,
+      onSelectComponent: (definition) {
+        if (!mounted || !identical(document, _modelCommands.project)) return;
+        if (definition.id == component.definitionId) return;
+        final replacement = component.copyWith(
+          definitionId: definition.id,
+          parameters: Map.of(definition.defaultParameters),
+        );
+        _commands.commit(source.updateActiveStorey(source.activeStorey.copyWith(
+          components: [for (final c in source.activeStorey.components)
+            c.id == id ? replacement : c],
+        )));
+        setState(() {
+          _componentPlacementPoint = null;
+          _cursorModel = null;
+          _restorePickedTool(id);
+        });
+        _saveBiMProjectIfAttached();
+      },
+    );
+  }
+
   Future<void> _showComponentDimensions(
     ArchitectComponentInstance component,
   ) async {
@@ -25677,14 +25602,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final canvasSize = _viewport.size;
     const height = 60.0;
     final safe = (Offset.zero & canvasSize).deflate(8);
+    final objectBounds = [
+      for (final component in _drawingProject.activeStorey.components)
+        if (_dragController.elementIds.contains(component.id))
+          Rect.fromPoints(
+            _viewport.toScreen(component.worldBoundingRect.topLeft),
+            _viewport.toScreen(component.worldBoundingRect.bottomRight),
+          ).inflate(8),
+    ];
     final candidates = [
+      // Do not turn a base-point pick on furniture into an accidental Cancel.
+      for (final bounds in objectBounds) ...[
+        Offset(bounds.right + 8, bounds.top),
+        Offset(bounds.left - width - 8, bounds.top),
+        Offset(bounds.left, bounds.top - height - 8),
+        Offset(bounds.left, bounds.bottom + 8),
+      ],
       screenPos + const Offset(24, 32),
       screenPos + const Offset(24, -height - 36),
       screenPos + Offset(-width - 24, 32),
       screenPos + Offset(-width - 24, -height - 36),
     ];
     final clamped = candidates.where((position) =>
-      safe.contains(position) && safe.contains(position + Offset(width, height)),
+      safe.contains(position) && safe.contains(position + Offset(width, height)) &&
+        objectBounds.every((bounds) => !bounds.overlaps(
+          position & Size(width, height))),
     ).firstOrNull ?? Offset(
       (screenPos.dx + 24).clamp(8.0, math.max(8.0, canvasSize.width - width - 8)),
       (screenPos.dy + 32).clamp(8.0, math.max(8.0, canvasSize.height - height - 8)),
@@ -29080,7 +29022,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               : const [],
         ),
       );
-      if (generic) {
+      if (generic && !storey.components.any((c) => ids.contains(c.id))) {
         actions.addAll([
           action(
             'architect-selection-mirror-move',
@@ -29387,6 +29329,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
     }
 
+    final component = ids.length == 1
+        ? storey.components.where((c) => ids.contains(c.id)).firstOrNull : null;
+    if (component != null && !component.isLocked) {
+      actions.add(action(
+        'architect-component-rotate', l.architectRadialRotate,
+        Icons.rotate_right, _startRotation, commandId: 'rotate',
+      ));
+      actions.add(action(
+        'architect-component-duplicate', l.dragDuplicateAction,
+        Icons.copy, () => _beginDuplicateMove(component.id), commandId: 'duplicate',
+      ));
+      actions.add(action(
+        'architect-component-replace', l.architectComponentReplace,
+        Icons.swap_horiz, () => _replaceComponentFromLibrary(component.id),
+        primary: true, color: accent, tooltip: l.architectComponentReplaceHelp,
+        commandId: 'replace',
+      ));
+    }
     if (ids.isNotEmpty) {
       actions.add(
         action(
@@ -29444,6 +29404,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ),
 
+      ...storey.components.where((e) => !e.isLocked).map((e) => e.id),
       ...storey.columns.map((e) => e.id),
 
       ...storey.beams.map((e) => e.id),
@@ -29471,6 +29432,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ..._project.elevations.map((e) => e.id),
     ].contains(id);
 
+    if (storey.components.any((e) => e.id == id && e.isLocked)) return false;
     _zoneTool.cancelEditingZone();
 
     _axisTool.deselect();
@@ -30929,7 +30891,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                     setState(() {
 
-                      _componentRotation = (_componentRotation + 3.141592653589793 / 2.0) % (2.0 * 3.141592653589793);
+                      _componentRotation = (_componentRotation + math.pi / 2) % (2 * math.pi);
+                      _componentPlacementRotation = (_componentPlacementRotation + 90) % 360;
 
                     });
 
@@ -30940,17 +30903,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ArchitectComponentLibraryDialog.show(
 
                       context,
-                      initialCategory: _activeTool == ArchitectTool.services
-                          ? ArchitectComponentCategory.services : null,
+                      initialCategory: ComponentLibraryService.instance.activeDefinition.category,
 
                       onSelectDownpipe: () => _beginDownpipePlacement(),
-                      onSelectFloorDrain: () => setState(() => _activeTool = ArchitectTool.floorDrain,
-                      ),
+                      onSelectFloorDrain: () => _changeTool(ArchitectTool.floorDrain, toggle: false),
 
                       onSelectComponent: (def) {
 
-                        setState(() => _activeTool = def.category == ArchitectComponentCategory.services
-                            ? ArchitectTool.services : ArchitectTool.component);
+                        _changeTool(def.category == ArchitectComponentCategory.services
+                            ? ArchitectTool.services : ArchitectTool.component, toggle: false);
 
                       },
 
@@ -32043,23 +32004,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    if (_activeTool == ArchitectTool.services && _effectiveSelection.isEmpty) {
-      final center = _servicePreviewPoint ?? _cursorModel;
-      if (center == null) return null;
-      final activeDef = ComponentLibraryService.instance.activeDefinition;
-      final activeParams = ComponentLibraryService.instance.activeParameters;
-      final (w, d) = activeDef is ServiceComponentDefinition
-          ? activeDef.footprint(activeParams)
-          : (0.4, 0.4);
-      final halfWidth = w / 2;
-      final halfDepth = d / 2;
-      final angle = _servicePreviewRotation * math.pi / 180;
-      final cosine = math.cos(angle).abs();
-      final sine = math.sin(angle).abs();
-      return center + Offset(
-        halfWidth * cosine + halfDepth * sine,
-        -(halfWidth * sine + halfDepth * cosine),
+    if (_placingComponent && _componentPlacementPoint != null) {
+      final component = ArchitectComponentInstance(
+        id: 'preview',
+        definitionId: ComponentLibraryService.instance.activeDefinition.id,
+        position: _componentPlacementPoint!,
+        rotation: _componentPlacementRotation * math.pi / 180,
+        parameters: ComponentLibraryService.instance.activeParameters,
       );
+      return component.worldBoundingRect.topRight;
     }
 
     if (_activeTool == ArchitectTool.opening && _draftStart != null && _draftEnd != null) {
@@ -32160,7 +32113,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool get _canConfirmDraft => _canConfirmDimension || _canConfirmRoofDraft || _canConfirmLandscapeDraft ||
       _canConfirmContour || _canConfirmZone ||
-      (_activeTool == ArchitectTool.services && _servicePreviewPoint != null) ||
+      (_placingComponent && _componentPlacementPoint != null) ||
       (_activeTool == ArchitectTool.column && _columnPreviewPoint != null && !_columnPreviewIsOccupied) ||
       (_activeTool == ArchitectTool.opening && _draftStart != null && _draftEnd != null);
 
@@ -32198,14 +32151,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
-  void _commitServicePlacement() {
-    final pt = _servicePreviewPoint ?? _cursorModel;
+  void _commitComponentPlacement() {
+    if (!_placingComponent) return;
+    final pt = _componentPlacementPoint ?? _cursorModel;
     if (pt == null) return;
     final activeDef = ComponentLibraryService.instance.activeDefinition;
     final activeParams = ComponentLibraryService.instance.activeParameters;
-    final rot = _servicePreviewRotation * math.pi / 180.0;
+    final rot = _componentPlacementRotation * math.pi / 180.0;
     final newComp = ArchitectComponentInstance(
-      id: "comp_${DateTime.now().millisecondsSinceEpoch}",
+      id: ArchitectElementId.next('component'),
       definitionId: activeDef.id,
       position: pt,
       rotation: rot,
@@ -32225,7 +32179,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
         applyDraftingDefaults: true,
       );
-      _servicePreviewPoint = null;
+      _componentPlacementPoint = null;
+      _cursorModel = null;
     });
     _saveBiMProjectIfAttached();
     HapticFeedback.lightImpact();
@@ -32469,8 +32424,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    if (_activeTool == ArchitectTool.services && _servicePreviewPoint != null) {
-      _commitServicePlacement();
+    if (_placingComponent && _componentPlacementPoint != null) {
+      _commitComponentPlacement();
       return;
     }
 
@@ -32725,7 +32680,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ? 'architect-roof-confirm'
 
-                      : _canConfirmContour || _canConfirmZone
+                      : _canConfirmContour || _canConfirmZone || _placingComponent
 
                       ? 'architect-draft-confirm'
 
@@ -32867,15 +32822,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         onToolHoldStart: _beginPlacementHold,
 
-        onSelectionHold: !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSelectionHold: !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
 
             ? _onSelectionHold
 
             : null,
 
-        onSecondaryTap: !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSecondaryTap: !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
             ? _onContextHold : null,
-        onContextHold: !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onContextHold: !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
 
             ? _onContextHold
 
@@ -35930,7 +35885,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     activeOpeningType: _elementTool.openingType,
 
-    componentPreview: _activeTool.usesComponent && _cursorModel != null
+    componentPreview: _placingComponent && _componentPlacementPoint != null
 
         ? () {
 
@@ -35938,7 +35893,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             final activeParams = ComponentLibraryService.instance.activeParameters;
 
-            final (pos, rot) = _snapComponent(_cursorModel!, activeDef);
+            final pos = _componentPlacementPoint!;
+            final rot = _componentPlacementRotation * math.pi / 180;
 
             return ArchitectComponentInstance(
 

@@ -23705,6 +23705,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Storeys'**
   String get architectStoreyManagerTitle;
+
+  /// No description provided for @architectComponentReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get architectComponentReplace;
+
+  /// No description provided for @architectComponentReplaceHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace from the library, keeping position and rotation.'**
+  String get architectComponentReplaceHelp;
+
+  /// No description provided for @architectComponentPlacementHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to position, then confirm to place. Tap Object again to finish; select an object to move it.'**
+  String get architectComponentPlacementHelp;
 }
 
 class _AppLocalizationsDelegate

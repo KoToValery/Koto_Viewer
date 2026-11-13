@@ -5,6 +5,11 @@
 
 ## 1. How to use this map
 
+`MoveArchitectElement` translates component insertion positions while retaining
+their geometry parameters and metadata, and leaves locked components unchanged.
+`MoveArchitectElements` delegates component IDs to that same command. Direct
+selected-object movement and two-point Drag therefore share history/persistence.
+
 1. Use this map to identify the closest existing `ArchitectModelCommand` for your mutation.
 2. Search the current Dart source, for example: `rg -n "class SplitArchitectWall|class MoveArchitectElements|class ArchitectCommandController" lib/src/features/architect/services/architect_command_controller.dart`.
 3. Inspect both the command class (`execute` / `undo`) and its callers in `architect_workspace_screen.dart` to match undo/redo and persistence behavior.

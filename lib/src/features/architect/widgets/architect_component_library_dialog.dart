@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../components/dsl/parametric_script_parser.dart';
 import '../models/architect_component.dart';
+import '../rendering/architect_component_opening_painter.dart';
 import '../models/architect_component_definition.dart';
 import '../models/architect_fenestration_style.dart';
 import '../services/component_geometry_cache.dart';
@@ -26,6 +27,8 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
   final VoidCallback? onSelectDownpipe;
   final VoidCallback? onSelectFloorDrain;
   final ArchitectComponentCategory? initialCategory;
+  final bool replaceSelection;
+  final String? selectedDefinitionId;
   const ArchitectComponentLibraryDialog({
     super.key,
     this.onSelectComponent,
@@ -33,6 +36,8 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
     this.onSelectDownpipe,
     this.onSelectFloorDrain,
     this.initialCategory,
+    this.replaceSelection = false,
+    this.selectedDefinitionId,
   });
 
   static Future<void> show(
@@ -42,6 +47,8 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
     VoidCallback? onSelectDownpipe,
     VoidCallback? onSelectFloorDrain,
     ArchitectComponentCategory? initialCategory,
+    bool replaceSelection = false,
+    String? selectedDefinitionId,
   }) => showDialog(
     context: context,
     builder: (_) => ArchitectComponentLibraryDialog(
@@ -50,6 +57,8 @@ class ArchitectComponentLibraryDialog extends StatefulWidget {
       onSelectDownpipe: onSelectDownpipe,
       onSelectFloorDrain: onSelectFloorDrain,
       initialCategory: initialCategory,
+      replaceSelection: replaceSelection,
+      selectedDefinitionId: selectedDefinitionId,
     ),
   );
 
@@ -66,7 +75,7 @@ class _ArchitectComponentLibraryDialogState
   _Source _source = _Source.all;
   String _search = '';
   ColorScheme get colors => Theme.of(context).colorScheme;
-  FenestrationPreviewMode _previewMode = FenestrationPreviewMode.elevation;
+  FenestrationPreviewMode _previewMode = FenestrationPreviewMode.plan;
   bool get _show3d => _previewMode == FenestrationPreviewMode.threeD;
 
   @override
@@ -139,6 +148,7 @@ class _ArchitectComponentLibraryDialogState
         .getAllStyles()
         .where(
           (s) =>
+              !widget.replaceSelection &&
               (_category == null ||
                   (_category == ArchitectComponentCategory.doors &&
                       s.kind == FenestrationKind.door) ||
@@ -162,7 +172,9 @@ class _ArchitectComponentLibraryDialogState
                 children: [
                   Expanded(
                     child: Text(
-                      l.architectLibrary,
+                      widget.replaceSelection
+                          ? l.architectComponentReplace
+                          : l.architectLibrary,
                       style: TextStyle(
                         color: colors.onSurface,
                         fontSize: 18,
@@ -223,7 +235,7 @@ class _ArchitectComponentLibraryDialogState
                   visualDensity: VisualDensity.compact,
                   foregroundColor: WidgetStateProperty.resolveWith(
                     (states) => states.contains(WidgetState.selected)
-                        ? Colors.black87
+                        ? colors.onSecondaryContainer
                         : colors.onSurfaceVariant,
                   ),
                 ),
@@ -258,7 +270,7 @@ class _ArchitectComponentLibraryDialogState
                       child: DropdownButton<ArchitectComponentCategory>(
                         key: const ValueKey('component-library-category'),
                         isExpanded: true,
-                        dropdownColor: const Color(0xFF262633),
+                        dropdownColor: colors.surfaceContainerHigh,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: colors.onSurface,
                           fontSize: 13,
@@ -274,10 +286,13 @@ class _ArchitectComponentLibraryDialogState
                             child: Text(l.architectLibraryAll),
                           ),
                           for (final c in ArchitectComponentCategory.values)
-                            DropdownMenuItem(
-                              value: c,
-                              child: Text(componentCategoryLabel(l, c)),
-                            ),
+                            if (!widget.replaceSelection ||
+                                (c != ArchitectComponentCategory.doors &&
+                                    c != ArchitectComponentCategory.windows))
+                              DropdownMenuItem(
+                                value: c,
+                                child: Text(componentCategoryLabel(l, c)),
+                              ),
                         ],
                         onChanged: (value) => setState(() => _category = value),
                       ),
@@ -289,7 +304,7 @@ class _ArchitectComponentLibraryDialogState
                       child: DropdownButton<_Source>(
                         key: const ValueKey('component-library-source'),
                         isExpanded: true,
-                        dropdownColor: const Color(0xFF262633),
+                        dropdownColor: colors.surfaceContainerHigh,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: colors.onSurface,
                           fontSize: 13,
@@ -479,26 +494,35 @@ class _ArchitectComponentLibraryDialogState
                           componentLabel(l, d),
                           '$sizes cm',
                           CustomPaint(
-                            painter: _show3d
+                            painter:
+                                _previewMode != FenestrationPreviewMode.plan
                                 ? ComponentMeshPreviewPainter(
                                     geometry.mesh3d,
-                                    .55,
-                                    .65 + (d.id == 'service_fireplace' ? math.pi : 0),
+                                    _show3d ? .55 : 0,
+                                    _show3d
+                                        ? .65 +
+                                              (d.id == 'service_fireplace'
+                                                  ? math.pi
+                                                  : 0)
+                                        : math.pi,
                                   )
                                 : _ComponentThumbnailPainter(geometry.block2d),
                           ),
                           () {
-                            library.setActiveDefinition(d);
+                            if (!widget.replaceSelection) {
+                              library.setActiveDefinition(d);
+                            }
                             widget.onSelectComponent?.call(d);
                             Navigator.of(context).pop();
                           },
+                          itemKey: ValueKey('component-library-item-${d.id}'),
+                          selected: d.id == widget.selectedDefinitionId,
                           onEdit: d is ScriptedComponentDefinition
                               ? () => ComponentStudioDialog.show(
                                   context,
                                   initialScriptJson: d.rawSourceJson,
                                 )
-                              : d.category ==
-                                    ArchitectComponentCategory.services
+                              : !widget.replaceSelection
                               ? () async {
                                   final values =
                                       await ComponentDimensionsDialog.show(
@@ -578,10 +602,19 @@ class _ArchitectComponentLibraryDialogState
     String? editTooltip,
     IconData? editIcon,
     String? help,
+    Key? itemKey,
+    bool selected = false,
   }) => Card(
-    color: colors.surfaceContainerHigh,
+    color: selected ? colors.secondaryContainer : colors.surfaceContainerHigh,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: BorderSide(
+        color: selected ? colors.primary : colors.outlineVariant,
+      ),
+    ),
     clipBehavior: Clip.antiAlias,
     child: InkWell(
+      key: itemKey,
       onTap: select,
       child: Padding(
         padding: const EdgeInsets.all(8),
@@ -597,6 +630,10 @@ class _ArchitectComponentLibraryDialogState
                       top: 0,
                       right: 0,
                       child: IconButton(
+                        style: IconButton.styleFrom(
+                          foregroundColor: const Color(0xFF263238),
+                          backgroundColor: Colors.white,
+                        ),
                         tooltip:
                             editTooltip ??
                             context.l10n.architectComponentStudioTitle,
@@ -690,6 +727,7 @@ class _ComponentThumbnailPainter extends CustomPainter {
     for (final p in block.detailPaths) {
       canvas.drawPath(p, detailPaint);
     }
+    ArchitectComponentOpeningPainter.draw(canvas, block, detailPaint);
 
     canvas.restore();
   }

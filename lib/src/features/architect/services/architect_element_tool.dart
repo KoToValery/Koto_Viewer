@@ -1040,6 +1040,18 @@ class ArchitectElementTool extends ChangeNotifier {
   }) {
     final newId = ArchitectElementId.next('copy');
 
+    final component = storey.components.where((c) => c.id == elementId).firstOrNull;
+    if (component != null) {
+      if (component.isLocked) return (storey, null);
+      return (
+        storey.copyWith(components: [
+          ...storey.components,
+          component.copyWith(id: newId, position: component.position + offset),
+        ]),
+        newId,
+      );
+    }
+
     final annotation = storey.annotations
         .where((a) => a.id == elementId)
         .firstOrNull;

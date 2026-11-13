@@ -4498,5 +4498,8 @@
   "architectUnderlayRotateRight": "90° надясно",
   "@architectUnderlayRotateRight": { "description": "Rotate the underlay clockwise by 90 degrees" },
   "architectStoreyManagerTitle": "Етажи",
-  "@architectStoreyManagerTitle": { "description": "Short title of the storey manager" }
+  "@architectStoreyManagerTitle": { "description": "Short title of the storey manager" },
+  "architectComponentReplace": "Замени",
+  "architectComponentReplaceHelp": "Замени от библиотеката със запазване на позицията и завъртането.",
+  "architectComponentPlacementHelp": "Тапни за позиция и потвърди поставянето. Тапни „Обект“ отново за край; избери обект, за да го преместиш."
 }

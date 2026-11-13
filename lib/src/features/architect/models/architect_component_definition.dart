@@ -516,6 +516,9 @@ abstract class ArchitectComponentDefinition {
         detailPaths: [
           for (final path in block.detailPaths) path.transform(matrix),
         ],
+        openingPaths: [
+          for (final path in block.openingPaths) path.transform(matrix),
+        ],
         bounds: Rect.fromLTRB(
           block.bounds.left * sx,
           block.bounds.top * sy,

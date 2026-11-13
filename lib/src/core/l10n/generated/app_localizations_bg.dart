@@ -13094,4 +13094,15 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectStoreyManagerTitle => 'Етажи';
+
+  @override
+  String get architectComponentReplace => 'Замени';
+
+  @override
+  String get architectComponentReplaceHelp =>
+      'Замени от библиотеката със запазване на позицията и завъртането.';
+
+  @override
+  String get architectComponentPlacementHelp =>
+      'Тапни за позиция и потвърди поставянето. Тапни „Обект“ отново за край; избери обект, за да го преместиш.';
 }

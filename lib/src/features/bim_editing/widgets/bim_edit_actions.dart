@@ -32,6 +32,7 @@ enum BimEditAction {
   attach,
   hide,
   curve,
+  replace,
 }
 
 class BimEditActions {
@@ -65,6 +66,7 @@ class BimEditActions {
         BimEditAction.attach => l.architectWallAttach,
         BimEditAction.hide => l.architectUnderlayHide,
         BimEditAction.curve => l.architectLineCurve,
+        BimEditAction.replace => l.architectComponentReplace,
       };
   static AppIconId icon(BimEditAction action) => switch (action) {
     BimEditAction.move => AppIconId.move,
@@ -95,6 +97,7 @@ class BimEditActions {
     BimEditAction.attach => AppIconId.link,
     BimEditAction.hide => AppIconId.hidden,
     BimEditAction.curve => AppIconId.roundedCorner,
+    BimEditAction.replace => AppIconId.component,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};
@@ -181,8 +184,8 @@ class BimEditingSymbol extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => AppIcon(
-        fallback ?? BimEditActions.icon(action!),
-        size: size,
-        color: color,
-      );
-    }
+    fallback ?? BimEditActions.icon(action!),
+    size: size,
+    color: color,
+  );
+}

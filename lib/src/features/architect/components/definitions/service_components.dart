@@ -151,9 +151,18 @@ class ServiceComponentDefinition extends ArchitectComponentDefinition {
     final outer = Path()..addRect(rect);
     final center = Offset(0, d / 2);
     final triangles = <Triangle3D>[], details = <Path>[];
+    final openings = <Path>[];
     Path outline = outer, mask = outer;
     void solid(Path path, double bottom, double top, Color color) {
-      triangles.addAll(ArchitectPathSolid.extrude(path, bottom, top, color));
+      triangles.addAll(
+        ArchitectPathSolid.extrude(
+          path,
+          bottom,
+          top,
+          color,
+          contourTolerance: math.min(.0001, math.min(w, d) * .001),
+        ),
+      );
     }
 
     Path minus(Path a, Path b) => Path.combine(PathOperation.difference, a, b);
@@ -169,7 +178,10 @@ class ServiceComponentDefinition extends ArchitectComponentDefinition {
       final outside = circle(at, diameter / 2);
       final inside = circle(at, diameter / 2 - thickness);
       solid(minus(outside, inside), bottom, top ?? h, color);
-      if (planVisible) details.addAll([outside, inside]);
+      if (planVisible) {
+        details.addAll([outside, inside]);
+        openings.add(inside);
+      }
     }
 
     switch (kind) {
@@ -194,6 +206,7 @@ class ServiceComponentDefinition extends ArchitectComponentDefinition {
         if (single) {
           solid(shell, 0, h, concrete);
           details.add(Path()..addRect(inner));
+          openings.add(Path()..addRect(inner));
         } else {
           // LS 1: 200×170 main channel + 90×170 branch in 355×220.
           final web = compact ? .015 : wall;
@@ -239,12 +252,32 @@ class ServiceComponentDefinition extends ArchitectComponentDefinition {
                 ..lineTo(divider.left - wall, center.dy + wall)
                 ..lineTo(divider.right + wall, center.dy + wall),
           ]);
+          openings.addAll([
+            Path()..addRect(
+              Rect.fromLTRB(inner.left, inner.top, divider.left, inner.bottom),
+            ),
+            Path()..addRect(
+              Rect.fromLTRB(
+                divider.right,
+                inner.top,
+                inner.right,
+                inner.bottom,
+              ),
+            ),
+          ]);
         }
       case ServiceComponentKind.combinedRiser:
         if (w < .40 || d < .20) {
           throw const FormatException('Combined riser is too small');
         }
         final inner = rect.deflate(.025);
+        var shaftVoid = Path()..addRect(inner);
+        shaftVoid = minus(shaftVoid, circle(Offset(-w * .27, d * .5), .055));
+        shaftVoid = minus(shaftVoid, circle(Offset(w * .03, d * .5), .025));
+        for (final y in [d * .30, d * .70]) {
+          shaftVoid = minus(shaftVoid, circle(Offset(w * .31, y), .026));
+        }
+        openings.add(shaftVoid);
         solid(
           minus(outer, Path()..addRect(inner)),
           0,
@@ -513,6 +546,7 @@ class ServiceComponentDefinition extends ArchitectComponentDefinition {
         boundsMask: mask,
         outline: outline,
         detailPaths: details,
+        openingPaths: openings,
         bounds: rect,
       ),
     );

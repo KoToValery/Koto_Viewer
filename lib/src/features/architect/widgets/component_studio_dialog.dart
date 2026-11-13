@@ -175,9 +175,10 @@ class $className extends ArchitectComponentDefinition {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final colors = Theme.of(context).colorScheme;
     final phone = MediaQuery.sizeOf(context).width < 600;
     return Dialog(
-      backgroundColor: const Color(0xFF181820),
+      backgroundColor: colors.surface,
       insetPadding: EdgeInsets.all(phone ? 8 : 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 760),
@@ -192,23 +193,25 @@ class $className extends ArchitectComponentDefinition {
                       l.architectComponentStudioTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.onSurface,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   PopupMenuButton<bool>(
                     tooltip: l.architectComponentTemplateHint,
-                    icon: const AppIcon(AppIconId.file,
-                      color: Colors.white70),
+                    icon: AppIcon(
+                      AppIconId.file,
+                      color: colors.onSurfaceVariant,
+                    ),
                     itemBuilder: (_) => [
                       PopupMenuItem(
                         value: false,
                         child: AppMenuLabel(
                           icon: AppIconId.furniture,
                           child: Text(l.architectTemplateDesk),
-                      ),
+                        ),
                       ),
                       PopupMenuItem(
                         value: true,
@@ -225,9 +228,9 @@ class $className extends ArchitectComponentDefinition {
                   ),
                   PopupMenuButton<bool>(
                     tooltip: l.architectComponentExportJsonTooltip,
-                    icon: const AppIcon(
+                    icon: AppIcon(
                       AppIconId.duplicate,
-                      color: Colors.white70,
+                      color: colors.onSurfaceVariant,
                     ),
                     itemBuilder: (_) => [
                       PopupMenuItem(
@@ -235,7 +238,7 @@ class $className extends ArchitectComponentDefinition {
                         child: AppMenuLabel(
                           icon: AppIconId.file,
                           child: Text(l.architectComponentExportJsonTooltip),
-                      ),
+                        ),
                       ),
                       PopupMenuItem(
                         value: true,
@@ -249,7 +252,10 @@ class $className extends ArchitectComponentDefinition {
                   ),
                   IconButton(
                     tooltip: l.close,
-                    icon: const AppIcon(AppIconId.close, color: Colors.white70),
+                    icon: AppIcon(
+                      AppIconId.close,
+                      color: colors.onSurfaceVariant,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -257,8 +263,8 @@ class $className extends ArchitectComponentDefinition {
             ),
             TabBar(
               controller: _tabs,
-              labelColor: Colors.cyanAccent,
-              unselectedLabelColor: Colors.white60,
+              labelColor: colors.primary,
+              unselectedLabelColor: colors.onSurfaceVariant,
               tabs: [
                 Tab(text: l.architectComponentCode),
                 const Tab(text: '2D'),
@@ -276,12 +282,12 @@ class $className extends ArchitectComponentDefinition {
                       children: [
                         Text(
                           l.architectComponentInvalid,
-                          style: const TextStyle(color: Colors.redAccent),
+                          style: TextStyle(color: colors.error),
                         ),
                         SelectableText(
                           _error!,
-                          style: const TextStyle(
-                            color: Colors.white70,
+                          style: TextStyle(
+                            color: colors.onSurfaceVariant,
                             fontFamily: 'monospace',
                             fontSize: 11,
                           ),
@@ -302,8 +308,8 @@ class $className extends ArchitectComponentDefinition {
                       controller: _code,
                       expands: true,
                       maxLines: null,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.onSurface,
                         fontFamily: 'monospace',
                         fontSize: 12,
                       ),
@@ -339,7 +345,7 @@ class $className extends ArchitectComponentDefinition {
                       );
                     }),
                     child: ColoredBox(
-                      color: const Color(0xFF121218),
+                      color: Colors.white,
                       child: _geometry == null
                           ? const SizedBox.shrink()
                           : CustomPaint(
@@ -360,23 +366,20 @@ class $className extends ArchitectComponentDefinition {
                 children: [
                   TextButton.icon(
                     onPressed: _definition == null ? null : _resize,
-                    icon: const AppIcon(AppIconId.measure),
+                    icon: AppIcon(AppIconId.measure),
                     label: Text(l.architectPropertySize),
                   ),
                   const Spacer(),
                   IconButton(
                     tooltip: l.architectComponentCompileBtn,
-                    icon: const AppIcon(
-                      AppIconId.play,
-                      color: Colors.cyanAccent,
-                    ),
+                    icon: AppIcon(AppIconId.play, color: colors.primary),
                     onPressed: () {
                       if (_compile()) _tabs.animateTo(1);
                     },
                   ),
                   FilledButton.icon(
                     onPressed: _saving ? null : _save,
-                    icon: const AppIcon(AppIconId.save),
+                    icon: AppIcon(AppIconId.save),
                     label: Text(l.save),
                   ),
                 ],

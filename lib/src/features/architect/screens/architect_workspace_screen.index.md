@@ -26,6 +26,8 @@
 | [TAG:TOUCH_DOWN] | Pointer-down dispatch and tool start |
 | [TAG:TOUCH_MOVE] | Pointer movement, preview, and snapping |
 | [TAG:TOUCH_UP] | Pointer-up dispatch and commits |
+| [TAG:OBJECT_PLACEMENT] | Exclusive furniture/service placement preview and shared Apply/Cancel |
+| [TAG:OBJECT_REPLACEMENT] | Catalog replacement retaining object identity and placement |
 | [TAG:ZONE_LOGIC] | Zone mutations, area updates, and schedules |
 | [TAG:WALL_DRAFT] | Wall drafting and chained wall placement |
 | [TAG:WALL_ENDPOINT_ANGLE] | Straight-wall endpoint angle constraint and compact unlock control |

@@ -1148,6 +1148,7 @@ class MoveArchitectElement extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     ArchitectModelCommand.point(delta);
     final s = ArchitectModelCommand.storey(project, storeyId);
+    if (s.components.any((c) => c.id == elementId && c.isLocked)) return project;
     if (s.zones.any((zone) => zone.id == elementId && zone.isAutoBoundary)) {
       return project;
     }
@@ -1226,6 +1227,12 @@ class MoveArchitectElement extends ArchitectModelCommand {
     }
 
     final next = s.copyWith(
+      components: [
+        for (final component in s.components)
+          matches(component.id)
+              ? component.copyWith(position: component.position + delta)
+              : component,
+      ],
       walls: [
         for (final e in s.walls)
           matches(e.id)

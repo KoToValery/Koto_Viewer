@@ -70,6 +70,10 @@ class ArchitectComponentBlock2D {
   /// Internal detail linework (e.g. pillow seams, sanitary bowls, sink drains, cabinet lines).
   final List<Path> detailPaths;
 
+  /// Actual voids receiving the same sparse cross used for slab openings.
+  /// Separate clips keep the symbol clear of casing, dividers and pipes.
+  final List<Path> openingPaths;
+
   /// Bounding box in local coordinates.
   final Rect bounds;
 
@@ -77,6 +81,7 @@ class ArchitectComponentBlock2D {
     required this.boundsMask,
     required this.outline,
     this.detailPaths = const [],
+    this.openingPaths = const [],
     required this.bounds,
   });
 
@@ -182,9 +187,9 @@ class ArchitectComponentInstance {
 
     return [
       transform(-wHalf, 0.0), // Back-left
-      transform(wHalf, 0.0),  // Back-right
-      transform(wHalf, d),    // Front-right
-      transform(-wHalf, d),   // Front-left
+      transform(wHalf, 0.0), // Back-right
+      transform(wHalf, d), // Front-right
+      transform(-wHalf, d), // Front-left
     ];
   }
 

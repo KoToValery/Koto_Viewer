@@ -1,6 +1,7 @@
 import '../services/architect_ellipse_geometry.dart';
 import '../services/architect_spline_geometry.dart';
 import 'architect_annotation_layout.dart';
+import 'architect_component_opening_painter.dart';
 import 'architect_line_presentation.dart';
 import '../models/architect_contour.dart';
 import '../models/architect_line_style.dart';
@@ -1228,6 +1229,7 @@ class ArchitectElementsPainterHelper {
       for (final p in geo.block2d.detailPaths) {
         canvas.drawPath(p, detailPaint);
       }
+      ArchitectComponentOpeningPainter.draw(canvas, geo.block2d, detailPaint);
 
       // If selected, display insertion origin indicator
       if (isSelected) {

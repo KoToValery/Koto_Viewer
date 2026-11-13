@@ -26,10 +26,12 @@ class SanitaryToiletWallHung extends ArchitectComponentDefinition {
   String get defaultName => 'Wall-hung Toilet';
 
   @override
-  ArchitectComponentCategory get category => ArchitectComponentCategory.sanitary;
+  ArchitectComponentCategory get category =>
+      ArchitectComponentCategory.sanitary;
 
   @override
-  ComponentPlacementMode get placementMode => ComponentPlacementMode.wallAttached;
+  ComponentPlacementMode get placementMode =>
+      ComponentPlacementMode.wallAttached;
 
   @override
   List<ParametricFieldSchema> get schema => const [
@@ -99,10 +101,12 @@ class SanitaryToiletFloorStanding extends ArchitectComponentDefinition {
   String get defaultName => 'Floor-standing Toilet';
 
   @override
-  ArchitectComponentCategory get category => ArchitectComponentCategory.sanitary;
+  ArchitectComponentCategory get category =>
+      ArchitectComponentCategory.sanitary;
 
   @override
-  ComponentPlacementMode get placementMode => ComponentPlacementMode.wallAttached;
+  ComponentPlacementMode get placementMode =>
+      ComponentPlacementMode.wallAttached;
 
   @override
   List<ParametricFieldSchema> get schema => const [
@@ -183,10 +187,12 @@ class SanitaryWashbasinCabinet extends ArchitectComponentDefinition {
   String get defaultName => 'Washbasin Vanity';
 
   @override
-  ArchitectComponentCategory get category => ArchitectComponentCategory.sanitary;
+  ArchitectComponentCategory get category =>
+      ArchitectComponentCategory.sanitary;
 
   @override
-  ComponentPlacementMode get placementMode => ComponentPlacementMode.wallAttached;
+  ComponentPlacementMode get placementMode =>
+      ComponentPlacementMode.wallAttached;
 
   @override
   List<ParametricFieldSchema> get schema => [
@@ -270,10 +276,12 @@ class SanitaryBathtub extends ArchitectComponentDefinition {
   String get defaultName => 'Bathtub';
 
   @override
-  ArchitectComponentCategory get category => ArchitectComponentCategory.sanitary;
+  ArchitectComponentCategory get category =>
+      ArchitectComponentCategory.sanitary;
 
   @override
-  ComponentPlacementMode get placementMode => ComponentPlacementMode.wallAttached;
+  ComponentPlacementMode get placementMode =>
+      ComponentPlacementMode.wallAttached;
 
   @override
   List<ParametricFieldSchema> get schema => const [
@@ -337,10 +345,12 @@ class SanitaryShower extends ArchitectComponentDefinition {
   String get defaultName => 'Shower Enclosure';
 
   @override
-  ArchitectComponentCategory get category => ArchitectComponentCategory.sanitary;
+  ArchitectComponentCategory get category =>
+      ArchitectComponentCategory.sanitary;
 
   @override
-  ComponentPlacementMode get placementMode => ComponentPlacementMode.wallAttached;
+  ComponentPlacementMode get placementMode =>
+      ComponentPlacementMode.wallAttached;
 
   @override
   List<ParametricFieldSchema> get schema => const [
@@ -445,10 +455,12 @@ class SanitaryLinearDrain extends ArchitectComponentDefinition {
   String get defaultName => 'Linear Shower Drain';
 
   @override
-  ArchitectComponentCategory get category => ArchitectComponentCategory.sanitary;
+  ArchitectComponentCategory get category =>
+      ArchitectComponentCategory.sanitary;
 
   @override
-  ComponentPlacementMode get placementMode => ComponentPlacementMode.freeStanding;
+  ComponentPlacementMode get placementMode =>
+      ComponentPlacementMode.freeStanding;
 
   @override
   List<ParametricFieldSchema> get schema => const [
@@ -502,7 +514,7 @@ class SanitaryLinearDrain extends ArchitectComponentDefinition {
       center: Offset(0, d / 2),
       basinWidth: math.max(0.10, w - flange * 2),
       basinDepth: math.max(0.04, d - flange * 2),
-      basinHeight: h * 0.70,
+      basinHeight: h * 0.75,
       zBottom: h * 0.25,
       wall: 0.008,
       base: 0.01,
@@ -573,10 +585,12 @@ class SanitaryFloorDrain extends ArchitectComponentDefinition {
   String get defaultName => 'Floor Drain';
 
   @override
-  ArchitectComponentCategory get category => ArchitectComponentCategory.sanitary;
+  ArchitectComponentCategory get category =>
+      ArchitectComponentCategory.sanitary;
 
   @override
-  ComponentPlacementMode get placementMode => ComponentPlacementMode.freeStanding;
+  ComponentPlacementMode get placementMode =>
+      ComponentPlacementMode.freeStanding;
 
   @override
   List<ParametricFieldSchema> get schema => const [
@@ -630,7 +644,7 @@ class SanitaryFloorDrain extends ArchitectComponentDefinition {
       center: Offset(0, d / 2),
       basinWidth: radius * 2,
       basinDepth: radius * 2,
-      basinHeight: h * 0.75,
+      basinHeight: h * 0.80,
       zBottom: h * 0.20,
       wall: 0.006,
       base: 0.01,
@@ -687,4 +701,3 @@ class SanitaryFloorDrain extends ArchitectComponentDefinition {
     return builder.build(defaultName);
   }
 }
-

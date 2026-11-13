@@ -7,6 +7,12 @@
 
 ## 1. How to use this map
 
+Object duplication: `duplicateElementById` under `[TAG:ELEMENT_TRANSFORMS]`
+copies component instances, including parameters, rotation and metadata, and
+returns the copy ID through the existing group/history path. Locked components
+are not duplicated. Translation is owned by `MoveArchitectElement` in the
+command controller, shared by direct selected-object movement and Drag.
+
 1. Use this map to find the relevant section tag, class, or method name.
 2. Search the current Dart source with `rg -n "\[TAG:<NAME>\]|<SymbolName>" lib/src/features/architect/services/architect_element_tool.dart`.
 3. For behavior changes, read the target implementation and its immediate callers/callees; follow the Reference-First protocol in `AGENTS.md` / `GEMINI.md`.

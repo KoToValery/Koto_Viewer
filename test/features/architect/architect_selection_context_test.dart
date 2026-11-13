@@ -333,7 +333,7 @@ void main() {
     for (final drawing in [false, true]) {
       for (final secondary in [false, true]) {
         testWidgets(
-          '$tool context opens in ${drawing ? "drawing" : "navigation"} '
+          '$tool ${drawing && tool.usesComponent ? "placement stays separate" : "context opens"} in ${drawing ? "drawing" : "navigation"} '
           'with ${secondary ? "right click" : "touch hold"}',
           (tester) async {
             final c = ArchitectCommandController(
@@ -366,6 +366,17 @@ void main() {
             }
             await gesture.up();
             await tester.pumpAndSettle();
+            if (drawing && tool.usesComponent) {
+              expect(find.byType(ArchitectRadialMenu), findsNothing);
+              expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+              if (!secondary) {
+                expect(workspace.overlay(tester).componentPreview, isNotNull);
+              }
+              expect(c.project, same(original));
+              expect(c.canUndo, isFalse);
+              expect(tester.takeException(), isNull);
+              return;
+            }
             if (tool == ArchitectTool.zone) {
               expect(find.byType(PopupMenuItem<String>), findsWidgets);
             } else {

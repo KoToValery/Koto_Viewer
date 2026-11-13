@@ -121,7 +121,7 @@ extension ArchitectToolCatalogLabel on ArchitectTool {
     ArchitectTool.roof => (AppIconId.roof, l.architectToolRoof),
     ArchitectTool.opening => (AppIconId.opening, l.architectToolOpening),
     ArchitectTool.stair => (AppIconId.stairs, l.architectToolStair),
-    ArchitectTool.component => (AppIconId.furniture, l.architectLibrary),
+    ArchitectTool.component => (AppIconId.furniture, l.architectToolComponent),
     ArchitectTool.services => (AppIconId.component, l.architectServiceBodies),
     ArchitectTool.zone => (AppIconId.zone, l.architectToolZone),
     ArchitectTool.zoneTable => (AppIconId.schedule, l.architectToolZoneTable),

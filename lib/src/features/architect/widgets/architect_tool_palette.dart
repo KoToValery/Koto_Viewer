@@ -30,6 +30,24 @@ import "../services/component_library_service.dart";
 import 'architect_tool_catalog.dart';
 export 'architect_tool_catalog.dart' show ArchitectToolCategory;
 
+// ============================================================================
+// MASTER ARCHITECT TOOL PALETTE LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'architect_tool_palette.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
+//
+// [SEC-01-WIDGET]  [TAG:ARCH_PALETTE_WIDGET] Declarations: `ArchitectToolPalette`
+// [SEC-02-STATE]   [TAG:ARCH_PALETTE_STATE] `_ArchitectToolPaletteState` state fields (51 fields: `category`, `c
+// [SEC-03-BUILD]   [TAG:ARCH_PALETTE_BUILD_LAYOUT] Widget Build & HUD Layout: `build`, `_buildToolButton` (2 methods)
+// [SEC-04-WALLS]   [TAG:ARCH_PALETTE_WALL_OPS] Wall Drafting, Splitting & Joints: `_buildWallSubBar`, `_chooseWallT
+// [SEC-05-OPENINGS] [TAG:ARCH_PALETTE_FENEST_OPENINGS] Doors, Windows & Openings: `_buildWindowSubBar`, `_buildDoorSubBar`
+// [SEC-06-BUILD]   [TAG:ARCH_PALETTE_COMPONENT_SUB] Widget Build & HUD Layout: `_buildComponentSubBar`, `_buildColumnSub
+// [SEC-07-OPENINGS] [TAG:ARCH_PALETTE_OPENING_SUB] Doors, Windows & Openings: `_buildOpeningSubBar`, `_buildZoneSubBar`
+// [SEC-08-HITS]    [TAG:ARCH_PALETTE_HIT_TESTING] Hit Testing & Candidate Picking: `_showStylePicker`, `_buildViewsSub
+// ============================================================================
+
+// === SECTION: [SEC-01-WIDGET] WIDGET DECLARATIONS & PUBLIC API ===
+// --- SUBSECTION: [TAG:ARCH_PALETTE_WIDGET] Declarations: `ArchitectToolPalette` ---
 /// Responsive bottom bar for architectural drafting tools and contextual sub-options.
 class ArchitectToolPalette extends StatefulWidget {
   final ArchitectTool activeTool;
@@ -254,6 +272,8 @@ class ArchitectToolPalette extends StatefulWidget {
   State<ArchitectToolPalette> createState() => _ArchitectToolPaletteState();
 }
 
+// === SECTION: [SEC-02-STATE] ARCHITECTTOOLPALETTESTATE STATE & FIELDS ===
+// --- SUBSECTION: [TAG:ARCH_PALETTE_STATE] `_ArchitectToolPaletteState` state fields (51 fields: `category`, `colors`, `activeTool`, `mode`, `onToolChanged`) ---
 class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   ArchitectToolCategory category = ArchitectToolCategory.selection;
   ColorScheme get colors => Theme.of(context).colorScheme;
@@ -286,14 +306,16 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     setState(() => category = result.category);
     if (result.tool != null) {
       widget.onToolChanged(result.tool!);
-      if (result.tool!.usesComponent) {
+      if (result.tool!.usesComponent && result.tool != activeTool) {
         widget.onOpenComponentLibrary?.call();
       } else if (result.tool == ArchitectTool.decorativeLibrary) {
         widget.onOpenDecorativeStudio?.call();
       }
     } else if (result.category == ArchitectToolCategory.furnishing) {
       widget.onToolChanged(ArchitectTool.component);
-      widget.onOpenComponentLibrary?.call();
+      if (activeTool != ArchitectTool.component) {
+        widget.onOpenComponentLibrary?.call();
+      }
     } else if (result.category == ArchitectToolCategory.decorative &&
         !activeTool.isDecorativeTool) {
       widget.onToolChanged(ArchitectTool.decorativeProfile);
@@ -389,11 +411,14 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   ValueChanged<OpeningType>? get onOpeningTypeChanged =>
       widget.onOpeningTypeChanged;
 
+  // === SECTION: [SEC-03-BUILD] WIDGET BUILD & HUD LAYOUT ===
+  // --- SUBSECTION: [TAG:ARCH_PALETTE_BUILD_LAYOUT] Widget Build & HUD Layout: `build`, `_buildToolButton` (2 methods) ---
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final compactComponents =
         activeTool == ArchitectTool.component &&
+        mode == ArchitectInteractionMode.drawing &&
         category == ArchitectToolCategory.furnishing;
 
     return Theme(
@@ -422,7 +447,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   widget.selectedDoor != null ||
                   widget.selectedWindow != null) ...[
                 // Contextual Sub-bar for Active Tool parameters or Selection
-                if (widget.selectedDoor != null || activeTool == ArchitectTool.door)
+                if (widget.selectedDoor != null ||
+                    activeTool == ArchitectTool.door)
                   _buildDoorSubBar(context)
                 else if (widget.selectedWindow != null ||
                     activeTool == ArchitectTool.window)
@@ -437,8 +463,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   _buildBeamSubBar(context)
                 else if (activeTool == ArchitectTool.stair)
                   _buildStairSubBar(context)
-                else if (activeTool.usesComponent &&
-                    !compactComponents)
+                else if (activeTool.usesComponent && !compactComponents)
                   _buildComponentSubBar(context)
                 else if (activeTool == ArchitectTool.opening)
                   _buildOpeningSubBar(context)
@@ -644,7 +669,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 onPressed ??
                 () {
                   if (isSelected &&
-                      mode != ArchitectInteractionMode.contextEdit) {
+                      (tool.usesComponent ||
+                          mode != ArchitectInteractionMode.contextEdit)) {
                     onToolChanged(ArchitectTool.pan);
                   } else {
                     onToolChanged(tool);
@@ -709,6 +735,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     );
   }
 
+  // === SECTION: [SEC-04-WALLS] WALL DRAFTING, SPLITTING & JOINTS ===
+  // --- SUBSECTION: [TAG:ARCH_PALETTE_WALL_OPS] Wall Drafting, Splitting & Joints: `_buildWallSubBar`, `_chooseWallType`, `_buildDrawingShortcut` (3 methods) ---
   Widget _buildDrawingShortcut(BuildContext context, ArchitectTool tool) {
     final l = context.l10n;
     final (icon, label) = tool.presentation(l);
@@ -860,6 +888,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     );
   }
 
+  // === SECTION: [SEC-05-OPENINGS] DOORS, WINDOWS & OPENINGS ===
+  // --- SUBSECTION: [TAG:ARCH_PALETTE_FENEST_OPENINGS] Doors, Windows & Openings: `_buildWindowSubBar`, `_buildDoorSubBar` (2 methods) ---
   Widget _buildDoorSubBar(BuildContext context) {
     final l10n = context.l10n;
     final effectiveDoorStyle =
@@ -905,8 +935,11 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               ],
               if (effectiveDoorStyle != null) ...[
                 ActionChip(
-                  avatar:
-                      AppIcon(AppIconId.door, size: 14, color: colors.primary),
+                  avatar: AppIcon(
+                    AppIconId.door,
+                    size: 14,
+                    color: colors.primary,
+                  ),
                   label: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -971,7 +1004,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 padding: const EdgeInsets.only(right: 6),
                 child: Text(
                   l10n.architectDoorWidth,
-                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               for (final w in [0.70, 0.80, 0.90, 1.00, 1.20, 1.50, 2.10, 2.50])
@@ -1001,7 +1037,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 padding: const EdgeInsets.only(right: 6),
                 child: Text(
                   l10n.architectDoorHeight,
-                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               for (final h in [2.00, 2.10, 2.20])
@@ -1152,7 +1191,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 padding: const EdgeInsets.only(right: 6),
                 child: Text(
                   l10n.architectWindowWidth,
-                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               for (final w in [0.60, 0.80, 0.90, 1.20, 1.40, 1.80, 2.00, 2.40])
@@ -1182,7 +1224,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 padding: const EdgeInsets.only(right: 6),
                 child: Text(
                   l10n.architectWindowHeight,
-                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               for (final h in [0.60, 1.20, 1.40, 1.60, 1.80])
@@ -1202,7 +1247,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 padding: const EdgeInsets.only(right: 6),
                 child: Text(
                   l10n.architectWindowSill,
-                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               for (final s in [0.00, 0.85, 0.90])
@@ -1224,6 +1272,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     );
   }
 
+  // === SECTION: [SEC-06-BUILD] WIDGET BUILD & HUD LAYOUT ===
+  // --- SUBSECTION: [TAG:ARCH_PALETTE_COMPONENT_SUB] Widget Build & HUD Layout: `_buildComponentSubBar`, `_buildColumnSubBar`, `_buildStairSubBar`, `_buildBeamSubBar` (4 methods) ---
   Widget _buildColumnSubBar(BuildContext context) {
     final l10n = context.l10n;
 
@@ -1332,53 +1382,30 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(context).width < 600 ? 110 : 220,
+          if (activeTool == ArchitectTool.component)
+            _buildToolButton(
+              tool: ArchitectTool.component,
+              icon: AppIconId.component,
+              label: l.architectToolComponent,
+              tooltip: l.architectComponentPlacementHelp,
             ),
-            child: OutlinedButton.icon(
-              key: const ValueKey("component-tool-library-btn"),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: colors.primary,
-                side: BorderSide(color: colors.primary),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-              ),
-              icon: AppIcon(AppIconId.component, size: 16),
-              label: Text(
-                componentLabel(l, activeDef),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+          Tooltip(
+            message: '${l.architectLibrary}: ${componentLabel(l, activeDef)}',
+            child: IconButton(
+              key: const ValueKey('component-tool-library-btn'),
+              icon: AppIcon(AppIconId.library, size: 20, color: colors.primary),
               onPressed: widget.onOpenComponentLibrary,
             ),
           ),
-          const SizedBox(width: 4),
-          if (activeTool != ArchitectTool.services) OutlinedButton.icon(
-            key: const ValueKey("component-tool-floor-drain-btn"),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colors.onSurfaceVariant,
-              side: BorderSide(color: colors.outlineVariant),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            ),
-            icon: AppIcon(AppIconId.water, size: 16, color: colors.primary),
-            label: Text(
-              l.architectToolFloorDrain,
-              style: TextStyle(fontSize: 12),
-            ),
-            onPressed: () => widget.onToolChanged(ArchitectTool.floorDrain),
-          ),
-          const SizedBox(width: 4),
           Tooltip(
             message:
                 activeTool == ArchitectTool.services &&
-                    ServiceComponentDefinition.continuousIds.contains(activeDef.id) &&
+                    ServiceComponentDefinition.continuousIds.contains(
+                      activeDef.id,
+                    ) &&
                     activeParams['autoHeight'] != false
-                    ? '${componentDimensionCm(w)}×${componentDimensionCm(d)} cm • ${l.architectServiceAutoHeight}'
-                    : '${componentDimensionCm(w)}×${componentDimensionCm(d)}×${componentDimensionCm(h)} cm',
+                ? '${componentDimensionCm(w)}×${componentDimensionCm(d)} cm • ${l.architectServiceAutoHeight}'
+                : '${componentDimensionCm(w)}×${componentDimensionCm(d)}×${componentDimensionCm(h)} cm',
             child: TextButton.icon(
               key: const ValueKey('component-tool-size-btn'),
               icon: AppIcon(AppIconId.measure, size: 18),
@@ -1463,6 +1490,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     );
   }
 
+  // === SECTION: [SEC-07-OPENINGS] DOORS, WINDOWS & OPENINGS ===
+  // --- SUBSECTION: [TAG:ARCH_PALETTE_OPENING_SUB] Doors, Windows & Openings: `_buildOpeningSubBar`, `_buildZoneSubBar` (2 methods) ---
   Widget _buildOpeningSubBar(BuildContext context) {
     final l10n = context.l10n;
 
@@ -1536,6 +1565,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     );
   }
 
+  // === SECTION: [SEC-08-HITS] HIT TESTING & CANDIDATE PICKING ===
+  // --- SUBSECTION: [TAG:ARCH_PALETTE_HIT_TESTING] Hit Testing & Candidate Picking: `_showStylePicker`, `_buildViewsSubBar`, `_buildDecorativeSubBar` (3 methods) ---
   void _showStylePicker(BuildContext context, FenestrationKind kind) {
     final l10n = context.l10n;
     final styles = FenestrationLibraryService.instance.getStylesForKind(kind);

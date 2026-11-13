@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../cad_3d/models/mesh_3d.dart';
 import '../models/architect_component.dart';
+import '../rendering/architect_component_opening_painter.dart';
 
 class ComponentPlanPreviewPainter extends CustomPainter {
   final ArchitectComponentBlock2D block;
@@ -44,6 +45,7 @@ class ComponentPlanPreviewPainter extends CustomPainter {
     for (final p in block.detailPaths) {
       canvas.drawPath(p, detailPaint);
     }
+    ArchitectComponentOpeningPainter.draw(canvas, block, detailPaint);
 
     // 4. Insertion point indicator at (0, 0)
     canvas.drawCircle(

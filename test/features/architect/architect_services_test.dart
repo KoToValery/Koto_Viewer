@@ -357,6 +357,9 @@ void main() {
     await tester.pumpAndSettle();
     await workspace.wallTap(tester, const Offset(1, 1));
     await tester.pumpAndSettle();
+    expect(commands.project.activeStorey.components, isEmpty);
+    await tester.tap(find.byKey(const ValueKey('architect-draft-confirm')));
+    await tester.pumpAndSettle();
     expect(
       commands.project.activeStorey.components.single.definitionId,
       definition.id,

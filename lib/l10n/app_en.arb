@@ -7177,5 +7177,8 @@
   "architectUnderlayRotateRight": "90° right",
   "@architectUnderlayRotateRight": { "description": "Rotate the underlay clockwise by 90 degrees" },
   "architectStoreyManagerTitle": "Storeys",
-  "@architectStoreyManagerTitle": { "description": "Short title of the storey manager" }
+  "@architectStoreyManagerTitle": { "description": "Short title of the storey manager" },
+  "architectComponentReplace": "Replace",
+  "architectComponentReplaceHelp": "Replace from the library, keeping position and rotation.",
+  "architectComponentPlacementHelp": "Tap to position, then confirm to place. Tap Object again to finish; select an object to move it."
 }
