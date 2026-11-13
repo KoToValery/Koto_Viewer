@@ -64,6 +64,7 @@ String stairCheckLabel(AppLocalizations l, StairCheckKind kind) =>
       StairCheckKind.version => l.stairCheckVersion,
       StairCheckKind.upperStorey => l.stairCheckUpperStorey,
       StairCheckKind.groupSteps => l.stairCheckGroupSteps,
+      StairCheckKind.layout => l.stairCustomLayout,
     };
 String stairStateLabel(AppLocalizations l, StairCheckState state) =>
     switch (state) {

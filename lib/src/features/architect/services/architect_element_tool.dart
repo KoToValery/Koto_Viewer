@@ -1039,6 +1039,11 @@ class ArchitectElementTool extends ChangeNotifier {
     Offset offset = const Offset(0.5, 0.5),
   }) {
     final newId = ArchitectElementId.next('copy');
+    final stair = storey.stairs.where((s) => s.id == elementId).firstOrNull;
+    if (stair != null) {
+      final copy = const ArchitectStairEditingAdapter().translate(stair.copyWith(id: newId), offset);
+      return (storey.copyWith(stairs: [...storey.stairs, copy]), newId);
+    }
 
     final component = storey.components.where((c) => c.id == elementId).firstOrNull;
     if (component != null) {
@@ -1207,6 +1212,10 @@ class ArchitectElementTool extends ChangeNotifier {
   }
 
   ArchitectStorey rotateElementById(ArchitectStorey storey, String elementId) {
+    if (storey.stairs.any((s) => s.id == elementId)) {
+      return storey.copyWith(stairs: [for (final s in storey.stairs)
+        s.id == elementId ? const ArchitectStairEditingAdapter().rotate(s, math.pi / 2) : s]);
+    }
     if (storey.annotations.any((a) => a.id == elementId)) {
       return storey.copyWith(
         annotations: [

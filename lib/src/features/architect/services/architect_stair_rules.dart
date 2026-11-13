@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import 'architect_command_controller.dart';
+import 'architect_stair_layout_resolver.dart';
+import 'architect_stair_headroom.dart';
 
 enum StairCheckState { pass, error, advice, review }
 
@@ -26,6 +28,7 @@ enum StairCheckKind {
   version,
   upperStorey,
   groupSteps,
+  layout,
 }
 
 class StairCheck {
@@ -50,12 +53,32 @@ class ArchitectStairRules {
       'https://mvr.bg/upload/286736/Naredba%20Iz-1971_2025_1.pdf';
   static const accessibilitySource =
       'https://dv.parliament.bg/DVWeb/showMaterialDV.jsp?idMat=155689';
-  static List<StairCheck> check(ArchitectStair stair) {
+  static List<StairCheck> check(
+    ArchitectStair stair, {
+    ArchitectProject? project,
+    ArchitectStorey? storey,
+  }) {
     final d = stair.design;
     if (d == null) {
       return [const StairCheck(StairCheckKind.scope, StairCheckState.review)];
     }
     final result = <StairCheck>[];
+    final width = d.layout == null
+        ? stair.width
+        : d.layout!.flights.map((f) => f.width).reduce(math.min);
+    final landingDepth = d.layout == null
+        ? math.max(stair.width, d.landingDepth)
+        : ArchitectStairLayoutResolver.landingDepth(d);
+    final layoutIssues = ArchitectStairLayoutResolver.check(d);
+    if (layoutIssues.isNotEmpty) {
+      result.add(
+        const StairCheck(StairCheckKind.layout, StairCheckState.error),
+      );
+    }
+    final measuredHeadroom =
+        project != null && storey != null && d.layout != null
+        ? ArchitectStairHeadroom.minimum(project, storey, stair)
+        : null;
     void range(
       StairCheckKind kind,
       double actual, {
@@ -91,7 +114,9 @@ class ArchitectStairRules {
       article: '2h + b',
       advisory: true,
     );
-    if (d.shape == StairShape.spiralOverlap && d.overlapHeadroom < .001) {
+    if (d.layout == null &&
+        d.shape == StairShape.spiralOverlap &&
+        d.overlapHeadroom < .001) {
       range(
         StairCheckKind.headroom,
         d.overlapHeadroom,
@@ -100,6 +125,16 @@ class ArchitectStairRules {
       );
     }
     if (d.code == StairCode.geometryOnly) {
+      if (measuredHeadroom != null)
+        result.add(
+          StairCheck(
+            StairCheckKind.headroom,
+            measuredHeadroom <= 1e-6
+                ? StairCheckState.error
+                : StairCheckState.review,
+            actual: measuredHeadroom.isFinite ? measuredHeadroom : null,
+          ),
+        );
       result.add(
         const StairCheck(StairCheckKind.scope, StairCheckState.review),
       );
@@ -157,7 +192,7 @@ class ArchitectStairRules {
         );
       }
     }
-    if (d.shape == StairShape.spiralOverlap) {
+    if (d.layout == null && d.shape == StairShape.spiralOverlap) {
       final indoorAccessible = d.accessible && d.use != StairUse.outdoorRoute;
       range(
         StairCheckKind.headroom,
@@ -172,7 +207,7 @@ class ArchitectStairRules {
       final article = outdoor ? '18(1)' : '55(1)';
       range(
         StairCheckKind.width,
-        stair.width,
+        width,
         min: d.use == StairUse.assembly ? 1.6 : 1.2,
         article: article,
       );
@@ -199,7 +234,7 @@ class ArchitectStairRules {
         if (d.flightCount > 1) {
           range(
             StairCheckKind.landing,
-            math.max(stair.width, d.landingDepth),
+            landingDepth,
             min: outdoor ? 1.5 : 1.2,
             article: article,
           );
@@ -216,7 +251,12 @@ class ArchitectStairRules {
       result.addAll([
         StairCheck(
           StairCheckKind.headroom,
-          StairCheckState.review,
+          measuredHeadroom == null || outdoor
+              ? StairCheckState.review
+              : measuredHeadroom + 1e-6 >= 2.1
+              ? StairCheckState.pass
+              : StairCheckState.error,
+          actual: measuredHeadroom?.isFinite == true ? measuredHeadroom : null,
           minimum: outdoor ? null : 2.1,
           article: outdoor ? '18' : '55(1)5',
         ),
@@ -287,12 +327,25 @@ class ArchitectStairRules {
             );
           }
           if (d.flightCount > 1) {
-            range(
-              StairCheckKind.landing,
-              math.max(stair.width, d.landingDepth),
-              min: stair.width,
-              article: '45(8)',
-            );
+            if (d.layout != null) {
+              for (var i = 0; i < d.layout!.landings.length; i++) {
+                range(
+                  StairCheckKind.landing,
+                  ArchitectStairLayoutResolver.landingDepth(d, landingIndex: i),
+                  min: math.max(
+                    d.layout!.flights[i].width,
+                    d.layout!.flights[i + 1].width,
+                  ),
+                  article: '45(8)',
+                );
+              }
+            } else
+              range(
+                StairCheckKind.landing,
+                landingDepth,
+                min: stair.width,
+                article: '45(8)',
+              );
           }
         }
       }
@@ -331,6 +384,18 @@ class ArchitectStairRules {
           const StairCheck(StairCheckKind.headroom, StairCheckState.review),
         );
       }
+    }
+    if (d.layout != null &&
+        !result.any((c) => c.kind == StairCheckKind.headroom)) {
+      result.add(
+        StairCheck(
+          StairCheckKind.headroom,
+          measuredHeadroom != null && measuredHeadroom <= 1e-6
+              ? StairCheckState.error
+              : StairCheckState.review,
+          actual: measuredHeadroom?.isFinite == true ? measuredHeadroom : null,
+        ),
+      );
     }
     return result;
   }
@@ -406,6 +471,8 @@ class ArchitectStairRules {
                     (missingTarget ||
                         check(
                           stair.copyWith(design: next),
+                          project: next.layout == null ? null : project,
+                          storey: floor,
                         ).any((c) => c.state == StairCheckState.error))) {
                   next = next.copyWith(isDraft: true);
                 }
@@ -457,6 +524,10 @@ class PutArchitectStair extends ArchitectModelCommand {
           );
     final d = resolved.design;
     d?.validate();
+    if (d?.layout != null &&
+        ArchitectStairLayoutResolver.check(d!).isNotEmpty) {
+      throw ArgumentError('Invalid stair layout constraints');
+    }
     if (d != null &&
         !d.isDraft &&
         d.followStoreys &&
@@ -467,6 +538,8 @@ class PutArchitectStair extends ArchitectModelCommand {
         !resolved.design!.isDraft &&
         ArchitectStairRules.check(
           resolved,
+          project: project,
+          storey: floor,
         ).any((c) => c.state == StairCheckState.error)) {
       throw ArgumentError('Stair violates the selected geometric rules');
     }

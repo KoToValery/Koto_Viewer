@@ -5,6 +5,22 @@
 
 ## 1. How to use this map
 
+### Freeform stair reference
+
+`[TAG:STAIR_FREEFORM]`: `_startFreeStair` owns an unpublished
+`ArchitectStairDraftController`; `_applyFreeStair` normalizes its placement frame
+and publishes one `PutArchitectStair`. `_closeFreeStair` restores the original
+display on cancellation, tool/view changes or a changed source document.
+Pointer dispatch precedes underlay/selection hit testing. The shared viewport
+retains pan/pinch; only active mouse aiming or a precision hold owns the pointer.
+Selection/context hold callbacks and the palette are suppressed during the
+session. `_freeStairProperties` stages global settings without model history.
+`ArchitectStairDraftOverlay` owns compact controls and part/contour grips; the
+slab contour workflow and the existing stair property preview are the references.
+Existing straight-flight presets enter through the properties dialog's shape
+editor. Tests: `architect_stair_custom_test.dart` and
+`architect_stair_custom_phone_test.dart`.
+
 1. Use this map to discover a likely analogous feature and its source tags.
 2. Search the current Dart source, for example: rg -n "\[TAG:WALL_DRAFT\]|_finishChainedWall" lib/src/features/architect/screens/architect_workspace_screen.dart
 3. For behavior changes, read the relevant method bodies and immediate callers/callees. Follow related widgets, services, rendering, and viewport routing only where they participate in the feature.

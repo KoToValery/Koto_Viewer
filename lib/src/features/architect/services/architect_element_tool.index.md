@@ -105,6 +105,12 @@ command controller, shared by direct selected-object movement and Drag.
 
 ## 6. Mirror reference pattern
 
+Freeform stairs store flight, landing and cell points in their placement frame.
+Translation/rotation transform the frame, and reflection changes its handedness;
+local layout points must not also be reflected. `duplicateElementById` retains
+the immutable layout with a new stair ID. `rotateElementById` delegates to
+`ArchitectStairEditingAdapter.rotate`, using the physical plan bounds as pivot.
+
 - Interaction: `ArchitectWorkspaceScreen._startMirrorSession`, `_previewMirrorSnap`, `_pickMirrorSnap`, and `_executeMirror` use `ArchitectTransformPointInput` and the floating placement HUD. Preview and commit both call `MirrorArchitectElements`.
 - Mutation: `MirrorArchitectElements.apply` calls `mirrorElementsByIds`, which delegates to `mirrorElementById`. Model coordinates are reflected with `BimTransform2D.mirror`; CAD curves and dimension references use `ArchitectMirrorGeometry`.
 - Local geometry: bulges, ellipse sweeps, wall reference sides/tilt, door swing, stair handedness, roof slope arrows, and decorative basis vectors must reflect with their control points. Polygon reversal also remaps edge bulges.

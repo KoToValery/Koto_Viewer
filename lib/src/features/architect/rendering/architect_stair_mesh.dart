@@ -5,6 +5,9 @@ import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../services/architect_stair_geometry.dart';
 import '../services/architect_stair_railings.dart';
+import '../services/architect_polygon_geometry.dart';
+import 'architect_mesh_boolean.dart';
+import 'architect_path_solid.dart';
 
 enum StairSolidMaterial { concrete, finish, metal, timber }
 
@@ -31,9 +34,23 @@ class ArchitectStairMesh {
     final bottom = firstRiserBottom ?? stair.design?.startOffset ?? 0;
     return (_bodyCache[stair] ??= {}).putIfAbsent(
       bottom,
-      () => _body(stair, bottom),
+      () => stair.design?.layout == null
+          ? _body(stair, bottom)
+          : _cleanBody(_body(stair, bottom)),
     );
   }
+
+  static List<StairSolid> _cleanBody(List<StairSolid> solids) => [
+    for (final material in StairSolidMaterial.values)
+      if (solids.any((s) => s.material == material))
+        StairSolid(
+          material,
+          solids
+              .where((s) => s.material == material)
+              .map((s) => s.triangles)
+              .reduce(ArchitectMeshBoolean.union),
+        ),
+  ];
 
   static List<StairSolid> _body(ArchitectStair stair, double firstRiserBottom) {
     final d = stair.design;
@@ -438,24 +455,13 @@ class ArchitectStairMesh {
         }
       }
       for (final landing in geometry.landings) {
-        final p = landing.polygon;
-        final centre = p.reduce((a, b) => a + b) / p.length.toDouble();
-        for (var i = 0; i < p.length; i++) {
-          final a = p[i], b = p[(i + 1) % p.length], edge = b - a;
-          var inward = Offset(-edge.dy, edge.dx) / edge.distance;
-          if (ArchitectStairGeometry.dot(centre - (a + b) / 2, inward) < 0) {
-            inward = -inward;
-          }
-          // Perimeter beams remain inside the landing footprint.
-          final inset = inward * d.stringerWidth;
+        for (final polygon in landingSupportPolygons(
+          landing.polygon,
+          d.stringerWidth,
+        )) {
           final top = landing.elevation + d.startOffset - d.treadThickness;
           result.add(
-            verticalPrism(
-              [a, b, b + inset, a + inset],
-              top - d.stringerDepth,
-              top,
-              material,
-            ),
+            verticalPrism(polygon, top - d.stringerDepth, top, material),
           );
         }
       }
@@ -551,6 +557,32 @@ class ArchitectStairMesh {
           }
         }
       }
+    }
+    return result;
+  }
+
+  /// Shared with clearance checks. Winding, concave corners and intersections
+  /// are resolved against the real landing, rather than its centroid or box.
+  static List<List<Offset>> landingSupportPolygons(
+    List<Offset> polygon,
+    double width,
+  ) {
+    final boundary = Path()..addPolygon(polygon, true);
+    final result = <List<Offset>>[];
+    for (var i = 0; i < polygon.length; i++) {
+      final a = polygon[i], b = polygon[(i + 1) % polygon.length], v = b - a;
+      if (v.distance < 1e-8) continue;
+      final inward =
+          Offset(-v.dy, v.dx) /
+          v.distance *
+          width *
+          (ArchitectPolygonGeometry.signedArea(polygon) >= 0 ? 1 : -1);
+      final clipped = Path.combine(
+        PathOperation.intersect,
+        boundary,
+        Path()..addPolygon([a, b, b + inward, a + inward], true),
+      );
+      result.addAll(ArchitectPathSolid.contours(clipped, tolerance: 1e-7));
     }
     return result;
   }
@@ -679,7 +711,13 @@ class ArchitectStairMesh {
       final before = i == 0 ? base[1] - base[0] : base[i] - base[i - 1];
       final after = i == base.length - 1 ? before : base[i + 1] - base[i];
       final tangent = (before.normalized() + after.normalized()).normalized();
-      final u = tangent.cross(const Vector3(0, 0, 1)).normalized();
+      final u = tangent
+          .cross(
+            tangent.z.abs() > .99
+                ? const Vector3(1, 0, 0)
+                : const Vector3(0, 0, 1),
+          )
+          .normalized();
       final v = tangent.cross(u).normalized();
       final centre = base[i] + Vector3(0, 0, height);
       rings.add([
@@ -787,6 +825,8 @@ class ArchitectStairMesh {
     StairFlightGeometry flight,
     StairSolidMaterial material,
   ) {
+    if (ArchitectPolygonGeometry.signedArea(profile) > 0)
+      profile = profile.reversed.toList();
     final cap = triangulate(profile), triangles = <Triangle3D>[];
     Vector3 point(int i, double side) {
       final p = flight.point(profile[i].dx, side);
@@ -805,13 +845,13 @@ class ArchitectStairMesh {
     for (final (a, b, c) in cap) {
       face(
         point(a, -flight.width / 2),
-        point(c, -flight.width / 2),
         point(b, -flight.width / 2),
+        point(c, -flight.width / 2),
       );
       face(
         point(a, flight.width / 2),
-        point(b, flight.width / 2),
         point(c, flight.width / 2),
+        point(b, flight.width / 2),
       );
     }
     for (var i = 0; i < profile.length; i++) {
@@ -836,6 +876,8 @@ class ArchitectStairMesh {
     double top,
     StairSolidMaterial material,
   ) {
+    if (ArchitectPolygonGeometry.signedArea(polygon) < 0)
+      polygon = polygon.reversed.toList();
     final cap = triangulate(polygon), triangles = <Triangle3D>[];
     Vector3 p(int i, double z) => Vector3(polygon[i].dx, polygon[i].dy, z);
     void face(Vector3 a, Vector3 b, Vector3 c) => triangles.add(

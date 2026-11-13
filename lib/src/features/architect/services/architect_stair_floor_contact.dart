@@ -3,6 +3,7 @@ import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import 'architect_section_junctions.dart';
 import 'architect_slab_geometry.dart';
+import 'architect_stair_geometry.dart';
 
 /// The first riser's finish meets the approach floor, while the concrete waist
 /// retains its structural seat. Values are relative to the owning storey.
@@ -17,10 +18,18 @@ class ArchitectStairFloorContact {
     final (a, b) = stair.plan.nosings.first;
     final approach =
         (a + b) / 2 -
-        stair.unitVector * math.max(.005, stair.design!.nosingProjection);
+        (stair.design?.layout == null
+                ? stair.unitVector
+                : ArchitectStairGeometry.of(stair).flights.first.axis) *
+            math.max(.005, stair.design!.nosingProjection);
     var bottom = start;
     for (final slab in storey.slabs) {
-      if (!ArchitectSlabGeometry.contains(storey, slab, approach, project: project)) {
+      if (!ArchitectSlabGeometry.contains(
+        storey,
+        slab,
+        approach,
+        project: project,
+      )) {
         continue;
       }
       final surfaces = ArchitectSlabGeometry.surfaces(

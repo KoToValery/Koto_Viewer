@@ -12,6 +12,7 @@ import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../rendering/architect_elements_painter_helper.dart';
 import '../services/architect_stair_rules.dart';
+import '../services/architect_stair_layout_resolver.dart';
 import 'architect_stair_labels.dart';
 import 'architect_stair_section_screen.dart';
 import 'architect_wall_drafting_panel.dart';
@@ -22,6 +23,7 @@ class ArchitectStairPropertiesDialog extends StatefulWidget {
   final ArchitectProject project;
   final ArchitectStair stair;
   final bool Function(ArchitectStair) onApply;
+  final ValueChanged<ArchitectStair>? onEditLayout;
   const ArchitectStairPropertiesDialog({
     super.key,
     this.isCurrent,
@@ -29,6 +31,7 @@ class ArchitectStairPropertiesDialog extends StatefulWidget {
     required this.stair,
     required this.onApply,
     this.onPreview,
+    this.onEditLayout,
   });
   @override
   State<ArchitectStairPropertiesDialog> createState() =>
@@ -75,8 +78,12 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
   }
 
   void _saveDraft() {
-    if(widget.isCurrent?.call()==false){ScaffoldMessenger.of(context,
-      ).showSnackBar(SnackBar(content:Text(context.l10n.propertiesStale)));return;}
+    if (widget.isCurrent?.call() == false) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.propertiesStale)));
+      return;
+    }
     final invalid = _form.currentState!.validateGranularly();
     if (invalid.isNotEmpty) {
       final field = invalid.first;
@@ -89,6 +96,8 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
         (!d.isDraft &&
             ArchitectStairRules.check(
               stair,
+              project: widget.project,
+              storey: widget.project.activeStorey,
             ).any((c) => c.state == StairCheckState.error))) {
       return;
     }
@@ -231,6 +240,15 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
   );
 
   void fit() {
+    if (d.layout != null) {
+      final next = ArchitectStairLayoutResolver.fit(d);
+      if (next == null) {
+        invalid();
+      } else {
+        update(next);
+      }
+      return;
+    }
     var next = d.copyWith(
       rulesVersion: d.code == StairCode.bulgaria
           ? ArchitectStairDesign.currentRules
@@ -287,7 +305,11 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final checks = ArchitectStairRules.check(stair);
+    final checks = ArchitectStairRules.check(
+      stair,
+      project: widget.project,
+      storey: widget.project.activeStorey,
+    );
     final targetMissing =
         d.followStoreys &&
         ArchitectStairRules.linkedRise(
@@ -344,32 +366,36 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                   },
                   (v) => update(d.copyWith(construction: v)),
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: dropdown(
-                        'shape',
-                        l.stairShape,
-                        d.shape,
-                        StairShape.values,
-                        (v) => stairShapeLabel(l, v),
-                        (v) => update(d.copyWith(shape: v)),
+                if (d.layout == null)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: dropdown(
+                          'shape',
+                          l.stairShape,
+                          d.shape,
+                          StairShape.values,
+                          (v) => stairShapeLabel(l, v),
+                          (v) => update(d.copyWith(shape: v)),
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      key: const ValueKey('stair-mirror'),
-                      tooltip: d.turnLeft ? l.stairTurnRight : l.stairTurnLeft,
-                      onPressed: d.shape == StairShape.straight
-                          ? null
-                          : () => update(d.copyWith(turnLeft: !d.turnLeft)),
-                      icon: AppIcon.fromMaterial(
-                        d.turnLeft ? Icons.turn_left : Icons.turn_right,
+                      IconButton(
+                        key: const ValueKey('stair-mirror'),
+                        tooltip: d.turnLeft
+                            ? l.stairTurnRight
+                            : l.stairTurnLeft,
+                        onPressed: d.shape == StairShape.straight
+                            ? null
+                            : () => update(d.copyWith(turnLeft: !d.turnLeft)),
+                        icon: AppIcon.fromMaterial(
+                          d.turnLeft ? Icons.turn_left : Icons.turn_right,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                if (d.shape == StairShape.quarterTurn ||
-                    d.shape == StairShape.halfTurn)
+                    ],
+                  ),
+                if (d.layout == null &&
+                    (d.shape == StairShape.quarterTurn ||
+                        d.shape == StairShape.halfTurn))
                   Tooltip(
                     message: l.stairWindersHelp,
                     child: SwitchListTile.adaptive(
@@ -381,7 +407,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                       onChanged: (v) => update(d.copyWith(winderSteps: v)),
                     ),
                   ),
-                if (d.shape == StairShape.spiralOverlap)
+                if (d.layout == null && d.shape == StairShape.spiralOverlap)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
@@ -433,13 +459,31 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                     ),
                   ),
                 ),
-                number(
-                  'width',
-                  l.stairClearWidth,
-                  stair.width,
-                  (v) => setState(() => stair = stair.copyWith(width: v)),
-                  maximum: 10,
-                ),
+                if (widget.onEditLayout != null &&
+                    !legacy &&
+                    !d.isSpiral &&
+                    !d.hasWinders)
+                  OutlinedButton.icon(
+                    key: const ValueKey('stair-edit-layout'),
+                    icon: const Icon(Icons.polyline_outlined),
+                    label: Text(l.stairEditLayout),
+                    onPressed: () {
+                      final callback = widget.onEditLayout!, next = stair;
+                      Navigator.pop(context);
+                      WidgetsBinding.instance.addPostFrameCallback(
+                        (_) => callback(next),
+                      );
+                    },
+                  ),
+                if (d.layout != null) Text(l.stairCustom),
+                if (d.layout == null)
+                  number(
+                    'width',
+                    l.stairClearWidth,
+                    stair.width,
+                    (v) => setState(() => stair = stair.copyWith(width: v)),
+                    maximum: 10,
+                  ),
                 Tooltip(
                   message: l.stairHeightModeHelp,
                   child: dropdown<bool>(
@@ -469,7 +513,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                   enabled: !d.followStoreys,
                   maximum: 30,
                 ),
-                if (d.shape == StairShape.spiralOverlap)
+                if (d.layout == null && d.shape == StairShape.spiralOverlap)
                   number(
                     'overlap-headroom',
                     l.stairCheckHeadroom,
@@ -560,7 +604,8 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                     number(
                       'risers',
                       l.stairRisers,
-                      d.risers.toDouble(),
+                      (d.layout == null ? d.risers : d.manualRisers ?? d.risers)
+                          .toDouble(),
                       (v) => update(d.copyWith(manualRisers: v.toInt())),
                       metric: false,
                       integer: true,
@@ -584,18 +629,26 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                         'going',
                         l.stairGoing,
                         d.going,
-                        (v) => update(d.copyWith(manualGoing: v)),
+                        (v) => update(
+                          d.copyWith(
+                            manualGoing: v,
+                            layout: d.layout?.copyWith(goingLocked: true),
+                          ),
+                        ),
                         maximum: 2,
                       ),
                       SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
                         dense: true,
                         title: Text('${l.stairGoing} · ${l.stairAutomatic}'),
-                        value: d.manualGoing == null,
+                        value: d.layout == null
+                            ? d.manualGoing == null
+                            : !d.layout!.goingLocked,
                         onChanged: (v) => update(
                           d.copyWith(
-                            autoGoing: v,
-                            manualGoing: v ? null : d.going,
+                            autoGoing: v && d.layout == null,
+                            manualGoing: v && d.layout == null ? null : d.going,
+                            layout: d.layout?.copyWith(goingLocked: !v),
                           ),
                         ),
                       ),
@@ -666,7 +719,9 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                           ),
                         ),
                       ],
-                      if (d.flightCount > 1 && !d.hasWinders)
+                      if (d.layout == null &&
+                          d.flightCount > 1 &&
+                          !d.hasWinders)
                         number(
                           'landing',
                           l.stairLanding,

@@ -115,7 +115,10 @@ class ArchitectSlabEditingAdapter extends BimElementAdapter<ArchitectSlab> {
       ? source
       : source.copyWith(
           polygon: translatedContour(source.polygon, deltaMetres),
-          holes: ArchitectContour.transform(source.holes, (p) => p + deltaMetres),
+          holes: ArchitectContour.transform(
+            source.holes,
+            (p) => p + deltaMetres,
+          ),
         );
   @override
   BimElementSnapshot describe(
@@ -146,7 +149,10 @@ class ArchitectRoofEditingAdapter
       ? source
       : source.copyWith(
           points: translatedContour(source.points, deltaMetres),
-          holes: ArchitectContour.transform(source.holes, (p) => p + deltaMetres),
+          holes: ArchitectContour.transform(
+            source.holes,
+            (p) => p + deltaMetres,
+          ),
         );
   @override
   BimElementSnapshot describe(
@@ -188,10 +194,9 @@ class ArchitectZoneEditingAdapter extends BimElementAdapter<ArchitectZone> {
     kind: BimEditingGeometryKind.contour,
     anchor: source.polygon.isEmpty ? Offset.zero : source.polygon.first,
     outline: source.polygon,
-    capabilities: source.isAutoBoundary ? {} : {
-      BimEditingCapability.translate,
-      BimEditingCapability.contour,
-    },
+    capabilities: source.isAutoBoundary
+        ? {}
+        : {BimEditingCapability.translate, BimEditingCapability.contour},
     revision: revision,
     readOnly: readOnly || source.isAutoBoundary,
   );
@@ -227,8 +232,16 @@ class ArchitectWallEditingAdapter extends BimElementAdapter<ArchitectWall> {
     anchor: source.referencePointAt(.5),
     outline: source.polygonCorners,
     referenceLines: [
-      if(!source.isCurved) ...[(source.startPoint,source.endPoint),(source.coreCenterStart,source.coreCenterEnd)]
-      else ...[for(var i=0;i<32;i++)(source.referencePointAt(i/32),source.referencePointAt((i+1)/32))],
+      if (!source.isCurved) ...[
+        (source.startPoint, source.endPoint),
+        (source.coreCenterStart, source.coreCenterEnd),
+      ] else ...[
+        for (var i = 0; i < 32; i++)
+          (
+            source.referencePointAt(i / 32),
+            source.referencePointAt((i + 1) / 32),
+          ),
+      ],
     ],
     capabilities: {
       BimEditingCapability.translate,
@@ -256,6 +269,15 @@ class ArchitectStairEditingAdapter
     extends BimPathEditingAdapter<ArchitectStair> {
   const ArchitectStairEditingAdapter()
     : super(points: _points, withPoints: _withPoints);
+  ArchitectStair rotate(ArchitectStair source, double radians) {
+    if (radians == 0) return source;
+    final pivot = source.plan.bounds.center;
+    return source.copyWith(
+      startPoint: BimTransform2D.rotate(source.startPoint, pivot, radians),
+      endPoint: BimTransform2D.rotate(source.endPoint, pivot, radians),
+    );
+  }
+
   static List<Offset> _points(ArchitectStair source) => [
     source.startPoint,
     source.endPoint,
@@ -319,10 +341,19 @@ class ArchitectCadEditingAdapter
   const ArchitectCadEditingAdapter()
     : super(points: _points, withPoints: _withPoints);
   @override
-  ArchitectCadPrimitive translate(ArchitectCadPrimitive source, Offset deltaMetres) =>
-      deltaMetres == Offset.zero ? source : super.translate(source, deltaMetres).copyWith(
-        holes: ArchitectContour.transform(source.holes, (p) => p + deltaMetres),
-      );
+  ArchitectCadPrimitive translate(
+    ArchitectCadPrimitive source,
+    Offset deltaMetres,
+  ) => deltaMetres == Offset.zero
+      ? source
+      : super
+            .translate(source, deltaMetres)
+            .copyWith(
+              holes: ArchitectContour.transform(
+                source.holes,
+                (p) => p + deltaMetres,
+              ),
+            );
   static List<Offset> _points(ArchitectCadPrimitive source) => [
     source.startPoint,
     source.endPoint,

@@ -100,7 +100,8 @@ class ArchitectStairPlanPainter {
     }
     final geometry = ArchitectStairGeometry.of(stair);
     final cut = geometry.cut(cutHeight ?? double.infinity);
-    final overheadClip = d?.shape == StairShape.spiralOverlap
+    final overheadClip =
+        d?.layout == null && d?.shape == StairShape.spiralOverlap
         ? Path.combine(
             PathOperation.difference,
             Path()..addRect(plan.bounds.inflate(1)),

@@ -7,6 +7,49 @@ import 'architect_path_solid.dart';
 /// double precision; cut faces inherit the subject material. Inputs are closed,
 /// outward-oriented solids, never a concatenation of overlapping components.
 class ArchitectMeshBoolean {
+  /// Union of closed, outward-oriented components, including shared contacts.
+  static List<Triangle3D> union(
+    List<Triangle3D> subject,
+    List<Triangle3D> other,
+  ) {
+    if (subject.isEmpty) return other;
+    if (other.isEmpty) return subject;
+    final sa = BoundingBox3D.fromPoints([
+      for (final t in subject) ...[t.v0, t.v1, t.v2],
+    ]);
+    final sb = BoundingBox3D.fromPoints([
+      for (final t in other) ...[t.v0, t.v1, t.v2],
+    ]);
+    if (!sa.intersects(sb)) return [...subject, ...other];
+    List<_Polygon> polygons(List<Triangle3D> mesh) => [
+      for (final t in mesh)
+        if ((t.v1 - t.v0).cross(t.v2 - t.v0).length > 1e-12)
+          _Polygon([t.v0, t.v1, t.v2]),
+    ];
+    final a = _Node(polygons(subject)), b = _Node(polygons(other));
+    a.clipTo(b);
+    b.clipTo(a);
+    b.invert();
+    b.clipTo(a);
+    b.invert();
+    a.build(b.all());
+    return simplify([
+      for (final p in a.all())
+        for (var i = 1; i + 1 < p.vertices.length; i++)
+          if ((p.vertices[i] - p.vertices.first)
+                  .cross(p.vertices[i + 1] - p.vertices.first)
+                  .length >
+              1e-12)
+            Triangle3D(
+              v0: p.vertices.first,
+              v1: p.vertices[i],
+              v2: p.vertices[i + 1],
+              color: subject.first.color,
+              isDoubleSided: true,
+            ),
+    ]);
+  }
+
   /// Remove opposite coplanar contact faces from the display mesh. Unlike a
   /// solid difference this keeps each construction component's closed volume
   /// intact for sections. Polygon masks are united once per plane, avoiding

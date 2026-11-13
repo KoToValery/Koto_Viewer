@@ -9,6 +9,121 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get stairCustom => 'Freeform';
+
+  @override
+  String get stairCustomLayout => 'Stair layout';
+
+  @override
+  String get stairEditLayout => 'Edit shape';
+
+  @override
+  String get stairFlight => 'Flight';
+
+  @override
+  String get stairCell => 'Cell';
+
+  @override
+  String stairFlightNumber(int number) {
+    return 'Flight $number';
+  }
+
+  @override
+  String stairLandingNumber(int number) {
+    return 'Landing $number';
+  }
+
+  @override
+  String get stairPickStart =>
+      'Pick the flight start; after a landing, pick its exit edge.';
+
+  @override
+  String get stairPickEnd =>
+      'Pick the flight end. Its length follows the common going.';
+
+  @override
+  String get stairDrawCell =>
+      'Draw the clear cell boundary, then close the contour.';
+
+  @override
+  String get stairDrawLanding =>
+      'Draw the landing boundary, including both connection edges.';
+
+  @override
+  String get stairEditHint => 'Select a part.';
+
+  @override
+  String get stairEditHelp =>
+      'Drag grips, tap for exact dimensions; hold a vertex to remove it.';
+
+  @override
+  String get stairInsertVertex => 'Add vertex';
+
+  @override
+  String get stairLayoutClearanceError =>
+      'The landing has a narrow passage between the flights.';
+
+  @override
+  String get stairCloseContour => 'Close contour';
+
+  @override
+  String get stairContour => 'Contour';
+
+  @override
+  String get stairRun => 'Run';
+
+  @override
+  String get stairDirection => 'Direction';
+
+  @override
+  String get stairLockRun => 'Fix length';
+
+  @override
+  String get stairLockCount => 'Fix risers';
+
+  @override
+  String get stairLockGoing => 'Fix going';
+
+  @override
+  String get stairAcceptFit => 'Accept fit';
+
+  @override
+  String get stairFitProposal =>
+      'Review the proposed going and riser counts before accepting.';
+
+  @override
+  String get stairLayoutPolygonError =>
+      'The contour must be closed, with no crossing edges.';
+
+  @override
+  String get stairLayoutConnectionError =>
+      'Connect the full flight width to a landing edge.';
+
+  @override
+  String get stairLayoutCellError => 'This part extends outside the cell.';
+
+  @override
+  String get stairLayoutLengthError =>
+      'The fixed lengths do not fit a common going. Adjust a length or unlock a parameter.';
+
+  @override
+  String get stairLayoutTotalError =>
+      'The flights do not match the fixed total riser count.';
+
+  @override
+  String get stairLayoutCollisionError =>
+      'A landing overlaps its adjoining flight.';
+
+  @override
+  String stairSuggestedRun(String length) {
+    return 'Compatible run: $length';
+  }
+
+  @override
+  String get stairHeadroomModelHelp =>
+      'Checks modelled slabs, their openings and upper stair parts. Other obstacles still require review.';
+
+  @override
   String get architectWallAxisSpacing => 'Between axes';
 
   @override

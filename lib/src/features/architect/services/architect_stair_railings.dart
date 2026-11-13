@@ -184,16 +184,7 @@ class ArchitectStairRailings {
     final pieces = <({Vector3 a, Vector3 b, bool wall})>[];
     // Resample the spiral analytically, rather than creating a post at every
     // tiny vertex used to draw its smooth plan contour.
-    var edges = [
-      if (!d.isSpiral)
-        for (final (a, b) in geometry.guardEdges)
-          (
-            a: a,
-            b: b,
-            za: geometry.elevationAt(a),
-            zb: geometry.elevationAt(b),
-          ),
-    ];
+    var edges = [if (!d.isSpiral) ...geometry.guardSegments];
     if (d.isSpiral) {
       final u = stair.unitVector,
           v = stair.normalVector * (d.turnLeft ? -1 : 1);
@@ -226,6 +217,14 @@ class ArchitectStairRailings {
     for (final edge in edges) {
       final a = edge.a, b = edge.b;
       final delta = b - a;
+      if (delta.distance < 1e-8) {
+        pieces.add((
+          a: Vector3(a.dx, a.dy, edge.za),
+          b: Vector3(b.dx, b.dy, edge.zb),
+          wall: false,
+        ));
+        continue;
+      }
       final count = math.max(1, (delta.distance / .08).ceil());
       final tangent = delta / delta.distance;
       for (var i = 0; i < count; i++) {

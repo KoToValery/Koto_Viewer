@@ -9,6 +9,120 @@ class AppLocalizationsBg extends AppLocalizations {
   AppLocalizationsBg([String locale = 'bg']) : super(locale);
 
   @override
+  String get stairCustom => 'Свободна';
+
+  @override
+  String get stairCustomLayout => 'Форма на стълбището';
+
+  @override
+  String get stairEditLayout => 'Редактирай форма';
+
+  @override
+  String get stairFlight => 'Рамо';
+
+  @override
+  String get stairCell => 'Клетка';
+
+  @override
+  String stairFlightNumber(int number) {
+    return 'Рамо $number';
+  }
+
+  @override
+  String stairLandingNumber(int number) {
+    return 'Площадка $number';
+  }
+
+  @override
+  String get stairPickStart =>
+      'Посочи начало на рамото; след площадка избери изходния ѝ ръб.';
+
+  @override
+  String get stairPickEnd =>
+      'Посочи край на рамото. Дължината следва общия простъп.';
+
+  @override
+  String get stairDrawCell =>
+      'Очертай светлия контур на клетката и го затвори.';
+
+  @override
+  String get stairDrawLanding =>
+      'Очертай площадката, включително двата ръба за свързване.';
+
+  @override
+  String get stairEditHint => 'Избери част.';
+
+  @override
+  String get stairEditHelp =>
+      'Влачи ръкохватките, докосни за точен размер; задръж връх за премахване.';
+
+  @override
+  String get stairInsertVertex => 'Добави връх';
+
+  @override
+  String get stairLayoutClearanceError =>
+      'Площадката има тесен проход между рамената.';
+
+  @override
+  String get stairCloseContour => 'Затвори контур';
+
+  @override
+  String get stairContour => 'Контур';
+
+  @override
+  String get stairRun => 'Дължина';
+
+  @override
+  String get stairDirection => 'Посока';
+
+  @override
+  String get stairLockRun => 'Фиксирана дължина';
+
+  @override
+  String get stairLockCount => 'Фиксиран брой';
+
+  @override
+  String get stairLockGoing => 'Фиксиран простъп';
+
+  @override
+  String get stairAcceptFit => 'Приеми вписването';
+
+  @override
+  String get stairFitProposal =>
+      'Прегледай предложения простъп и брой стъпала преди приемане.';
+
+  @override
+  String get stairLayoutPolygonError =>
+      'Контурът трябва да е затворен, без пресичащи се ръбове.';
+
+  @override
+  String get stairLayoutConnectionError =>
+      'Свържи цялата ширина на рамото с ръб на площадката.';
+
+  @override
+  String get stairLayoutCellError => 'Тази част излиза извън клетката.';
+
+  @override
+  String get stairLayoutLengthError =>
+      'Фиксираните дължини не допускат общ простъп. Коригирай дължина или отключи параметър.';
+
+  @override
+  String get stairLayoutTotalError =>
+      'Рамената не съответстват на фиксирания общ брой стъпала.';
+
+  @override
+  String get stairLayoutCollisionError => 'Площадка застъпва съседното рамо.';
+
+  @override
+  String stairSuggestedRun(String length) {
+    return 'Съвместима дължина: $length';
+  }
+
+  @override
+  String get stairHeadroomModelHelp =>
+      'Проверява моделираните плочи, отворите им и горните части на стълбището. Останалите препятствия изискват преглед.';
+
+  @override
   String get architectWallAxisSpacing => 'Между осите';
 
   @override

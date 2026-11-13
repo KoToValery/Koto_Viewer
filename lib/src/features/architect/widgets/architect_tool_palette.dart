@@ -139,6 +139,7 @@ class ArchitectToolPalette extends StatefulWidget {
   final ArchitectStairDesign stairDesign;
   final ValueChanged<StairShape>? onStairShapeChanged;
   final VoidCallback? onStairProperties;
+  final VoidCallback? onFreeStair;
 
   // Stair options
   final double stairWidth;
@@ -244,6 +245,7 @@ class ArchitectToolPalette extends StatefulWidget {
     this.stairDesign = const ArchitectStairDesign(),
     this.onStairShapeChanged,
     this.onStairProperties,
+    this.onFreeStair,
     this.stairWidth = 1.10,
     this.onStairWidthChanged,
     this.stairSteps = 16,
@@ -1453,6 +1455,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
+          TextButton.icon(
+            key: const ValueKey('stair-tool-freeform'),
+            icon: const Icon(Icons.polyline_outlined, size: 18),
+            label: Text(l.stairCustom), onPressed: widget.onFreeStair),
           DropdownButton<StairShape>(
             key: const ValueKey('stair-tool-shape'),
             value: widget.stairDesign.shape,

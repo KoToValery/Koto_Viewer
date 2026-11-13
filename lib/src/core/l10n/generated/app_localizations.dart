@@ -98,6 +98,198 @@ abstract class AppLocalizations {
     Locale('en'),
   ];
 
+  /// No description provided for @stairCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Freeform'**
+  String get stairCustom;
+
+  /// No description provided for @stairCustomLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Stair layout'**
+  String get stairCustomLayout;
+
+  /// No description provided for @stairEditLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit shape'**
+  String get stairEditLayout;
+
+  /// No description provided for @stairFlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Flight'**
+  String get stairFlight;
+
+  /// No description provided for @stairCell.
+  ///
+  /// In en, this message translates to:
+  /// **'Cell'**
+  String get stairCell;
+
+  /// No description provided for @stairFlightNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Flight {number}'**
+  String stairFlightNumber(int number);
+
+  /// No description provided for @stairLandingNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Landing {number}'**
+  String stairLandingNumber(int number);
+
+  /// No description provided for @stairPickStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the flight start; after a landing, pick its exit edge.'**
+  String get stairPickStart;
+
+  /// No description provided for @stairPickEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the flight end. Its length follows the common going.'**
+  String get stairPickEnd;
+
+  /// No description provided for @stairDrawCell.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw the clear cell boundary, then close the contour.'**
+  String get stairDrawCell;
+
+  /// No description provided for @stairDrawLanding.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw the landing boundary, including both connection edges.'**
+  String get stairDrawLanding;
+
+  /// No description provided for @stairEditHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a part.'**
+  String get stairEditHint;
+
+  /// No description provided for @stairEditHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag grips, tap for exact dimensions; hold a vertex to remove it.'**
+  String get stairEditHelp;
+
+  /// No description provided for @stairInsertVertex.
+  ///
+  /// In en, this message translates to:
+  /// **'Add vertex'**
+  String get stairInsertVertex;
+
+  /// No description provided for @stairLayoutClearanceError.
+  ///
+  /// In en, this message translates to:
+  /// **'The landing has a narrow passage between the flights.'**
+  String get stairLayoutClearanceError;
+
+  /// No description provided for @stairCloseContour.
+  ///
+  /// In en, this message translates to:
+  /// **'Close contour'**
+  String get stairCloseContour;
+
+  /// No description provided for @stairContour.
+  ///
+  /// In en, this message translates to:
+  /// **'Contour'**
+  String get stairContour;
+
+  /// No description provided for @stairRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Run'**
+  String get stairRun;
+
+  /// No description provided for @stairDirection.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get stairDirection;
+
+  /// No description provided for @stairLockRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix length'**
+  String get stairLockRun;
+
+  /// No description provided for @stairLockCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix risers'**
+  String get stairLockCount;
+
+  /// No description provided for @stairLockGoing.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix going'**
+  String get stairLockGoing;
+
+  /// No description provided for @stairAcceptFit.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept fit'**
+  String get stairAcceptFit;
+
+  /// No description provided for @stairFitProposal.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the proposed going and riser counts before accepting.'**
+  String get stairFitProposal;
+
+  /// No description provided for @stairLayoutPolygonError.
+  ///
+  /// In en, this message translates to:
+  /// **'The contour must be closed, with no crossing edges.'**
+  String get stairLayoutPolygonError;
+
+  /// No description provided for @stairLayoutConnectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect the full flight width to a landing edge.'**
+  String get stairLayoutConnectionError;
+
+  /// No description provided for @stairLayoutCellError.
+  ///
+  /// In en, this message translates to:
+  /// **'This part extends outside the cell.'**
+  String get stairLayoutCellError;
+
+  /// No description provided for @stairLayoutLengthError.
+  ///
+  /// In en, this message translates to:
+  /// **'The fixed lengths do not fit a common going. Adjust a length or unlock a parameter.'**
+  String get stairLayoutLengthError;
+
+  /// No description provided for @stairLayoutTotalError.
+  ///
+  /// In en, this message translates to:
+  /// **'The flights do not match the fixed total riser count.'**
+  String get stairLayoutTotalError;
+
+  /// No description provided for @stairLayoutCollisionError.
+  ///
+  /// In en, this message translates to:
+  /// **'A landing overlaps its adjoining flight.'**
+  String get stairLayoutCollisionError;
+
+  /// No description provided for @stairSuggestedRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Compatible run: {length}'**
+  String stairSuggestedRun(String length);
+
+  /// No description provided for @stairHeadroomModelHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks modelled slabs, their openings and upper stair parts. Other obstacles still require review.'**
+  String get stairHeadroomModelHelp;
+
   /// No description provided for @architectWallAxisSpacing.
   ///
   /// In en, this message translates to:

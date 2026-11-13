@@ -213,7 +213,32 @@ class ArchitectStoreyCopyService {
           final newStairId = ArchitectElementId.next('stair');
           idMap[stair.id] = newStairId;
 
-          clonedStairs.add(stair.copyWith(id: newStairId));
+          var design = stair.design;
+          if (design?.layout != null && design!.followStoreys) {
+            final aboveSource =
+                currentProject.storeys
+                    .where((s) => s.elevation > sourceStorey.elevation + 1e-6)
+                    .toList()
+                  ..sort((a, b) => a.elevation.compareTo(b.elevation));
+            final span = design.upperStoreyId == null
+                ? 0
+                : aboveSource.indexWhere((s) => s.id == design!.upperStoreyId);
+            final aboveTarget =
+                currentProject.storeys
+                    .where((s) => s.elevation > targetStorey.elevation + 1e-6)
+                    .toList()
+                  ..sort((a, b) => a.elevation.compareTo(b.elevation));
+            if (span >= 0) {
+              final target = span < aboveTarget.length
+                  ? aboveTarget[span]
+                  : null;
+              design = design.copyWith(
+                upperStoreyId: target?.id,
+                clearUpperStorey: target == null,
+              );
+            }
+          }
+          clonedStairs.add(stair.copyWith(id: newStairId, design: design));
         }
         breakdown[ArchitectStoreyElementType.stairs] =
             (breakdown[ArchitectStoreyElementType.stairs] ?? 0) +

@@ -58,7 +58,7 @@ class ArchitectStairGeometry {
         StairFlightGeometry(
           origin,
           delta / delta.distance,
-          stair.width,
+          d.layout?.flights[f].width ?? stair.width,
           d.going,
           d.riser,
           counts[f],
@@ -104,7 +104,7 @@ class ArchitectStairGeometry {
             d.risers - 1,
           )]
         : null;
-    if (d.shape == StairShape.spiralOverlap) {
+    if (d.layout == null && d.shape == StairShape.spiralOverlap) {
       above = Path.combine(PathOperation.difference, above, below);
     }
     return _cuts[height] = StairPlanCutGeometry(below, above, crossing);
@@ -181,6 +181,68 @@ class ArchitectStairGeometry {
   }
 
   late final List<(Offset, Offset)> guardEdges = _guardEdges();
+
+  /// Carry the level with each edge, including flights stacked in plan.
+  late final List<({Offset a, Offset b, double za, double zb})> guardSegments =
+      _guardSegments();
+  List<({Offset a, Offset b, double za, double zb})> _guardSegments() {
+    final d = stair.design!;
+    if (d.layout == null)
+      return [
+        for (final (a, b) in guardEdges)
+          (a: a, b: b, za: elevationAt(a), zb: elevationAt(b)),
+      ];
+    final result = <({Offset a, Offset b, double za, double zb})>[];
+    for (var i = 0; i < flights.length; i++) {
+      final f = flights[i];
+      for (final sign in [-1.0, 1.0]) {
+        final a = f.point(0, sign * f.width / 2),
+            b = f.point(f.run, sign * f.width / 2);
+        final z = d.startOffset + f.base;
+        result.add((a: a, b: b, za: z + f.riser, zb: d.startOffset + f.top));
+        if (i > 0) result.add((a: a, b: a, za: z, zb: z + f.riser));
+      }
+    }
+    for (var i = 0; i < landings.length; i++) {
+      final l = landings[i], incoming = flights[i], outgoing = flights[i + 1];
+      final ports = [
+        (
+          incoming.point(incoming.run, -incoming.width / 2),
+          incoming.point(incoming.run, incoming.width / 2),
+        ),
+        (
+          outgoing.point(0, -outgoing.width / 2),
+          outgoing.point(0, outgoing.width / 2),
+        ),
+      ];
+      for (var j = 0; j < l.polygon.length; j++) {
+        final a = l.polygon[j], v = l.polygon[(j + 1) % l.polygon.length] - a;
+        if (v.distance < 1e-8) continue;
+        final ts = <double>[0, 1];
+        for (final port in ports) {
+          for (final p in [port.$1, port.$2]) {
+            if (cross(p - a, v).abs() < 1e-6)
+              ts.add((dot(p - a, v) / v.distanceSquared).clamp(0.0, 1.0));
+          }
+        }
+        ts.sort();
+        for (var k = 1; k < ts.length; k++) {
+          if (ts[k] - ts[k - 1] < 1e-8) continue;
+          final mid = a + v * ((ts[k] + ts[k - 1]) / 2);
+          if (ports.any((p) => pointSegmentDistance(mid, p.$1, p.$2) < 1e-6))
+            continue;
+          result.add((
+            a: a + v * ts[k - 1],
+            b: a + v * ts[k],
+            za: d.startOffset + l.elevation,
+            zb: d.startOffset + l.elevation,
+          ));
+        }
+      }
+    }
+    return result;
+  }
+
   List<(Offset, Offset)> _guardEdges() {
     final polygons = stair.plan.footprints;
     final all = <(Offset, Offset)>[

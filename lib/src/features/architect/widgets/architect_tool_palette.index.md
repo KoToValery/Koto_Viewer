@@ -1,4 +1,9 @@
 # Architect Tool Palette — Reference & Navigation Map
+
+Freeform stair entry: `_buildStairSubBar` exposes `onFreeStair` alongside the
+existing preset picker and properties. It starts the workspace session under
+`[TAG:STAIR_FREEFORM]`; the palette is hidden while that session owns the canvas.
+Both supported ARB locales provide the entry label and its drafting messages.
 > **Path**: `lib/src/features/architect/widgets/architect_tool_palette.dart`  
 > **Primary class**: `_ArchitectToolPaletteState` (+1 more)  
 > **Important**: Treat this map as a discovery aid, not a specification. Verify concrete symbols, anchors, and behavior in the current source with `rg -n`.

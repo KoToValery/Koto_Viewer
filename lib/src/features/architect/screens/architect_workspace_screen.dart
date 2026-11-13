@@ -248,6 +248,9 @@ import '../services/architect_command_controller.dart';
 import '../services/architect_element_tool.dart';
 
 import '../services/architect_stair_rules.dart';
+import '../services/architect_stair_draft_controller.dart';
+import '../services/architect_stair_layout_resolver.dart';
+import '../widgets/architect_stair_draft_overlay.dart';
 
 import '../widgets/architect_stair_properties_dialog.dart';
 
@@ -377,6 +380,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 // [SEC-06-WALLS]   [TAG:WALL_DRAFT] Wall Concept Drafting & Chain Grouping
 // [SEC-07-SPLIT]   [TAG:WALL_SPLIT] Wall Splitting, Cut Sessions & Clearances
 // [SEC-08-FENEST]  [TAG:FENEST_RADIAL] Door/Window Placement & Radial Context Menus
+//   ↳ [SUB]        [TAG:STAIR_FREEFORM] Free stair session, preview and atomic commit
 //   ↳ [SUB]        [TAG:OBJECT_REPLACEMENT] Atomic catalog replacement retaining identity
 //   ↳ [SUB]        [TAG:FLOATING_HUD] Contextual Floating Command Overlays & Interactive Edge Curving
 //   ↳ [SUB]        [TAG:CURVING_EXACT_INPUT] Existing element: exact h, side preview, final Apply/Cancel
@@ -3724,6 +3728,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     setState(() {
       _touchCandidates = null;
+      _closeFreeStair();
       _is3DView = !_is3DView;
     });
 
@@ -5419,6 +5424,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onModelChanged() {
+    if (_stairDraft != null && !identical(_stairDraftDocument, _modelCommands.project)) {
+      _closeFreeStair();
+    }
     if (_commandPreview != null &&
         !identical(_commandPreview!.document, _modelCommands.project)) {
       _discardGeometryCommand();
@@ -5566,6 +5574,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _undoModel() {
+    if (_stairDraft != null) { _stairDraft!.undo(); return; }
 
     _cancelDrafting();
 
@@ -5576,6 +5585,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _redoModel() {
+    if (_stairDraft != null) { _stairDraft!.redo(); return; }
 
     _cancelDrafting();
 
@@ -5586,6 +5596,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _cancelDrafting() {
+    if (_stairDraft != null) { _cancelFreeStair(); return; }
     if (_dragController.isActive) {
       _cancelDragPlacement();
       return;
@@ -5620,6 +5631,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _pendingShape = null;
 
     _ellipseDraft.cancel();
+    _closeFreeStair();
 
     _shapePanelAnchor = null;
 
@@ -5818,6 +5830,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _pendingShape = null;
 
     _ellipseDraft.cancel();
+    _closeFreeStair();
 
     _shapePanelAnchor = null;
 
@@ -8769,6 +8782,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   @override
 
   void dispose() {
+    _closeFreeStair();
     _dragController.dispose();
 
     _cadFileWatcher?.dispose();
@@ -9041,6 +9055,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerDown(PointerDownEvent event) {
+    if (_stairDraft != null) {
+      _touchInput = event.kind == PointerDeviceKind.touch;
+      _handlePointerDown = event.localPosition;
+      _placingWithHold = false;
+      _isHandleEngaged = !_touchInput;
+      _stairDraft!.aim(_freeStairPoint(event.localPosition));
+      return;
+    }
     if (_commandReady) return;
     _dismissTouchCandidates();
     if (_startUnderlayCrop(_screenToModel(event.localPosition))) {
@@ -10163,6 +10185,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // --- SUBSECTION: [TAG:TOUCH_MOVE] _onPointerMove Input Dispatch & Previews ---
   void _onPointerMove(PointerMoveEvent event) {
+    if (_stairDraft != null) {
+      _stairDraft!.aim(_freeStairPoint(event.localPosition));
+      return;
+    }
     if (_commandReady) return;
     if (_underlayCropEditor.active) {
       if (_handlePointerDown != null && !_handleMoved &&
@@ -10251,6 +10277,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _beginPlacementHold(Offset point) {
+    if (_stairDraft != null) {
+      _placingWithHold = true;
+      _isHandleEngaged = true;
+      _stairDraft!.aim(_freeStairPoint(point));
+      return;
+    }
 
     if (_dragController.isActive) {
       _isHandleEngaged = true;
@@ -10308,8 +10340,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool get _canPlaceWithMarker =>
-
-      (_dragController.isActive ||
+      _stairDraft == null && (_dragController.isActive ||
           (_activeTool != ArchitectTool.select && _activeTool != ArchitectTool.pan && !_selectionContextActive) ||
 
           _mirrorActive ||
@@ -12857,6 +12888,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerHover(PointerHoverEvent event) {
+    if (_stairDraft != null) {
+      _touchInput = false;
+      _stairDraft!.aim(_freeStairPoint(event.localPosition));
+      return;
+    }
     if (_commandReady) return;
     if (_interactionMode == ArchitectInteractionMode.navigation &&
         !_terrainDrafting && !_dragController.isActive) return;
@@ -12873,6 +12909,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // --- SUBSECTION: [TAG:TOUCH_UP] _onPointerUp Input Dispatch & Tool Commits ---
   void _onPointerUp(PointerUpEvent event) {
+    if (_stairDraft != null) {
+      _stairDraft!.pick(_freeStairPoint(event.localPosition), tolerance: 18 / _viewport.scale);
+      _placingWithHold = false;
+      _isHandleEngaged = false;
+      _handlePointerDown = null;
+      return;
+    }
     if (_commandReady) return;
     if (_underlayCropEditor.active) {
       if (_handleMoved) _updateUnderlayCrop(_screenToModel(event.localPosition));
@@ -23762,6 +23805,83 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     ).whenComplete(() => _setPropertiesPreview(null));
   }
 
+  // --- SUBSECTION: [TAG:STAIR_FREEFORM] Free stair session, preview and atomic commit ---
+  ArchitectStairDraftController? _stairDraft;
+  ArchitectProject? _stairDraftDocument;
+
+  Offset _freeStairPoint(Offset screen) {
+    final target = StructuralPointerInteraction.placementTarget(screen,
+      isMouse: !_touchInput || !_placingWithHold);
+    return _snapElement(_screenToModel(target)).point;
+  }
+
+  void _startFreeStair({ArchitectStair? stair, bool create = true}) {
+    if (!_commands.isPlan) return;
+    _changeTool(ArchitectTool.stair, toggle: false);
+    final original = _commands.documentProject;
+    var seed = stair ?? _stairAt(Offset.zero, const Offset(1, 0),
+      id: ArchitectElementId.next('stair'));
+    if (create) seed = seed.copyWith(id: ArchitectElementId.next('stair'));
+    final draft = ArchitectStairDraftController(seed, create: create);
+    setState(() {
+      _stairDraftDocument = _modelCommands.project;
+      _stairDraft = draft;
+      _interactionEpoch++;
+      if (!create) {
+        _commands.editPreview = original.updateActiveStorey(original.activeStorey.copyWith(
+          stairs: original.activeStorey.stairs.where((s) => s.id != seed.id).toList()));
+      }
+    });
+  }
+
+  void _closeFreeStair() {
+    final draft = _stairDraft;
+    if (draft == null) return;
+    _stairDraft = null;
+    _interactionEpoch++;
+    _stairDraftDocument = null;
+    _commands.editPreview = null;
+    _placingWithHold = false;
+    _isHandleEngaged = false;
+    _handlePointerDown = null;
+    draft.dispose();
+  }
+
+  void _cancelFreeStair() { setState(_closeFreeStair); }
+
+  void _applyFreeStair() {
+    final draft = _stairDraft;
+    if (draft == null || !draft.complete || draft.preview == null ||
+        !identical(_stairDraftDocument, _modelCommands.project)) return;
+    final stair = ArchitectStairLayoutResolver.normalizePlacement(draft.preview!);
+    final command = PutArchitectStair(storeyId: _commands.documentProject.activeStoreyId,
+      stair: stair, create: draft.create);
+    try {
+      command.apply(_commands.documentProject);
+      setState(_closeFreeStair);
+      _commands.execute(command);
+      _selectionIds.add(stair.id);
+      _selectedElementId = stair.id;
+      _saveBiMProjectIfAttached();
+    } on ArgumentError { _operationError(); }
+  }
+
+  void _freeStairProperties() {
+    final draft = _stairDraft;
+    if (draft == null) return;
+    final initial = draft.preview ?? draft.baseStair;
+    showArchitectProperties<void>(context: context, onInsets: _insetProperties,
+      builder: (_) => ArchitectStairPropertiesDialog(
+        project: _commands.documentProject, stair: initial,
+        isCurrent: () => identical(draft, _stairDraft) &&
+          identical(_stairDraftDocument, _modelCommands.project),
+        onApply: (next) {
+          if (!identical(draft, _stairDraft)) return false;
+          draft.replaceDesign(next.design!);
+          return true;
+        }));
+  }
+
   void _showStairProperties({ArchitectStair? stair, bool create = false}) {
     final defaults = stair == null;
 
@@ -23774,6 +23894,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       onInsets: _insetProperties,
 
       builder: (_) => ArchitectStairPropertiesDialog(
+        onEditLayout: (next) {
+          if (identical(document, _modelCommands.project)) {
+            _startFreeStair(stair: next, create: defaults || create);
+          }
+        },
         isCurrent: () => identical(document, _modelCommands.project),
         project: original,
         onPreview: defaults
@@ -30553,7 +30678,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ? null
 
               : Visibility(
-                  visible: !_dragController.isActive,
+                  visible: !_dragController.isActive && _stairDraft == null,
                   maintainState: true,
                   child: ArchitectToolPalette(
 
@@ -30822,6 +30947,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   ),
 
                   onStairProperties: () => _showStairProperties(),
+                  onFreeStair: () => _startFreeStair(),
 
                   stairWidth: _elementTool.stairWidth,
 
@@ -32798,7 +32924,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         holdToEdit:
 
-            !_dragController.isActive && _duplicateMove == null &&
+            _stairDraft == null && !_dragController.isActive && _duplicateMove == null &&
 
             _offsetOptions == null &&
 
@@ -32821,21 +32947,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             _newPointTargetId == null,
 
-        touchHoldToPlace: _canPlaceWithMarker,
+        touchHoldToPlace: _stairDraft != null || _canPlaceWithMarker,
 
         holdExistingHandles: _dragController.isActive,
 
         onToolHoldStart: _beginPlacementHold,
 
-        onSelectionHold: !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSelectionHold: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
 
             ? _onSelectionHold
 
             : null,
 
-        onSecondaryTap: !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSecondaryTap: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
             ? _onContextHold : null,
-        onContextHold: !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onContextHold: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
 
             ? _onContextHold
 
@@ -32847,7 +32973,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         // A Drag session stays active for lifecycle guards, but touch claims
         // the viewport only after the precision hold starts.
-        isDraggingHandle: () => _dragController.isActive
+        isDraggingHandle: () => _stairDraft != null ? _isHandleEngaged : _dragController.isActive
             ? _isHandleEngaged
             : _selectionBoxDown != null ||
             _newPointTargetId != null || _isActivelyDraggingHandle ||
@@ -32862,8 +32988,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         onToolUp: _onPointerUp,
 
         onToolCancel: () {
-
-          if (_dragController.isActive) {
+          if (_stairDraft != null) {
+            _placingWithHold = false;
+            _isHandleEngaged = false;
+            _handlePointerDown = null;
+          } else if (_dragController.isActive) {
             _cancelDragGesture();
           } else {
             _cancelActiveDrags();
@@ -33668,6 +33797,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _buildPolygonDistanceOverlay(),
 
       _buildHatchTransformHandle(),
+      if (_stairDraft case final draft?)
+        Positioned.fill(child: AnimatedBuilder(
+          animation: Listenable.merge([draft, _viewport]),
+          builder: (_, _) => ArchitectStairDraftOverlay(draft: draft,
+            project: _commands.documentProject, toScreen: _viewport.toScreen,
+            toModel: _screenToModel, scale: _viewport.scale,
+            darkCanvas: _canvasPalette.isDark, onApply: _applyFreeStair,
+            onCancel: _cancelFreeStair, onProperties: _freeStairProperties))),
 
       if (_activeTool == ArchitectTool.cadEllipse && _effectiveSelection.isEmpty)
         Positioned.fill(child: AnimatedBuilder(
