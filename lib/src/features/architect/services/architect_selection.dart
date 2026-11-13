@@ -23,6 +23,7 @@ import '../models/architect_wall_type.dart';
 import '../models/architect_zone.dart';
 import '../rendering/architect_scene_geometry.dart';
 import 'architect_command_controller.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import 'architect_stair_rules.dart';
 import 'architect_panel_supports.dart';
 import 'fenestration_library_service.dart';
@@ -1047,12 +1048,36 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
           wall.thickness <= wall.insulationThicknessOverride!) {
         throw ArgumentError('Insulation too thick');
       }
-      for (final o in [
-        ...wall.doors.map((d) => (d.offsetRatio, d.width)),
-        ...wall.windows.map((w) => (w.offsetRatio, w.width)),
+      final previousWall = project.activeStorey.walls
+          .where((w) => w.id == wall.id)
+          .firstOrNull;
+      final previousOpenings = {
+        if (previousWall != null) ...{
+          for (final d in previousWall.doors) d.id: (d.offsetRatio, d.width),
+          for (final w in previousWall.windows) w.id: (w.offsetRatio, w.width),
+        },
+      };
+      for (final opening in [
+        ...wall.doors.map((d) => (d.id, d.offsetRatio, d.width)),
+        ...wall.windows.map((w) => (w.id, w.offsetRatio, w.width)),
       ]) {
-        if (o.$1 * wall.length < o.$2 / 2 ||
-            o.$1 * wall.length + o.$2 / 2 > wall.length) {
+        final previous = previousOpenings[opening.$1];
+        final span = wall.openingArcSpan(opening.$3);
+        // Hinge, swing and height edits leave the horizontal footprint alone.
+        // Existing openings elsewhere on the floor must not veto those edits.
+        if (previousWall != null &&
+            previous != null &&
+            previous.$1 == opening.$2 &&
+            previous.$2 == opening.$3 &&
+            previousWall.length == wall.length &&
+            previousWall.openingArcSpan(previous.$2) == span) {
+          continue;
+        }
+        if (!BimLineGeometry.hostedFits(
+          length: wall.length,
+          width: span,
+          ratio: opening.$2,
+        )) {
           throw ArgumentError('Opening outside host');
         }
       }
