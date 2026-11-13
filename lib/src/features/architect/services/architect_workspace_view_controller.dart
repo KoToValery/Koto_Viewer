@@ -105,6 +105,8 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
         levelDecimals: next.levelDecimals,
         lineStyles: next.lineStyles,
         hatchPatterns: next.hatchPatterns,
+        layers: next.layers,
+        elementLayers: next.elementLayers,
         elevations: [
           for (final e in original.elevations)
             if (view == ArchitectWorkspaceView.elevation && e.id == viewId)

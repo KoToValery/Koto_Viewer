@@ -63,6 +63,18 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Multi-step geometry modification | Wall split: [TAG:WALL_SPLIT]. Chamfer/fillet and edge-curving: [TAG:FLOATING_HUD]; _startChamferFilletSession, _buildChamferFilletFloatingOverlay | Session state, preview/rubber band, pan and gesture arbitration, confirm/cancel controls, model command and history |
 | CAD/raster underlay placement or repositioning | [TAG:UNDERLAY_DRAG], [TAG:CAD_INSERTION], [TAG:DRAG_TOOL]; _startUnderlaySnapDrag, _confirmDragPlacement | Import/configuration, shared drag lifecycle, calibration, preview, commit and persistence |
 
+### Layer visibility menu
+
+Layer visibility menu: `_openLayersDialog` under `[TAG:SELECTION_BAR]` follows
+the live-listener pattern of `ArchitectGridAxisBar`. Its route listens to
+`_commands` and passes the current project into `ArchitectLayersDialog` on each
+change, including Undo/Redo. The existing callbacks commit and save as before.
+`ArchitectWorkspaceViewController.commit` forwards layers and element-layer
+assignments to the source model from sections/elevations, alongside line styles.
+`ArchitectLayer.sortedForDisplay` groups hidden layers first, then sorts each
+group by localized name; the element-layer picker shares that display order.
+The modal route retains normal input blocking for the drawing viewport.
+
 ### Drag entry points and exclusive ownership
 
 | Entry point | Session owner | Confirmation and cancellation |

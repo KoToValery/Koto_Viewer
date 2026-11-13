@@ -84,6 +84,22 @@ class ArchitectLayer {
     };
   }
 
+  /// Menu order uses the displayed names and never changes project storage.
+  static List<ArchitectLayer> sortedForDisplay(
+    Iterable<ArchitectLayer> layers,
+    AppLocalizations l,
+  ) {
+    final names = {
+      for (final layer in layers)
+        layer.id: layer.localizedName(l).toLowerCase(),
+    };
+    return layers.toList()..sort((a, b) {
+      if (a.visible != b.visible) return a.visible ? 1 : -1;
+      final byName = names[a.id]!.compareTo(names[b.id]!);
+      return byName != 0 ? byName : a.id.compareTo(b.id);
+    });
+  }
+
   static const String wallLayerId = 'A-WALL';
   static const String doorLayerId = 'A-DOOR';
   static const String windowLayerId = 'A-WINDOW';

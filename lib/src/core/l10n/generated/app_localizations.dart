@@ -17405,6 +17405,18 @@ abstract class AppLocalizations {
   /// **'Layers'**
   String get commandIconLayers;
 
+  /// No description provided for @commandIconGhostStoreys.
+  ///
+  /// In en, this message translates to:
+  /// **'Ghost storeys'**
+  String get commandIconGhostStoreys;
+
+  /// No description provided for @commandIconSheets.
+  ///
+  /// In en, this message translates to:
+  /// **'Sheets'**
+  String get commandIconSheets;
+
   /// No description provided for @commandIconLayersOff.
   ///
   /// In en, this message translates to:

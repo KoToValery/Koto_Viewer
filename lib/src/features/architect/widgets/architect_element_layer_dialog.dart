@@ -14,7 +14,7 @@ Future<String?> showArchitectElementLayerPicker(
   isScrollControlled: true,
   builder: (sheetContext) {
     final l = sheetContext.l10n;
-    final layers = project.effectiveLayers;
+    final layers = ArchitectLayer.sortedForDisplay(project.effectiveLayers, l);
 
     return SafeArea(
       child: ConstrainedBox(
@@ -66,11 +66,16 @@ Future<String?> showArchitectElementLayerPicker(
                     title: Text(
                       layer.localizedName(l),
                       style: TextStyle(
-                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isCurrent
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                         color: isCurrent ? Colors.cyanAccent : null,
                       ),
                     ),
-                    subtitle: Text(layer.id, style: const TextStyle(fontSize: 11)),
+                    subtitle: Text(
+                      layer.id,
+                      style: const TextStyle(fontSize: 11),
+                    ),
                     trailing: isCurrent
                         ? const Icon(Icons.check, color: Colors.cyanAccent)
                         : null,

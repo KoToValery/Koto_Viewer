@@ -61,3 +61,11 @@ Material bridge mappings do not determine these three edit operations.
 round. `BimEditActions.icon` assigns them to their own commands; Curve retains
 `roundedCorner`. Selection menus and landscape controls use the same semantic
 IDs directly, with ARB-backed labels.
+
+## Architectural workspace navigation
+
+`AppIconId.layers` opens layer visibility management. `sheets` identifies the
+compact Model/Sheets publication menu, with a page, viewport and title block.
+`ghostStoreys` uses one solid current-storey outline and dashed neighboring
+storeys. Geometry is authored in `tools/generate_command_icons.py`; all three
+use dedicated ARB-backed labels.

@@ -5550,6 +5550,8 @@
   "commandIconAlignTop": "Align top",
   "commandIconAlignBottom": "Align bottom",
   "commandIconLayers": "Layers",
+  "commandIconGhostStoreys": "Ghost storeys",
+  "commandIconSheets": "Sheets",
   "commandIconLayersOff": "Hide layers",
   "commandIconGrid": "Grid",
   "commandIconGridOff": "Hide grid",

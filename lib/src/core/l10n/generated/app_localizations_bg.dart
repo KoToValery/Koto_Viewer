@@ -9672,6 +9672,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String get commandIconLayers => 'Слоеве';
 
   @override
+  String get commandIconGhostStoreys => 'Съседни етажи';
+
+  @override
+  String get commandIconSheets => 'Листове';
+
+  @override
   String get commandIconLayersOff => 'Скриване на слоевете';
 
   @override

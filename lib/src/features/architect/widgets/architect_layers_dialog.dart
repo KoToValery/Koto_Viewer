@@ -115,36 +115,43 @@ class _ArchitectLayersDialogState extends State<ArchitectLayersDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(l.architectLayerColor),
-                  const Spacer(),
-                  for (final color in const [
-                    Color(0xFF00E5FF),
-                    Color(0xFFFFB300),
-                    Color(0xFF81C784),
-                    Color(0xFFE57373),
-                    Color(0xFFBA68C8),
-                    Color(0xFF90CAF9),
-                  ])
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: GestureDetector(
-                        onTap: () => setDialogState(() => selectedColor = color),
-                        child: Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: selectedColor == color ? Colors.white : Colors.transparent,
-                              width: 2,
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final color in const [
+                        Color(0xFF00E5FF),
+                        Color(0xFFFFB300),
+                        Color(0xFF81C784),
+                        Color(0xFFE57373),
+                        Color(0xFFBA68C8),
+                        Color(0xFF90CAF9),
+                      ])
+                        GestureDetector(
+                          onTap: () =>
+                              setDialogState(() => selectedColor = color),
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: selectedColor == color
+                                    ? Colors.white
+                                    : Colors.transparent,
+                                width: 2,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
+                    ],
+                  ),
                 ],
               ),
             ],
@@ -173,7 +180,10 @@ class _ArchitectLayersDialogState extends State<ArchitectLayersDialog> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final layers = widget.project.effectiveLayers;
+    final layers = ArchitectLayer.sortedForDisplay(
+      widget.project.effectiveLayers,
+      l,
+    );
     final storey = widget.project.activeStorey;
 
     return Dialog(
@@ -188,14 +198,17 @@ class _ArchitectLayersDialogState extends State<ArchitectLayersDialog> {
                 children: [
                   const AppIcon(AppIconId.layers, size: 24),
                   const SizedBox(width: 8),
-                  Text(
-                    l.architectLayers,
-                    style: Theme.of(context).textTheme.titleLarge,
+                  Expanded(
+                    child: Text(
+                      l.architectLayers,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                   ),
-                  const Spacer(),
-                  TextButton.icon(
+                  IconButton(
                     icon: const AppIcon(AppIconId.visible, size: 18),
-                    label: Text(l.architectAllLayersVisible),
+                    tooltip: l.architectAllLayersVisible,
                     onPressed: widget.onShowAll,
                   ),
                   IconButton(
@@ -218,6 +231,7 @@ class _ArchitectLayersDialogState extends State<ArchitectLayersDialog> {
                       : Colors.grey;
 
                   return ListTile(
+                    key: ValueKey(layer.id),
                     leading: IconButton(
                       icon: AppIcon(
                         layer.visible ? AppIconId.visible : AppIconId.hidden,
@@ -241,7 +255,9 @@ class _ArchitectLayersDialogState extends State<ArchitectLayersDialog> {
                             layer.localizedName(l),
                             style: TextStyle(
                               color: layer.visible ? null : Colors.grey,
-                              fontWeight: layer.isStandard ? FontWeight.w500 : FontWeight.bold,
+                              fontWeight: layer.isStandard
+                                  ? FontWeight.w500
+                                  : FontWeight.bold,
                             ),
                           ),
                         ),
@@ -256,7 +272,11 @@ class _ArchitectLayersDialogState extends State<ArchitectLayersDialog> {
                     ),
                     trailing: !layer.isStandard
                         ? IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              size: 20,
+                              color: Colors.redAccent,
+                            ),
                             tooltip: l.architectDeleteLayer,
                             onPressed: () => widget.onDeleteLayer(layer),
                           )
@@ -268,14 +288,16 @@ class _ArchitectLayersDialogState extends State<ArchitectLayersDialog> {
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(
+              child: OverflowBar(
+                alignment: MainAxisAlignment.spaceBetween,
+                spacing: 8,
+                overflowSpacing: 8,
                 children: [
                   OutlinedButton.icon(
                     icon: const Icon(Icons.add),
                     label: Text(l.architectNewLayer),
                     onPressed: () => _showAddLayerDialog(context),
                   ),
-                  const Spacer(),
                   FilledButton(
                     onPressed: () => Navigator.of(context).pop(),
                     child: Text(l.close),

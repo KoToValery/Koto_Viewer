@@ -226,6 +226,8 @@ add('align_center', P('M12 2v20 M3 5h18 M6 10h12 M3 15h18 M6 20h12'), 'align_hor
 add('align_top', P('M3 3h18 M8 7v14 M16 7v9 M5 10l3-3 3 3 m2 0 3-3 3 3'), 'vertical_align_top')
 add('align_bottom', P('M3 21h18 M8 17V3 M16 17V8 M5 14l3 3 3-3 m2 0 3 3 3-3'), 'vertical_align_bottom')
 add('layers', P('m2 8 10-5 10 5-10 5Z M3 12l9 5 9-5 M3 16l9 5 9-5'))
+add('ghost_storeys', P('m3 12 9-4 9 4-9 4Z') + '<path d="m3 6 9-4 9 4 M3 18l9 4 9-4" stroke-dasharray="2 2" stroke-width="1.25"/>')
+add('sheets', R(3, 3, 18, 18, 1) + R(6, 6, 12, 8) + detail('M3 17h18 M14 17v4 M17 17v4'))
 add('layers_off', P('m4 7 8-4 10 5-8 4 M3 12l9 5 9-5 M3 16l9 5 6-3 M3 3l18 18'), 'layers_clear')
 add('grid', grid, 'grid_on grid_4x4')
 add('grid_off', grid + P('M2 2l20 20'))

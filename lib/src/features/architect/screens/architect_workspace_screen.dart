@@ -694,7 +694,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             tooltip: l.architectSheets,
 
-            icon: const AppIcon(AppIconId.layers, color: Colors.white),
+            key: const ValueKey('architect-model-sheets'),
+
+            icon: const AppIcon(AppIconId.sheets, color: Colors.white),
 
             onSelected: action,
 
@@ -28494,60 +28496,63 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _openLayersDialog() {
     showDialog<void>(
       context: context,
-      builder: (_) => ArchitectLayersDialog(
-        project: _project,
-        onToggleVisibility: (layer) {
-          final updated = _project.effectiveLayers.map((l) {
-            if (l.id == layer.id) {
-              return l.copyWith(visible: !l.visible);
-            }
-            return l;
-          }).toList();
-          setState(() {
-            _project = _project.copyWith(layers: updated);
-          });
-          _saveBiMProjectIfAttached();
-        },
-        onCreateLayer: (name, colorValue) {
-          final id = 'CUSTOM_${DateTime.now().millisecondsSinceEpoch}';
-          final newLayer = ArchitectLayer(
-            id: id,
-            name: name,
-            isStandard: false,
-            visible: true,
-            colorValue: colorValue,
-          );
-          setState(() {
-            _project = _project.copyWith(
-              layers: [..._project.effectiveLayers, newLayer],
+      builder: (_) => ListenableBuilder(
+        listenable: _commands,
+        builder: (_, _) => ArchitectLayersDialog(
+          project: _project,
+          onToggleVisibility: (layer) {
+            final updated = _project.effectiveLayers.map((l) {
+              if (l.id == layer.id) {
+                return l.copyWith(visible: !l.visible);
+              }
+              return l;
+            }).toList();
+            setState(() {
+              _project = _project.copyWith(layers: updated);
+            });
+            _saveBiMProjectIfAttached();
+          },
+          onCreateLayer: (name, colorValue) {
+            final id = 'CUSTOM_${DateTime.now().millisecondsSinceEpoch}';
+            final newLayer = ArchitectLayer(
+              id: id,
+              name: name,
+              isStandard: false,
+              visible: true,
+              colorValue: colorValue,
             );
-          });
-          _saveBiMProjectIfAttached();
-        },
-        onDeleteLayer: (layer) {
-          if (layer.isStandard) return;
-          final updatedLayers = _project.effectiveLayers
-              .where((l) => l.id != layer.id)
-              .toList();
-          final updatedElementLayers = Map<String, String>.from(_project.elementLayers);
-          updatedElementLayers.removeWhere((_, lId) => lId == layer.id);
-          setState(() {
-            _project = _project.copyWith(
-              layers: updatedLayers,
-              elementLayers: updatedElementLayers,
-            );
-          });
-          _saveBiMProjectIfAttached();
-        },
-        onShowAll: () {
-          final updated = _project.effectiveLayers
-              .map((l) => l.copyWith(visible: true))
-              .toList();
-          setState(() {
-            _project = _project.copyWith(layers: updated);
-          });
-          _saveBiMProjectIfAttached();
-        },
+            setState(() {
+              _project = _project.copyWith(
+                layers: [..._project.effectiveLayers, newLayer],
+              );
+            });
+            _saveBiMProjectIfAttached();
+          },
+          onDeleteLayer: (layer) {
+            if (layer.isStandard) return;
+            final updatedLayers = _project.effectiveLayers
+                .where((l) => l.id != layer.id)
+                .toList();
+            final updatedElementLayers = Map<String, String>.from(_project.elementLayers);
+            updatedElementLayers.removeWhere((_, lId) => lId == layer.id);
+            setState(() {
+              _project = _project.copyWith(
+                layers: updatedLayers,
+                elementLayers: updatedElementLayers,
+              );
+            });
+            _saveBiMProjectIfAttached();
+          },
+          onShowAll: () {
+            final updated = _project.effectiveLayers
+                .map((l) => l.copyWith(visible: true))
+                .toList();
+            setState(() {
+              _project = _project.copyWith(layers: updated);
+            });
+            _saveBiMProjectIfAttached();
+          },
+        ),
       ),
     );
   }
@@ -29965,7 +29970,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         tooltip: l10n.architectGhostStoreys,
 
                         icon: AppIcon(
-                          AppIconId.layers,
+                          AppIconId.ghostStoreys,
 
                           color: _showGhostStoreys
 

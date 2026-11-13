@@ -9639,6 +9639,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commandIconLayers => 'Layers';
 
   @override
+  String get commandIconGhostStoreys => 'Ghost storeys';
+
+  @override
+  String get commandIconSheets => 'Sheets';
+
+  @override
   String get commandIconLayersOff => 'Hide layers';
 
   @override

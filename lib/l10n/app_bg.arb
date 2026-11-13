@@ -3227,6 +3227,8 @@
   "commandIconAlignTop": "Подравняване горе",
   "commandIconAlignBottom": "Подравняване долу",
   "commandIconLayers": "Слоеве",
+  "commandIconGhostStoreys": "Съседни етажи",
+  "commandIconSheets": "Листове",
   "commandIconLayersOff": "Скриване на слоевете",
   "commandIconGrid": "Мрежа",
   "commandIconGridOff": "Скриване на мрежата",
