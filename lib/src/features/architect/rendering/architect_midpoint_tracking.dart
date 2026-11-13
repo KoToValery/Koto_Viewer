@@ -49,6 +49,7 @@ class ArchitectMidpointTracking {
     required double scale,
     required Object context,
     bool enabled = true,
+    bool wallCoresOnly = false,
     double hoverPixels = 12,
     double capturePixels = 8,
     Set<String> excludedIds = const {},
@@ -60,7 +61,10 @@ class ArchitectMidpointTracking {
     final key = (project.id, project.activeStoreyId, context);
     if (_context != key) clear();
     _context = key;
-    final geometry = ArchitectSnapGeometry.of(project);
+    final geometry = ArchitectSnapGeometry.of(
+      project,
+      wallCoresOnly: wallCoresOnly,
+    );
     if (!identical(_geometry, geometry)) {
       _references.removeWhere((r) => !geometry.midpointEdges.contains(r.edge));
       _geometry = geometry;

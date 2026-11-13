@@ -25,7 +25,14 @@ enum WallResolutionMode { automatic, manual }
 class ArchitectWallAttachment {
   final ArchitectWall source;
   final WallReferenceLine reference;
-  const ArchitectWallAttachment(this.source, this.reference);
+  final bool continuation;
+  final Offset? corePoint;
+  const ArchitectWallAttachment(
+    this.source,
+    this.reference, {
+    this.continuation = false,
+    this.corePoint,
+  });
 
   WallExteriorSide sideFor(
     Offset start,
@@ -33,6 +40,9 @@ class ArchitectWallAttachment {
     double thickness,
     double insulation,
   ) {
+    // A chain has an ordered direction. Keep its handedness through every
+    // corner; end-cap overlap cannot determine which side is outside.
+    if (continuation) return source.exteriorSide;
     final delta = end - start;
     if (delta.distance < .001) return source.exteriorSide;
     final normal = Offset(-delta.dy, delta.dx) / delta.distance;
@@ -93,6 +103,7 @@ class ArchitectWall {
   final double? insulationThicknessOverride;
   final bool connectStart;
   final bool connectEnd;
+
   /// A user Detach is released by the next actual relocation, unlike a cut.
   final bool autoAttachAfterMove;
   final String? wallTypeId;

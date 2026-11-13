@@ -19,6 +19,7 @@ typedef ArchitectSnapCircle = ({Offset center, double radius, String owner});
 /// Immutable drawing geometry shared by every placement and editing tool.
 class ArchitectSnapGeometry {
   static final _cache = Expando<ArchitectSnapGeometry>();
+  static final _coreCache = Expando<ArchitectSnapGeometry>();
   final _index = BimPointIndex<ArchitectSnapPoint>();
   final _edgeIndex = BimBoundsIndex<ArchitectSnapEdge>();
   final _circleIndex = BimBoundsIndex<ArchitectSnapCircle>();
@@ -29,10 +30,20 @@ class ArchitectSnapGeometry {
   final List<ArchitectSnapCircle> circles = [];
   final List<ArchitectSnapPoint> alignmentPoints = [];
 
-  static ArchitectSnapGeometry of(ArchitectProject project) =>
-      _cache[project] ??= ArchitectSnapGeometry._(project);
+  static ArchitectSnapGeometry of(
+    ArchitectProject project, {
+    bool wallCoresOnly = false,
+  }) => wallCoresOnly
+      ? (_coreCache[project] ??= ArchitectSnapGeometry._(
+          project,
+          wallCoresOnly: true,
+        ))
+      : (_cache[project] ??= ArchitectSnapGeometry._(project));
 
-  ArchitectSnapGeometry._(ArchitectProject project) {
+  ArchitectSnapGeometry._(
+    ArchitectProject project, {
+    bool wallCoresOnly = false,
+  }) {
     void point(Offset p, String label, String owner) {
       if (!p.dx.isFinite || !p.dy.isFinite) return;
       final value = (point: p, label: label, owner: owner);
@@ -106,13 +117,15 @@ class ArchitectSnapGeometry {
 
     final floor = project.activeStorey;
     final activeIdx = project.storeys.indexWhere((s) => s.id == floor.id);
-    final referenceWalls = floor.walls.isNotEmpty
+    var referenceWalls = floor.walls.isNotEmpty
         ? floor.walls
         : (floor.isRoof
               ? (project.highestWallStorey?.walls ?? const [])
               : (activeIdx > 0
                     ? project.storeys[activeIdx - 1].walls
                     : floor.walls));
+    if (wallCoresOnly)
+      referenceWalls = ArchitectWallGeometry.coreWalls(referenceWalls);
 
     for (final wall in referenceWalls) {
       if (wall.railing != null) {

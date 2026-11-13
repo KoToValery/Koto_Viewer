@@ -30,12 +30,15 @@ void main() {
           } else if (tool == 'polyline') {
             await arc_ui.button(tester, 'architect-line-mode-polyline');
             await arc_ui.button(tester, 'architect-polyline-arc-mode');
-          } else {
+          } else if (tool != 'wall') {
             await arc_ui.button(tester, 'wall-arc-toggle');
           }
           await workspace.wallTap(tester, const Offset(-2, 0));
           await workspace.wallTap(tester, const Offset(1, 0));
           await tester.pumpAndSettle();
+          if (tool == 'wall') {
+            await arc_ui.button(tester, 'wall-panel-curve');
+          }
           expect(workspace.overlay(tester).activeWallArcEnd, isNull);
           expect(find.byType(EditableText), findsNothing);
           expect(find.byKey(const ValueKey('wall-key-0')), findsNothing);

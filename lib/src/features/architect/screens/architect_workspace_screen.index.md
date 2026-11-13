@@ -148,6 +148,26 @@ and generic review input stay suppressed while Mirror owns the session.
 
 ### Wall reference, detach and contact-only attach
 
+Wall drafting uses `ArchitectWallAttachment.continuation` to carry the ordered
+chain's exterior side through turns. Independent starts retain physical-face
+adoption. `_snapWall` selects core-only geometry for walls;
+`ArchitectWallGeometry.coreWalls` supplies cached proxies for object snaps,
+midpoint tracking, alignment, translation and endpoint edits. Two-point Drag also
+uses core geometry for both picks when its selection contains walls. Other drawing tools
+keep the full physical geometry. A snapped `corePoint` lets
+`_orientWallReference` compensate the active finish-based leading line, including
+inside plaster, before preview/commit.
+
+`ArchitectWallDraftControls` places reference, Flip and curve controls above
+the exact length without resetting the keypad. Flip shares `_flipDraftWallSide`
+with the toolbar; `_toggleExactWallCurve` preserves the current chord and enters
+the existing `_beginDraftArcShaping` flow on confirmation. The wall panel uses
+`BimDistanceDraftingPanel.continuePrimary`; Enter follows Next when shown.
+All labels/tooltips reuse existing ARB messages. Placement continues through
+`_placeDraftSegment`, `CreateArchitectWall`, command history and the existing save
+path. Regression coverage: `architect_wall_core_snapping_test.dart` and
+`architect_wall_drafting_controls_test.dart`.
+
 `_setWallReferenceLine` and wall properties use
 `SetArchitectElementProperties.preserveWallPosition` (default true). The core
 axis remains fixed while the saved reference is reconstructed, including

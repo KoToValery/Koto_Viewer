@@ -7,6 +7,29 @@ import 'architect_path_solid.dart';
 
 /// Physical body and material boundaries, independent of the reference line.
 class ArchitectWallGeometry {
+  static final _cores = Expando<List<ArchitectWall>>();
+
+  /// Snap proxies retain the physical core, independently of finish thickness
+  /// and the saved leading line. Railings keep their mounting geometry.
+  static List<ArchitectWall> coreWalls(List<ArchitectWall> walls) =>
+      _cores[walls] ??= List.unmodifiable([
+        for (final wall in walls)
+          if (wall.railing != null)
+            wall
+          else
+            ArchitectWall(
+              id: wall.id,
+              startPoint: wall.coreCenterStart,
+              endPoint: wall.coreCenterEnd,
+              arcBulge: wall.arcBulge,
+              thickness: wall.coreThickness,
+              exteriorSide: wall.exteriorSide,
+              connectStart: wall.connectStart,
+              connectEnd: wall.connectEnd,
+              doors: wall.doors,
+              windows: wall.windows,
+            ),
+      ]);
   final List<(Offset, Offset)> edges;
   final List<Offset> corners;
   const ArchitectWallGeometry(this.edges, this.corners);
@@ -144,7 +167,9 @@ class ArchitectWallAlignment {
     Offset delta,
     double scale, {
     bool parallelOnly = false,
+    bool coreOnly = false,
   }) {
+    if (coreOnly) walls = ArchitectWallGeometry.coreWalls(walls);
     final moving = walls.where((w) => ids.contains(w.id)).toList();
     if (moving.isEmpty) return (delta, []);
     final radius = math.min(22.0 / scale, 0.4);

@@ -32,6 +32,9 @@ enum ArchitectDragPhase { idle, pickingBasePoint, draggingToTarget }
 /// 3. Commit:
 ///    - Commits the displacement strictly to the architectural model via CommandController / Underlay config.
 class ArchitectDragController extends ChangeNotifier {
+  bool _usesWallCores(ArchitectProject project) =>
+      !_isUnderlay &&
+      project.activeStorey.walls.any((wall) => _elementIds.contains(wall.id));
   ArchitectDragPhase _phase = ArchitectDragPhase.idle;
 
   Set<String> _elementIds = {};
@@ -233,6 +236,7 @@ class ArchitectDragController extends ChangeNotifier {
         project: project,
         tolerance: tolerance,
         magnetic: true,
+        wallCoresOnly: _usesWallCores(project),
         underlay: _isCadUnderlay ? null : dxfDoc,
         frame: frame ?? const BimCoordinateFrame(),
       );
@@ -266,6 +270,7 @@ class ArchitectDragController extends ChangeNotifier {
         project: project,
         tolerance: tolerance,
         magnetic: true,
+        wallCoresOnly: _usesWallCores(project),
         alignment: false,
         includedIds: _elementIds,
       );
@@ -410,6 +415,7 @@ class ArchitectDragController extends ChangeNotifier {
       project: project,
       tolerance: tolerance,
       magnetic: true,
+      wallCoresOnly: _usesWallCores(project),
       alignment: true,
       excludedIds: _elementIds,
       underlay: _isCadUnderlay ? null : dxfDoc,

@@ -16,6 +16,7 @@ import 'package:kotoview/src/features/architect/screens/architect_workspace_scre
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_wall_reference_control.dart';
+import 'architect_wall_core_snapping_test.dart' as core_snapping;
 
 import 'architect_editing_test.dart' as editing;
 import 'architect_workspace_interaction_test.dart' as workspace;
@@ -166,8 +167,30 @@ void main() {
           }
           await chooseReference(tester, WallReferenceLine.outer, toolbar: true);
           expect(preview(tester).referenceLine, WallReferenceLine.outer);
+          final beforeFlip = preview(tester);
+          await command(tester, 'wall-panel-flip');
+          expect(preview(tester).exteriorSide, isNot(beforeFlip.exteriorSide));
+          expect(preview(tester).startPoint, beforeFlip.startPoint);
+          expect(preview(tester).endPoint, beforeFlip.endPoint);
+          expect(find.byKey(const ValueKey('wall-key-0')), findsOneWidget);
+          await command(tester, 'wall-panel-curve');
+          expect(workspace.overlay(tester).activeWallCurved, isTrue);
+          expect(preview(tester).length, closeTo(4.25, 1e-9));
+          await command(tester, 'wall-panel-curve');
+          expect(workspace.overlay(tester).activeWallCurved, isFalse);
+          expect(find.byKey(const ValueKey('wall-key-0')), findsOneWidget);
+          expect(model.canUndo, isFalse);
+          final next = tester.widget<IconButton>(
+            find.byKey(const ValueKey('wall-continue')),
+          );
+          final colors = Theme.of(
+            tester.element(find.byKey(const ValueKey('wall-continue'))),
+          ).colorScheme;
+          expect(next.style!.backgroundColor!.resolve({}), colors.primary);
           for (final key in [
             'wall-panel-reference',
+            'wall-panel-flip',
+            'wall-panel-curve',
             'wall-toolbar-reference',
             'wall-length-input',
             'wall-key-0',
@@ -222,6 +245,85 @@ void main() {
       );
     }
   }
+
+  testWidgets(
+    'Inside leading line keeps exterior on an upward then rightward chain',
+    (tester) async {
+      final model = editing.seeded(const ArchitectStorey(id: 's', name: ''));
+      addTearDown(model.dispose);
+      await open(tester, model);
+      await workspace.wallTap(tester, const Offset(-2, -2));
+      await workspace.wallTap(tester, const Offset(-2, 1));
+      await chooseReference(tester, WallReferenceLine.inner);
+      final first = preview(tester);
+      expect(first.exteriorNormal.dx, lessThan(0));
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(model.project.activeStorey.walls, hasLength(1));
+      expect(workspace.overlay(tester).activeDraftStart, first.endPoint);
+      await workspace.wallTap(tester, const Offset(1, 1));
+      final second = preview(tester);
+      expect(second.exteriorNormal.dy, greaterThan(0));
+      expect(second.exteriorSide, first.exteriorSide);
+      await command(tester, 'wall-end');
+      expect(
+        model.project.activeStorey.walls.last.exteriorSide,
+        first.exteriorSide,
+      );
+      final saved = model.project.toJson();
+      model.undo();
+      model.redo();
+      expect(model.project.toJson(), saved);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Starting on a core face compensates the new wall finishes', (
+    tester,
+  ) async {
+    const host = ArchitectWall(
+      id: 'host',
+      startPoint: Offset(-3, -2),
+      endPoint: Offset(3, -2),
+      thickness: .385,
+      layers: core_snapping.layers,
+    );
+    final model = editing.seeded(
+      const ArchitectStorey(id: 's', name: '', walls: [host]),
+    );
+    addTearDown(model.dispose);
+    await open(tester, model);
+    final coreFace =
+        (host.coreCenterStart + host.coreCenterEnd) / 2 +
+        host.exteriorNormal * host.coreThickness / 2;
+    final gesture = await tester.startGesture(
+      workspace.screen(tester, coreFace) + const Offset(0, 64),
+    );
+    await tester.pump(const Duration(milliseconds: 281));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(workspace.overlay(tester).activeDraftStart, coreFace);
+    expect(
+      workspace.overlay(tester).activeWallReference,
+      WallReferenceLine.outer,
+    );
+    await workspace.wallTap(tester, coreFace + const Offset(1.3, 0));
+    final draft = preview(tester);
+    final actualFace =
+        draft.coreCenterStart + draft.exteriorNormal * draft.coreThickness / 2;
+    expect((actualFace - coreFace).distance, lessThan(1e-7));
+    expect((draft.endPoint - draft.startPoint).dy, closeTo(0, 1e-7));
+    await command(tester, 'wall-end');
+    final placed = model.project.activeStorey.walls.last;
+    expect(
+      (placed.coreCenterStart +
+              placed.exteriorNormal * placed.coreThickness / 2 -
+              coreFace)
+          .distance,
+      lessThan(1e-7),
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   for (final stop in ['wall-end', 'wall-cancel', 'wall-stop-drawing']) {
     for (final kind in [PointerDeviceKind.touch, PointerDeviceKind.mouse]) {

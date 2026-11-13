@@ -44,6 +44,7 @@ class ArchitectSnapHelper {
     bool magnetic = true,
     bool alignment = false,
     bool excludeWallAxes = false,
+    bool wallCoresOnly = false,
     bool preferIntersections = false,
     Set<String> excludedIds = const {},
     List<ArchitectMidpointReference> midpointReferences = const [],
@@ -58,6 +59,7 @@ class ArchitectSnapHelper {
     magnetic: magnetic,
     alignment: alignment,
     excludeWallAxes: excludeWallAxes,
+    wallCoresOnly: wallCoresOnly,
     preferIntersections: preferIntersections,
     excludedIds: excludedIds,
     midpointReferences: midpointReferences,
@@ -73,6 +75,7 @@ class ArchitectSnapHelper {
     bool magnetic = true,
     bool alignment = false,
     bool excludeWallAxes = false,
+    bool wallCoresOnly = false,
     bool preferIntersections = false,
     Set<String> excludedIds = const {},
     Set<String>? includedIds,
@@ -87,6 +90,7 @@ class ArchitectSnapHelper {
     magnetic: magnetic,
     alignment: alignment,
     excludeWallAxes: excludeWallAxes,
+    wallCoresOnly: wallCoresOnly,
     preferIntersections: preferIntersections,
     excludedIds: excludedIds,
     includedIds: includedIds,
@@ -122,16 +126,19 @@ class ArchitectSnapHelper {
     required Offset delta,
     double tolerance = .20,
     bool magnetic = true,
+    bool wallCoresOnly = false,
     List<ArchitectMidpointReference> midpointReferences = const [],
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
   }) {
     if (!magnetic) return ArchitectSnapResult(point: delta);
-    final points = ArchitectSnapGeometry.of(project).alignmentPoints
-        .where((p) => elementIds.contains(p.owner))
-        .map((p) => p.point)
-        .toSet();
+    final points =
+        ArchitectSnapGeometry.of(project, wallCoresOnly: wallCoresOnly)
+            .alignmentPoints
+            .where((p) => elementIds.contains(p.owner))
+            .map((p) => p.point)
+            .toSet();
     ArchitectSnapResult? best;
     var bestCorrection = double.infinity;
     var bestRank = 99;
@@ -142,6 +149,7 @@ class ArchitectSnapHelper {
         project: project,
         tolerance: tolerance,
         alignment: true,
+        wallCoresOnly: wallCoresOnly,
         excludedIds: elementIds,
         midpointReferences: midpointReferences,
         underlay: underlay,
@@ -174,6 +182,7 @@ class ArchitectSnapHelper {
     required bool magnetic,
     required bool alignment,
     bool excludeWallAxes = false,
+    bool wallCoresOnly = false,
     bool preferIntersections = false,
     required Set<String> excludedIds,
     Set<String>? includedIds,
@@ -185,7 +194,10 @@ class ArchitectSnapHelper {
     if (!magnetic || radius <= 0) {
       return ArchitectSnapResult(point: precision(project).inputPoint(raw));
     }
-    final geometry = ArchitectSnapGeometry.of(project);
+    final geometry = ArchitectSnapGeometry.of(
+      project,
+      wallCoresOnly: wallCoresOnly,
+    );
     final underlayMask = ArchitectUnderlayClip.of(project);
     final excludeJoints = project.activeStorey.walls.any(
       (w) => excludedIds.contains(w.id),

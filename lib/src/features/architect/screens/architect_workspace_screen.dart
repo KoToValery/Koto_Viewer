@@ -16,6 +16,7 @@ import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../services/architect_selection_candidates.dart';
 import '../widgets/architect_candidate_picker.dart';
 import '../widgets/architect_wall_reference_control.dart';
+import '../widgets/architect_wall_draft_controls.dart';
 import '../services/architect_interaction_mode.dart';
 import '../services/architect_projection_loader.dart';
 import '../widgets/architect_projection_status.dart';
@@ -3857,6 +3858,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       context: (_activeTool, _workspaceViewKey),
 
       enabled: _showMidpointReferences,
+      wallCoresOnly: _activeTool == ArchitectTool.wall,
 
       capturePixels: _touchInput ? 12 : 8,
 
@@ -8337,6 +8339,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       project: session.original,
 
       elementIds: {_duplicateMoveId!, _duplicateSourceId!},
+      wallCoresOnly: session.original.activeStorey.walls.any(
+        (w) => w.id == _duplicateMoveId! || w.id == _duplicateSourceId!,
+      ),
 
       delta: delta,
 
@@ -10533,33 +10538,34 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  ArchitectSnapResult _snapWall(Offset raw, {Offset? anchor}) =>
-
-      ArchitectWallSnap.resolve(
-
-        midpointReferences: _midpointTracking.references,
-
-        raw: raw,
-
-        anchor: anchor,
-
-        project: _project,
-
-        scale: _currentScale,
-
-        capturePixels: _touchInput ? 12 : 8,
-
-        magnetic: _magnetEnabled,
-
-        underlay: _currentUnderlayDoc,
-
-        frame: _effectiveUnderlayFrame,
-
-        visibility: _effectiveUnderlayLayerVisibility,
-
-      );
-
-
+  ArchitectSnapResult _snapWall(Offset raw, {Offset? anchor}) {
+    if (anchor != null && _wallStartAttachment?.corePoint != null) {
+      _orientWallReference(raw);
+      anchor = _draftStart;
+    }
+    ArchitectSnapResult resolve() => ArchitectWallSnap.resolve(
+      midpointReferences: _midpointTracking.references,
+      raw: raw,
+      anchor: anchor,
+      project: _project,
+      scale: _currentScale,
+      capturePixels: _touchInput ? 12 : 8,
+      magnetic: _magnetEnabled,
+      coreOnly: _activeTool == ArchitectTool.wall,
+      underlay: _currentUnderlayDoc,
+      frame: _effectiveUnderlayFrame,
+      visibility: _effectiveUnderlayLayerVisibility,
+    );
+    final snap = resolve();
+    if (anchor != null &&
+        _wallStartAttachment?.corePoint != null &&
+        snap.angleDeg != null) {
+      _orientWallReference(snap.point, angleDeg: snap.angleDeg);
+      anchor = _draftStart;
+      return resolve();
+    }
+    return snap;
+  }
 
   ArchitectSnapResult _snapElement(Offset raw, {Offset? anchor, double? tolerancePixels,
   }) {
@@ -11207,6 +11213,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       project: _elementMoveOriginal!,
 
       elementIds: ids,
+      wallCoresOnly: _elementMoveOriginal!.activeStorey.walls.any(
+        (w) => ids.contains(w.id),
+      ),
 
       delta: delta,
 
@@ -11766,6 +11775,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               visibility: _effectiveUnderlayLayerVisibility,
             )
           : ArchitectWallSnap.resolve(
+              coreOnly: _elementMoveOriginal!.activeStorey.walls.any(
+                (w) => w.id == original.id,
+              ),
               midpointReferences: _midpointTracking.references,
               raw: rawTarget,
               magnetic: _magnetEnabled,
@@ -11953,6 +11965,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _currentScale,
 
           parallelOnly: _transverseMove,
+          coreOnly: true,
 
         );
 
@@ -12079,6 +12092,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _currentScale,
 
           parallelOnly: _transverseMove,
+          coreOnly: true,
 
         );
 
@@ -16873,7 +16887,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _draftEnd = p2;
 
-        _wallStartAttachment = ArchitectWallAttachment(newWall, _wallReference);
+        _wallStartAttachment = ArchitectWallAttachment(
+          newWall,
+          _wallReference,
+          continuation: true,
+        );
 
       } else {
 
@@ -16943,6 +16961,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _repaintPreview();
   }
 
+  void _flipDraftWallSide() {
+    setState(() {
+      _wallStartAttachment = null;
+      _wallExteriorSideMode = WallResolutionMode.manual;
+      _wallExteriorSide = _wallExteriorSide == WallExteriorSide.left
+          ? WallExteriorSide.right
+          : WallExteriorSide.left;
+    });
+    _repaintPreview();
+  }
+
+  void _toggleExactWallCurve() {
+    setState(() => _wallCurved = !_wallCurved);
+    _repaintPreview();
+  }
+
 
   void _adoptWallReference(ArchitectWallAttachment? attachment) {
 
@@ -16961,7 +16995,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  void _orientWallReference(Offset end) {
+  void _orientWallReference(Offset end, {double? angleDeg}) {
 
     if (_activeTool != ArchitectTool.wall ||
 
@@ -16976,6 +17010,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final side = ArchitectWallAttachment(
       _wallStartAttachment!.source,
       _wallReference,
+      continuation: _wallStartAttachment!.continuation,
     ).sideFor(
 
       _draftStart!,
@@ -16989,6 +17024,49 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
 
     if (_wallExteriorSide != side) setState(() => _wallExteriorSide = side);
+
+    // The snap identifies a core face. Offset the finish-based leading line
+    // so the new core, including compositions with inside plaster, meets it.
+    final corePoint = _wallStartAttachment!.corePoint;
+    if (corePoint != null && (end - corePoint).distance >= .001) {
+      final probe = ArchitectWall(
+        id: 'draft-core-reference',
+        startPoint: _draftStart!,
+        endPoint: end,
+        thickness: _wallThickness,
+        layers: _activeWallType?.resolvedLayers ?? const [],
+        system: _activeWallType?.system ?? const ArchitectWallSystem(),
+        insulationThicknessOverride: _activeWallType?.insulationThickness,
+        referenceLine: _wallReference,
+        exteriorSide: side,
+      );
+      final coreOffset =
+          probe.centerLineOffset - probe.exteriorSign * probe.coreAsymmetry / 2;
+      final faceOffset = switch (_wallReference) {
+        WallReferenceLine.center => coreOffset,
+        WallReferenceLine.inner =>
+          coreOffset - probe.exteriorSign * probe.coreThickness / 2,
+        WallReferenceLine.outer =>
+          coreOffset + probe.exteriorSign * probe.coreThickness / 2,
+        WallReferenceLine.left => coreOffset + probe.coreThickness / 2,
+        WallReferenceLine.right => coreOffset - probe.coreThickness / 2,
+      };
+      if (angleDeg != null) {
+        final radians = angleDeg * math.pi / 180;
+        _draftStart = corePoint -
+            Offset(-math.sin(radians), math.cos(radians)) * faceOffset;
+      } else {
+        // Solve the offset leading line against the fixed target exactly;
+        // repeatedly shifting along an estimated normal leaves tiny steps.
+        final d = end - corePoint;
+        if (d.distanceSquared > faceOffset * faceOffset) {
+          final along = math.sqrt(d.distanceSquared - faceOffset * faceOffset);
+          final u = (d * along + Offset(-d.dy, d.dx) * faceOffset) /
+              d.distanceSquared;
+          _draftStart = corePoint - Offset(-u.dy, u.dx) * faceOffset;
+        }
+      }
+    }
 
   }
 
@@ -34309,20 +34387,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           ),
 
-                          onPressed: () => setState(() {
-
-                            _wallStartAttachment = null;
-                            _wallExteriorSideMode = WallResolutionMode.manual;
-
-                            _wallExteriorSide =
-
-                                _wallExteriorSide == WallExteriorSide.left
-
-                                ? WallExteriorSide.right
-
-                                : WallExteriorSide.left;
-
-                          }),
+                          onPressed: _flipDraftWallSide,
 
                         ),
 
@@ -34800,18 +34865,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         minimumLength: _project.units.toUnit(.001),
                         keypadInitiallyOpen: false,
+                        continuePrimary: _activeTool == ArchitectTool.wall,
                         showContinue: !_curvedDraftTool,
                         title: _curvedDraftTool ? context.l10n.architectEdgeDistance : null,
                         endLabel: _curvedDraftTool ? context.l10n.applyAction : null,
 
                         extraControls: _activeTool == ArchitectTool.wall
-                            ? SizedBox(
-                                height: 36,
-                                child: ArchitectWallReferenceControl(
-                                  key: const ValueKey('wall-panel-reference'),
-                                  value: _wallReference,
-                                  onChanged: _setDraftWallReference,
-                                ),
+                            ? ArchitectWallDraftControls(
+                                reference: _wallReference,
+                                onReference: _setDraftWallReference,
+                                onFlip: _flipDraftWallSide,
+                                onCurve: _toggleExactWallCurve,
+                                flipped: _wallExteriorSide == WallExteriorSide.right,
+                                curved: _wallCurved,
+                                canCurve: _activeWallType?.system.isSpecial != true,
                               )
                             : null,
 

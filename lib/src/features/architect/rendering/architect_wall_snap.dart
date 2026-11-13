@@ -22,18 +22,24 @@ class ArchitectWallSnap {
     required double scale,
     double capturePixels = 14,
     bool magnetic = true,
+    bool coreOnly = false,
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
     List<Offset> referenceDirections = const [],
     List<ArchitectMidpointReference> midpointReferences = const [],
   }) {
+    final originalWalls = project.activeStorey.walls;
+    final walls = coreOnly
+        ? ArchitectWallGeometry.coreWalls(originalWalls)
+        : originalWalls;
     final radius = math.min(capturePixels / scale, .35);
     var best = magnetic
         ? ArchitectSnapHelper.snapFree(
             rawPoint: raw,
             project: project,
             tolerance: radius,
+            wallCoresOnly: coreOnly,
             midpointReferences: midpointReferences,
           )
         : ArchitectSnapResult(point: raw);
@@ -75,17 +81,22 @@ class ArchitectWallSnap {
       if (!result.isSnapped) return result;
       ArchitectWallAttachment? attachment;
       var bestDistance = double.infinity;
-      for (final wall in project.activeStorey.walls) {
+      for (final wall in walls) {
+        ArchitectWallAttachment attach(WallReferenceLine reference) =>
+            ArchitectWallAttachment(
+              coreOnly
+                  ? originalWalls.firstWhere((w) => w.id == wall.id)
+                  : wall,
+              reference,
+              corePoint: coreOnly && wall.railing == null ? result.point : null,
+            );
         if (wall.isOpenRailing) {
           final ratio = wall.projectPoint(result.point).$1.clamp(0.0, 1.0);
           final axis = wall.referencePointAt(ratio);
           if ((axis - result.point).distance < 1e-7 &&
               (axis - raw).distance < bestDistance) {
             bestDistance = (axis - raw).distance;
-            attachment = ArchitectWallAttachment(
-              wall,
-              WallReferenceLine.center,
-            );
+            attachment = attach(WallReferenceLine.center);
           }
           continue;
         }
@@ -109,7 +120,7 @@ class ArchitectWallSnap {
             if ((result.point - face.$2).distance < .0001 &&
                 (face.$2 - raw).distance < bestDistance) {
               bestDistance = (face.$2 - raw).distance;
-              attachment = ArchitectWallAttachment(wall, face.$1);
+              attachment = attach(face.$1);
             }
           }
           continue;
@@ -140,7 +151,7 @@ class ArchitectWallSnap {
           final distance = (projection - raw).distance;
           if (distance < bestDistance) {
             bestDistance = distance;
-            attachment = ArchitectWallAttachment(wall, face.$1);
+            attachment = attach(face.$1);
           }
         }
       }
@@ -175,7 +186,24 @@ class ArchitectWallSnap {
 
     final segments = <(Offset, Offset)>[];
     if (magnetic) {
-      final geometry = ArchitectWallGeometry.of(project.activeStorey.walls);
+      // Curved core faces are analytic arcs. Tessellated drawing edges can be
+      // farther away than the capture radius at a close zoom.
+      if (coreOnly) {
+        for (final wall in walls.where(
+          (w) => w.isCurved && w.railing == null,
+        )) {
+          final ratio = wall.arc!.parameter(raw).clamp(0.0, 1.0);
+          for (final offset in [-wall.thickness / 2, 0.0, wall.thickness / 2]) {
+            Offset face(double t) =>
+                wall.centerPointAt(t) + wall.normalAt(t) * offset;
+            consider(face(ratio), 'Edge', 2);
+            consider(face(.5), 'Midpoint', 1);
+            consider(face(0), 'Endpoint', 0);
+            consider(face(1), 'Endpoint', 0);
+          }
+        }
+      }
+      final geometry = ArchitectWallGeometry.of(walls);
       segments.addAll(geometry.edges);
       for (final point in geometry.corners) {
         consider(point, 'Vertex', 0);
@@ -221,11 +249,7 @@ class ArchitectWallSnap {
       return describe(best);
     }
     if (magnetic && anchor == null) {
-      final aligned = ArchitectWallAlignment.point(
-        raw,
-        project.activeStorey.walls,
-        scale,
-      );
+      final aligned = ArchitectWallAlignment.point(raw, walls, scale);
       if (aligned.$2.isNotEmpty &&
           (anchor == null || (aligned.$1 - anchor).distance >= .001)) {
         return ArchitectSnapResult(
@@ -268,7 +292,7 @@ class ArchitectWallSnap {
           u: u,
           projected: projected,
           degrees: degrees,
-          walls: project.activeStorey.walls,
+          walls: walls,
           tolerance: directionRadius,
           scale: scale,
         );
@@ -291,10 +315,7 @@ class ArchitectWallSnap {
       // Relative directions and reference directions (e.g. wall being lengthened/edited).
       final directionRadius = math.min(24.0 / scale, 0.4);
       final directionsToTest = <Offset>[
-        for (final wall in project.activeStorey.walls) ...[
-          wall.unitVector,
-          wall.normalVector,
-        ],
+        for (final wall in walls) ...[wall.unitVector, wall.normalVector],
         ...referenceDirections,
       ];
       for (final uCandidate in directionsToTest) {
@@ -323,7 +344,7 @@ class ArchitectWallSnap {
               u: u,
               projected: projected,
               degrees: degrees,
-              walls: project.activeStorey.walls,
+              walls: walls,
               tolerance: directionRadius,
               scale: scale,
             );
@@ -343,11 +364,7 @@ class ArchitectWallSnap {
           }
         }
       }
-      final aligned = ArchitectWallAlignment.point(
-        raw,
-        project.activeStorey.walls,
-        scale,
-      );
+      final aligned = ArchitectWallAlignment.point(raw, walls, scale);
       if (aligned.$2.isNotEmpty && (aligned.$1 - anchor).distance >= .001) {
         return ArchitectSnapResult(
           point: aligned.$1,

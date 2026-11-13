@@ -14,6 +14,7 @@ class BimDistanceDraftingPanel extends StatefulWidget {
   final ValueChanged<double> onLength;
   final VoidCallback onEnd, onContinue, onUnlock, onCancel;
   final bool showContinue, showDirection, keypadInitiallyOpen;
+  final bool continuePrimary;
   final String? title, endLabel;
 
   /// Tool-specific controls above the length, without changing keypad state.
@@ -30,6 +31,7 @@ class BimDistanceDraftingPanel extends StatefulWidget {
     required this.onUnlock,
     required this.onCancel,
     this.showContinue = true,
+    this.continuePrimary = false,
     this.showDirection = true,
     this.keypadInitiallyOpen = false,
     this.title,
@@ -185,7 +187,11 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
         if ((event.logicalKey == LogicalKeyboardKey.enter ||
                 event.logicalKey == LogicalKeyboardKey.numpadEnter) &&
             _valid) {
-          widget.onEnd();
+          if (widget.showContinue && widget.continuePrimary) {
+            widget.onContinue();
+          } else {
+            widget.onEnd();
+          }
           return KeyEventResult.handled;
         }
         if (event.logicalKey == LogicalKeyboardKey.escape) {
@@ -250,7 +256,9 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 style: IconButton.styleFrom(
-                  backgroundColor: colors.surfaceContainerLow,
+                  backgroundColor: widget.continuePrimary
+                      ? colors.primary
+                      : colors.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -259,7 +267,9 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                 icon: _symbol(
                   AppIconId.redo,
                   _valid
-                      ? colors.primary
+                      ? widget.continuePrimary
+                            ? colors.onPrimary
+                            : colors.primary
                       : colors.onSurface.withValues(alpha: .38),
                   captions ? l.architectWallContinue : null,
                 ),
@@ -272,6 +282,10 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                   child: FilledButton(
                     key: const ValueKey('wall-end'),
                     style: FilledButton.styleFrom(
+                      backgroundColor:
+                          widget.showContinue && widget.continuePrimary
+                          ? colors.surfaceContainerLow
+                          : null,
                       minimumSize: const Size(44, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       shape: RoundedRectangleBorder(
@@ -282,7 +296,9 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                     child: _symbol(
                       AppIconId.confirm,
                       _valid
-                          ? colors.onPrimary
+                          ? widget.showContinue && widget.continuePrimary
+                                ? colors.primary
+                                : colors.onPrimary
                           : colors.onSurface.withValues(alpha: .38),
                       captions ? widget.endLabel ?? l.architectWallEnd : null,
                     ),

@@ -36,6 +36,7 @@ class ArchitectWallEndpointSnap {
         project: snapProject,
         tolerance: radius,
         magnetic: magnetic,
+        wallCoresOnly: true,
         underlay: underlay,
         frame: frame,
         visibility: visibility,
@@ -93,7 +94,10 @@ class ArchitectWallEndpointSnap {
     }
 
     if (magnetic) {
-      final geometry = ArchitectSnapGeometry.of(snapProject);
+      final geometry = ArchitectSnapGeometry.of(
+        snapProject,
+        wallCoresOnly: true,
+      );
       for (final point in geometry.query(projected, radius)) {
         consider(point.point, point.label, 0);
       }
