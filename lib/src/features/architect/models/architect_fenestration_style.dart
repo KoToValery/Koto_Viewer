@@ -1254,6 +1254,20 @@ class ArchitectFenestrationStyle {
         palette: palette,
         isSelected: isSelected,
       );
+    } else if (kind == FenestrationKind.door) {
+      ArchitectOpeningPlanPainter.paintDoorStep(
+        canvas: canvas,
+        center: centerPos,
+        direction: u,
+        normal: n,
+        width: elementWidth,
+        frameThickness: frameFaceWidth,
+        wallThickness: wallThickness,
+        zoomScale: zoomScale,
+        palette: palette,
+        sillHeight: elementSillHeight,
+        isSelected: isSelected,
+      );
     }
 
     // 8. Architectural Dimension Notation (W/H, sill)

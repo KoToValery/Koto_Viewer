@@ -257,6 +257,59 @@ class ArchitectOpeningPlanPainter {
         across.abs() <= 0.15 + tolerance;
   }
 
+  static void _paintWallFaceLines({
+    required Canvas canvas,
+    required Offset center,
+    required Offset direction,
+    required Offset normal,
+    required double halfSpanLength,
+    required double wallThickness,
+    required double zoomScale,
+    required ArchitectCanvasPalette palette,
+    required bool isSelected,
+  }) {
+    if (halfSpanLength <= 0.005) return;
+    final projection = Paint()
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(const Color(0xFF546E7A))
+      ..strokeWidth = 0.8 / zoomScale
+      ..style = PaintingStyle.stroke;
+    final halfSpan = direction * halfSpanLength;
+    for (final sign in [-1.0, 1.0]) {
+      final face = center + normal * (sign * wallThickness / 2);
+      canvas.drawLine(face - halfSpan, face + halfSpan, projection);
+    }
+  }
+
+  /// Threshold / step lines across a door opening in 2D plan when [sillHeight] > 0.
+  static void paintDoorStep({
+    required Canvas canvas,
+    required Offset center,
+    required Offset direction,
+    required Offset normal,
+    required double width,
+    required double frameThickness,
+    required double wallThickness,
+    required double zoomScale,
+    required ArchitectCanvasPalette palette,
+    required double sillHeight,
+    bool isSelected = false,
+  }) {
+    if (sillHeight <= 0.001) return;
+    _paintWallFaceLines(
+      canvas: canvas,
+      center: center,
+      direction: direction,
+      normal: normal,
+      halfSpanLength: math.max(0.0, width / 2 - frameThickness),
+      wallThickness: wallThickness,
+      zoomScale: zoomScale,
+      palette: palette,
+      isSelected: isSelected,
+    );
+  }
+
   /// Thin exterior ledge, 4 cm in front of the wall and 5 cm past each jamb.
   static void paintWindowSill({
     required Canvas canvas,
@@ -271,17 +324,23 @@ class ArchitectOpeningPlanPainter {
     bool isSelected = false,
   }) {
     if (sillHeight <= .001) return;
+    _paintWallFaceLines(
+      canvas: canvas,
+      center: center,
+      direction: direction,
+      normal: exteriorNormal,
+      halfSpanLength: width / 2,
+      wallThickness: wallThickness,
+      zoomScale: zoomScale,
+      palette: palette,
+      isSelected: isSelected,
+    );
     final projection = Paint()
       ..color = isSelected
           ? const Color(0xFF00E5FF)
           : palette.foreground(const Color(0xFF546E7A))
       ..strokeWidth = .8 / zoomScale
       ..style = PaintingStyle.stroke;
-    final halfSpan = direction * (width / 2);
-    for (final sign in [-1.0, 1.0]) {
-      final face = center + exteriorNormal * (sign * wallThickness / 2);
-      canvas.drawLine(face - halfSpan, face + halfSpan, projection);
-    }
     final ledge = center + exteriorNormal * (wallThickness / 2 + 0.04);
     final end = direction * (width / 2 + 0.05);
     for (final sign in [-1.0, 1.0]) {

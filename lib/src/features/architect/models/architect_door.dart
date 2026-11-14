@@ -449,6 +449,20 @@ class ArchitectDoor {
     drawJamb(pLeftBase, true);
     drawJamb(pRightBase, false);
 
+    ArchitectOpeningPlanPainter.paintDoorStep(
+      canvas: canvas,
+      center: centerPos,
+      direction: u,
+      normal: n,
+      width: width,
+      frameThickness: frameThickness,
+      wallThickness: wallThickness,
+      zoomScale: zoomScale,
+      palette: palette,
+      sillHeight: sillHeight,
+      isSelected: isSelected,
+    );
+
     // The hinge follows the selected opening face of the frame.
     final leaf = _leafGeometry(pLeftBase, pRightBase, u, n, halfThick);
     final hingePos = leaf.hinge;

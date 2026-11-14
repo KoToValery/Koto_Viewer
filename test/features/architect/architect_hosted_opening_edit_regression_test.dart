@@ -46,6 +46,33 @@ Future<void> _tapChip(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _enterOpeningDimension(
+  WidgetTester tester,
+  String chipKey,
+  String expectedCurrentLabel,
+  String digits,
+) async {
+  final chip = find.descendant(
+    of: find.byType(ArchitectToolPalette),
+    matching: find.byKey(ValueKey(chipKey)),
+  );
+  expect(chip, findsOneWidget);
+  expect(
+    find.descendant(of: chip, matching: find.text(expectedCurrentLabel)),
+    findsOneWidget,
+  );
+  await tester.ensureVisible(chip);
+  await tester.pumpAndSettle();
+  await tester.tap(chip);
+  await tester.pumpAndSettle();
+  for (final ch in digits.split('')) {
+    await tester.tap(find.byKey(ValueKey('bim-number-key-$ch')));
+    await tester.pump();
+  }
+  await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+  await tester.pumpAndSettle();
+}
+
 Future<AppLocalizations> _selectOpening(
   WidgetTester tester,
   ArchitectCommandController commands,
@@ -122,7 +149,13 @@ void main() {
       expect(commands.undoCount, 1);
       expect(find.text(l.architectOperationRejected), findsNothing);
 
-      await _tapChip(tester, '80 cm');
+      expect(_paletteChip('70 cm'), findsNothing);
+      expect(_paletteChip('210 cm'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('door-height-input')),
+        findsOneWidget,
+      );
+      await _enterOpeningDimension(tester, 'door-width-input', '90 cm', '80');
       expect(_door(commands.project).width, .8);
       expect(_door(commands.project).isHingeLeft, isFalse);
       expect(commands.undoCount, 2);
@@ -188,7 +221,13 @@ void main() {
       expect(commands.undoCount, 1);
       expect(find.text(l.architectOperationRejected), findsNothing);
 
-      await _tapChip(tester, '80 cm');
+      expect(_paletteChip('80 cm'), findsNothing);
+      expect(_paletteChip('150 cm'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('window-height-input')),
+        findsOneWidget,
+      );
+      await _enterOpeningDimension(tester, 'window-width-input', '90 cm', '80');
       expect(_window(commands.project).width, .8);
       expect(_window(commands.project).isFlipped, isTrue);
       expect(commands.undoCount, 2);

@@ -308,4 +308,36 @@ void main() {
       expect(operable.lines.length, fixed.lines.length + 2);
     },
   );
+
+  test('Doors with a step draw threshold lines on both wall faces and omit them at floor level', () {
+    final doorStyle = style.copyWith(kind: FenestrationKind.door);
+    for (final candidate in [door, door.copyWith(style: doorStyle)]) {
+      for (final sill in [0.0, 0.15]) {
+        final canvas = _PlanCanvas();
+        candidate
+            .copyWith(sillHeight: sill)
+            .paint2D(
+              canvas: canvas,
+              wallStart: Offset.zero,
+              wallEnd: const Offset(4, 0),
+              wallThickness: .37,
+              zoomScale: 100,
+            );
+        final frame =
+            candidate.resolvedStyle?.frameFaceWidth ?? candidate.frameThickness;
+        final clearLeft = 1.4 + frame;
+        final clearRight = 2.6 - frame;
+        for (final y in [-.185, .185]) {
+          final stepLines = canvas.lines.where(
+            (l) =>
+                ((l.$1 - Offset(clearLeft, y)).distance < 1e-8 &&
+                    (l.$2 - Offset(clearRight, y)).distance < 1e-8) ||
+                ((l.$1 - Offset(clearRight, y)).distance < 1e-8 &&
+                    (l.$2 - Offset(clearLeft, y)).distance < 1e-8),
+          );
+          expect(stepLines.length, sill > 0 ? 1 : 0);
+        }
+      }
+    }
+  });
 }
