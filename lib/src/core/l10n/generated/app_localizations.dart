@@ -23933,6 +23933,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap to position, then confirm to place. Tap Object again to finish; select an object to move it.'**
   String get architectComponentPlacementHelp;
+
+  /// Label for total width of a multi-flight stair including stairwell gap
+  ///
+  /// In en, this message translates to:
+  /// **'Total stair width'**
+  String get stairTotalWidth;
+
+  /// Visibility category label for CAD/raster/ghost storey underlays
+  ///
+  /// In en, this message translates to:
+  /// **'Underlays'**
+  String get architectVisibilityUnderlays;
 }
 
 class _AppLocalizationsDelegate

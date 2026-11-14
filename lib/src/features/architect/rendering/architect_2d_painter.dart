@@ -1,4 +1,5 @@
 import 'architect_selection_painter.dart';
+import 'architect_wall_geometry.dart';
 import 'architect_roof_drainage_painter.dart';
 import '../models/architect_line_style.dart';
 import '../services/architect_polyline_editing.dart';
@@ -1506,12 +1507,13 @@ class Architect2dPainter extends CustomPainter {
               ..style = PaintingStyle.stroke)
           : wallBorderPaint;
 
+      final planWall = ArchitectWallGeometry.planWall(wall);
       if (isSelected) {
         canvas.drawPath(
-          wall.system.isSpecial
-              ? layers.coreRegions[wall.id] ??
-                    ArchitectWallNetwork.polygon(wall.polygonCorners)
-              : ArchitectWallNetwork.polygon(wall.polygonCorners),
+          planWall.system.isSpecial
+              ? layers.coreRegions[planWall.id] ??
+                    ArchitectWallNetwork.polygon(planWall.polygonCorners)
+              : ArchitectWallNetwork.polygon(planWall.polygonCorners),
           borderPaint,
         );
         for (final point in [wall.startPoint, wall.endPoint]) {
@@ -1548,36 +1550,36 @@ class Architect2dPainter extends CustomPainter {
       canvas.drawCircle(midPoint, 3.2 / draftingScale, midDotPaint);
       canvas.drawCircle(midPoint, 3.2 / draftingScale, midBorderPaint);
 
-      for (final door in wall.doors) {
+      for (final door in planWall.doors) {
         door.paint2D(
           cutPlaneHeight: project.activeStorey.cutPlaneHeight,
           palette: palette,
           canvas: canvas,
-          wallGeometryProvided:wall.isCurved || wall.system.isSpecial,
-          wallStart: wall.openingAxis(door.offsetRatio).$1,
-          wallEnd: wall.openingAxis(door.offsetRatio).$2,
-          wallThickness: wall.thickness,
-          coreThickness: wall.coreThickness,
-          coreCenterShift: -wall.exteriorSign*wall.coreAsymmetry/2,
-          insulationThickness: wall.insulationThickness,
-          exteriorSign: wall.exteriorSign.toDouble(),
+          wallGeometryProvided:planWall.isCurved || planWall.system.isSpecial,
+          wallStart: planWall.openingAxis(door.offsetRatio).$1,
+          wallEnd: planWall.openingAxis(door.offsetRatio).$2,
+          wallThickness: planWall.thickness,
+          coreThickness: planWall.coreThickness,
+          coreCenterShift: -planWall.exteriorSign*planWall.coreAsymmetry/2,
+          insulationThickness: planWall.insulationThickness,
+          exteriorSign: planWall.exteriorSign.toDouble(),
           zoomScale: zoomScale,
           isSelected: door.id == selectedElementId,
         );
       }
-      for (final window in wall.windows) {
+      for (final window in planWall.windows) {
         window.paint2D(
           cutPlaneHeight: project.activeStorey.cutPlaneHeight,
           palette: palette,
           canvas: canvas,
-          wallGeometryProvided:wall.isCurved || wall.system.isSpecial,
-          wallStart: wall.openingAxis(window.offsetRatio).$1,
-          wallEnd: wall.openingAxis(window.offsetRatio).$2,
-          wallThickness: wall.thickness,
-          coreThickness: wall.coreThickness,
-          coreCenterShift: -wall.exteriorSign*wall.coreAsymmetry/2,
-          insulationThickness: wall.insulationThickness,
-          exteriorSign: wall.exteriorSign.toDouble(),
+          wallGeometryProvided:planWall.isCurved || planWall.system.isSpecial,
+          wallStart: planWall.openingAxis(window.offsetRatio).$1,
+          wallEnd: planWall.openingAxis(window.offsetRatio).$2,
+          wallThickness: planWall.thickness,
+          coreThickness: planWall.coreThickness,
+          coreCenterShift: -planWall.exteriorSign*planWall.coreAsymmetry/2,
+          insulationThickness: planWall.insulationThickness,
+          exteriorSign: planWall.exteriorSign.toDouble(),
           zoomScale: zoomScale,
           isSelected: window.id == selectedElementId,
         );
@@ -1721,7 +1723,7 @@ class Architect2dPainter extends CustomPainter {
         )..layout();
         canvas.save();
         canvas.translate(gap.midpoint.dx, gap.midpoint.dy);
-        canvas.scale(1.0 / ArchitectClearanceBadgeLayout.openingReferenceScale);
+        canvas.scale(1.0 / zoomScale);
         final rect = Rect.fromCenter(
           center: Offset.zero,
           width: tp.width + 12,
@@ -2115,7 +2117,11 @@ class Architect2dPainter extends CustomPainter {
       );
       _drawWallLayers(
         canvas,
-        ArchitectWallLayers.build([wall], _project.wallTypes),
+        ArchitectWallLayers.build(
+          [wall],
+          _project.wallTypes,
+          includeInteriorPlaster: false,
+        ),
         Paint()
           ..color = const Color(0xFF00E5FF)
           ..strokeWidth = 1.8 / zoomScale

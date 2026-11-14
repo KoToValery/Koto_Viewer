@@ -258,22 +258,14 @@ void main() {
             ),
             findsOneWidget,
           );
-          // Tapping over an existing bed stages another object, without selecting it.
+          // Tapping places the object directly without selecting an existing bed.
           await workspace.wallTap(tester, const Offset(-.5, 0));
-          await tester.pumpAndSettle();
-          expect(commands.project.activeStorey.components.length, 1);
-          expect(workspace.overlay(tester).componentPreview, isNotNull);
-          expect(workspace.overlay(tester).selectedElementId, isNull);
-          await capture(tester, 'placement_${language}_${brightness.name}');
-          await tester.tap(
-            find.byKey(const ValueKey('architect-draft-confirm')),
-          );
           await tester.pumpAndSettle();
           expect(commands.project.activeStorey.components.length, 2);
           expect(commands.undoCount, 1);
           expect(workspace.overlay(tester).componentPreview, isNull);
-          await workspace.wallTap(tester, const Offset(2, 1));
-          await tester.pumpAndSettle();
+          expect(workspace.overlay(tester).selectedElementId, isNull);
+          await capture(tester, 'placement_${language}_${brightness.name}');
           await tester.tap(button);
           await tester.pumpAndSettle();
           expect(
@@ -284,7 +276,7 @@ void main() {
           );
           expect(workspace.overlay(tester).componentPreview, isNull);
           expect(find.byType(ArchitectComponentLibraryDialog), findsNothing);
-          // The pending object was discarded, and a new canvas tap selects only.
+          // A new canvas tap after exiting no longer places an object.
           await workspace.wallTap(tester, const Offset(2, 1));
           await tester.pumpAndSettle();
           expect(commands.project.activeStorey.components.length, 2);
@@ -375,7 +367,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Object placement hold never opens editing; cancel discards it', (
+  testWidgets('Object placement hold never opens editing; X exits to pan', (
     tester,
   ) async {
     final commands = model(object: true);
@@ -389,12 +381,13 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
     expect(find.byType(ArchitectRadialMenu), findsNothing);
-    expect(commands.undoCount, 0);
-    expect(workspace.overlay(tester).componentPreview, isNotNull);
+    expect(commands.project.activeStorey.components.length, 2);
+    expect(commands.undoCount, 1);
+    expect(workspace.overlay(tester).componentPreview, isNull);
     await tester.tap(find.byKey(const ValueKey('architect-draft-cancel')));
     await tester.pumpAndSettle();
     expect(workspace.overlay(tester).componentPreview, isNull);
-    expect(commands.project.activeStorey.components.length, 1);
+    expect(commands.project.activeStorey.components.length, 2);
     expect(
       tester
           .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))

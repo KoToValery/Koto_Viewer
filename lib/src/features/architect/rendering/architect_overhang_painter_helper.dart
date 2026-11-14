@@ -47,11 +47,6 @@ class ArchitectOverhangPainterHelper {
         ..strokeWidth = strokeWidth
         ..style = PaintingStyle.stroke;
 
-      // Faint tint (4%) to subtly indicate the overhead boundary area
-      final fillPaint = Paint()
-        ..color = baseColor.withValues(alpha: 0.04)
-        ..style = PaintingStyle.fill;
-
       final Path continuousPath;
       if (overhang.path != null) {
         continuousPath = overhang.path!;
@@ -61,10 +56,7 @@ class ArchitectOverhangPainterHelper {
         continue;
       }
 
-      // 1. Draw subtle background tint
-      canvas.drawPath(continuousPath, fillPaint);
-
-      // 2. Draw thin dashed line
+      // Draw thin dashed line without plan hatching/fill
       final dashedPath = DxfLinetypeHelper.createDashedPath(
         continuousPath,
         [dashLength, gapLength],

@@ -49,7 +49,7 @@ class ArchitectElementTool extends ChangeNotifier {
   // Window options
   double windowWidth = 1.20;
   double windowHeight = 1.40;
-  double windowSill = 0.85;
+  double windowSill = 0.90;
   bool windowHasCasing = false;
   ArchitectFenestrationStyle? activeWindowStyle;
   ArchitectFenestrationStyle? activeDoorStyle;

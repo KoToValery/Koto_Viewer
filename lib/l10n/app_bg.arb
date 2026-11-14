@@ -4539,5 +4539,7 @@
   "@architectStoreyManagerTitle": { "description": "Short title of the storey manager" },
   "architectComponentReplace": "Замени",
   "architectComponentReplaceHelp": "Замени от библиотеката със запазване на позицията и завъртането.",
-  "architectComponentPlacementHelp": "Тапни за позиция и потвърди поставянето. Тапни „Обект“ отново за край; избери обект, за да го преместиш."
+  "architectComponentPlacementHelp": "Тапни за позиция и потвърди поставянето. Тапни „Обект“ отново за край; избери обект, за да го преместиш.",
+  "stairTotalWidth": "Обща широчина на стълбата",
+  "architectVisibilityUnderlays": "Подложки"
 }

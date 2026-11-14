@@ -4,6 +4,7 @@ import 'dart:ui';
 import '../models/architect_component.dart';
 import '../models/architect_component_definition.dart';
 import '../models/architect_wall.dart';
+import '../rendering/architect_wall_geometry.dart';
 
 /// Optional, screen-sized attachment to the closest physical wall face.
 /// Catalog order and the saved wall reference line never decide the result.
@@ -22,7 +23,10 @@ class ArchitectComponentPlacement {
     }
     var bestDistance = tolerance;
     var result = (raw, rotation);
-    for (final wall in walls) {
+    final planWalls = walls is List<ArchitectWall>
+        ? ArchitectWallGeometry.planWalls(walls)
+        : ArchitectWallGeometry.planWalls(walls.toList());
+    for (final wall in planWalls) {
       if (wall.length < .001) continue;
       final (ratio, _) = wall.projectPoint(raw);
       if (ratio < 0 || ratio > 1) continue;

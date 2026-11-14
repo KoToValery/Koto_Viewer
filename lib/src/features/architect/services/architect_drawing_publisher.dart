@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
 import '../models/architect_project.dart';
+import '../models/architect_layer.dart';
 import '../rendering/architect_2d_painter.dart';
 import '../rendering/architect_vector_scene.dart';
 import '../rendering/architect_elements_painter_helper.dart';
@@ -103,6 +104,8 @@ class ArchitectDrawingPublisher {
     p.sections,
     p.sectionVisibility,
     p.elevations,
+    p.layers,
+    p.elementLayers,
     p.northSymbol,
     p.slabCompositionNumbers,
     p.existingTerrain,
@@ -191,9 +194,25 @@ class ArchitectDrawingPublisher {
 
     collect(p.toJson()['storeys']);
     final canvas = ArchitectVectorCanvas(sourceIds: ids);
+    final hasLayerOverrides = drawing.visibility.keys.any(
+      (k) => k.startsWith('layer:'),
+    );
+    final effectiveProject = hasLayerOverrides
+        ? p.copyWith(
+            layers: [
+              for (final layer in p.effectiveLayers)
+                layer.copyWith(
+                  visible:
+                      drawing.visibility['layer:${layer.id}'] ?? layer.visible,
+                ),
+            ],
+          )
+        : p;
     scope.run(() {
-      final scaled = p.copyWith(
-        gridAxes: drawing.visibility['axes'] == false ? [] : p.gridAxes,
+      final scaled = effectiveProject.copyWith(
+        gridAxes: drawing.visibility['axes'] == false
+            ? []
+            : effectiveProject.gridAxes,
         dimensionScale: ArchitectDimensionScale.values.firstWhere(
           (s) => s.denominator == denominator,
           // Legacy painters still accept the preset enum. Publication text and
@@ -223,8 +242,10 @@ class ArchitectDrawingPublisher {
         );
         if (visible['axes'] == false) plan = plan.copyWith(gridAxes: []);
         canvas.scale(1000 / denominator);
-        if (drawing.visibility['underlay'] != false &&
-            sources.underlays[drawing.sourceId] != null) {
+        final showUnderlay =
+            drawing.visibility['underlay'] != false &&
+            effectiveProject.isLayerVisible(ArchitectLayer.cadUnderlayLayerId);
+        if (showUnderlay && sources.underlays[drawing.sourceId] != null) {
           canvas.save();
           canvas.scale(1 / sources.frame.unitsPerMeter);
           canvas.translate(-sources.frame.origin.dx, -sources.frame.origin.dy);
@@ -242,9 +263,25 @@ class ArchitectDrawingPublisher {
           );
           canvas.restore();
         }
+        final wallLayers = hasLayerOverrides
+            ? ArchitectWallLayers.forProject(
+                plan.updateActiveStorey(
+                  plan.activeStorey.copyWith(
+                    walls: [
+                      for (final w in plan.activeStorey.walls)
+                        if (plan.isElementVisible(
+                          w.id,
+                          ArchitectLayer.wallLayerId,
+                        ))
+                          w,
+                    ],
+                  ),
+                ),
+              )
+            : _wallLayers(p, drawing.sourceId);
         Architect2dPainter(
           project: plan,
-          publicationWallLayers: _wallLayers(p, drawing.sourceId),
+          publicationWallLayers: wallLayers,
           l10n: l,
           layer: ArchitectPaintLayer.model,
           paintGrid: false,
@@ -258,7 +295,7 @@ class ArchitectDrawingPublisher {
           final cut = scaled.sections.firstWhere(
             (s) => s.id == drawing.sourceId,
           );
-          final geometry = _section(p, drawing.sourceId);
+          final geometry = _section(effectiveProject, drawing.sourceId);
           final data = ArchitectSectionDrawing(
             scaled,
             cut,
@@ -278,7 +315,7 @@ class ArchitectDrawingPublisher {
           final view = scaled.elevations.firstWhere(
             (s) => s.id == drawing.sourceId,
           );
-          final geometry = _elevation(p, view.id);
+          final geometry = _elevation(effectiveProject, view.id);
           bounds = geometry.bounds;
           painter = ArchitectFacadePainter(
             geometry,

@@ -2,6 +2,7 @@ import 'architect_dialog.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import '../../bim_editing/widgets/bim_numeric_keypad.dart';
 
 String roofNumber(double value, {int precision = 9}) =>
     value.toStringAsFixed(precision).replaceFirst(RegExp(r'\.?0+$'), '');
@@ -82,15 +83,42 @@ class _NumberState extends State<ArchitectRoofNumberField> {
     super.dispose();
   }
 
+  Future<void> _openKeypad(BuildContext context) async {
+    final result = await BimNumericKeypad.showInputDialog(
+      context,
+      title: widget.label,
+      initialText: text.text,
+      unitLabel: widget.pitch ? (percent ? '%' : '°') : widget.unit,
+      decimals: 3,
+      allowNegative: widget.min < 0,
+      validate: (raw) {
+        final mapped = percent ? math.atan(raw / 100) * 180 / math.pi : raw;
+        if (mapped < widget.min || mapped > widget.max) {
+          return widget.invalidMessage ?? context.l10n.roofUiNumericInvalid;
+        }
+        return widget.validate?.call(mapped);
+      },
+    );
+    if (!mounted || result == null) return;
+    final formatted = roofNumber(result);
+    text.text = formatted;
+    final value = _value(formatted);
+    if (value != null &&
+        value >= widget.min &&
+        value <= widget.max &&
+        widget.validate?.call(value) == null) {
+      last = value;
+      widget.onChanged(value);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 5),
     child: TextFormField(
       controller: text,
-      keyboardType: TextInputType.numberWithOptions(
-        decimal: true,
-        signed: widget.min < 0,
-      ),
+      keyboardType: TextInputType.none,
+      onTap: () => _openKeypad(context),
       autovalidateMode: AutovalidateMode.onUserInteraction,
       decoration: InputDecoration(
         labelText: widget.label,

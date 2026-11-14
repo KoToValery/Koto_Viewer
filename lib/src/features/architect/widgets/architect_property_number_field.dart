@@ -1,6 +1,7 @@
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import '../../bim_editing/widgets/bim_numeric_keypad.dart';
 import '../models/architect_project.dart';
 import '../services/architect_properties_session.dart';
 import 'architect_properties_shell.dart';
@@ -65,15 +66,40 @@ class _NumberState extends State<ArchitectPropertyNumberField> {
     super.dispose();
   }
 
+  Future<void> _openKeypad(BuildContext context) async {
+    ArchitectPropertiesShell.of(context)?.expand();
+    if (widget.readOnly) return;
+    final decimals =
+        widget.descriptor.measure == ArchitectPropertyMeasure.count ? 0 : 3;
+    final scale = widget.descriptor.scale(widget.project);
+    final result = await BimNumericKeypad.showInputDialog(
+      context,
+      title: widget.label,
+      initialText: controller.text,
+      unitLabel: widget.descriptor.unit(widget.project),
+      decimals: decimals,
+      allowNegative: widget.descriptor.minimum < 0,
+      min: widget.descriptor.minimum.isFinite
+          ? widget.descriptor.minimum / scale
+          : null,
+      max: widget.descriptor.maximum.isFinite
+          ? widget.descriptor.maximum / scale
+          : null,
+    );
+    if (!mounted || result == null) return;
+    final formatted = ArchitectUnit.trimZeros(result.toStringAsFixed(9));
+    controller.text = formatted;
+    edited = true;
+    final parsed = widget.descriptor.parse(formatted, widget.project);
+    if (parsed != null) widget.onChanged(parsed);
+  }
+
   @override
   Widget build(BuildContext context) => TextFormField(
     controller: controller,
     focusNode: focus,
     readOnly: widget.readOnly,
-    keyboardType: TextInputType.numberWithOptions(
-      decimal: widget.descriptor.measure != ArchitectPropertyMeasure.count,
-      signed: widget.descriptor.minimum < 0,
-    ),
+    keyboardType: TextInputType.none,
     textInputAction: TextInputAction.next,
     autovalidateMode: AutovalidateMode.onUserInteraction,
     decoration: InputDecoration(
@@ -111,6 +137,6 @@ class _NumberState extends State<ArchitectPropertyNumberField> {
       final value = widget.descriptor.parse(text, widget.project);
       if (value != null) widget.onChanged(value);
     },
-    onTap: () => ArchitectPropertiesShell.of(context)?.expand(),
+    onTap: () => _openKeypad(context),
   );
 }

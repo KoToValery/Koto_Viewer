@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_wall.dart';
+import '../models/architect_wall_type.dart';
 import 'architect_wall_network.dart';
 import 'architect_railing_geometry.dart';
 import 'architect_path_solid.dart';
@@ -8,6 +9,50 @@ import 'architect_path_solid.dart';
 /// Physical body and material boundaries, independent of the reference line.
 class ArchitectWallGeometry {
   static final _cores = Expando<List<ArchitectWall>>();
+  static final _planWallsCache = Expando<List<ArchitectWall>>();
+
+  static bool _isHiddenPlanPlaster(ArchitectMaterialLayer l) =>
+      l.role == ArchitectLayerRole.finish &&
+      l.material == ArchitectMaterial.plaster;
+
+  /// Plan projection strips interior wall plaster so floor plans, ghost
+  /// storeys, openings, and plan snapping work against structural/insulation faces
+  /// while the full geometric layers stay intact for sections and 3D.
+  static ArchitectWall planWall(ArchitectWall wall) {
+    if (wall.railing != null ||
+        wall.system.isSpecial ||
+        wall.layers.isEmpty ||
+        !wall.layers.any(_isHiddenPlanPlaster)) {
+      return wall;
+    }
+    final remaining =
+        wall.layers.where((l) => !_isHiddenPlanPlaster(l)).toList();
+    if (remaining.isEmpty) return wall;
+    final newThickness =
+        remaining.fold<double>(0.0, (s, l) => s + l.thickness);
+    return wall.copyWith(
+      startPoint: wall.coreCenterStart,
+      endPoint: wall.coreCenterEnd,
+      referenceLine: WallReferenceLine.center,
+      thickness: newThickness,
+      layers: remaining,
+    );
+  }
+
+  static List<ArchitectWall> planWalls(List<ArchitectWall> walls) {
+    final cached = _planWallsCache[walls];
+    if (cached != null) return cached;
+    var changed = false;
+    final out = List<ArchitectWall>.generate(walls.length, (i) {
+      final w = walls[i];
+      final pw = planWall(w);
+      if (!identical(w, pw)) changed = true;
+      return pw;
+    }, growable: false);
+    final res = changed ? out : walls;
+    _planWallsCache[walls] = res;
+    return res;
+  }
 
   /// Snap proxies retain the physical core, independently of finish thickness
   /// and the saved leading line. Railings keep their mounting geometry.

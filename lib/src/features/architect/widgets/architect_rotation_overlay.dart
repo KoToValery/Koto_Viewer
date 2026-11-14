@@ -291,6 +291,7 @@ class _RotationAngleDialog extends StatefulWidget {
 
 class _RotationAngleDialogState extends State<_RotationAngleDialog> {
   final controller = TextEditingController();
+  String? _input;
   @override
   void dispose() {
     controller.dispose();
@@ -313,21 +314,24 @@ class _RotationAngleDialogState extends State<_RotationAngleDialog> {
               readOnly: true,
               keyboardType: TextInputType.none,
               decoration: const InputDecoration(suffixText: '°'),
+              onChanged: (text) => setState(() => _input = text),
             ),
             BimNumericKeypad(
               keyPrefix: 'architect-rotation-key',
               decimals: 3,
               onKey: (key) => setState(() {
-                controller.text = BimNumericKeypad.edit(
-                  controller.text,
+                _input = BimNumericKeypad.edit(
+                  _input,
                   key,
                   decimals: 3,
                 );
+                controller.text = _input!;
               }),
             ),
             TextButton(
               onPressed: () => setState(() {
-                controller.text = BimNumericKeypad.edit(controller.text, '±');
+                _input = BimNumericKeypad.edit(_input ?? controller.text, '±');
+                controller.text = _input!;
               }),
               child: const Text('±'),
             ),

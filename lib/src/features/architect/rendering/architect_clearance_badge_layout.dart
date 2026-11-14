@@ -7,10 +7,11 @@ class ArchitectClearanceBadgeLayout {
   static const openingReferenceScale = 100.0;
   static const openingBaseSize = Size(88, 36);
 
-  /// Opening values follow model space, including when the view zooms out.
+  /// Opening values keep constant screen size on zoom-in and scale down on zoom-out.
   static Size openingSize(double zoomScale, Rect available) {
+    if (available.width <= 0 || available.height <= 0) return Size.zero;
     final scale = math.min(
-      zoomScale / openingReferenceScale,
+      1.0,
       math.min(
         available.width / openingBaseSize.width,
         available.height / openingBaseSize.height,

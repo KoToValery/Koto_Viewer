@@ -481,8 +481,28 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                     'width',
                     l.stairClearWidth,
                     stair.width,
-                    (v) => setState(() => stair = stair.copyWith(width: v)),
+                    (v) => setState(
+                      () => stair = stair.copyWith(
+                        width: v,
+                        design: d.totalWidth != null && d.totalWidth! < 2 * v
+                            ? d.copyWith(totalWidth: 2 * v + .1)
+                            : d,
+                      ),
+                    ),
                     maximum: 10,
+                  ),
+                if (d.layout == null &&
+                    d.shape == StairShape.halfTurn &&
+                    !d.hasWinders)
+                  number(
+                    'total-width',
+                    l.stairTotalWidth,
+                    d.effectiveTotalWidth(stair.width),
+                    (v) => update(
+                      d.copyWith(totalWidth: math.max(2 * stair.width, v)),
+                    ),
+                    minimum: 2 * stair.width,
+                    maximum: 20,
                   ),
                 Tooltip(
                   message: l.stairHeightModeHelp,

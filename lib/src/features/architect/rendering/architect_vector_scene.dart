@@ -33,10 +33,14 @@ class ArchitectTextScope {
     this.publication = false,
   });
   T run<T>(T Function() body) => runZoned(body, zoneValues: {_key: this});
-  double height(String id, ArchitectAnnotationRole role) =>
-      ArchitectDrawingScale(
-        denominator,
-      ).paperToModel(document.textMm(view, id, role, denominator));
+  double height(String id, ArchitectAnnotationRole role) {
+    final mm = document.textMm(view, id, role, denominator);
+    final modelHeight = ArchitectDrawingScale(denominator).paperToModel(mm);
+    if (!publication && renderScale > 0) {
+      return math.min(modelHeight, (mm * 5.5) / renderScale);
+    }
+    return modelHeight;
+  }
   String length(double metres) =>
       BimDistanceUnit.trimZeros(units.format(metres, decimals: decimals));
   String level(double metres, {BimDistanceUnit? units, int? decimals}) =>

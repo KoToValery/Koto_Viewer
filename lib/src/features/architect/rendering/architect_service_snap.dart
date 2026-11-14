@@ -1,5 +1,3 @@
-// === SECTION: ARCHITECT SERVICE SNAP ENGINE ===
-
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -7,14 +5,26 @@ import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
-import 'architect_snap_helper.dart';
 import 'architect_midpoint_tracking.dart';
+import 'architect_snap_helper.dart';
+import 'architect_wall_geometry.dart';
 
 /// Snapping engine for MEP risers, shafts, and chimneys.
 /// Snaps flush against wall faces, wall corners/endpoints, and door/window jambs,
 /// automatically aligning the riser orientation to the host wall.
 class ArchitectServiceSnap {
-  ArchitectServiceSnap._();
+  const ArchitectServiceSnap._();
+
+  static double _faceRotationDeg(Offset faceNormal) {
+    final deg =
+        (math.atan2(-faceNormal.dx, faceNormal.dy) * 180.0 / math.pi) % 360.0;
+    return deg.abs() < 1e-6 || (360.0 - deg).abs() < 1e-6 ? 0.0 : deg;
+  }
+
+  static double _angleDiffDeg(double a, double b) {
+    final diff = ((a - b) % 360.0 + 540.0) % 360.0 - 180.0;
+    return diff.abs();
+  }
 
   static ArchitectSnapResult resolve({
     required Offset raw,
@@ -38,162 +48,181 @@ class ArchitectServiceSnap {
 
     final floor = project.activeStorey;
     final activeIdx = project.storeys.indexWhere((s) => s.id == floor.id);
-    final referenceWalls = floor.walls.isNotEmpty
+    final rawWalls = floor.walls.isNotEmpty
         ? floor.walls
         : (activeIdx > 0 ? project.storeys[activeIdx - 1].walls : floor.walls);
+    final referenceWalls = ArchitectWallGeometry.planWalls(rawWalls);
 
-    ArchitectSnapResult? bestCornerSnap;
-    double bestCornerDist = tolerance;
+    var bestScoreDist = double.infinity;
+    var bestOriginDist = double.infinity;
+    var bestAngleDiff = double.infinity;
+    ArchitectSnapResult? bestSnap;
 
-    ArchitectSnapResult? bestJambSnap;
-    double bestJambDist = tolerance;
-
-    ArchitectSnapResult? bestFaceSnap;
-    double bestFaceDist = tolerance;
-
-    // Helper to generate orientations
-    List<({double rot, double halfAlong, double halfAcross})> getOrientations(
-      double wallAngleDeg,
-    ) {
-      return [
-        (rot: wallAngleDeg, halfAlong: width / 2.0, halfAcross: depth / 2.0),
-        if ((width - depth).abs() > 1e-4)
-          (
-            rot: (wallAngleDeg + 90.0) % 360.0,
-            halfAlong: depth / 2.0,
-            halfAcross: width / 2.0,
-          ),
-      ];
+    void resetBest() {
+      bestScoreDist = double.infinity;
+      bestOriginDist = double.infinity;
+      bestAngleDiff = double.infinity;
+      bestSnap = null;
     }
 
-    // -------------------------------------------------------------------------
-    // 1. Wall corners & junctions (discrete point snap - high priority)
-    // -------------------------------------------------------------------------
-    final visitedJunctions = <String>{};
+    void considerCandidate({
+      required Offset faceOrigin,
+      required Offset faceNormal,
+      required String label,
+      List<(Offset, Offset)> guides = const [],
+    }) {
+      final normLen = faceNormal.distance;
+      if (normLen < 1e-6) return;
+      final n = faceNormal / normLen;
+      final visualCenter = faceOrigin + n * (depth / 2.0);
+      final originDist = (raw - faceOrigin).distance;
+      final centerDist = (raw - visualCenter).distance;
+      final scoreDist = math.min(originDist, centerDist);
+      final angleDeg = _faceRotationDeg(n);
+      final angleDiff = _angleDiffDeg(angleDeg, currentRotationDeg);
 
+      final isBetter =
+          scoreDist < bestScoreDist - 1e-4 ||
+          ((scoreDist - bestScoreDist).abs() <= 1e-4 &&
+              (originDist < bestOriginDist - 1e-4 ||
+                  ((originDist - bestOriginDist).abs() <= 1e-4 &&
+                      angleDiff < bestAngleDiff - 1e-4)));
+      if (!isBetter) return;
+
+      bestScoreDist = scoreDist;
+      bestOriginDist = originDist;
+      bestAngleDiff = angleDiff;
+      bestSnap = ArchitectSnapResult(
+        point: faceOrigin,
+        isSnapped: true,
+        snapLabel: label,
+        angleDeg: angleDeg,
+        magneticGuides: guides,
+      );
+    }
+
+    void considerCornerSide(
+      ArchitectWall backWall,
+      Offset uBack,
+      Offset nBack,
+      ArchitectWall sideWall,
+      Offset uAdj,
+      Offset nAdj,
+      Offset junctionPt,
+    ) {
+      final denom = uBack.dx * uAdj.dy - uBack.dy * uAdj.dx;
+      if (denom.abs() <= 0.1) return;
+      final maxReach =
+          (width + depth + backWall.thickness + sideWall.thickness) * 2.0;
+
+      for (final sideBack in const [1.0, -1.0]) {
+        final backNorm = nBack * sideBack;
+        final pBackLine =
+            junctionPt + backNorm * (backWall.thickness / 2.0 + depth / 2.0);
+        for (final sideAdj in const [1.0, -1.0]) {
+          final adjNorm = nAdj * sideAdj;
+          final pAdjLine =
+              junctionPt + adjNorm * (sideWall.thickness / 2.0 + width / 2.0);
+          final dP = pAdjLine - pBackLine;
+          final t = (dP.dx * uAdj.dy - dP.dy * uAdj.dx) / denom;
+          final visualCenter = pBackLine + uBack * t;
+          if ((visualCenter - junctionPt).distance > maxReach) continue;
+
+          considerCandidate(
+            faceOrigin: visualCenter - backNorm * (depth / 2.0),
+            faceNormal: backNorm,
+            label: 'Wall corner',
+            guides: [
+              (pBackLine - uBack * 1.5, pBackLine + uBack * 1.5),
+              (pAdjLine - uAdj * 1.5, pAdjLine + uAdj * 1.5),
+            ],
+          );
+        }
+      }
+    }
+
+    // 1. Wall corners & endpoints (discrete point snap - high priority)
+    final cornerRadius = math.min(0.45, tolerance * 1.4);
     for (var i = 0; i < referenceWalls.length; i++) {
       final wallA = referenceWalls[i];
-      if (excludedIds.contains(wallA.id) || wallA.length < 1e-4) continue;
-
+      if (excludedIds.contains(wallA.id) ||
+          wallA.length < 1e-4 ||
+          wallA.isCurved) {
+        continue;
+      }
+      final uA = (wallA.endPoint - wallA.startPoint).normalized();
+      final nA = Offset(-uA.dy, uA.dx);
       final ptsA = [wallA.startPoint, wallA.endPoint];
+      final junctionFlags = [false, false];
 
-      for (var j = i + 1; j < referenceWalls.length; j++) {
+      for (var j = 0; j < referenceWalls.length; j++) {
+        if (i == j) continue;
         final wallB = referenceWalls[j];
-        if (excludedIds.contains(wallB.id) || wallB.length < 1e-4) continue;
-
+        if (excludedIds.contains(wallB.id) ||
+            wallB.length < 1e-4 ||
+            wallB.isCurved) {
+          continue;
+        }
+        final uB = (wallB.endPoint - wallB.startPoint).normalized();
+        final nB = Offset(-uB.dy, uB.dx);
         final ptsB = [wallB.startPoint, wallB.endPoint];
 
-        // Check if wallA and wallB meet at any endpoint
-        for (final pA in ptsA) {
-          for (final pB in ptsB) {
-            final junctionDist = (pA - pB).distance;
-            final maxJunctionTol = math.max(wallA.thickness, wallB.thickness) * 1.5;
-            if (junctionDist > maxJunctionTol) continue;
-
-            final junctionPt = (pA + pB) / 2.0;
-            final key = '${junctionPt.dx.toStringAsFixed(2)}_${junctionPt.dy.toStringAsFixed(2)}';
-            if (visitedJunctions.contains(key)) continue;
-            visitedJunctions.add(key);
-
-            // Direction vectors moving away from junction into walls
-            final farA = (pA == wallA.startPoint) ? wallA.endPoint : wallA.startPoint;
-            final farB = (pB == wallB.startPoint) ? wallB.endPoint : wallB.startPoint;
-            final vecA = farA - junctionPt;
-            final vecB = farB - junctionPt;
-            if (vecA.distance < 1e-4 || vecB.distance < 1e-4) continue;
-
-            final uA = vecA / vecA.distance;
-            final uB = vecB / vecB.distance;
-            final nA = Offset(-uA.dy, uA.dx);
-            final nB = Offset(-uB.dy, uB.dx);
-
-            final wallAngleA = (math.atan2(-uA.dy, -uA.dx) * 180.0 / math.pi) % 360.0;
-            final orients = getOrientations(wallAngleA);
-
-            // Test line intersection in the corner quadrants
-            final det = uA.dx * uB.dy - uA.dy * uB.dx;
-            if (det.abs() > 0.05) {
-              for (final orient in orients) {
-                for (final sideA in [1.0, -1.0]) {
-                  for (final sideB in [1.0, -1.0]) {
-                    final pLineA = junctionPt + nA * ((wallA.thickness / 2.0 + orient.halfAcross) * sideA);
-                    final pLineB = junctionPt + nB * ((wallB.thickness / 2.0 + orient.halfAlong) * sideB);
-                    final diff = pLineB - pLineA;
-                    final t = (diff.dx * uB.dy - diff.dy * uB.dx) / det;
-                    final cornerCandidate = pLineA + uA * t;
-
-                    final dist = (cornerCandidate - raw).distance;
-                    if (dist < bestCornerDist) {
-                      bestCornerDist = dist;
-                      bestCornerSnap = ArchitectSnapResult(
-                        point: cornerCandidate,
-                        isSnapped: true,
-                        snapLabel: 'Wall corner',
-                        angleDeg: orient.rot,
-                        magneticGuides: [
-                          (pLineA - uA * 1.5, pLineA + uA * 1.5),
-                          (pLineB - uB * 1.5, pLineB + uB * 1.5),
-                        ],
-                      );
-                    }
-                  }
-                }
+        for (var aIdx = 0; aIdx < 2; aIdx++) {
+          for (var bIdx = 0; bIdx < 2; bIdx++) {
+            if ((ptsA[aIdx] - ptsB[bIdx]).distance <= 0.15) {
+              junctionFlags[aIdx] = true;
+              if (i < j) {
+                final junctionPt = ptsA[aIdx];
+                considerCornerSide(wallA, uA, nA, wallB, uB, nB, junctionPt);
+                considerCornerSide(wallB, uB, nB, wallA, uA, nA, junctionPt);
               }
             }
           }
         }
       }
 
-      // Standalone wall endpoints (not part of a corner)
-      for (final endPt in ptsA) {
-        final farPt = (endPt == wallA.startPoint) ? wallA.endPoint : wallA.startPoint;
+      // Standalone wall endpoints (not part of a corner junction)
+      for (var idx = 0; idx < 2; idx++) {
+        if (junctionFlags[idx]) continue;
+        final endPt = ptsA[idx];
+        final farPt = idx == 0 ? wallA.endPoint : wallA.startPoint;
         final dir = (farPt - endPt).normalized();
+        if (dir.distance < 1e-6) continue;
         final norm = Offset(-dir.dy, dir.dx);
-        final wallAngle = (math.atan2(-dir.dy, -dir.dx) * 180.0 / math.pi) % 360.0;
-        final orients = getOrientations(wallAngle);
-
-        for (final orient in orients) {
-          final candidatePoints = [
-            endPt + dir * orient.halfAlong + norm * (wallA.thickness / 2.0 + orient.halfAcross),
-            endPt + dir * orient.halfAlong - norm * (wallA.thickness / 2.0 + orient.halfAcross),
-            endPt - dir * orient.halfAlong + norm * (wallA.thickness / 2.0 + orient.halfAcross),
-            endPt - dir * orient.halfAlong - norm * (wallA.thickness / 2.0 + orient.halfAcross),
-          ];
-
-          for (final cp in candidatePoints) {
-            final dist = (cp - raw).distance;
-            if (dist < bestCornerDist) {
-              bestCornerDist = dist;
-              bestCornerSnap = ArchitectSnapResult(
-                point: cp,
-                isSnapped: true,
-                snapLabel: 'Wall corner',
-                angleDeg: orient.rot,
-              );
-            }
-          }
+        for (final side in const [1.0, -1.0]) {
+          final faceNormal = norm * side;
+          considerCandidate(
+            faceOrigin:
+                endPt + dir * (width / 2.0) + faceNormal * (wallA.thickness / 2.0),
+            faceNormal: faceNormal,
+            label: 'Wall corner',
+          );
         }
+        considerCandidate(
+          faceOrigin: endPt,
+          faceNormal: -dir,
+          label: 'Wall corner',
+        );
       }
     }
 
-    // -------------------------------------------------------------------------
+    if (bestSnap != null && bestScoreDist <= cornerRadius) {
+      return bestSnap!;
+    }
+
     // 2. Door & window opening jambs (discrete point snap - high priority)
-    // -------------------------------------------------------------------------
+    resetBest();
+    final jambRadius = math.min(0.45, tolerance * 1.3);
     for (final wall in referenceWalls) {
       if (excludedIds.contains(wall.id) || wall.length < 1e-4) continue;
+      final openings = <(String, double, double)>[
+        for (final d in wall.doors) (d.id, d.offsetRatio, d.width),
+        for (final w in wall.windows) (w.id, w.offsetRatio, w.width),
+      ];
 
-      final wallLen = wall.length;
-      for (final opening in [
-        for (final d in wall.doors) (d.id, d.offsetRatio, d.width, true),
-        for (final w in wall.windows) (w.id, w.offsetRatio, w.width, false),
-      ]) {
-        if (excludedIds.contains(opening.$1)) continue;
-
+      for (final opening in openings) {
         final ratio = opening.$2;
         final openWidth = opening.$3;
-        final isDoor = opening.$4;
-        final snapLabel = 'Opening jamb';
-
         final center = wall.centerPointAt(ratio);
         final tangent = wall.tangentAt(ratio);
         final normal = wall.normalAt(ratio);
@@ -201,117 +230,65 @@ class ArchitectServiceSnap {
 
         final leftJamb = center - tangent * halfOpen;
         final rightJamb = center + tangent * halfOpen;
-        final wallAngleDeg = (math.atan2(tangent.dy, tangent.dx) * 180.0 / math.pi) % 360.0;
-        final orients = getOrientations(wallAngleDeg);
+        final guideExt = normal * (wall.thickness * 1.5);
 
-        for (final orient in orients) {
-          final sideOffsets = <double>[
-            wall.thickness / 2.0 + orient.halfAcross,
-            -(wall.thickness / 2.0 + orient.halfAcross),
-            0.0,
-          ];
-
-          for (final acrossOff in sideOffsets) {
-            final acrossVec = normal * acrossOff;
-
-            // Left jamb snap
-            final pLeft = leftJamb - tangent * orient.halfAlong + acrossVec;
-            final dLeft = (pLeft - raw).distance;
-            if (dLeft < bestJambDist) {
-              bestJambDist = dLeft;
-              bestJambSnap = ArchitectSnapResult(
-                point: pLeft,
-                isSnapped: true,
-                snapLabel: snapLabel,
-                angleDeg: orient.rot,
-                magneticGuides: [
-                  (leftJamb - normal * (wall.thickness * 1.5), leftJamb + normal * (wall.thickness * 1.5)),
-                  (center - tangent * (openWidth + 1.2), center + tangent * (openWidth + 1.2)),
-                ],
-              );
-            }
-
-            // Right jamb snap
-            final pRight = rightJamb + tangent * orient.halfAlong + acrossVec;
-            final dRight = (pRight - raw).distance;
-            if (dRight < bestJambDist) {
-              bestJambDist = dRight;
-              bestJambSnap = ArchitectSnapResult(
-                point: pRight,
-                isSnapped: true,
-                snapLabel: snapLabel,
-                angleDeg: orient.rot,
-                magneticGuides: [
-                  (rightJamb - normal * (wall.thickness * 1.5), rightJamb + normal * (wall.thickness * 1.5)),
-                  (center - tangent * (openWidth + 1.2), center + tangent * (openWidth + 1.2)),
-                ],
-              );
-            }
-          }
+        for (final side in const [1.0, -1.0]) {
+          final faceNormal = normal * side;
+          final faceShift = faceNormal * (wall.thickness / 2.0);
+          considerCandidate(
+            faceOrigin: leftJamb - tangent * (width / 2.0) + faceShift,
+            faceNormal: faceNormal,
+            label: 'Opening jamb',
+            guides: [(leftJamb - guideExt, leftJamb + guideExt)],
+          );
+          considerCandidate(
+            faceOrigin: rightJamb + tangent * (width / 2.0) + faceShift,
+            faceNormal: faceNormal,
+            label: 'Opening jamb',
+            guides: [(rightJamb - guideExt, rightJamb + guideExt)],
+          );
         }
       }
     }
 
-    // If a discrete corner or jamb snap was found within tolerance, it takes priority!
-    if (bestCornerSnap != null || bestJambSnap != null) {
-      if (bestCornerSnap != null && bestJambSnap != null) {
-        return bestCornerDist <= bestJambDist ? bestCornerSnap : bestJambSnap;
-      }
-      return bestCornerSnap ?? bestJambSnap!;
+    if (bestSnap != null && bestScoreDist <= jambRadius) {
+      return bestSnap!;
     }
 
-    // -------------------------------------------------------------------------
     // 3. Wall faces along wall length (continuous edge snap)
-    // -------------------------------------------------------------------------
+    resetBest();
     for (final wall in referenceWalls) {
       if (excludedIds.contains(wall.id) || wall.length < 1e-4) continue;
 
-      final wallLen = wall.length;
-      final p1 = wall.startPoint;
-      final p2 = wall.endPoint;
-      final lineVec = p2 - p1;
-      final u = lineVec / wallLen;
-      final toPt = raw - p1;
-      final projDist = toPt.dx * u.dx + toPt.dy * u.dy;
-      final n = Offset(-u.dy, u.dx);
-      final wallAngleDeg = (math.atan2(lineVec.dy, lineVec.dx) * 180.0 / math.pi) % 360.0;
-      final orients = getOrientations(wallAngleDeg);
+      final (rawRatio, _) = wall.projectPoint(raw);
+      final ratio = rawRatio.clamp(0.0, 1.0);
+      final baseProj = wall.centerPointAt(ratio);
+      final n = wall.normalAt(ratio);
+      final toRaw = raw - baseProj;
+      final signedPerp = toRaw.dx * n.dx + toRaw.dy * n.dy;
+      final side = signedPerp >= 0 ? 1.0 : -1.0;
+      final faceNormal = n * side;
+      final halfThick = wall.thickness / 2.0;
+      final faceOrigin = baseProj + faceNormal * halfThick;
+      final centerGuideOffset = faceNormal * (halfThick + depth / 2.0);
 
-      if (projDist >= -tolerance && projDist <= wallLen + tolerance) {
-        final clampedProj = projDist.clamp(0.0, wallLen);
-        final baseProj = p1 + u * clampedProj;
-        final side = (toPt.dx * n.dx + toPt.dy * n.dy) >= 0 ? 1.0 : -1.0;
-
-        for (final orient in orients) {
-          final candidateOffsets = <double>[
-            (wall.thickness / 2.0 + orient.halfAcross) * side,
-            if (wall.thickness >= orient.halfAcross * 2.0)
-              (wall.thickness / 2.0 - orient.halfAcross) * side,
-            0.0,
-          ];
-
-          for (final off in candidateOffsets) {
-            final targetPoint = baseProj + n * off;
-            final dist = (targetPoint - raw).distance;
-            if (dist < bestFaceDist) {
-              bestFaceDist = dist;
-              final guideStart = p1 + n * off;
-              final guideEnd = p2 + n * off;
-              bestFaceSnap = ArchitectSnapResult(
-                point: targetPoint,
-                isSnapped: true,
-                snapLabel: 'Wall face',
-                angleDeg: orient.rot,
-                magneticGuides: [(guideStart, guideEnd)],
-              );
-            }
-          }
-        }
-      }
+      considerCandidate(
+        faceOrigin: faceOrigin,
+        faceNormal: faceNormal,
+        label: 'Wall face',
+        guides: wall.isCurved
+            ? const []
+            : [
+                (
+                  wall.centerStart + centerGuideOffset,
+                  wall.centerEnd + centerGuideOffset,
+                ),
+              ],
+      );
     }
 
-    if (bestFaceSnap != null) {
-      return bestFaceSnap;
+    if (bestSnap != null && bestScoreDist <= tolerance) {
+      return bestSnap!;
     }
 
     // Fallback to standard drawing snaps

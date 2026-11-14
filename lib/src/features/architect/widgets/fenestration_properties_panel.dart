@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import '../../bim_editing/widgets/bim_numeric_keypad.dart';
 import '../models/architect_fenestration_style.dart';
 
 class FenestrationPropertiesPanel extends StatelessWidget {
@@ -597,6 +598,23 @@ class _NumberState extends State<FenestrationNumberField> {
     super.dispose();
   }
 
+  Future<void> _openKeypad(BuildContext context) async {
+    final result = await BimNumericKeypad.showInputDialog(
+      context,
+      title: widget.label,
+      initialText: controller.text,
+      unitLabel: widget.unit,
+      decimals: widget.integer ? 0 : 2,
+      min: widget.min * widget.scale,
+      max: widget.max * widget.scale,
+    );
+    if (!mounted || result == null) return;
+    controller.text = widget.integer
+        ? result.round().toString()
+        : result.toStringAsFixed(6).replaceFirst(RegExp(r'\.?0+$'), '');
+    commit();
+  }
+
   @override
   Widget build(BuildContext context) => TextFormField(
     controller: controller,
@@ -606,7 +624,8 @@ class _NumberState extends State<FenestrationNumberField> {
       suffixText: widget.unit,
       isDense: true,
     ),
-    keyboardType: TextInputType.numberWithOptions(decimal: !widget.integer),
+    keyboardType: TextInputType.none,
+    onTap: () => _openKeypad(context),
     textInputAction: TextInputAction.next,
     autovalidateMode: AutovalidateMode.onUserInteraction,
     validator: (s) => parse(s ?? '') == null

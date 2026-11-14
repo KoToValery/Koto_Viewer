@@ -15,6 +15,27 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
 
+// ============================================================================
+// MASTER ARCHITECT FENESTRATION STYLE LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'architect_fenestration_style.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
+//
+// [SEC-01-MODELS]  [TAG:ARCH_STYLE_FENESTRA] Declarations: `FenestrationKind`, `PaneType`, `GlazingType`, `Fenest
+// [SEC-02-FENESTRA] [TAG:ARCH_STYLE_FENESTRA_2] Declarations: `FenestrationLayout`
+// [SEC-03-STATE]   [TAG:ARCH_STYLE_STATE] `ArchitectFenestrationStyle` state fields (29 fields: `id`, `name`, 
+// [SEC-04-CORE]    [TAG:ARCH_STYLE_CORE_LOGIC] Core Operations & Helpers: `resolveLayout`, `copyWith`, `setPaneMetr
+// [SEC-05-XFORM]   [TAG:ARCH_STYLE_XFORM_COORDS] Coordinate Transforms & Viewport Math: `collapsePane`, `updatePane`,
+// [SEC-06-CORE]    [TAG:ARCH_STYLE_PAINT_PLAN2] Core Operations & Helpers: `paintPlan2D`, `paintElevation2D` (2 meth
+// [SEC-07-PAINT]   [TAG:ARCH_STYLE_PAINT_RENDER] Canvas Painting & Geometry Rendering: `_renderSubdivisionElevation` 
+// [SEC-08-DIMS]    [TAG:ARCH_STYLE_DIMS_ANNOT] Dimensions, Text & Annotations: `_drawElevationDimensions`, `localiz
+// [SEC-09-CORE]    [TAG:ARCH_STYLE_STANDARD_CATALOG] Core Operations & Helpers: `standardCatalog` (1 methods)
+// [SEC-10-PARSE]   [TAG:ARCH_STYLE_PARSER_IO] Parsing, Serialization & Underlays: `toJson` (1 methods)
+// ============================================================================
+
+
+// === SECTION: [SEC-01-MODELS] CLASSES & HELPERS (FenestrationKind) ===
+// --- SUBSECTION: [TAG:ARCH_STYLE_FENESTRA] Declarations: `FenestrationKind`, `PaneType`, `GlazingType`, `FenestrationInfill` (+4 more) ---
 /// Semantic classification of the fenestration element.
 enum FenestrationKind { window, door }
 
@@ -516,6 +537,8 @@ class FenestrationTransom {
       );
 }
 
+// === SECTION: [SEC-02-FENESTRA] CLASS FenestrationLayout ===
+// --- SUBSECTION: [TAG:ARCH_STYLE_FENESTRA_2] Declarations: `FenestrationLayout` ---
 /// Bottom-up model coordinates. Clear pane rectangles never overlap profiles.
 class FenestrationLayout {
   final Map<String, ({FenestrationPane pane, Rect rect})> panes;
@@ -523,6 +546,8 @@ class FenestrationLayout {
   const FenestrationLayout(this.panes, this.dividers);
 }
 
+// === SECTION: [SEC-03-STATE] ARCHITECTFENESTRATIONSTYLE STATE & FIELDS ===
+// --- SUBSECTION: [TAG:ARCH_STYLE_STATE] `ArchitectFenestrationStyle` state fields (29 fields: `id`, `name`, `kind`, `defaultWidth`, `defaultHeight`) ---
 class ArchitectFenestrationStyle {
   final String id;
   final String name;
@@ -564,7 +589,7 @@ class ArchitectFenestrationStyle {
     this.kind = FenestrationKind.window,
     this.defaultWidth = 1.40,
     this.defaultHeight = 1.40,
-    this.defaultSillHeight = 0.85,
+    this.defaultSillHeight = 0.90,
     this.frameDepth = 0.07,
     this.frameFaceWidth = 0.07,
     this.centerInCore = true,
@@ -581,6 +606,8 @@ class ArchitectFenestrationStyle {
     this.transom,
   });
 
+// === SECTION: [SEC-04-CORE] CORE OPERATIONS & HELPERS ===
+// --- SUBSECTION: [TAG:ARCH_STYLE_CORE_LOGIC] Core Operations & Helpers: `resolveLayout`, `copyWith`, `setPaneMetricDimension`, `splitPane` (7 methods) ---
   static String centimeters(double meters) =>
       (meters * 100).toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
 
@@ -797,6 +824,8 @@ class ArchitectFenestrationStyle {
     );
   }
 
+// === SECTION: [SEC-05-XFORM] COORDINATE TRANSFORMS & VIEWPORT MATH ===
+// --- SUBSECTION: [TAG:ARCH_STYLE_XFORM_COORDS] Coordinate Transforms & Viewport Math: `collapsePane`, `updatePane`, `getPaneRect` (3 methods) ---
   /// Collapses an individual division or pane back to a single leaf pane.
   ArchitectFenestrationStyle collapsePane(String paneId) {
     if (transom?.subdivision.findPane(paneId) != null) {
@@ -946,6 +975,8 @@ class ArchitectFenestrationStyle {
   // SECTION 4: 2D PARAMETRIC PLAN DRAWING (HORIZONTAL CUT)
   // ===========================================================================
 
+// === SECTION: [SEC-06-CORE] CORE OPERATIONS & HELPERS ===
+// --- SUBSECTION: [TAG:ARCH_STYLE_PAINT_PLAN2] Core Operations & Helpers: `paintPlan2D`, `paintElevation2D` (2 methods) ---
   /// Draws the horizontal 2D architectural CAD plan cut of the window/door in the wall.
   void paintPlan2D({
     required Canvas canvas,
@@ -1403,6 +1434,8 @@ class ArchitectFenestrationStyle {
     }
   }
 
+// === SECTION: [SEC-07-PAINT] CANVAS PAINTING & GEOMETRY RENDERING ===
+// --- SUBSECTION: [TAG:ARCH_STYLE_PAINT_RENDER] Canvas Painting & Geometry Rendering: `_renderSubdivisionElevation` (1 methods) ---
   void _renderSubdivisionElevation({
     required Canvas canvas,
     required FenestrationSubdivision node,
@@ -1584,6 +1617,8 @@ class ArchitectFenestrationStyle {
     }
   }
 
+// === SECTION: [SEC-08-DIMS] DIMENSIONS, TEXT & ANNOTATIONS ===
+// --- SUBSECTION: [TAG:ARCH_STYLE_DIMS_ANNOT] Dimensions, Text & Annotations: `_drawElevationDimensions`, `localizedName` (2 methods) ---
   void _drawElevationDimensions(Canvas canvas, Offset origin, double scale) {
     final dimPaint = Paint()
       ..color = const Color(0xFF45515B)
@@ -1717,6 +1752,8 @@ class ArchitectFenestrationStyle {
   // SECTION 6: STANDARD PRESETS CATALOG
   // ===========================================================================
 
+// === SECTION: [SEC-09-CORE] CORE OPERATIONS & HELPERS ===
+// --- SUBSECTION: [TAG:ARCH_STYLE_STANDARD_CATALOG] Core Operations & Helpers: `standardCatalog` (1 methods) ---
   static List<ArchitectFenestrationStyle> standardCatalog() => [
     // 1. Single Casement Window (5-chamber, double glazing)
     ArchitectFenestrationStyle(
@@ -1725,7 +1762,7 @@ class ArchitectFenestrationStyle {
       kind: FenestrationKind.window,
       defaultWidth: 0.80,
       defaultHeight: 1.40,
-      defaultSillHeight: 0.85,
+      defaultSillHeight: 0.90,
       hasCasing: false,
       rootSubdivision: const FenestrationSubdivision(
         id: 'root',
@@ -1740,7 +1777,7 @@ class ArchitectFenestrationStyle {
       kind: FenestrationKind.window,
       defaultWidth: 1.40,
       defaultHeight: 1.40,
-      defaultSillHeight: 0.85,
+      defaultSillHeight: 0.90,
       hasCasing: false,
       rootSubdivision: const FenestrationSubdivision(
         id: 'root',
@@ -1773,7 +1810,7 @@ class ArchitectFenestrationStyle {
       kind: FenestrationKind.window,
       defaultWidth: 1.40,
       defaultHeight: 1.40,
-      defaultSillHeight: 0.85,
+      defaultSillHeight: 0.90,
       hasCasing: true,
       casingWidth: 0.10,
       casingProjection: 0.03,
@@ -1808,7 +1845,7 @@ class ArchitectFenestrationStyle {
       kind: FenestrationKind.window,
       defaultWidth: 2.10,
       defaultHeight: 1.40,
-      defaultSillHeight: 0.85,
+      defaultSillHeight: 0.90,
       hasCasing: false,
       rootSubdivision: const FenestrationSubdivision(
         id: 'root',
@@ -1848,7 +1885,7 @@ class ArchitectFenestrationStyle {
       kind: FenestrationKind.window,
       defaultWidth: 1.40,
       defaultHeight: 1.80,
-      defaultSillHeight: 0.85,
+      defaultSillHeight: 0.90,
       hasCasing: false,
       rootSubdivision: const FenestrationSubdivision(
         id: 'root',
@@ -2093,6 +2130,8 @@ class ArchitectFenestrationStyle {
   // SECTION 7: JSON SERIALIZATION
   // ===========================================================================
 
+// === SECTION: [SEC-10-PARSE] PARSING, SERIALIZATION & UNDERLAYS ===
+// --- SUBSECTION: [TAG:ARCH_STYLE_PARSER_IO] Parsing, Serialization & Underlays: `toJson` (1 methods) ---
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
@@ -2127,7 +2166,7 @@ class ArchitectFenestrationStyle {
     ),
     defaultWidth: (json['defaultWidth'] as num?)?.toDouble() ?? 1.40,
     defaultHeight: (json['defaultHeight'] as num?)?.toDouble() ?? 1.40,
-    defaultSillHeight: (json['defaultSillHeight'] as num?)?.toDouble() ?? 0.85,
+    defaultSillHeight: (json['defaultSillHeight'] as num?)?.toDouble() ?? 0.90,
     frameDepth: (json['frameDepth'] as num?)?.toDouble() ?? 0.07,
     frameFaceWidth: (json['frameFaceWidth'] as num?)?.toDouble() ?? 0.07,
     centerInCore: json['centerInCore'] as bool? ?? true,

@@ -8,6 +8,7 @@ import '../models/architect_column.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_scene_geometry.dart';
 import 'architect_wall_network.dart';
+import 'architect_wall_geometry.dart';
 import '../services/architect_spline_geometry.dart';
 
 /// View-only silhouettes of the nearest floors. They do not enter hit testing,
@@ -68,7 +69,9 @@ class ArchitectGhostStoreyPainter extends CustomPainter {
         canvas.drawPath(path, stroke);
       }
 
-      final walls = ArchitectWallNetwork.body(storey.walls);
+      final walls = ArchitectWallNetwork.body(
+        ArchitectWallGeometry.planWalls(storey.walls),
+      );
       canvas.drawPath(walls, fill);
       canvas.drawPath(walls, stroke);
       for (final slab in storey.slabs) {

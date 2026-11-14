@@ -11,6 +11,7 @@ import 'architect_component_labels.dart';
 import '../components/definitions/service_components.dart';
 import 'component_dimensions_dialog.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import '../../bim_editing/widgets/bim_numeric_keypad.dart';
 import '../models/architect_column.dart';
 import '../models/architect_decorative_element.dart';
 import '../models/architect_elements.dart';
@@ -40,7 +41,7 @@ export 'architect_tool_catalog.dart' show ArchitectToolCategory;
 // [SEC-02-STATE]   [TAG:ARCH_PALETTE_STATE] `_ArchitectToolPaletteState` state fields (51 fields: `category`, `c
 // [SEC-03-BUILD]   [TAG:ARCH_PALETTE_BUILD_LAYOUT] Widget Build & HUD Layout: `build`, `_buildToolButton` (2 methods)
 // [SEC-04-WALLS]   [TAG:ARCH_PALETTE_WALL_OPS] Wall Drafting, Splitting & Joints: `_buildWallSubBar`, `_chooseWallT
-// [SEC-05-OPENINGS] [TAG:ARCH_PALETTE_FENEST_OPENINGS] Doors, Windows & Openings: `_buildWindowSubBar`, `_buildDoorSubBar`
+// [SEC-05-OPENINGS] [TAG:ARCH_PALETTE_FENEST_OPENINGS] Doors, Windows & Openings: `_buildWindowSubBar`, `_buildDoorSubBar` 
 // [SEC-06-BUILD]   [TAG:ARCH_PALETTE_COMPONENT_SUB] Widget Build & HUD Layout: `_buildComponentSubBar`, `_buildColumnSub
 // [SEC-07-OPENINGS] [TAG:ARCH_PALETTE_OPENING_SUB] Doors, Windows & Openings: `_buildOpeningSubBar`, `_buildZoneSubBar`
 // [SEC-08-HITS]    [TAG:ARCH_PALETTE_HIT_TESTING] Hit Testing & Candidate Picking: `_showStylePicker`, `_buildViewsSub
@@ -225,7 +226,7 @@ class ArchitectToolPalette extends StatefulWidget {
     this.onWindowWidthChanged,
     this.windowHeight = 1.40,
     this.onWindowHeightChanged,
-    this.windowSill = 0.85,
+    this.windowSill = 0.90,
     this.onWindowSillChanged,
     this.windowHasCasing = false,
     this.onWindowHasCasingChanged,
@@ -1261,18 +1262,34 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   ),
                 ),
               ),
-              for (final s in [0.00, 0.85, 0.90])
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: ChoiceChip(
-                    label: Text(s == 0.0 ? '0' : '${(s * 100).round()} cm'),
-                    selected: (effectiveSill - s).abs() < 1e-3,
-                    onSelected: (sel) {
-                      if (sel) onWindowSillChanged?.call(s);
-                    },
-                    visualDensity: VisualDensity.compact,
-                  ),
+              ActionChip(
+                key: const ValueKey('window-sill-input'),
+                label: Text(
+                  '${ArchitectUnit.trimZeros((effectiveSill * 100).toStringAsFixed(1))} cm',
                 ),
+                onPressed: onWindowSillChanged == null
+                    ? null
+                    : () async {
+                        final initial = ArchitectUnit.trimZeros(
+                          (effectiveSill * 100).toStringAsFixed(1),
+                        );
+                        final entered = await BimNumericKeypad.showInputDialog(
+                          context,
+                          title: l10n.architectWindowSill,
+                          initialText: initial,
+                          unitLabel: 'cm',
+                          decimals: 1,
+                          min: 0,
+                          max: 300,
+                          cancelLabel: l10n.cancel,
+                          applyLabel: l10n.applyAction,
+                        );
+                        if (entered != null) {
+                          onWindowSillChanged!(entered / 100.0);
+                        }
+                      },
+                visualDensity: VisualDensity.compact,
+              ),
             ],
           ),
         ),

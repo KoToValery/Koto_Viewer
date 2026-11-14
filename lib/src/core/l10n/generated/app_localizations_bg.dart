@@ -13230,4 +13230,10 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectComponentPlacementHelp =>
       'Тапни за позиция и потвърди поставянето. Тапни „Обект“ отново за край; избери обект, за да го преместиш.';
+
+  @override
+  String get stairTotalWidth => 'Обща широчина на стълбата';
+
+  @override
+  String get architectVisibilityUnderlays => 'Подложки';
 }

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'architect_properties_shell.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import '../../bim_editing/widgets/bim_numeric_keypad.dart';
 import '../models/architect_component_definition.dart';
 import '../models/component_dimensions.dart';
 import '../models/architect_component.dart';
@@ -191,9 +192,25 @@ class _ComponentDimensionsDialogState extends State<ComponentDimensionsDialog> {
                           !automaticBody ||
                           axes[i] != 'height' ||
                           _values['autoHeight'] == false,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
+                      keyboardType: TextInputType.none,
+                      onTap: () async {
+                        final label = '${labels[i]} (${['X', 'Y', 'Z'][i]})';
+                        final result = await BimNumericKeypad.showInputDialog(
+                          context,
+                          title: label,
+                          initialText: _controllers[axes[i]]!.text,
+                          unitLabel: 'cm',
+                          decimals: 2,
+                          min: 0.1,
+                          max: 10000,
+                        );
+                        if (!mounted || result == null) return;
+                        final text = result
+                            .toStringAsFixed(3)
+                            .replaceFirst(RegExp(r'\.?0+$'), '');
+                        _controllers[axes[i]]!.text = text;
+                        _change(axes[i], text);
+                      },
                       textInputAction: i == 2
                           ? TextInputAction.done
                           : TextInputAction.next,
@@ -266,9 +283,27 @@ class _ComponentDimensionsDialogState extends State<ComponentDimensionsDialog> {
                     child: TextFormField(
                       key: ValueKey('service-${entry.key}'),
                       controller: _controllers[entry.key],
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
+                      keyboardType: TextInputType.none,
+                      onTap: () async {
+                        final result = await BimNumericKeypad.showInputDialog(
+                          context,
+                          title: entry.value,
+                          initialText: _controllers[entry.key]!.text,
+                          unitLabel: 'cm',
+                          decimals: 2,
+                          min: entry.key == 'flueDiameter' ? 8 : 0,
+                          max: 1000,
+                        );
+                        if (!mounted || result == null) return;
+                        final text = result
+                            .toStringAsFixed(3)
+                            .replaceFirst(RegExp(r'\.?0+$'), '');
+                        _controllers[entry.key]!.text = text;
+                        setState(() {
+                          _invalidAxes.remove(entry.key);
+                          _values[entry.key] = result / 100;
+                        });
+                      },
                       decoration: InputDecoration(
                         labelText: entry.value,
                         suffixText: 'cm',

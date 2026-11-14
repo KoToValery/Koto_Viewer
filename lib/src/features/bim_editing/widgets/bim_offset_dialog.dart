@@ -192,6 +192,7 @@ class _BimOffsetDialog extends StatefulWidget {
 
 class _BimOffsetDialogState extends State<_BimOffsetDialog> {
   final controller = TextEditingController();
+  String? _input;
 
   @override
   void dispose() {
@@ -230,18 +231,19 @@ class _BimOffsetDialogState extends State<_BimOffsetDialog> {
                 labelText: context.l10n.offsetAction,
                 suffixText: widget.unitSymbol,
               ),
-              onChanged: (_) => setState(() {}),
+              onChanged: (text) => setState(() => _input = text),
               onSubmitted: (_) => submit(),
             ),
             BimNumericKeypad(
               keyPrefix: 'bim-offset-key',
               decimals: 3,
               onKey: (key) => setState(() {
-                controller.text = BimNumericKeypad.edit(
-                  controller.text,
+                _input = BimNumericKeypad.edit(
+                  _input,
                   key,
                   decimals: 3,
                 );
+                controller.text = _input!;
               }),
             ),
           ],

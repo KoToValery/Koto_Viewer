@@ -3,6 +3,7 @@ import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_wall_network.dart';
+import 'architect_wall_geometry.dart';
 import 'architect_special_wall_geometry.dart';
 import 'architect_mesh_section.dart';
 import 'architect_path_solid.dart';
@@ -53,6 +54,7 @@ class ArchitectWallLayers {
         storeyElevation: project.activeStorey.elevation,
         storey: project.activeStorey,
         project: project,
+        includeInteriorPlaster: false,
       );
 
   static ArchitectWallLayers build(
@@ -62,7 +64,11 @@ class ArchitectWallLayers {
     double storeyElevation = 0,
     ArchitectStorey? storey,
     ArchitectProject? project,
+    bool includeInteriorPlaster = true,
   }) {
+    if (!includeInteriorPlaster) {
+      walls = ArchitectWallGeometry.planWalls(walls);
+    }
     if (walls.any((w) => w.hasRailingDesign)) {
       walls = [
         for (final w in walls)
@@ -75,6 +81,7 @@ class ArchitectWallLayers {
         types,
         cutPlaneHeight: cutPlaneHeight,
         storeyElevation: storeyElevation,
+        includeInteriorPlaster: includeInteriorPlaster,
       );
       var body = ordinary.body,
           core = ordinary.core,

@@ -35,6 +35,7 @@ class ArchitectStairDesign {
   final int? manualRisers;
   final double? manualGoing;
   final double landingDepth;
+  final double? totalWidth;
   final double innerRadius;
   final double sweepDegrees;
   final bool winderSteps;
@@ -67,6 +68,7 @@ class ArchitectStairDesign {
     this.manualRisers,
     this.manualGoing,
     this.landingDepth = 1.2,
+    this.totalWidth,
     this.innerRadius = .6,
     double? sweepDegrees,
     this.winderSteps = false,
@@ -88,6 +90,14 @@ class ArchitectStairDesign {
     this.nosingProjection = .03,
   }) : sweepDegrees =
            sweepDegrees ?? (shape == StairShape.spiralOverlap ? 375 : 270);
+
+  double wellGap(double flightWidth) =>
+      totalWidth == null ? .1 : math.max(0.0, totalWidth! - 2 * flightWidth);
+
+  double effectiveTotalWidth(double flightWidth) =>
+      totalWidth != null && totalWidth! >= 2 * flightWidth
+          ? totalWidth!
+          : 2 * flightWidth + .1;
 
   bool get isSpiral =>
       layout == null &&
@@ -236,6 +246,7 @@ class ArchitectStairDesign {
     for (final value in [
       rise,
       landingDepth,
+      ?totalWidth,
       innerRadius,
       sweepDegrees,
       ?manualGoing,
@@ -304,6 +315,8 @@ class ArchitectStairDesign {
     double? manualGoing,
     bool autoGoing = false,
     double? landingDepth,
+    double? totalWidth,
+    bool autoTotalWidth = false,
     double? innerRadius,
     double? sweepDegrees,
     bool? winderSteps,
@@ -341,6 +354,7 @@ class ArchitectStairDesign {
     manualRisers: autoRisers ? null : manualRisers ?? this.manualRisers,
     manualGoing: autoGoing ? null : manualGoing ?? this.manualGoing,
     landingDepth: landingDepth ?? this.landingDepth,
+    totalWidth: autoTotalWidth ? null : totalWidth ?? this.totalWidth,
     innerRadius: innerRadius ?? this.innerRadius,
     sweepDegrees:
         sweepDegrees ??
@@ -388,6 +402,7 @@ class ArchitectStairDesign {
     'manualRisers': manualRisers,
     'manualGoing': manualGoing,
     'landingDepth': landingDepth,
+    'totalWidth': totalWidth,
     'innerRadius': innerRadius,
     'sweepDegrees': sweepDegrees,
     'winderSteps': winderSteps,
@@ -433,6 +448,7 @@ class ArchitectStairDesign {
       manualRisers: (json['manualRisers'] as num?)?.toInt(),
       manualGoing: (json['manualGoing'] as num?)?.toDouble(),
       landingDepth: (json['landingDepth'] as num?)?.toDouble() ?? 1.2,
+      totalWidth: (json['totalWidth'] as num?)?.toDouble(),
       innerRadius: (json['innerRadius'] as num?)?.toDouble() ?? .6,
       sweepDegrees: (json['sweepDegrees'] as num?)?.toDouble(),
       winderSteps: json['winderSteps'] as bool? ?? false,
@@ -696,15 +712,16 @@ class ArchitectStairPlan {
           walk.add(world(end + axis * (d - width / 2)));
           axis = normal;
         } else {
-          // A 10 cm clear well separates the two return flights.
+          // A 10 cm clear well separates the two return flights unless a custom total width is set.
+          final well = design.wellGap(width);
           final side = f.isEven ? normal : -normal;
           landing([
             end - side * width / 2,
             end + axis * d - side * width / 2,
-            end + axis * d + side * (1.5 * width + .1),
-            end + side * (1.5 * width + .1),
+            end + axis * d + side * (1.5 * width + well),
+            end + side * (1.5 * width + well),
           ]);
-          origin = end + side * (width + .1);
+          origin = end + side * (width + well);
           walk.addAll([
             world(end + axis * d / 2),
             world(origin + axis * d / 2),

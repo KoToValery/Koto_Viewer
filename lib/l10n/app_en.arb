@@ -7219,5 +7219,13 @@
   "@architectStoreyManagerTitle": { "description": "Short title of the storey manager" },
   "architectComponentReplace": "Replace",
   "architectComponentReplaceHelp": "Replace from the library, keeping position and rotation.",
-  "architectComponentPlacementHelp": "Tap to position, then confirm to place. Tap Object again to finish; select an object to move it."
+  "architectComponentPlacementHelp": "Tap to position, then confirm to place. Tap Object again to finish; select an object to move it.",
+  "stairTotalWidth": "Total stair width",
+  "@stairTotalWidth": {
+    "description": "Label for total width of a multi-flight stair including stairwell gap"
+  },
+  "architectVisibilityUnderlays": "Underlays",
+  "@architectVisibilityUnderlays": {
+    "description": "Visibility category label for CAD/raster/ghost storey underlays"
+  }
 }

@@ -10755,9 +10755,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   ) {
 
     if (def.category == ArchitectComponentCategory.services || def is ServiceComponentDefinition) {
-      if (_componentPlacementPoint != null) {
-        return (_componentPlacementPoint!, _componentPlacementRotation * math.pi / 180.0);
-      }
       final activeParams = ComponentLibraryService.instance.activeParameters;
       final (w, d) = def is ServiceComponentDefinition
           ? def.footprint(activeParams)
@@ -12252,22 +12249,85 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         }
 
-        try {
-
-          _elementMovePreview = MoveArchitectElement(
-
-            storeyId: _project.activeStorey.id,
-
-            elementId: _draggingElementId!,
-
-            delta: delta,
-
-          ).apply(_elementMoveOriginal!);
-
-        } on ArgumentError {
-
-          _elementMoveDelta = null;
-
+        final dragComp = _elementMoveOriginal!.activeStorey.components
+            .where((c) => c.id == _draggingElementId && !c.isLocked)
+            .firstOrNull;
+        final dragDef = dragComp == null
+            ? null
+            : ComponentLibraryService.instance.findDefinition(dragComp.definitionId);
+        if (dragComp != null &&
+            dragDef != null &&
+            _magnetEnabled &&
+            (dragDef.category == ArchitectComponentCategory.services ||
+                dragDef is ServiceComponentDefinition ||
+                dragDef.placementMode == ComponentPlacementMode.wallAttached)) {
+          final targetRaw = dragComp.position + delta;
+          final Offset snappedPt;
+          final double snappedRotRad;
+          if (dragDef.category == ArchitectComponentCategory.services ||
+              dragDef is ServiceComponentDefinition) {
+            final (w, d) = dragDef is ServiceComponentDefinition
+                ? dragDef.footprint(dragComp.parameters)
+                : (dragComp.width, dragComp.depth);
+            final snap = ArchitectServiceSnap.resolve(
+              raw: targetRaw,
+              project: _elementMoveOriginal!,
+              width: w,
+              depth: d,
+              currentRotationDeg: dragComp.rotation * 180.0 / math.pi,
+              tolerance: (_touchInput ? 16 : 10) / _currentScale,
+              magnetic: _magnetEnabled,
+              excludedIds: {dragComp.id},
+              underlay: _currentUnderlayDoc,
+              frame: _effectiveUnderlayFrame,
+            );
+            snappedPt = snap.point;
+            snappedRotRad = snap.angleDeg != null
+                ? snap.angleDeg! * math.pi / 180.0
+                : dragComp.rotation;
+            _activeSnapLabel = snap.snapLabel;
+            _activeMagneticGuides = snap.magneticGuides;
+          } else {
+            _activeSnapLabel = null;
+            _activeMagneticGuides = const [];
+            final resolved = ArchitectComponentPlacement.resolve(
+              raw: targetRaw,
+              definition: dragDef,
+              walls: _elementMoveOriginal!.activeStorey.walls,
+              rotation: dragComp.rotation,
+              tolerance: math.min(18 / _currentScale, .25),
+              magnetic: _magnetEnabled,
+            );
+            snappedPt = resolved.$1;
+            snappedRotRad = resolved.$2;
+          }
+          delta = snappedPt - dragComp.position;
+          _elementMoveDelta = delta;
+          final updatedStorey = _elementMoveOriginal!.activeStorey.copyWith(
+            components: [
+              for (final c in _elementMoveOriginal!.activeStorey.components)
+                if (c.id == dragComp.id)
+                  dragComp.copyWith(position: snappedPt, rotation: snappedRotRad)
+                else
+                  c,
+            ],
+          );
+          _elementMovePreview = _elementMoveOriginal!.copyWith(
+            storeys: [
+              for (final s in _elementMoveOriginal!.storeys)
+                if (s.id == updatedStorey.id) updatedStorey else s,
+            ],
+          );
+        } else {
+          try {
+            _elementMovePreview = MoveArchitectElement(
+              storeyId: _project.activeStorey.id,
+              elementId: _draggingElementId!,
+              delta: delta,
+            ).apply(_elementMoveOriginal!);
+          } on ArgumentError {
+            _elementMoveDelta = null;
+          }
         }
 
       }
@@ -15262,7 +15322,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // Explicit Object placement never silently changes to selection.
     if (_placingComponent) {
-      setState(() => _updateComponentPlacement(rawModel));
+      _updateComponentPlacement(rawModel);
+      _commitComponentPlacement();
       return;
     }
 
@@ -15297,6 +15358,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _columnPreviewRotation = snap.angleDeg ?? _columnPreviewRotation;
         _cursorModel = pt;
       });
+      _commitColumnPlacement();
       _repaintPreview();
       return;
     }
@@ -28719,11 +28781,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _openLayersDialog() {
     showDialog<void>(
       context: context,
-      builder: (_) => ListenableBuilder(
-        listenable: _commands,
-        builder: (_, _) => ArchitectLayersDialog(
-          project: _project,
-          onToggleVisibility: (layer) {
+      builder: (_) => StatefulBuilder(
+        builder: (_, setDialogState) => ListenableBuilder(
+          listenable: _commands,
+          builder: (_, _) => ArchitectLayersDialog(
+            project: _project,
+            underlaysVisible: _showUnderlay || _showGhostStoreys,
+            onToggleUnderlays: (visible) {
+              final updated = _project.effectiveLayers.map((l) {
+                if (l.id == ArchitectLayer.cadUnderlayLayerId ||
+                    l.id == ArchitectLayer.rasterUnderlayLayerId) {
+                  return l.copyWith(visible: visible);
+                }
+                return l;
+              }).toList();
+              setState(() {
+                _showUnderlay = visible;
+                _showGhostStoreys = visible;
+                _project = _project.copyWith(layers: updated);
+              });
+              setDialogState(() {});
+              unawaited(_saveWorkspacePreferences());
+              _saveBiMProjectIfAttached();
+            },
+            onToggleVisibility: (layer) {
             final updated = _project.effectiveLayers.map((l) {
               if (l.id == layer.id) {
                 return l.copyWith(visible: !l.visible);
@@ -28766,15 +28847,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             });
             _saveBiMProjectIfAttached();
           },
-          onShowAll: () {
-            final updated = _project.effectiveLayers
-                .map((l) => l.copyWith(visible: true))
-                .toList();
-            setState(() {
-              _project = _project.copyWith(layers: updated);
-            });
-            _saveBiMProjectIfAttached();
-          },
+            onShowAll: () {
+              final updated = _project.effectiveLayers
+                  .map((l) => l.copyWith(visible: true))
+                  .toList();
+              setState(() {
+                _showUnderlay = true;
+                _project = _project.copyWith(layers: updated);
+              });
+              setDialogState(() {});
+              unawaited(_saveWorkspacePreferences());
+              _saveBiMProjectIfAttached();
+            },
+          ),
         ),
       ),
     );
@@ -32180,15 +32265,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    if (_placingComponent && _componentPlacementPoint != null) {
-      final component = ArchitectComponentInstance(
-        id: 'preview',
-        definitionId: ComponentLibraryService.instance.activeDefinition.id,
-        position: _componentPlacementPoint!,
-        rotation: _componentPlacementRotation * math.pi / 180,
-        parameters: ComponentLibraryService.instance.activeParameters,
-      );
-      return component.worldBoundingRect.topRight;
+    if (_placingComponent) {
+      final pt = _componentPlacementPoint ?? _cursorModel;
+      if (pt != null) {
+        final component = ArchitectComponentInstance(
+          id: 'preview',
+          definitionId: ComponentLibraryService.instance.activeDefinition.id,
+          position: pt,
+          rotation: _componentPlacementRotation * math.pi / 180,
+          parameters: ComponentLibraryService.instance.activeParameters,
+        );
+        return component.worldBoundingRect.topRight;
+      }
     }
 
     if (_activeTool == ArchitectTool.opening && _draftStart != null && _draftEnd != null) {
@@ -32289,8 +32377,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool get _canConfirmDraft => _canConfirmDimension || _canConfirmRoofDraft || _canConfirmLandscapeDraft ||
       _canConfirmContour || _canConfirmZone ||
-      (_placingComponent && _componentPlacementPoint != null) ||
-      (_activeTool == ArchitectTool.column && _columnPreviewPoint != null && !_columnPreviewIsOccupied) ||
       (_activeTool == ArchitectTool.opening && _draftStart != null && _draftEnd != null);
 
   void _commitColumnPlacement() {
@@ -32356,7 +32442,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         applyDraftingDefaults: true,
       );
       _componentPlacementPoint = null;
-      _cursorModel = null;
+      _cursorModel = pt;
     });
     _saveBiMProjectIfAttached();
     HapticFeedback.lightImpact();
@@ -32856,7 +32942,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ? 'architect-roof-confirm'
 
-                      : _canConfirmContour || _canConfirmZone || _placingComponent
+                      : _canConfirmContour || _canConfirmZone
 
                       ? 'architect-draft-confirm'
 

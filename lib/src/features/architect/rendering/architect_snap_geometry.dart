@@ -124,8 +124,11 @@ class ArchitectSnapGeometry {
               : (activeIdx > 0
                     ? project.storeys[activeIdx - 1].walls
                     : floor.walls));
-    if (wallCoresOnly)
+    if (wallCoresOnly) {
       referenceWalls = ArchitectWallGeometry.coreWalls(referenceWalls);
+    } else {
+      referenceWalls = ArchitectWallGeometry.planWalls(referenceWalls);
+    }
 
     for (final wall in referenceWalls) {
       if (wall.railing != null) {

@@ -13181,4 +13181,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectComponentPlacementHelp =>
       'Tap to position, then confirm to place. Tap Object again to finish; select an object to move it.';
+
+  @override
+  String get stairTotalWidth => 'Total stair width';
+
+  @override
+  String get architectVisibilityUnderlays => 'Underlays';
 }

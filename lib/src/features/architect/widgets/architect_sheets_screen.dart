@@ -18,6 +18,25 @@ import '../services/architect_sheet_geometry.dart';
 import 'architect_sheet_viewport.dart';
 import 'architect_exchange_export_dialog.dart';
 
+// ============================================================================
+// MASTER ARCHITECT SHEETS SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
+// ============================================================================
+// COMPANION MAP: See 'architect_sheets_screen.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
+//
+// [SEC-01-WIDGET]  [TAG:ARCH_SHEETS_WIDGET] Declarations: `_paperFormat`, `_paperNumber`, `_id`, `_parse` (+1 mo
+// [SEC-02-STATE]   [TAG:ARCH_SHEETS_STATE] `_SheetsState` state fields (16 fields: `selected`, `pendingPlacemen
+// [SEC-03-CORE]    [TAG:ARCH_SHEETS_CORE_LOGIC] Core Operations & Helpers: `_sourceOptions`, `fitView`, `checkLayout
+// [SEC-04-COMMITS] [TAG:ARCH_SHEETS_COMMIT_HANDLERS] Placement & Geometry Commit Handlers: `placeView`, `template`, `plac
+// [SEC-05-CORE]    [TAG:ARCH_SHEETS_OUTPUT] Core Operations & Helpers: `output`, `visibility`, `renameDrawing` (
+// [SEC-06-BUILD]   [TAG:ARCH_SHEETS_BUILD_LAYOUT] Widget Build & HUD Layout: `build` (1 methods)
+// [SEC-07-WIDGET]  [TAG:ARCH_SHEETS_WIDGET_2] Declarations: `_SheetDialog`, `_SheetDialogState`, `_PlacementDialog
+// [SEC-08-MODELS]  [TAG:ARCH_SHEETS_TEMPLATE] Declarations: `_TemplateDialogState`, `_fieldLabel`
+// ============================================================================
+
+
+// === SECTION: [SEC-01-WIDGET] WIDGET DECLARATIONS & PUBLIC API ===
+// --- SUBSECTION: [TAG:ARCH_SHEETS_WIDGET] Declarations: `_paperFormat`, `_paperNumber`, `_id`, `_parse` (+1 more) ---
 String _paperFormat(double width, double height) {
   for (final e in {
     'A4': (297, 210),
@@ -55,6 +74,8 @@ class ArchitectSheetsScreen extends StatefulWidget {
   State<ArchitectSheetsScreen> createState() => _SheetsState();
 }
 
+// === SECTION: [SEC-02-STATE] SHEETSSTATE STATE & FIELDS ===
+// --- SUBSECTION: [TAG:ARCH_SHEETS_STATE] `_SheetsState` state fields (16 fields: `selected`, `pendingPlacement`, `pendingDrawing`, `cropMode`, `busy`) ---
 class _SheetsState extends State<ArchitectSheetsScreen> {
   String? sheetId, selected;
   ArchitectDrawingPlacement? pendingPlacement;
@@ -69,6 +90,8 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
   Object? preflightRevision;
   List<String> preflightIssues = const [];
 
+// === SECTION: [SEC-03-CORE] CORE OPERATIONS & HELPERS ===
+// --- SUBSECTION: [TAG:ARCH_SHEETS_CORE_LOGIC] Core Operations & Helpers: `_sourceOptions`, `fitView`, `checkLayout`, `fitPlacement` (13 methods) ---
   List<String> layoutIssues(ArchitectSheet value, AppLocalizations l) {
     final key = (
       ArchitectDrawingPublisher.sourceRevision(project),
@@ -295,6 +318,8 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
     ];
   }
 
+// === SECTION: [SEC-04-COMMITS] PLACEMENT & GEOMETRY COMMIT HANDLERS ===
+// --- SUBSECTION: [TAG:ARCH_SHEETS_COMMIT_HANDLERS] Placement & Geometry Commit Handlers: `placeView`, `template`, `placementProperties`, `placePending` (7 methods) ---
   Future<void> placeView() async {
     if (sheet == null) return;
     final l = context.l10n;
@@ -507,6 +532,8 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
     );
   }
 
+// === SECTION: [SEC-05-CORE] CORE OPERATIONS & HELPERS ===
+// --- SUBSECTION: [TAG:ARCH_SHEETS_OUTPUT] Core Operations & Helpers: `output`, `visibility`, `renameDrawing` (3 methods) ---
   Future<void> renameDrawing() async {
     final drawing = document.drawings
         .where((d) => d.id == placement?.drawingId)
@@ -565,7 +592,9 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
       'dimensions': l.architectSheetDimensions,
       'annotations': l.architectSheetAnnotations,
       'markers': l.architectSheetMarkers,
+      'underlay': l.architectVisibilityUnderlays,
     };
+    final layers = ArchitectLayer.sortedForDisplay(project.effectiveLayers, l);
     final result = await showDialog<bool>(
       context: context,
       builder: (c) => StatefulBuilder(
@@ -574,6 +603,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
           scrollable: true,
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -586,6 +616,25 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                       (visible[entry.key] ?? drawing.visibility[entry.key]) !=
                       false,
                   onChanged: (v) => update(() => visible[entry.key] = v!),
+                ),
+              const Divider(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  l.architectLayers,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              for (final layer in layers)
+                CheckboxListTile(
+                  key: ValueKey('sheet-layer-${layer.id}'),
+                  title: Text(layer.localizedName(l)),
+                  value:
+                      visible['layer:${layer.id}'] ??
+                      drawing.visibility['layer:${layer.id}'] ??
+                      layer.visible,
+                  onChanged: (v) =>
+                      update(() => visible['layer:${layer.id}'] = v ?? true),
                 ),
             ],
           ),
@@ -719,6 +768,8 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
     }
   }
 
+// === SECTION: [SEC-06-BUILD] WIDGET BUILD & HUD LAYOUT ===
+// --- SUBSECTION: [TAG:ARCH_SHEETS_BUILD_LAYOUT] Widget Build & HUD Layout: `build` (1 methods) ---
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.controller,
@@ -1188,6 +1239,8 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
   );
 }
 
+// === SECTION: [SEC-07-WIDGET] WIDGET DECLARATIONS & PUBLIC API ===
+// --- SUBSECTION: [TAG:ARCH_SHEETS_WIDGET_2] Declarations: `_SheetDialog`, `_SheetDialogState`, `_PlacementDialog`, `_PlacementDialogState` (+4 more) ---
 class _SheetDialog extends StatefulWidget {
   final ArchitectSheet initial;
   const _SheetDialog(this.initial);
@@ -1593,6 +1646,8 @@ class _TemplateDialog extends StatefulWidget {
   State<_TemplateDialog> createState() => _TemplateDialogState();
 }
 
+// === SECTION: [SEC-08-MODELS] CLASSES & HELPERS (_TemplateDialogState) ===
+// --- SUBSECTION: [TAG:ARCH_SHEETS_TEMPLATE] Declarations: `_TemplateDialogState`, `_fieldLabel` ---
 class _TemplateDialogState extends State<_TemplateDialog> {
   late final name = TextEditingController(text: widget.initial.name);
   late List<ArchitectTitleItem> items = [...widget.initial.items];

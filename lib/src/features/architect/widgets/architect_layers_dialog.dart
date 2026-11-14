@@ -12,6 +12,8 @@ class ArchitectLayersDialog extends StatefulWidget {
   final void Function(String name, int? colorValue) onCreateLayer;
   final ValueChanged<ArchitectLayer> onDeleteLayer;
   final VoidCallback onShowAll;
+  final bool? underlaysVisible;
+  final ValueChanged<bool>? onToggleUnderlays;
 
   const ArchitectLayersDialog({
     super.key,
@@ -20,6 +22,8 @@ class ArchitectLayersDialog extends StatefulWidget {
     required this.onCreateLayer,
     required this.onDeleteLayer,
     required this.onShowAll,
+    this.underlaysVisible,
+    this.onToggleUnderlays,
   });
 
   @override
@@ -219,6 +223,21 @@ class _ArchitectLayersDialogState extends State<ArchitectLayersDialog> {
               ),
             ),
             const Divider(height: 1),
+            if (widget.onToggleUnderlays != null) ...[
+              SwitchListTile.adaptive(
+                key: const ValueKey('layers-toggle-underlays'),
+                secondary: AppIcon(
+                  (widget.underlaysVisible ?? true)
+                      ? AppIconId.visible
+                      : AppIconId.hidden,
+                  size: 20,
+                ),
+                title: Text(l.architectVisibilityUnderlays),
+                value: widget.underlaysVisible ?? true,
+                onChanged: widget.onToggleUnderlays,
+              ),
+              const Divider(height: 1),
+            ],
             Expanded(
               child: ListView.separated(
                 itemCount: layers.length,
