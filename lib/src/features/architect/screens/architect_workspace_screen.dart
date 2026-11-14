@@ -5803,6 +5803,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _selectedElementId = null;
 
+    _polygonEditId = null;
+
+    _polygonSelectedEdge = null;
+
+    _polygonContourElementId = null;
+
+    _polygonContourIndex = 0;
+
+    _polygonEditor.cancel();
+
     _transverseMove = false;
 
     _wallEndpointClearanceId = null;
@@ -5873,6 +5883,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectionIds.clear();
 
       _selectedElementId = null;
+
+      _polygonEditId = null;
+
+      _polygonSelectedEdge = null;
+
+      _polygonContourElementId = null;
+
+      _polygonContourIndex = 0;
+
+      _polygonEditor.cancel();
 
       _selectedZoneId = null;
 
@@ -9221,9 +9241,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _touchPosition = null;
       _placingWithHold = false;
       final grip = _newPointGrip;
-      _newPointDragOffset = grip != null && (grip - event.localPosition).distance <= 24
-          ? _viewport.toScreen(_newPointCandidate!) - event.localPosition
-          : Offset.zero;
+      final candidateScreen = _newPointCandidate != null
+          ? _viewport.toScreen(_newPointCandidate!)
+          : null;
+      _newPointDragOffset = grip != null && (grip - event.localPosition).distance <= 36
+          ? candidateScreen! - event.localPosition
+          : (candidateScreen != null &&
+                  (candidateScreen - event.localPosition).distance <= 20 &&
+                  _touchInput
+              ? candidateScreen - event.localPosition
+              : Offset.zero);
       _updateNewPointCandidate(
         _screenToModel(event.localPosition + _newPointDragOffset), isTouch: _touchInput,
       );
@@ -9410,7 +9437,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final id = _hitSelection(rawModel);
 
-      if (_moveSelection && id != null && _effectiveSelection.contains(id)) {
+      if (_moveSelection &&
+          id != null &&
+          _effectiveSelection.contains(id) &&
+          _selectedSlab == null &&
+          _polygonEditId == null) {
 
         _groupDragIds = _effectiveSelection;
 
@@ -13096,32 +13127,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final pos = _screenToModel(event.localPosition);
 
-      if (_polygonEditId != null || _selectedRoof != null) {
-
-        _selectPolygonEdge(pos);
-
-      }
+      final hitPolygonEdge =
+          (_polygonEditId != null || _selectedRoof != null) &&
+          _selectPolygonEdge(pos);
 
       _cancelActiveDrags();
 
-      if (_polygonEditId == null && _selectedRoof == null && !_moveSelection) {
-
-        _selectAt(
-
-          pos,
-
-          toggle:
-
-              _multiSelect ||
-
-              _activeTool == ArchitectTool.select ||
-
-              HardwareKeyboard.instance.isShiftPressed ||
-
-              HardwareKeyboard.instance.isControlPressed,
-
-        );
-
+      if (!hitPolygonEdge && !_moveSelection) {
+        final candidates = _selectionCandidates(pos);
+        final targetId = _polygonEditId ?? _selectedRoof?.id;
+        final onlySamePolygon = targetId != null &&
+            candidates.length == 1 &&
+            candidates.first == targetId;
+        if (!onlySamePolygon) {
+          _selectAt(
+            pos,
+            toggle:
+                _multiSelect ||
+                _activeTool == ArchitectTool.select ||
+                HardwareKeyboard.instance.isShiftPressed ||
+                HardwareKeyboard.instance.isControlPressed,
+          );
+        }
       }
 
       _repaintPreview();
@@ -14033,8 +14060,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     if (_polygonEditId != null || _selectedRoof != null) {
-      _selectPolygonEdge(rawModel);
-      return;
+      if (_selectPolygonEdge(rawModel)) return;
+      final candidates = _selectionCandidates(rawModel);
+      final targetId = _polygonEditId ?? _selectedRoof?.id;
+      if (candidates.length == 1 && candidates.first == targetId) {
+        return;
+      }
     }
 
     if (_wallCutIds.isNotEmpty) {
@@ -18310,26 +18341,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  void _selectPolygonEdge(Offset point) {
+  bool _selectPolygonEdge(Offset point) {
 
-    if (_polygonDistanceOpen) return;
+    if (_polygonDistanceOpen) return false;
     _selectPolygonContour(point);
 
     final polygon = _editablePolygon;
 
-    if (polygon == null) return;
+    if (polygon == null) return false;
 
-    var edge = ArchitectPolygonDimensions.hitEdge(
+    int? edge;
 
-      polygon,
-
-      point,
-
-      18 / _currentScale,
-
-    );
-
-    if (edge == null && _handleOffsetLength > 0) {
+    if (_handleOffsetLength > 0) {
       var best = 28 / _currentScale;
       for (var i = 0; i < polygon.length; i++) {
         final handle = ArchitectPolygonEditor.offsetEdgeHandle(
@@ -18346,13 +18369,39 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
 
+    if (edge == null) {
+      final hitEdge = ArchitectPolygonDimensions.hitEdge(
+        polygon,
+        point,
+        18 / _currentScale,
+      );
+      if (hitEdge != null) {
+        final targetId = _polygonEditId ?? _selectedRoof?.id;
+        final candidates = _selectionCandidates(point);
+        if (candidates.isNotEmpty &&
+            targetId != null &&
+            candidates.first != targetId) {
+          return false;
+        }
+        edge = hitEdge;
+      }
+    }
+
     if (edge != null) {
 
       setState(() => _polygonSelectedEdge = edge);
 
       HapticFeedback.selectionClick();
 
+      return true;
+
     }
+
+    if (_polygonSelectedEdge != null) {
+      setState(() => _polygonSelectedEdge = null);
+    }
+
+    return false;
 
   }
 
@@ -18659,6 +18708,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           onPressed: _polygonDistanceOpen ? null : _showProperties,
                         ),
                       ],
+                      if (_commandPreview == null)
                       IconButton(
 
                         key: const ValueKey('polygon-edit-close'),
@@ -18679,13 +18729,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                             ? null
 
-                            : () => setState(() {
-
-                                _polygonEditId = null;
-
-                                _polygonSelectedEdge = null;
-
-                              }),
+                            : () {
+                                if (_hatchOrSlabSelected) {
+                                  _clearSelection();
+                                } else {
+                                  setState(() {
+                                    _polygonEditId = null;
+                                    _polygonSelectedEdge = null;
+                                  });
+                                }
+                              },
 
                         icon: AppIcon(
                           AppIconId.confirm,
@@ -19940,7 +19993,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_wallCutIds.isNotEmpty ||
 
-        _polygonEditId != null ||
+        _polygonEditor.active ||
 
         _wallJoinSourceId != null ||
 
@@ -21870,11 +21923,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       for (final p in [...a.polygonCorners, ...a.coreCorners]) {
 
-        final targetPoint = path.closed
+        final targetPoint = BimLineGeometry.closest(p, edgeP1, edgeP2);
 
-            ? p
-
-            : BimLineGeometry.closest(p, edgeP1, edgeP2);
+        if (path.closed &&
+            (!_magnetEnabled || (p - targetPoint).distance > 8.0 / _currentScale)) {
+          continue;
+        }
 
         final dist = (targetPoint - hit.point).distance;
 
@@ -21888,7 +21942,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           guides = [
 
-            if (!path.closed && (p - targetPoint).distance > 1e-4)
+            if ((p - targetPoint).distance > 1e-4)
 
               (p, targetPoint),
 
@@ -21936,11 +21990,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             if (pt != null) {
 
-              final targetPoint = path.closed
+              final targetPoint = BimLineGeometry.closest(pt, edgeP1, edgeP2);
 
-                  ? pt
-
-                  : BimLineGeometry.closest(pt, edgeP1, edgeP2);
+              if (!path.closed ||
+                  (_magnetEnabled &&
+                      (pt - targetPoint).distance <= 8.0 / _currentScale)) {
 
               final dist = (targetPoint - hit.point).distance;
 
@@ -21953,6 +22007,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 snapLabel = 'Corner';
 
                 guides = [fa, fb];
+
+              }
 
               }
 
@@ -21990,11 +22046,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             if (pt != null) {
 
-              final targetPoint = path.closed
+              final targetPoint = BimLineGeometry.closest(pt, edgeP1, edgeP2);
 
-                  ? pt
-
-                  : BimLineGeometry.closest(pt, edgeP1, edgeP2);
+              if (!path.closed ||
+                  (_magnetEnabled &&
+                      (pt - targetPoint).distance <= 8.0 / _currentScale)) {
 
               final dist = (targetPoint - hit.point).distance;
 
@@ -22007,6 +22063,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 snapLabel = 'Core';
 
                 guides = [ca, cb];
+
+              }
 
               }
 
@@ -22336,7 +22394,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // nearest end of the edge. Only used when no stronger snap was found.
 
-    if (snapLabel == null) {
+    if (snapLabel == null && !path.closed) {
 
       final edgeLen = (edgeP2 - edgeP1).distance;
 
@@ -25588,6 +25646,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _touchCandidates = null;
     _moveSelection = false;
     _transverseMove = false;
+    _polygonDisplacementLine = null;
+    _polygonDistanceOpen = false;
     assert(_commandPreview == null);
 
     final storeyId = _project.activeStorey.id;
@@ -25987,11 +26047,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final screenPos = _viewport.toScreen(anchor);
     final clamped = _clampOverlayPosition(screenPos, width: 200);
     return ArchitectFloatingCommandOverlay(
+      surfaceKey: const ValueKey('architect-new-point-banner'),
       position: clamped,
       label: l.bimNewPoint,
       ready: _newPointValid,
-      onCancel: _cancelNewPointSession,
-      onConfirm: _commitNewPoint,
+      onCancel: _commandPreview != null
+          ? _cancelGeometryCommand
+          : _cancelNewPointSession,
+      onConfirm: _commandPreview != null
+          ? _confirmGeometryCommand
+          : _commitNewPoint,
     );
   }
 
@@ -29678,8 +29743,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ...storey.beams.map((e) => e.id),
 
-      ...storey.slabs.map((e) => e.id),
-
       ...storey.roofs.map((e) => e.id),
 
       ...storey.openings.map((e) => e.id),
@@ -32314,7 +32377,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _zoneTool.draftPoints.lastOrNull ??
 
-        _elementTool.slabDraftPoints.lastOrNull ??
+        (_activeTool == ArchitectTool.slab && _cutOpeningTargetId == null
+            ? null
+            : _elementTool.slabDraftPoints.lastOrNull) ??
 
         _roofTool.draftPoints.firstOrNull;
 
@@ -35373,7 +35438,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ),
-      if (_commandPreview != null && !_dragController.isActive && !_mirrorActive && _chamferFilletSourceId == null)
+      if (_commandPreview != null &&
+          !_dragController.isActive &&
+          !_mirrorActive &&
+          _chamferFilletSourceId == null &&
+          _newPointTargetId == null &&
+          _offsetOptions == null &&
+          !_splitActive &&
+          (_wallCutIds.isEmpty || _wallCutStroke) &&
+          _curvingEdgeElementId == null &&
+          _wallJoinSourceId == null &&
+          !_polygonDistanceOpen)
         ArchitectFloatingCommandOverlay(
           surfaceKey: const ValueKey('architect-generic-command-overlay'),
           label: BimEditActions.label(_commandAction!, context.l10n),
