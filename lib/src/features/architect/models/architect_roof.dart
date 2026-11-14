@@ -383,6 +383,13 @@ class ArchitectRoofAssembly {
     required this.timber,
   });
 
+  static bool isFactoryId(String id) => id.isEmpty || id.startsWith('preset_');
+
+  bool get isFactoryPreset =>
+      isFactoryId(id) &&
+      customName.trim().isEmpty &&
+      preset != ArchitectRoofPreset.custom;
+
   String label(AppLocalizations l10n) =>
       customName.isNotEmpty ? customName : preset.label(l10n);
 

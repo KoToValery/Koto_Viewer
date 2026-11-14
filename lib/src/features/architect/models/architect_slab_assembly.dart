@@ -141,6 +141,11 @@ class ArchitectSlabAssembly {
     this.below = const [],
   });
 
+  static bool isFactoryId(String id) =>
+      SlabUsage.values.any((u) => id == 'slab-${u.name}');
+
+  bool get isFactoryPreset => isFactoryId(id);
+
   bool get hasSlope => above.any((l) => l.slopePercent > 0);
   double get upperThickness => above.fold(0, (a, l) => a + l.thickness);
   double get lowerThickness => below.fold(0, (a, l) => a + l.thickness);

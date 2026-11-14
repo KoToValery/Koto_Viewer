@@ -23969,6 +23969,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading underlay...'**
   String get architectWizardLoadingUnderlay;
+
+  /// Confirmation dialog title when deleting a custom hatch pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Delete hatch pattern'**
+  String get architectHatchDeleteConfirmTitle;
+
+  /// Confirmation message when deleting a custom hatch pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Delete custom hatch pattern \"{name}\"?'**
+  String architectHatchDeleteConfirmPrompt(String name);
+
+  /// Snackbar message shown after deleting a custom hatch pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Custom hatch pattern deleted.'**
+  String get architectHatchPatternDeleted;
+
+  /// Confirmation message when deleting a custom 3D decorative preset
+  ///
+  /// In en, this message translates to:
+  /// **'Delete custom 3D decorative element \"{name}\"?'**
+  String architectDecorativeDeleteConfirm(String name);
+
+  /// Snackbar message shown after deleting a custom 3D decorative preset
+  ///
+  /// In en, this message translates to:
+  /// **'Custom 3D decorative element deleted.'**
+  String get architectDecorativeDeleted;
+
+  /// Warning message when attempting to delete a built-in factory preset
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in factory presets cannot be deleted.'**
+  String get architectFactoryPresetProtected;
 }
 
 class _AppLocalizationsDelegate

@@ -13248,4 +13248,29 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectWizardLoadingUnderlay => 'Зареждане на подложка...';
+
+  @override
+  String get architectHatchDeleteConfirmTitle => 'Изтриване на щриховка';
+
+  @override
+  String architectHatchDeleteConfirmPrompt(String name) {
+    return 'Да се изтрие ли потребителската щриховка „$name“?';
+  }
+
+  @override
+  String get architectHatchPatternDeleted =>
+      'Потребителската щриховка е изтрита.';
+
+  @override
+  String architectDecorativeDeleteConfirm(String name) {
+    return 'Да се изтрие ли потребителският 3D декоративен елемент „$name“?';
+  }
+
+  @override
+  String get architectDecorativeDeleted =>
+      'Потребителският 3D декоративен елемент е изтрит.';
+
+  @override
+  String get architectFactoryPresetProtected =>
+      'Фабричните типове не могат да бъдат изтривани.';
 }

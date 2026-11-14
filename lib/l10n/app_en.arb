@@ -7243,5 +7243,35 @@
   "architectWizardLoadingUnderlay": "Loading underlay...",
   "@architectWizardLoadingUnderlay": {
     "description": "Loading indicator text while importing CAD underlay during project creation"
+  },
+  "architectHatchDeleteConfirmTitle": "Delete hatch pattern",
+  "@architectHatchDeleteConfirmTitle": {
+    "description": "Confirmation dialog title when deleting a custom hatch pattern"
+  },
+  "architectHatchDeleteConfirmPrompt": "Delete custom hatch pattern \"{name}\"?",
+  "@architectHatchDeleteConfirmPrompt": {
+    "description": "Confirmation message when deleting a custom hatch pattern",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "architectHatchPatternDeleted": "Custom hatch pattern deleted.",
+  "@architectHatchPatternDeleted": {
+    "description": "Snackbar message shown after deleting a custom hatch pattern"
+  },
+  "architectDecorativeDeleteConfirm": "Delete custom 3D decorative element \"{name}\"?",
+  "@architectDecorativeDeleteConfirm": {
+    "description": "Confirmation message when deleting a custom 3D decorative preset",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "architectDecorativeDeleted": "Custom 3D decorative element deleted.",
+  "@architectDecorativeDeleted": {
+    "description": "Snackbar message shown after deleting a custom 3D decorative preset"
+  },
+  "architectFactoryPresetProtected": "Built-in factory presets cannot be deleted.",
+  "@architectFactoryPresetProtected": {
+    "description": "Warning message when attempting to delete a built-in factory preset"
   }
 }

@@ -66,6 +66,7 @@ class ArchitectLineStyleLibrary {
   }
 
   static Future<bool> delete(String id) async {
+    if (ArchitectLineStyle.allPresets.any((s) => s.id == id)) return false;
     final entries = await load();
     final prefs = await SharedPreferences.getInstance();
     return prefs.setString(

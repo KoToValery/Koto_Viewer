@@ -53,6 +53,7 @@ class ArchitectRoofLibrary {
 
   /// Deletes a custom roof build-up from the library by ID.
   static Future<bool> delete(String id) async {
+    if (ArchitectRoofAssembly.isFactoryId(id)) return false;
     final entries = await load();
     final prefs = await SharedPreferences.getInstance();
     return prefs.setString(

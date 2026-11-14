@@ -172,6 +172,7 @@ class ArchitectSlabLibrary {
   }
 
   static Future<bool> delete(String id) async {
+    if (ArchitectSlabAssembly.isFactoryId(id)) return false;
     final entries = await load();
     final prefs = await SharedPreferences.getInstance();
     return prefs.setString(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'architect_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -23,15 +24,16 @@ class ArchitectWallTypesManager extends StatefulWidget {
 }
 
 class _TypesState extends State<ArchitectWallTypesManager> {
-  late ArchitectProject project =
-      widget.project.wallTypes.any((t) => t.isCatalogType)
-      ? widget.project
-      : widget.project.copyWith(
-          wallTypes: [
-            ...ArchitectWallType.standardCatalog(),
-            ...widget.project.wallTypes,
-          ],
-        );
+  late ArchitectProject project = ArchitectWallLibrary.mergeCustomTypes(
+    widget.project.wallTypes.any((t) => t.isCatalogType)
+        ? widget.project
+        : widget.project.copyWith(
+            wallTypes: [
+              ...ArchitectWallType.standardCatalog(),
+              ...widget.project.wallTypes,
+            ],
+          ),
+  );
   String? activeId;
   int uses(String id) => project.storeys.fold(
     0,
@@ -73,7 +75,12 @@ class _TypesState extends State<ArchitectWallTypesManager> {
               replaceTypeId: copy ? null : type.id,
             ).apply(project),
           );
-          if (accepted) setState(() => activeId = value.id);
+          if (accepted) {
+            if (value.isCatalogType && !value.isFactoryPreset) {
+              unawaited(ArchitectWallLibrary.saveCustomType(value));
+            }
+            setState(() => activeId = value.id);
+          }
           return accepted;
         },
       ),
@@ -81,6 +88,7 @@ class _TypesState extends State<ArchitectWallTypesManager> {
   }
 
   Future<void> remove(ArchitectWallType type) async {
+    if (type.isFactoryPreset) return;
     var replacement = '';
     if (uses(type.id) == 0) {
       final confirmed = await showDialog<bool>(
@@ -159,16 +167,18 @@ class _TypesState extends State<ArchitectWallTypesManager> {
       );
       if (accepted != true || !mounted) return;
     }
-    apply(
+    if (apply(
       DeleteArchitectWallType(
         type.id,
         replacementId: replacement,
       ).apply(project),
-    );
+    )) {
+      unawaited(ArchitectWallLibrary.deleteCustomType(type.id));
+    }
   }
 
   Future<void> newType() async {
-    final templates = ArchitectWallLibrary.available(const []);
+    final templates = ArchitectWallLibrary.available(project.wallTypes);
     final result = await showArchitectWallTypePicker(
       context,
       types: templates,
@@ -193,8 +203,11 @@ class _TypesState extends State<ArchitectWallTypesManager> {
       onCopy: (type) => edit(type, copy: true),
       onDelete: types.length > 1 ? remove : null,
       canDelete: (type) =>
-          uses(type.id) == 0 ||
-          types.any((t) => t.id != type.id && t.isParapet == type.isParapet),
+          !type.isFactoryPreset &&
+          (uses(type.id) == 0 ||
+              types.any(
+                (t) => t.id != type.id && t.isParapet == type.isParapet,
+              )),
       onNewType: newType,
       onClose: () => Navigator.pop(context),
     );

@@ -595,7 +595,7 @@ class _BrowserState extends State<ArchitectWallCatalogBrowser> {
                       child: Text(l.wallTypeCopy),
                     ),
                   ),
-                  if (widget.onDelete != null)
+                  if (!type.isFactoryPreset && widget.onDelete != null)
                     PopupMenuItem(
                       value: 'delete',
                       enabled: widget.canDelete?.call(type) ?? true,

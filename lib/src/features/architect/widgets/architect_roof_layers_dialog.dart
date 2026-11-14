@@ -160,9 +160,9 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
     );
     if (chosenName != null && chosenName.isNotEmpty) {
       final toSave = _assembly.copyWith(
-        id: _assembly.id.isNotEmpty
-            ? _assembly.id
-            : ArchitectElementId.next('roof_assembly'),
+        id: ArchitectRoofAssembly.isFactoryId(_assembly.id)
+            ? ArchitectElementId.next('roof_assembly')
+            : _assembly.id,
         preset: ArchitectRoofPreset.custom,
         customName: chosenName,
       );
@@ -177,6 +177,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
   }
 
   Future<void> _deleteFromLibrary() async {
+    if (_assembly.isFactoryPreset) return;
     final l = context.l10n;
     final messenger = ScaffoldMessenger.of(context);
     final confirm = await showDialog<bool>(
@@ -597,7 +598,22 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
       setState(() => _error = _assemblyError);
       return;
     }
-    final result = _result(pickDownpipe: pickDownpipe);
+    var result = _result(pickDownpipe: pickDownpipe);
+    final isCustomAssembly =
+        _assembly.preset == ArchitectRoofPreset.custom ||
+        _assembly.customName.trim().isNotEmpty ||
+        _library.any((a) => a.id == _assembly.id);
+    if (isCustomAssembly) {
+      final customToSave = _assembly.copyWith(
+        id: ArchitectRoofAssembly.isFactoryId(_assembly.id)
+            ? ArchitectElementId.next('roof_assembly')
+            : _assembly.id,
+        preset: ArchitectRoofPreset.custom,
+      );
+      _assembly = customToSave;
+      result = _result(pickDownpipe: pickDownpipe);
+      unawaited(ArchitectRoofLibrary.save(customToSave));
+    }
     if (widget.onTryApply != null) {
       if (!widget.onTryApply!(result)) {
         setState(() => _error = context.l10n.roofUiNumericInvalid);
@@ -930,6 +946,7 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                 preset,
               ).layers.map((layer) => layer.material.label(l)).join(' · '),
               value: 'preset_${preset.name}',
+              isPreset: true,
             ),
         for (final item in _library)
           ArchitectCompositionChoice(
@@ -939,8 +956,45 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                 .map((layer) => layer.material.label(l))
                 .join(' · '),
             value: 'lib_${item.id}',
+            isPreset: false,
           ),
       ],
+      onDelete: (choice) async {
+        if (choice.isPreset || !choice.id.startsWith('lib_')) return false;
+        final item = _library
+            .where((a) => 'lib_${a.id}' == choice.id)
+            .firstOrNull;
+        if (item == null || item.isFactoryPreset) return false;
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => architectAlertDialog(
+            title: Text(l.roofDeleteLibrary),
+            content: Text(l.roofDeleteConfirm(item.label(l))),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(l.delete),
+              ),
+            ],
+          ),
+        );
+        if (confirm != true) return false;
+        await ArchitectRoofLibrary.delete(item.id);
+        await _loadLibrary();
+        if (_assembly.id == item.id && mounted) {
+          setState(() {
+            _assembly = ArchitectRoofAssembly.fromPreset(
+              ArchitectRoofPreset.pitchedTiles,
+            );
+          });
+          _queuePreview();
+        }
+        return true;
+      },
     );
     if (chosen == null || !mounted) return;
     if (chosen.startsWith('lib_')) {
@@ -980,7 +1034,8 @@ class _ArchitectRoofLayersDialogState extends State<ArchitectRoofLayersDialog>
                     child: Text(l.roofSaveLibrary),
                   ),
                 ),
-                if (_library.any((a) => a.id == _assembly.id))
+                if (!_assembly.isFactoryPreset &&
+                    _library.any((a) => a.id == _assembly.id))
                   PopupMenuItem(
                     value: 'library_delete',
                     child: AppMenuLabel(

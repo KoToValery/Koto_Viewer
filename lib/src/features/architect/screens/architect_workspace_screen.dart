@@ -5997,27 +5997,51 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   Future<void> _loadWallTypePreference() async {
-
     try {
-
+      final initial = _modelCommands.project;
+      await ArchitectWallLibrary.syncFromProject(initial);
+      final globalLineStyles = await ArchitectLineStyleLibrary.load();
+      final globalHatchPatterns = await ArchitectHatchPatternLibrary.load();
+      for (final s in initial.lineStyles) {
+        if (!s.isPreset && !globalLineStyles.any((g) => g.id == s.id)) {
+          await ArchitectLineStyleLibrary.save(s);
+        }
+      }
+      for (final p in initial.hatchPatterns) {
+        if (!p.isPreset && !globalHatchPatterns.any((g) => g.id == p.id)) {
+          await ArchitectHatchPatternLibrary.save(p);
+        }
+      }
       final preferences = await SharedPreferences.getInstance();
-
-      if (!mounted || _wallPreferenceChanged) return;
-
+      if (!mounted) return;
+      final current = _modelCommands.project;
+      var merged = ArchitectWallLibrary.mergeCustomTypes(current);
+      final missingLines = [
+        for (final s in globalLineStyles)
+          if (!current.lineStyles.any((e) => e.id == s.id)) s,
+      ];
+      final missingHatches = [
+        for (final p in globalHatchPatterns)
+          if (!current.hatchPatterns.any((e) => e.id == p.id)) p,
+      ];
+      if (missingLines.isNotEmpty || missingHatches.isNotEmpty) {
+        merged = merged.copyWith(
+          lineStyles: [...merged.lineStyles, ...missingLines],
+          hatchPatterns: [...merged.hatchPatterns, ...missingHatches],
+        );
+      }
+      if (!identical(merged, current)) {
+        _modelCommands.replaceView(merged);
+      }
       setState(() {
-
-        _preferredWallTypeId = preferences.getString(_wallTypePreference);
-
+        if (!_wallPreferenceChanged) {
+          _preferredWallTypeId = preferences.getString(_wallTypePreference);
+        }
         _restoreWallType();
-
       });
-
     } catch (error) {
-
       debugPrint('Architect wall preference: $error');
-
     }
-
   }
 
 
@@ -7742,14 +7766,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     onCancel: () => setState(_elementTool.cancelSlabDrafting),
 
+    onDeletePattern: (pattern) {
+      if (pattern.isPreset) return;
+      _commands.execute(DeleteArchitectHatchPattern(pattern.id));
+      unawaited(ArchitectHatchPatternLibrary.delete(pattern.id));
+      _saveBiMProjectIfAttached();
+      if (_activeHatchPattern.id == pattern.id) {
+        setState(() => _activeHatchPattern = ArchitectHatchPattern.diagonal);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.architectHatchPatternDeleted)),
+      );
+    },
+
     onChanged: (pattern) {
 
-      if (!pattern.isPreset && !_project.hatchPatterns.any((p) => p == pattern)) {
-
-        _commands.execute(SaveArchitectHatchPattern(pattern));
-
-        _saveBiMProjectIfAttached();
-
+      if (!pattern.isPreset) {
+        unawaited(ArchitectHatchPatternLibrary.save(pattern));
+        if (!_project.hatchPatterns.any((p) => p == pattern)) {
+          _commands.execute(SaveArchitectHatchPattern(pattern));
+          _saveBiMProjectIfAttached();
+        }
       }
 
       setState(() => _activeHatchPattern = pattern);
@@ -24525,6 +24562,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _deleteWallType(ArchitectWallType type) async {
+    if (type.isFactoryPreset) return;
     final l = context.l10n;
     final uses = _project.storeys.fold(
       0,
@@ -24558,6 +24596,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _modelCommands.commit(
           DeleteArchitectWallType(type.id).apply(_modelCommands.project),
         );
+        unawaited(ArchitectWallLibrary.deleteCustomType(type.id));
         _restoreWallType();
         _saveBiMProjectIfAttached();
         ScaffoldMessenger.of(context,
@@ -24584,6 +24623,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           try {
 
             _modelCommands.commit(next);
+
+            unawaited(ArchitectWallLibrary.syncFromProject(next));
 
             _restoreWallType();
 
@@ -24632,6 +24673,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           }
           try {
             _modelCommands.execute(SetArchitectWallComposition(type: type));
+            if (type.isCatalogType && !type.isFactoryPreset) {
+              unawaited(ArchitectWallLibrary.saveCustomType(type));
+            }
             _selectWallType(type);
             _saveBiMProjectIfAttached();
             return true;
@@ -24804,6 +24848,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
 
             ]);
+            if (next.isCatalogType && !next.isFactoryPreset) {
+              unawaited(ArchitectWallLibrary.saveCustomType(next));
+            }
 
             _saveBiMProjectIfAttached();
 
@@ -26404,6 +26451,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ).apply(edited),
 
             );
+            if (variant.isCatalogType && !variant.isFactoryPreset) {
+              unawaited(ArchitectWallLibrary.saveCustomType(variant));
+            }
 
             _saveBiMProjectIfAttached();
 

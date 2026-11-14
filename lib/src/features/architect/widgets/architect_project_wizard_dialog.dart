@@ -6,6 +6,9 @@ import '../../bim_projects/services/bim_underlay_picker_helper.dart';
 import '../models/architect_grid_preset.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
+import '../services/architect_hatch_patterns.dart';
+import '../services/architect_line_styles.dart';
+import '../services/architect_wall_library.dart';
 import 'architect_grid_scheme.dart';
 import 'architect_grid_preset_label.dart';
 import 'architect_numeric_keypad.dart';
@@ -190,35 +193,42 @@ class _ArchitectProjectWizardDialogState
         );
       }
     }
-    final project = ArchitectProject.starterWithCatalog(
-      name: _name.text.trim().isEmpty
-          ? l.architectDefaultProjectName
-          : _name.text.trim(),
-      storeyCount: storeys.length,
-      groundHeight: storeys.first.height,
-      gridPreset: _grid,
-      spacingsX: _spacingsX,
-      spacingsY: _spacingsY,
-      structuralScheme: _structuralScheme,
-      units: _unit,
-      wallTypes: ArchitectWallType.standardCatalog(
-        l10n: l,
-        parapetHeight: ArchitectWallType.resolveParapetHeight(
-          storeyElevation: storeys.last.elevation + storeys.last.height,
-          storeyIndex: storeys.length,
-        ),
-      ),
-    ).copyWith(
-      storeys: storeys,
-      cadUnderlays: configs,
-      distanceDecimals: _decimals,
-    );
-    if (widget.onCreate == null) {
-      Navigator.pop(context, project);
-      return;
-    }
     setState(() => _isCreating = true);
     try {
+      await ArchitectWallLibrary.loadCustomTypes();
+      final customLines = await ArchitectLineStyleLibrary.load();
+      final customHatches = await ArchitectHatchPatternLibrary.load();
+      if (!mounted) return;
+      final baseProject = ArchitectProject.starterWithCatalog(
+        name: _name.text.trim().isEmpty
+            ? l.architectDefaultProjectName
+            : _name.text.trim(),
+        storeyCount: storeys.length,
+        groundHeight: storeys.first.height,
+        gridPreset: _grid,
+        spacingsX: _spacingsX,
+        spacingsY: _spacingsY,
+        structuralScheme: _structuralScheme,
+        units: _unit,
+        wallTypes: ArchitectWallType.standardCatalog(
+          l10n: l,
+          parapetHeight: ArchitectWallType.resolveParapetHeight(
+            storeyElevation: storeys.last.elevation + storeys.last.height,
+            storeyIndex: storeys.length,
+          ),
+        ),
+      ).copyWith(
+        storeys: storeys,
+        cadUnderlays: configs,
+        distanceDecimals: _decimals,
+        lineStyles: customLines,
+        hatchPatterns: customHatches,
+      );
+      final project = ArchitectWallLibrary.mergeCustomTypes(baseProject);
+      if (widget.onCreate == null) {
+        Navigator.pop(context, project);
+        return;
+      }
       await widget.onCreate!(project);
       if (mounted) Navigator.pop(context, project);
     } catch (e) {

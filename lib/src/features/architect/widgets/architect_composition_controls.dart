@@ -255,11 +255,13 @@ class ArchitectCompositionChoice<T> {
   final String id, label;
   final String? detail;
   final T value;
+  final bool isPreset;
   const ArchitectCompositionChoice({
     required this.id,
     required this.label,
     required this.value,
     this.detail,
+    this.isPreset = false,
   });
 }
 
@@ -269,6 +271,7 @@ Future<T?> showArchitectCompositionPicker<T>(
   required String selectedId,
   required String preferenceKey,
   required String title,
+  Future<bool> Function(ArchitectCompositionChoice<T> choice)? onDelete,
 }) => showModalBottomSheet<T>(
   context: context,
   isScrollControlled: true,
@@ -279,17 +282,20 @@ Future<T?> showArchitectCompositionPicker<T>(
     selectedId: selectedId,
     preferenceKey: preferenceKey,
     title: title,
+    onDelete: onDelete,
   ),
 );
 
 class _CompositionPicker<T> extends StatefulWidget {
   final List<ArchitectCompositionChoice<T>> choices;
   final String selectedId, preferenceKey, title;
+  final Future<bool> Function(ArchitectCompositionChoice<T> choice)? onDelete;
   const _CompositionPicker({
     required this.choices,
     required this.selectedId,
     required this.preferenceKey,
     required this.title,
+    this.onDelete,
   });
   @override
   State<_CompositionPicker<T>> createState() => _CompositionPickerState<T>();
@@ -298,6 +304,7 @@ class _CompositionPicker<T> extends StatefulWidget {
 class _CompositionPickerState<T> extends State<_CompositionPicker<T>> {
   final query = TextEditingController();
   final favorites = <String>{};
+  final removedIds = <String>{};
   bool favoritesOnly = false, changed = false;
   Future<void> writes = Future.value();
   @override
@@ -342,6 +349,7 @@ class _CompositionPickerState<T> extends State<_CompositionPicker<T>> {
     final choices = widget.choices
         .where(
           (choice) =>
+              !removedIds.contains(choice.id) &&
               (!favoritesOnly || favorites.contains(choice.id)) &&
               (q.isEmpty ||
                   '${choice.label} ${choice.detail ?? ''}'
@@ -418,14 +426,39 @@ class _CompositionPickerState<T> extends State<_CompositionPicker<T>> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                           onTap: () => Navigator.pop(context, choice.value),
-                          trailing: IconButton(
-                            tooltip: l.compositionFavorites,
-                            onPressed: () => _favorite(choice.id),
-                            icon: Icon(
-                              favorites.contains(choice.id)
-                                  ? Icons.star
-                                  : Icons.star_border,
-                            ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!choice.isPreset && widget.onDelete != null)
+                                IconButton(
+                                  key: ValueKey(
+                                    'composition-delete-${choice.id}',
+                                  ),
+                                  tooltip: l.delete,
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.redAccent,
+                                  ),
+                                  onPressed: () async {
+                                    final deleted =
+                                        await widget.onDelete!(choice);
+                                    if (deleted && mounted) {
+                                      setState(
+                                        () => removedIds.add(choice.id),
+                                      );
+                                    }
+                                  },
+                                ),
+                              IconButton(
+                                tooltip: l.compositionFavorites,
+                                onPressed: () => _favorite(choice.id),
+                                icon: Icon(
+                                  favorites.contains(choice.id)
+                                      ? Icons.star
+                                      : Icons.star_border,
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       },

@@ -99,14 +99,21 @@ class ArchitectDecorativeLibraryService extends ChangeNotifier {
     return saved;
   }
 
-  Future<void> deleteTemplate(String id) async {
+  Future<bool> deleteTemplate(String id) async {
     await init();
+    if (id.startsWith('preset_') ||
+        ArchitectDecorativeElement.standardCatalog().any((e) => e.id == id)) {
+      return false;
+    }
+    final before = _customElements.length;
     _customElements.removeWhere((e) => e.id == id);
+    if (_customElements.length == before) return false;
     if (_activeTemplate.id == id) {
       _activeTemplate = ArchitectDecorativeElement.standardCatalog().first;
     }
     await _persist();
     notifyListeners();
+    return true;
   }
 
   Future<void> _persist() async {

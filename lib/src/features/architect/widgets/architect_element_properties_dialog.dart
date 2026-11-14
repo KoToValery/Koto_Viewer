@@ -8,6 +8,7 @@ import '../models/architect_hatch_pattern.dart';
 import '../models/architect_drawing_color.dart';
 import 'architect_drawing_color_picker.dart';
 import 'architect_hatch_picker.dart';
+import '../services/architect_hatch_patterns.dart';
 import 'architect_line_style_picker.dart';
 import '../services/architect_line_styles.dart';
 import 'package:flutter/material.dart';
@@ -770,6 +771,9 @@ class _ArchitectElementPropertiesDialogState
         preserveComposition: !_compositionChanged,
         railingHeight: heightEdited ? compositionHeight : null,
       ).apply(next);
+      if (_composition!.isCatalogType && !_composition!.isFactoryPreset) {
+        unawaited(ArchitectWallLibrary.saveCustomType(_composition!));
+      }
     }
     if (_flipMixed) {
       for (final wall in widget.project.activeStorey.walls.where(
@@ -1690,10 +1694,27 @@ class _ArchitectElementPropertiesDialogState
               colorValue: _hatchColor?.argb,
               customPatterns: widget.project.hatchPatterns,
               lineStyles: widget.project.lineStyles,
-              onChanged: (pattern) => setState(() {
-                _hatchPattern = pattern;
-                texts['hatchPattern'] = jsonEncode(pattern.toJson());
-              }),
+              onDeletePattern: (pattern) {
+                if (pattern.isPreset) return;
+                unawaited(ArchitectHatchPatternLibrary.delete(pattern.id));
+                setState(() {
+                  if (_hatchPattern?.id == pattern.id) {
+                    _hatchPattern = ArchitectHatchPattern.diagonal;
+                    texts['hatchPattern'] = jsonEncode(
+                      ArchitectHatchPattern.diagonal.toJson(),
+                    );
+                  }
+                });
+              },
+              onChanged: (pattern) {
+                if (!pattern.isPreset) {
+                  unawaited(ArchitectHatchPatternLibrary.save(pattern));
+                }
+                setState(() {
+                  _hatchPattern = pattern;
+                  texts['hatchPattern'] = jsonEncode(pattern.toJson());
+                });
+              },
             ),
             ArchitectDrawingColorPicker(
               key: const ValueKey('architect-property-hatch-color'),
@@ -1732,10 +1753,15 @@ class _ArchitectElementPropertiesDialogState
                   }
                 });
               },
-              onChanged: (style) => setState(() {
-                _lineStyle = style;
-                texts['lineStyle'] = jsonEncode(style.toJson());
-              }),
+              onChanged: (style) {
+                if (!style.isPreset) {
+                  unawaited(ArchitectLineStyleLibrary.save(style));
+                }
+                setState(() {
+                  _lineStyle = style;
+                  texts['lineStyle'] = jsonEncode(style.toJson());
+                });
+              },
             ),
           if (_supportsLineStyle)
             TextButton.icon(
@@ -1760,6 +1786,9 @@ class _ArchitectElementPropertiesDialogState
                   ),
                 );
                 if (edited != null && mounted) {
+                  if (!edited.isPreset) {
+                    unawaited(ArchitectLineStyleLibrary.save(edited));
+                  }
                   setState(() {
                     _lineStyle = edited;
                     texts['lineStyle'] = jsonEncode(edited.toJson());

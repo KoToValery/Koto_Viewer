@@ -3,6 +3,7 @@ import '../models/architect_wall_type.dart';
 import '../models/architect_wall.dart';
 import 'architect_command_controller.dart';
 import 'architect_wall_connection_policy.dart';
+import 'architect_wall_library.dart';
 
 /// Kept distinct so the editor can explain a refused conversion precisely.
 class ArchitectRailingOpeningsError extends ArgumentError {
@@ -167,6 +168,12 @@ class DeleteArchitectWallType extends ArchitectModelCommand {
   const DeleteArchitectWallType(this.typeId, {this.replacementId = ''});
   @override
   ArchitectProject apply(ArchitectProject project) {
+    final existing = project.wallTypes
+        .where((t) => t.id == typeId)
+        .firstOrNull;
+    if (existing?.isFactoryPreset ?? ArchitectWallLibrary.isFactoryId(typeId)) {
+      throw ArgumentError('Factory wall types cannot be deleted');
+    }
     final used = project.storeys.any(
       (s) => s.walls.any((w) => w.wallTypeId == typeId),
     );

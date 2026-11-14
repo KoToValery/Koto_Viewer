@@ -13199,4 +13199,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectWizardLoadingUnderlay => 'Loading underlay...';
+
+  @override
+  String get architectHatchDeleteConfirmTitle => 'Delete hatch pattern';
+
+  @override
+  String architectHatchDeleteConfirmPrompt(String name) {
+    return 'Delete custom hatch pattern \"$name\"?';
+  }
+
+  @override
+  String get architectHatchPatternDeleted => 'Custom hatch pattern deleted.';
+
+  @override
+  String architectDecorativeDeleteConfirm(String name) {
+    return 'Delete custom 3D decorative element \"$name\"?';
+  }
+
+  @override
+  String get architectDecorativeDeleted =>
+      'Custom 3D decorative element deleted.';
+
+  @override
+  String get architectFactoryPresetProtected =>
+      'Built-in factory presets cannot be deleted.';
 }

@@ -140,17 +140,22 @@ class ArchitectWallType {
           ),
         ];
 
-  bool get isFactoryPreset =>
-      labelId == null &&
-      const {
-        'ext_25_12_eps',
-        'int_12_partition',
-        'ext_25_brick',
-        'int_25_brick',
-        'int_10_aerated',
-        'bearing_25_concrete',
-        'parapet_12',
-      }.contains(id);
+  static const Set<String> factoryPresetIds = {
+    'ext_25_12_eps',
+    'int_12_partition',
+    'ext_25_brick',
+    'int_25_brick',
+    'int_10_aerated',
+    'bearing_25_concrete',
+    'parapet_12',
+    'round_logs_240',
+  };
+
+  /// Returns whether [id] belongs to a built-in factory wall or railing preset.
+  static bool isFactoryId(String id) =>
+      factoryPresetIds.contains(id) || id.startsWith('factory_');
+
+  bool get isFactoryPreset => labelId == null && isFactoryId(id);
   bool get isParapet => usage == WallUsage.parapet;
   bool get hasSolidWallBody => railing == null || railing!.hasSolidBody;
   bool get canHostOpenings => railing == null;

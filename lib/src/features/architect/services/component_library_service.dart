@@ -179,11 +179,16 @@ class ComponentLibraryService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Deletes a custom scripted definition.
-  Future<void> deleteCustomScript(String id) async {
+  /// Deletes a custom scripted definition; standard and legacy built-in components cannot be deleted.
+  Future<bool> deleteCustomScript(String id) async {
     await init();
+    if (_standardDefinitions.any((d) => d.id == id) ||
+        _legacyDefinitions.containsKey(id)) {
+      return false;
+    }
     final previous = List<ScriptedComponentDefinition>.of(_customScripted);
     _customScripted.removeWhere((c) => c.id == id);
+    if (_customScripted.length == previous.length) return false;
     try {
       await _persistCustomScripts();
     } catch (_) {
@@ -197,6 +202,7 @@ class ComponentLibraryService extends ChangeNotifier {
       _initDefaults();
     }
     notifyListeners();
+    return true;
   }
 
   Future<void> _persistCustomScripts() async {

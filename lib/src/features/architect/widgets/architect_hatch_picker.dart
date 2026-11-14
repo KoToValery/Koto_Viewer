@@ -90,12 +90,14 @@ class ArchitectHatchPicker extends StatelessWidget {
   final List<ArchitectHatchPattern> customPatterns;
   final List<ArchitectLineStyle> lineStyles;
   final ValueChanged<ArchitectHatchPattern> onChanged;
+  final ValueChanged<ArchitectHatchPattern>? onDeletePattern;
   final bool compact;
   final int? colorValue;
   const ArchitectHatchPicker({
     super.key,
     required this.value,
     required this.onChanged,
+    this.onDeletePattern,
     this.customPatterns = const [],
     this.lineStyles = const [],
     this.compact = false,
@@ -113,57 +115,105 @@ class ArchitectHatchPicker extends StatelessWidget {
     }.values.toList();
     final chosen = await showDialog<ArchitectHatchPattern>(
       context: context,
-      builder: (ctx) => architectAlertDialog(
-        title: Text(l.architectToolHatch),
-        contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-        content: SizedBox(
-          width: 300,
-          height: MediaQuery.sizeOf(context).height * .45,
-          child: ListView(
-            children: [
-              for (final p in options)
-                ListTile(
-                  key: ValueKey('hatch-pattern-${p.id}'),
-                  dense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  title: Text(
-                    p.label(l),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => architectAlertDialog(
+          title: Text(l.architectToolHatch),
+          contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          content: SizedBox(
+            width: 300,
+            height: MediaQuery.sizeOf(context).height * .45,
+            child: ListView(
+              children: [
+                for (final p in options)
+                  ListTile(
+                    key: ValueKey('hatch-pattern-${p.id}'),
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: Text(
+                      p.label(l),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ArchitectHatchSample(
+                          pattern: p,
+                          color: colorValue == null ? null : Color(colorValue!),
+                        ),
+                        if (!p.isPreset && onDeletePattern != null)
+                          IconButton(
+                            key: ValueKey('hatch-delete-${p.id}'),
+                            icon: const AppIcon(
+                              AppIconId.delete,
+                              size: 18,
+                              color: Colors.redAccent,
+                            ),
+                            tooltip: l.delete,
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: dialogContext,
+                                builder: (ctx) => architectAlertDialog(
+                                  title: Text(l.architectHatchDeleteConfirmTitle),
+                                  content: Text(
+                                    l.architectHatchDeleteConfirmPrompt(
+                                      p.label(l),
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, false),
+                                      child: Text(l.cancel),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: Text(l.delete),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                setDialogState(() {
+                                  options.removeWhere((item) => item.id == p.id);
+                                });
+                                onDeletePattern!(p);
+                              }
+                            },
+                          ),
+                      ],
+                    ),
+                    selected: p == value,
+                    onTap: () => Navigator.pop(dialogContext, p),
                   ),
-                  trailing: ArchitectHatchSample(
-                    pattern: p,
-                    color: colorValue == null ? null : Color(colorValue!),
-                  ),
-                  selected: p == value,
-                  onTap: () => Navigator.pop(ctx, p),
-                ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton.icon(
+              key: const ValueKey('hatch-custom'),
+              icon: const AppIcon(AppIconId.properties, size: 18),
+              label: Text(l.architectHatchCustom),
+              onPressed: () async {
+                final result = await showDialog<ArchitectHatchPattern>(
+                  context: dialogContext,
+                  builder: (_) => ArchitectHatchGenerator(
+                    initial: value == null || value!.isSolid
+                        ? ArchitectHatchPattern.diagonal
+                        : value!,
+                    lineStyles: lineStyles,
+                  ),
+                );
+                if (result != null && dialogContext.mounted) {
+                  Navigator.pop(dialogContext, result);
+                }
+              },
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(l.cancel),
+            ),
+          ],
         ),
-        actions: [
-          TextButton.icon(
-            key: const ValueKey('hatch-custom'),
-            icon: const AppIcon(AppIconId.properties, size: 18),
-            label: Text(l.architectHatchCustom),
-            onPressed: () async {
-              final result = await showDialog<ArchitectHatchPattern>(
-                context: ctx,
-                builder: (_) => ArchitectHatchGenerator(
-                  initial: value == null || value!.isSolid
-                      ? ArchitectHatchPattern.diagonal
-                      : value!,
-                  lineStyles: lineStyles,
-                ),
-              );
-              if (result != null && ctx.mounted) Navigator.pop(ctx, result);
-            },
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l.cancel),
-          ),
-        ],
       ),
     );
     if (chosen != null && context.mounted) onChanged(chosen);
@@ -427,6 +477,7 @@ class ArchitectHatchDraftBar extends StatelessWidget {
   final List<ArchitectLineStyle> lineStyles;
   final int pointCount;
   final ValueChanged<ArchitectHatchPattern> onChanged;
+  final ValueChanged<ArchitectHatchPattern>? onDeletePattern;
   final VoidCallback onUndo, onFinish, onCancel;
   final bool automatic;
   final ValueChanged<bool>? onAutomaticChanged;
@@ -439,6 +490,7 @@ class ArchitectHatchDraftBar extends StatelessWidget {
     required this.lineStyles,
     required this.pointCount,
     required this.onChanged,
+    this.onDeletePattern,
     required this.onUndo,
     required this.onFinish,
     required this.onCancel,
@@ -491,6 +543,7 @@ class ArchitectHatchDraftBar extends StatelessWidget {
               customPatterns: customPatterns,
               lineStyles: lineStyles,
               onChanged: onChanged,
+              onDeletePattern: onDeletePattern,
             ),
             if (onColorChanged != null)
               ArchitectDrawingColorPicker(

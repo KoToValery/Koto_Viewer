@@ -1,5 +1,6 @@
 // === SECTION: ARCHITECT DECORATIVE SUB-BAR ===
 import 'package:flutter/material.dart';
+import 'architect_dialog.dart';
 import '../../../core/icons/app_icon.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
@@ -110,79 +111,154 @@ class ArchitectDecorativeBar extends StatelessWidget {
 
   Future<void> _showPresetSheet(BuildContext context) async {
     final l = context.l10n;
-    final presets = ArchitectDecorativeLibraryService.instance.getAllTemplates();
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (ctx) {
-        final colors = Theme.of(ctx).colorScheme;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l.architectDecorativeTemplates,
-                        style: Theme.of(ctx).textTheme.titleMedium,
-                      ),
-                    ),
-                    if (onOpenStudio != null)
-                      FilledButton.tonalIcon(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          onOpenStudio!();
-                        },
-                        icon: const Icon(Icons.view_in_ar, size: 18),
-                        label: Text(l.architectDecorativeEditStudio),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ChoiceChip(
-                          selected: activePreset == null,
-                          label: Text(l.architectToolDecorativeProfile),
-                          onSelected: (_) {
-                            onPresetChanged?.call(null);
-                            Navigator.pop(ctx);
-                          },
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final colors = Theme.of(ctx).colorScheme;
+          final presets =
+              ArchitectDecorativeLibraryService.instance.getAllTemplates();
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l.architectDecorativeTemplates,
+                          style: Theme.of(ctx).textTheme.titleMedium,
                         ),
-                        for (final preset in presets)
+                      ),
+                      if (onOpenStudio != null)
+                        FilledButton.tonalIcon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            onOpenStudio!();
+                          },
+                          icon: const Icon(Icons.view_in_ar, size: 18),
+                          label: Text(l.architectDecorativeEditStudio),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
                           ChoiceChip(
-                            selected: activePreset?.id == preset.id,
-                            avatar: Icon(
-                              preset.mode ==
-                                      ArchitectDecorativeCreationMode.section
-                                  ? Icons.architecture
-                                  : Icons.crop_square,
-                              size: 16,
-                              color: colors.primary,
-                            ),
-                            label: Text(preset.localizedPresetName(l)),
+                            selected: activePreset == null,
+                            label: Text(l.architectToolDecorativeProfile),
                             onSelected: (_) {
-                              onPresetChanged?.call(preset);
+                              onPresetChanged?.call(null);
                               Navigator.pop(ctx);
                             },
                           ),
-                      ],
+                          for (final preset in presets)
+                            if (preset.isPreset ||
+                                preset.id.startsWith('preset_'))
+                              ChoiceChip(
+                                selected: activePreset?.id == preset.id,
+                                avatar: Icon(
+                                  preset.mode ==
+                                          ArchitectDecorativeCreationMode
+                                              .section
+                                      ? Icons.architecture
+                                      : Icons.crop_square,
+                                  size: 16,
+                                  color: colors.primary,
+                                ),
+                                label: Text(preset.localizedPresetName(l)),
+                                onSelected: (_) {
+                                  onPresetChanged?.call(preset);
+                                  Navigator.pop(ctx);
+                                },
+                              )
+                            else
+                              InputChip(
+                                key: ValueKey(
+                                  'decorative-custom-${preset.id}',
+                                ),
+                                selected: activePreset?.id == preset.id,
+                                avatar: Icon(
+                                  preset.mode ==
+                                          ArchitectDecorativeCreationMode
+                                              .section
+                                      ? Icons.architecture
+                                      : Icons.crop_square,
+                                  size: 16,
+                                  color: colors.primary,
+                                ),
+                                label: Text(preset.localizedPresetName(l)),
+                                deleteIcon: const AppIcon(
+                                  AppIconId.delete,
+                                  size: 16,
+                                  color: Colors.redAccent,
+                                ),
+                                deleteButtonTooltipMessage: l.delete,
+                                onDeleted: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: ctx,
+                                    builder: (dialogCtx) => architectAlertDialog(
+                                      title: Text(l.delete),
+                                      content: Text(
+                                        l.architectDecorativeDeleteConfirm(
+                                          preset.localizedPresetName(l),
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(dialogCtx, false),
+                                          child: Text(l.cancel),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () =>
+                                              Navigator.pop(dialogCtx, true),
+                                          child: Text(l.delete),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    await ArchitectDecorativeLibraryService
+                                        .instance
+                                        .deleteTemplate(preset.id);
+                                    if (activePreset?.id == preset.id) {
+                                      onPresetChanged?.call(null);
+                                    }
+                                    setSheetState(() {});
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          l.architectDecorativeDeleted,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                onSelected: (_) {
+                                  onPresetChanged?.call(preset);
+                                  Navigator.pop(ctx);
+                                },
+                              ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 

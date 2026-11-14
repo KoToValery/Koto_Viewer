@@ -45,6 +45,7 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
   bool setDirection = false;
   bool lower = false;
   bool details = false;
+  bool _compositionModified = false;
   SlabUsage? filter;
   String? error;
   final invalidLayers = <String>{};
@@ -117,6 +118,7 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
 
   List<ArchitectSlabLayer> get layers => lower ? draft.below : draft.above;
   void change(List<ArchitectSlabLayer> next) => setState(() {
+    _compositionModified = true;
     draft = lower ? draft.copyWith(below: next) : draft.copyWith(above: next);
     invalidLayers.retainAll([...draft.above, ...draft.below].map((l) => l.id));
   });
@@ -252,7 +254,24 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
     }
     try {
       final project = _candidate();
-      if (widget.onApply(project)) Navigator.pop(context);
+      if (widget.onApply(project)) {
+        final updatedSlab = project.storeys
+            .where((s) => s.id == storey.id)
+            .expand((s) => s.slabs)
+            .where((s) => s.id == widget.slab.id)
+            .firstOrNull;
+        final savedAssembly = updatedSlab == null
+            ? null
+            : ArchitectSlabAssemblies.of(project, updatedSlab);
+        if (savedAssembly != null &&
+            !savedAssembly.isFactoryPreset &&
+            (savedAssembly.customName.isNotEmpty ||
+                _compositionModified ||
+                library.any((a) => a.id == savedAssembly.id))) {
+          unawaited(ArchitectSlabLibrary.save(savedAssembly));
+        }
+        Navigator.pop(context);
+      }
     } on ArgumentError {
       setState(() => error = context.l10n.slabInvalid);
     }
@@ -279,8 +298,34 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
               detail:
                   '${a.usage.label(l)} · ${[...a.above, ...a.below].map((layer) => layer.label(l)).join(' · ')}',
               value: a,
+              isPreset: a.isFactoryPreset,
             ),
       ],
+      onDelete: (choice) async {
+        final item = choice.value;
+        if (item.isFactoryPreset) return false;
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => architectAlertDialog(
+            title: Text(l.slabDeleteLibrary),
+            content: Text(l.slabDeleteConfirm(item.label(l))),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(l.delete),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return false;
+        await ArchitectSlabLibrary.delete(item.id);
+        await _loadLibrary();
+        return true;
+      },
     );
     if (chosen != null && mounted) load(chosen);
   }
@@ -413,7 +458,8 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                           child: Text(l.slabSaveLibrary),
                         ),
                       ),
-                      if (library.any((a) => a.id == draft.id))
+                      if (!draft.isFactoryPreset &&
+                          library.any((a) => a.id == draft.id))
                         PopupMenuItem(
                           value: 'delete_library',
                           child: AppMenuLabel(
@@ -433,6 +479,7 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                       if (action == 'new') {
                         setState(() {
                           onlyThis = true;
+                          _compositionModified = true;
                           draft = named.copyWith(
                             id: ArchitectElementId.next('assembly'),
                           );
@@ -476,7 +523,15 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                       }
                       if (!valid()) return;
                       final messenger = ScaffoldMessenger.of(context);
-                      final ok = await ArchitectSlabLibrary.save(named);
+                      final toSave = named.isFactoryPreset
+                          ? named.copyWith(
+                              id: ArchitectElementId.next('assembly'),
+                            )
+                          : named;
+                      final ok = await ArchitectSlabLibrary.save(toSave);
+                      if (ok && mounted && toSave.id != draft.id) {
+                        setState(() => draft = toSave);
+                      }
                       if (!mounted) return;
                       messenger.showSnackBar(
                         SnackBar(
