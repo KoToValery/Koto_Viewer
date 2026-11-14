@@ -11,6 +11,7 @@ import '../services/architect_geodetic_detector.dart';
 import '../widgets/architect_underlay_bar.dart';
 import '../../bim_projects/services/bim_underlay_picker_helper.dart';
 import '../widgets/architect_dialog.dart';
+import '../widgets/architect_numeric_keypad.dart';
 import '../services/architect_column_clearance.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../services/architect_selection_candidates.dart';
@@ -19180,9 +19181,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   labelText: context.l10n.architectPropertyOffset,
                   suffixText: _project.units.symbol,
                 ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                  signed: true,
+                keyboardType: TextInputType.none,
+                onTap: () => openArchitectNumericKeypad(
+                  context: ctx,
+                  controller: input,
+                  title: context.l10n.architectPropertyOffset,
+                  unitLabel: _project.units.symbol,
+                  decimals: architectNumericDecimals(_project.units),
+                  allowNegative: true,
                 ),
                 validator: (v) =>
                     double.tryParse((v ?? '').replaceAll(',', '.'))?.isFinite ==
@@ -26687,17 +26693,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   ),
 
                   itemBuilder: (context) => [
-                    PopupMenuItem<WallReferenceLine>(enabled: false,
-                      child: StatefulBuilder(builder: (context, update) => CheckboxListTile(
-                        key: const ValueKey('architect-reference-preserve-position'),
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(l.architectPreserveWallPosition),
-                        value: _preserveWallPosition,
-                        onChanged: (value) {
-                          setState(() => _preserveWallPosition = value ?? true);
-                          update(() {});
-                        },
-                      )),
+                    PopupMenuItem<WallReferenceLine>(
+                      enabled: false,
+                      child: StatefulBuilder(
+                        builder: (context, update) => CheckboxListTile(
+                          key: const ValueKey(
+                            'architect-reference-preserve-position',
+                          ),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          activeColor: const Color(0xFFFFB74D),
+                          checkColor: const Color(0xFF1E242C),
+                          side: const BorderSide(color: Colors.white70),
+                          title: Text(
+                            l.architectPreserveWallPosition,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          value: _preserveWallPosition,
+                          onChanged: (value) {
+                            setState(
+                              () => _preserveWallPosition = value ?? true,
+                            );
+                            update(() {});
+                          },
+                        ),
+                      ),
                     ),
 
 
@@ -35853,7 +35877,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         title: Text(ctx.l10n.architectPolylineWidth),
         content: TextField(
           controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          keyboardType: TextInputType.none,
+          onTap: () => openArchitectNumericKeypad(
+            context: ctx,
+            controller: controller,
+            title: ctx.l10n.architectPolylineWidth,
+            unitLabel: 'm',
+            decimals: 3,
+            min: 0,
+          ),
           autofocus: true,
           decoration: const InputDecoration(
             suffixText: 'm',

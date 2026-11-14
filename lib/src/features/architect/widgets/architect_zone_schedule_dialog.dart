@@ -8,6 +8,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
 import '../models/architect_zone_presets.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_zone_preset_field.dart';
 
 // =============================================================================
@@ -243,8 +244,14 @@ class _ArchitectZoneScheduleDialogState
                 const SizedBox(height: 12),
                 TextField(
                   controller: heightController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                  keyboardType: TextInputType.none,
+                  onTap: () => openArchitectNumericKeypad(
+                    context: ctx,
+                    controller: heightController,
+                    title: l10n.architectZoneClearHeight,
+                    unitLabel: 'm',
+                    decimals: 3,
+                    min: .01,
                   ),
                   style: TextStyle(color: colors.onSurface, fontSize: 14),
                   decoration: InputDecoration(

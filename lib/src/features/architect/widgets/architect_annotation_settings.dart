@@ -5,6 +5,7 @@ import '../models/architect_project.dart';
 import '../rendering/architect_vector_scene.dart';
 import '../services/architect_command_controller.dart';
 import '../services/architect_drawing_publisher.dart';
+import 'architect_numeric_keypad.dart';
 
 Future<void> showArchitectAnnotationSettings(
   BuildContext context,
@@ -125,8 +126,14 @@ Future<void> showArchitectAnnotationSettings(
                   ),
                   TextField(
                     controller: input,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                    keyboardType: TextInputType.none,
+                    onTap: () => openArchitectNumericKeypad(
+                      context: c,
+                      controller: input,
+                      title: l.architectAnnotationSize,
+                      unitLabel: 'mm',
+                      decimals: 2,
+                      min: .000001,
                     ),
                     decoration: InputDecoration(
                       labelText: l.architectAnnotationSize,

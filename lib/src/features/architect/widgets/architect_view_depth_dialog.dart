@@ -2,6 +2,7 @@ import 'architect_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
+import 'architect_numeric_keypad.dart';
 
 Future<({double? depth})?> showArchitectViewDepth(
   BuildContext context,
@@ -76,9 +77,19 @@ class _ViewDepthState extends State<_ViewDepthDialog> {
                 key: const ValueKey('architect-view-depth-input'),
                 controller: input,
                 enabled: !unlimited,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                keyboardType: TextInputType.none,
+                onTap: unlimited
+                    ? null
+                    : () => openArchitectNumericKeypad(
+                        context: context,
+                        controller: input,
+                        title: l.architectViewDepth,
+                        unitLabel: widget.project.units.symbol,
+                        decimals: architectNumericDecimals(
+                          widget.project.units,
+                        ),
+                        min: widget.project.units.toUnit(widget.minimumDepth),
+                      ),
                 decoration: InputDecoration(
                   labelText:
                       '${l.architectViewDepth} (${widget.project.units.symbol})',

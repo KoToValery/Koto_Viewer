@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
+import 'architect_numeric_keypad.dart';
 
 String architectCompositionNumber(double metres, ArchitectUnit unit) =>
     ArchitectUnit.trimZeros(unit.toUnit(metres).toStringAsFixed(6));
@@ -206,12 +207,31 @@ class _ThicknessFieldState extends State<ArchitectCompositionThicknessField> {
     super.dispose();
   }
 
+  void _handleTextChanged(String value) {
+    final parsed = parse(value);
+    widget.onValidityChanged?.call(parsed != null);
+    if (parsed != null &&
+        value != architectCompositionNumber(widget.value, widget.unit)) {
+      lastValue = parsed;
+      widget.onChanged(parsed);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Semantics(
     label: context.l10n.architectPropertyThickness,
     child: TextFormField(
       controller: text,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      keyboardType: TextInputType.none,
+      onTap: () => openArchitectNumericKeypad(
+        context: context,
+        controller: text,
+        title: context.l10n.architectPropertyThickness,
+        unitLabel: widget.unit.symbol,
+        decimals: architectNumericDecimals(widget.unit),
+        min: .000001,
+        onApplied: _handleTextChanged,
+      ),
       textAlign: TextAlign.end,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       decoration: InputDecoration(
@@ -226,15 +246,7 @@ class _ThicknessFieldState extends State<ArchitectCompositionThicknessField> {
       validator: (value) => parse(value ?? '') == null
           ? context.l10n.architectWallInvalidThickness
           : null,
-      onChanged: (value) {
-        final parsed = parse(value);
-        widget.onValidityChanged?.call(parsed != null);
-        if (parsed != null &&
-            value != architectCompositionNumber(widget.value, widget.unit)) {
-          lastValue = parsed;
-          widget.onChanged(parsed);
-        }
-      },
+      onChanged: _handleTextChanged,
     ),
   );
 }

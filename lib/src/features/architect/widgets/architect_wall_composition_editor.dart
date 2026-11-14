@@ -10,6 +10,7 @@ import '../services/architect_wall_library.dart';
 import '../services/architect_wall_compositions.dart';
 import 'architect_composition_controls.dart';
 import 'architect_material_layer_label.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_wall_type_label.dart';
 import 'architect_wall_type_picker.dart';
 import 'architect_wall_layer_preview.dart';
@@ -511,8 +512,15 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                   TextFormField(
                     key: const ValueKey('wall-new-layer-thickness'),
                     controller: input,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                    keyboardType: TextInputType.none,
+                    onTap: () => openArchitectNumericKeypad(
+                      context: ctx,
+                      controller: input,
+                      title: l.architectWallQuickThickness,
+                      unitLabel: unit.symbol,
+                      decimals: architectNumericDecimals(unit),
+                      min: .000001,
+                      onApplied: (_) => update(() {}),
                     ),
                     decoration: InputDecoration(
                       labelText: l.architectWallQuickThickness,
@@ -709,8 +717,15 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                       'wall-layer-thickness-${drafts.first.layer.id}',
                     ),
                     controller: drafts.first.input,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                    keyboardType: TextInputType.none,
+                    onTap: () => openArchitectNumericKeypad(
+                      context: context,
+                      controller: drafts.first.input,
+                      title: l.wallLogDiameter,
+                      unitLabel: widget.project.units.symbol,
+                      decimals: architectNumericDecimals(widget.project.units),
+                      min: .000001,
+                      onApplied: (_) => setState(changed),
                     ),
                     decoration: InputDecoration(
                       labelText: l.wallLogDiameter,
@@ -901,8 +916,17 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                     ),
                     TextFormField(
                       controller: defaultHeight,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                      keyboardType: TextInputType.none,
+                      onTap: () => openArchitectNumericKeypad(
+                        context: context,
+                        controller: defaultHeight,
+                        title: l.wallParapetDefaultHeight,
+                        unitLabel: widget.project.units.symbol,
+                        decimals: architectNumericDecimals(
+                          widget.project.units,
+                        ),
+                        min: .000001,
+                        onApplied: (_) => setState(changed),
                       ),
                       decoration: InputDecoration(
                         labelText: l.wallParapetDefaultHeight,
@@ -1010,8 +1034,16 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
               child: TextFormField(
                 key: ValueKey('wall-layer-thickness-${d.layer.id}'),
                 controller: d.input,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                keyboardType: TextInputType.none,
+                onTap: () => openArchitectNumericKeypad(
+                  context: context,
+                  controller: d.input,
+                  title:
+                      '${d.layer.material.label(l)} · ${l.architectWallQuickThickness}',
+                  unitLabel: widget.project.units.symbol,
+                  decimals: architectNumericDecimals(widget.project.units),
+                  min: .000001,
+                  onApplied: (_) => setState(changed),
                 ),
                 textAlign: TextAlign.end,
                 decoration: InputDecoration(
@@ -1138,7 +1170,16 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
             key: const ValueKey('wall-plinth-height'),
             controller: plinthHeight,
             onChanged: (_) => editedRegionFields.add('height'),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: TextInputType.none,
+            onTap: () => openArchitectNumericKeypad(
+              context: context,
+              controller: plinthHeight,
+              title: l.wallPlinth,
+              unitLabel: widget.project.units.symbol,
+              decimals: architectNumericDecimals(widget.project.units),
+              min: .000001,
+              onApplied: (_) => setState(() => editedRegionFields.add('height')),
+            ),
             decoration: InputDecoration(
               labelText: 'H (${widget.project.units.symbol})',
               hintText: l.wallMixedValue,
@@ -1179,9 +1220,14 @@ class _EditorState extends State<ArchitectWallCompositionEditor> {
                 key: const ValueKey('wall-plinth-base'),
                 controller: plinthBase,
                 onChanged: (_) => editedRegionFields.add('base'),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                  signed: true,
+                keyboardType: TextInputType.none,
+                onTap: () => openArchitectNumericKeypad(
+                  context: context,
+                  controller: plinthBase,
+                  title: l.wallPlinthBase,
+                  decimals: 3,
+                  allowNegative: true,
+                  onApplied: (_) => setState(() => editedRegionFields.add('base')),
                 ),
                 decoration: InputDecoration(
                   labelText: l.wallPlinthBase,

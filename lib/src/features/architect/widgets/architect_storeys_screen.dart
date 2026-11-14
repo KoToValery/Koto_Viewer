@@ -6,6 +6,7 @@ import '../models/architect_project.dart';
 import '../services/architect_command_controller.dart';
 import 'architect_copy_storey_dialog.dart';
 import 'architect_dialog.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_storey_plan_preview.dart';
 
 /// Storey management shares the workspace controller, history and autosave.
@@ -120,12 +121,13 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
                   onSaved: (value) => name = value!.trim(),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  key: const ValueKey('architect-storeys-height'),
+                ArchitectNumericFormField(
+                  fieldKey: const ValueKey('architect-storeys-height'),
                   initialValue: height.toStringAsFixed(2),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
+                  title: l.architectStoreyHeightLabel,
+                  unitLabel: 'm',
+                  decimals: 3,
+                  min: .000001,
                   decoration: InputDecoration(
                     labelText: l.architectStoreyHeightLabel,
                     suffixText: 'm',
@@ -204,10 +206,13 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  key: const ValueKey('architect-storeys-batch-count'),
+                ArchitectNumericFormField(
+                  fieldKey: const ValueKey('architect-storeys-batch-count'),
                   initialValue: '$count',
-                  keyboardType: TextInputType.number,
+                  title: l.architectBatchAddCount,
+                  decimals: 0,
+                  min: 1,
+                  max: 100,
                   decoration: InputDecoration(
                     labelText: l.architectBatchAddCount,
                   ),
@@ -220,12 +225,13 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
                   onSaved: (value) => count = int.parse(value!.trim()),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  key: const ValueKey('architect-storeys-batch-height'),
+                ArchitectNumericFormField(
+                  fieldKey: const ValueKey('architect-storeys-batch-height'),
                   initialValue: height.toStringAsFixed(2),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
+                  title: l.architectStoreyHeightLabel,
+                  unitLabel: 'm',
+                  decimals: 3,
+                  min: .000001,
                   decoration: InputDecoration(
                     labelText: l.architectStoreyHeightLabel,
                     suffixText: 'm',

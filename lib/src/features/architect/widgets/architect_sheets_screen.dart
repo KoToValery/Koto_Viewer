@@ -13,6 +13,7 @@ import '../services/architect_command_controller.dart';
 import '../services/architect_drawing_publisher.dart';
 import '../services/architect_sheet_composer.dart';
 import '../services/architect_pdf_export.dart';
+import 'architect_numeric_keypad.dart';
 import '../services/architect_sheet_layout.dart';
 import '../services/architect_sheet_geometry.dart';
 import 'architect_sheet_viewport.dart';
@@ -1337,9 +1338,17 @@ class _SheetDialogState extends State<_SheetDialog> {
                   controller: values[i],
                   onChanged: i == 4 || i == 5 ? (_) => setState(() {}) : null,
                   decoration: InputDecoration(labelText: labels[i]),
-                  keyboardType: i >= 4
-                      ? const TextInputType.numberWithOptions(decimal: true)
-                      : TextInputType.text,
+                  keyboardType: i >= 4 ? TextInputType.none : TextInputType.text,
+                  onTap: i >= 4
+                      ? () => openArchitectNumericKeypad(
+                          context: context,
+                          controller: values[i],
+                          title: labels[i],
+                          decimals: 2,
+                          min: .000001,
+                          onApplied: (_) => setState(() {}),
+                        )
+                      : null,
                 ),
               if (invalid)
                 Text(
@@ -1485,11 +1494,15 @@ class _PlacementDialogState extends State<_PlacementDialog> {
                 TextField(
                   controller: fields[i],
                   decoration: InputDecoration(labelText: labels[i]),
-                  keyboardType: i == 0
-                      ? TextInputType.text
-                      : const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
+                  keyboardType: i == 0 ? TextInputType.text : TextInputType.none,
+                  onTap: i == 0
+                      ? null
+                      : () => openArchitectNumericKeypad(
+                          context: context,
+                          controller: fields[i],
+                          title: labels[i],
+                          decimals: 3,
+                          allowNegative: true,
                         ),
                 ),
               SwitchListTile(
@@ -1564,7 +1577,14 @@ Widget _scaleInput(BuildContext context, TextEditingController controller) {
   return TextField(
     key: const ValueKey('architect-sheet-scale-input'),
     controller: controller,
-    keyboardType: TextInputType.number,
+    keyboardType: TextInputType.none,
+    onTap: () => openArchitectNumericKeypad(
+      context: context,
+      controller: controller,
+      title: l.architectSheetScale,
+      decimals: 0,
+      min: 1,
+    ),
     decoration: InputDecoration(
       labelText: l.architectSheetScale,
       prefixText: '1:',

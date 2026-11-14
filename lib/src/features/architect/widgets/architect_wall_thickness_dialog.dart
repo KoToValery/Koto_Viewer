@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
+import 'architect_numeric_keypad.dart';
 
 /// Quick instance edit: keep core and insulation explicit instead of scaling layers.
 class ArchitectWallThicknessDialog extends StatefulWidget {
@@ -59,7 +60,16 @@ class _ThicknessState extends State<ArchitectWallThicknessDialog> {
       key: ValueKey(key),
       controller: controller,
       autofocus: controller == core,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      keyboardType: TextInputType.none,
+      onTap: () => openArchitectNumericKeypad(
+        context: context,
+        controller: controller,
+        title: label,
+        unitLabel: widget.project.units.symbol,
+        decimals: architectNumericDecimals(widget.project.units),
+        min: widget.project.units.toUnit(minimum),
+        onApplied: (_) => setState(() {}),
+      ),
       decoration: InputDecoration(
         labelText: '$label (${widget.project.units.symbol})',
         border: const OutlineInputBorder(),

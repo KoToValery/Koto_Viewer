@@ -325,4 +325,75 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'slab layer and inline thickness inputs open BimNumericKeypad on tap',
+    (tester) async {
+      final p = slab_fixture.slabProject().copyWith(
+        units: ArchitectUnit.centimeters,
+      );
+      ArchitectProject? result;
+      await tester.pumpWidget(
+        host(
+          (context) => TextButton(
+            child: const Text('Open'),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (_) => ArchitectSlabLayersDialog(
+                project: p,
+                slab: p.activeStorey.slabs.single,
+                onApply: (value) {
+                  result = value;
+                  return true;
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('slab-core-thickness')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('bim-numeric-dialog-input')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('bim-number-key-2')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('bim-number-key-5')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+      await tester.pumpAndSettle();
+
+      final finishField = find.descendant(
+        of: find.byKey(const ValueKey('slab-layer-thickness-finish')),
+        matching: find.byType(TextFormField),
+      );
+      await tester.ensureVisible(finishField);
+      await tester.tap(finishField);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('bim-numeric-dialog-input')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('bim-number-key-3')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('slab-layers-save')));
+      await tester.pumpAndSettle();
+      expect(
+        result!.activeStorey.slabs.single.thickness,
+        closeTo(.25, 1e-12),
+      );
+      final savedAssembly = result!.slabAssemblies.firstWhere(
+        (a) => a.id == result!.activeStorey.slabs.single.assemblyId,
+      );
+      expect(savedAssembly.above.first.thickness, closeTo(.03, 1e-12));
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

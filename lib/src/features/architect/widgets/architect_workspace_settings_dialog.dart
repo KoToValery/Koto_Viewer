@@ -6,6 +6,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
 import '../models/architect_zone_presets.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_structural_scheme_labels.dart';
 import 'architect_wall_drafting_panel.dart';
 
@@ -176,20 +177,21 @@ class _ArchitectWorkspaceSettingsDialogState
               if (structuralScheme == ArchitectStructuralScheme.beamAndSlab)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: TextFormField(
-                    key: const ValueKey(
+                  child: ArchitectNumericFormField(
+                    fieldKey: const ValueKey(
                       'architect-settings-perimeter-beam-depth',
                     ),
                     initialValue: units
                         .toUnit(perimeterBeamDepth)
                         .toStringAsFixed(distanceDecimals),
+                    title: l.architectPerimeterBeamDepth,
+                    unitLabel: units.symbol,
+                    decimals: architectNumericDecimals(units),
+                    min: .000001,
                     decoration: InputDecoration(
                       labelText:
                           '${l.architectPerimeterBeamDepth} (${units.symbol})',
                       helperText: l.architectPerimeterBeamDepthHelp,
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
                     ),
                     onChanged: (val) {
                       final parsed = double.tryParse(val.replaceAll(',', '.'));

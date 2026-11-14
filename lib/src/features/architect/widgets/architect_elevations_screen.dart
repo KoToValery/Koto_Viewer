@@ -13,6 +13,7 @@ import '../models/architect_project.dart';
 import '../rendering/architect_elevation_markers.dart';
 import '../services/architect_building_elevation.dart';
 import '../services/architect_command_controller.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_elevation_labels.dart';
 import 'architect_view_plan.dart';
 import 'architect_projection_editor.dart';
@@ -813,9 +814,20 @@ class _NorthDialogState extends State<_NorthDialog> {
                     ),
                     suffixText: '°',
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                    signed: true,
+                  keyboardType: TextInputType.none,
+                  onTap: () => openArchitectNumericKeypad(
+                    context: context,
+                    controller: input,
+                    title: l.architectNorthAngle,
+                    unitLabel: '°',
+                    decimals: 2,
+                    allowNegative: true,
+                    onApplied: (value) {
+                      final parsed = double.tryParse(value.replaceAll(',', '.'));
+                      if (parsed != null && parsed.isFinite) {
+                        setState(() => degrees = parsed % 360);
+                      }
+                    },
                   ),
                   validator: (value) =>
                       double.tryParse(

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/icons/app_icon.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_underlay_models.dart';
+import 'architect_numeric_keypad.dart';
 
 /// Top/bottom HUD bar for the CAD Underlay (`ArchitectTool.cadUnderlay`) tool.
 class ArchitectCadUnderlayBar extends StatelessWidget {
@@ -613,8 +614,14 @@ showArchitectRasterCalibrationDialog({
               TextField(
                 controller: controller,
                 autofocus: true,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                keyboardType: TextInputType.none,
+                onTap: () => openArchitectNumericKeypad(
+                  context: ctx,
+                  controller: controller,
+                  title: l.architectRasterCalibrateRealDistanceLabel,
+                  unitLabel: 'm',
+                  decimals: 3,
+                  min: .000001,
                 ),
                 decoration: InputDecoration(
                   labelText: l.architectRasterCalibrateRealDistanceLabel,
@@ -1019,8 +1026,13 @@ Future<double?> showArchitectCadScaleDialog({
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: TextField(
                     controller: customController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                    keyboardType: TextInputType.none,
+                    onTap: () => openArchitectNumericKeypad(
+                      context: ctx,
+                      controller: customController,
+                      title: 'Units per Meter',
+                      decimals: 4,
+                      min: .000001,
                     ),
                     decoration: const InputDecoration(
                       labelText: 'Units per Meter',

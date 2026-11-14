@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart' show ArchitectUnit;
 import '../models/architect_wall_type.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_railing_label.dart';
 
 /// Controlled draft fields: editing does not execute a project command.
@@ -322,7 +323,19 @@ class _RailingDimensionState extends State<_RailingDimensionField> {
   @override
   Widget build(BuildContext context) => TextFormField(
     controller: input,
-    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+    keyboardType: TextInputType.none,
+    onTap: () => openArchitectNumericKeypad(
+      context: context,
+      controller: input,
+      title: widget.label,
+      unitLabel: widget.unit.symbol,
+      decimals: architectNumericDecimals(widget.unit),
+      min: widget.zeroAllowed ? 0 : .000001,
+      onApplied: (text) {
+        final value = parse(text);
+        if (value != null) widget.onChanged(value);
+      },
+    ),
     decoration: InputDecoration(
       labelText: widget.label,
       suffixText: widget.unit.symbol,

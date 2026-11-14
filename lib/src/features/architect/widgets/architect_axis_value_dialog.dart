@@ -1,6 +1,7 @@
 import 'architect_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import 'architect_numeric_keypad.dart';
 
 Future<String?> showArchitectAxisValueDialog({
   required BuildContext context,
@@ -57,9 +58,17 @@ class _AxisValueDialogState extends State<_AxisValueDialog> {
       key: const ValueKey('architect-axis-value'),
       controller: controller,
       autofocus: true,
-      keyboardType: widget.numeric
-          ? const TextInputType.numberWithOptions(decimal: true, signed: true)
-          : TextInputType.text,
+      keyboardType: widget.numeric ? TextInputType.none : TextInputType.text,
+      onTap: widget.numeric
+          ? () => openArchitectNumericKeypad(
+              context: context,
+              controller: controller,
+              title: widget.label,
+              decimals: 4,
+              allowNegative: true,
+              onApplied: (_) => setState(() {}),
+            )
+          : null,
       decoration: InputDecoration(labelText: widget.label),
       onChanged: (_) => setState(() {}),
       onSubmitted: (_) => save(),

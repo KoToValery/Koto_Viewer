@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_wall_type_label.dart';
 
 class ArchitectWallSystemFields extends StatelessWidget {
@@ -27,12 +28,15 @@ class ArchitectWallSystemFields extends StatelessWidget {
       bool dimension = true,
     }) => Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: TextFormField(
-        key: ValueKey('wall-system-$key'),
+      child: ArchitectNumericFormField(
+        fieldKey: ValueKey('wall-system-$key'),
         initialValue: ArchitectUnit.trimZeros(
           (dimension ? unit.toUnit(value) : value).toStringAsFixed(6),
         ),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        title: label,
+        unitLabel: dimension ? unit.symbol : null,
+        decimals: dimension ? architectNumericDecimals(unit) : 3,
+        min: 0,
         decoration: InputDecoration(
           labelText: label,
           suffixText: dimension ? unit.symbol : null,

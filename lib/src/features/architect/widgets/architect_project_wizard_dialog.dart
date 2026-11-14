@@ -8,6 +8,7 @@ import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_grid_scheme.dart';
 import 'architect_grid_preset_label.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_structural_scheme_labels.dart';
 
 class ArchitectProjectWizardDialog extends StatefulWidget {
@@ -524,10 +525,19 @@ class _ArchitectProjectWizardDialogState
                           key: ValueKey('architect-wizard-elevation-$i'),
                           controller: _levels[i].elevationInput,
                           readOnly: i == 0,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                            signed: true,
-                          ),
+                          keyboardType: TextInputType.none,
+                          onTap: i == 0
+                              ? null
+                              : () => openArchitectNumericKeypad(
+                                  context: context,
+                                  controller: _levels[i].elevationInput,
+                                  title: l.architectWizardElevation,
+                                  unitLabel: 'm',
+                                  decimals: 3,
+                                  allowNegative: true,
+                                  onApplied: (text) =>
+                                      _elevationChanged(i, text),
+                                ),
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
                           ),
@@ -548,8 +558,15 @@ class _ArchitectProjectWizardDialogState
                         child: TextFormField(
                           key: ValueKey('architect-wizard-height-$i'),
                           controller: _levels[i].heightInput,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
+                          keyboardType: TextInputType.none,
+                          onTap: () => openArchitectNumericKeypad(
+                            context: context,
+                            controller: _levels[i].heightInput,
+                            title: l.architectWizardHeight,
+                            unitLabel: _unit.symbol,
+                            decimals: architectNumericDecimals(_unit),
+                            min: .000001,
+                            onApplied: (text) => _heightChanged(i, text),
                           ),
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),

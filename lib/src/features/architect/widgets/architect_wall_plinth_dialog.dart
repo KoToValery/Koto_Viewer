@@ -4,6 +4,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_material_layer_label.dart';
+import 'architect_numeric_keypad.dart';
 
 class ArchitectWallPlinthDialog extends StatefulWidget {
   final ArchitectProject project;
@@ -107,8 +108,15 @@ class _PlinthState extends State<ArchitectWallPlinthDialog> {
                       labelText: 'H= (${widget.project.units.symbol})',
                       hintText: l.wallMixedValue,
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                    keyboardType: TextInputType.none,
+                    onTap: () => openArchitectNumericKeypad(
+                      context: context,
+                      controller: height,
+                      title: l.wallPlinth,
+                      unitLabel: widget.project.units.symbol,
+                      decimals: architectNumericDecimals(widget.project.units),
+                      min: .000001,
+                      onApplied: (_) => setState(() => edited.add('height')),
                     ),
                     onChanged: (_) => edited.add('height'),
                     validator: (_) {
@@ -156,9 +164,14 @@ class _PlinthState extends State<ArchitectWallPlinthDialog> {
                           helperText: l.wallPlinthBaseHelp,
                           hintText: l.wallMixedValue,
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
+                        keyboardType: TextInputType.none,
+                        onTap: () => openArchitectNumericKeypad(
+                          context: context,
+                          controller: base,
+                          title: l.wallPlinthBase,
+                          decimals: 3,
+                          allowNegative: true,
+                          onApplied: (_) => setState(() => edited.add('base')),
                         ),
                         onChanged: (_) => edited.add('base'),
                       ),

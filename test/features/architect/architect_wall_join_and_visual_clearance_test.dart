@@ -340,6 +340,24 @@ void main() {
         await tester.pumpAndSettle();
 
         // Check options are displayed
+        final preserveTileFinder = find.byKey(
+          const ValueKey('architect-reference-preserve-position'),
+        );
+        expect(preserveTileFinder, findsOneWidget);
+        final preserveTile = tester.widget<CheckboxListTile>(preserveTileFinder);
+        expect(preserveTile.side?.color, Colors.white70);
+        expect(
+          tester
+              .widget<Text>(
+                find.descendant(
+                  of: preserveTileFinder,
+                  matching: find.text('Keep position'),
+                ),
+              )
+              .style
+              ?.color,
+          Colors.white,
+        );
         expect(find.byKey(const ValueKey('architect-wall-ref-center')), findsOneWidget);
         expect(find.byKey(const ValueKey('architect-wall-ref-inner')), findsOneWidget);
         expect(find.byKey(const ValueKey('architect-wall-ref-outer')), findsOneWidget);

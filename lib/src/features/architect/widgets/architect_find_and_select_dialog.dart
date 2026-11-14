@@ -13,6 +13,7 @@ import '../models/architect_project.dart';
 import '../models/architect_fenestration_style.dart';
 import '../models/architect_filter_criteria.dart';
 import '../services/architect_filter_selection_service.dart';
+import 'architect_numeric_keypad.dart';
 import '../services/fenestration_library_service.dart';
 import '../services/architect_command_controller.dart';
 import '../screens/fenestration_editor_screen.dart';
@@ -742,8 +743,20 @@ class _ArchitectFindAndSelectDialogState
               child: TextField(
                 controller: controller,
                 enabled: active,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.none,
+                onTap: !active
+                    ? null
+                    : () => openArchitectNumericKeypad(
+                        context: context,
+                        controller: controller,
+                        title: label,
+                        unitLabel: widget.project.units.symbol,
+                        decimals: architectNumericDecimals(
+                          widget.project.units,
+                        ),
+                        min: 0,
+                        onApplied: (_) => _rebuildCriteria(),
+                      ),
                 decoration: InputDecoration(
                   isDense: true,
                   border: const OutlineInputBorder(),
@@ -1006,8 +1019,19 @@ class _ArchitectFindAndSelectDialogState
               child: TextField(
                 controller: controller,
                 enabled: active,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.none,
+                onTap: !active
+                    ? null
+                    : () => openArchitectNumericKeypad(
+                        context: context,
+                        controller: controller,
+                        title: label,
+                        unitLabel: widget.project.units.symbol,
+                        decimals: architectNumericDecimals(
+                          widget.project.units,
+                        ),
+                        min: 0,
+                      ),
                 decoration: InputDecoration(
                   isDense: true,
                   border: const OutlineInputBorder(),

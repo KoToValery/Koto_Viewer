@@ -5,6 +5,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_storey_copy_types.dart';
 import 'architect_dialog.dart';
+import 'architect_numeric_keypad.dart';
 
 /// Transfer form with local staging; the workspace owns command execution.
 class ArchitectCopyStoreyDialog extends StatefulWidget {
@@ -189,11 +190,14 @@ class _ArchitectCopyStoreyDialogState extends State<ArchitectCopyStoreyDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  key: const ValueKey('architect-copy-batch-count'),
+                ArchitectNumericFormField(
+                  fieldKey: const ValueKey('architect-copy-batch-count'),
                   initialValue: '$count',
+                  title: l.architectBatchAddCount,
+                  decimals: 0,
+                  min: 1,
+                  max: 100,
                   autofocus: true,
-                  keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: l.architectBatchAddCount,
                   ),
@@ -206,12 +210,12 @@ class _ArchitectCopyStoreyDialogState extends State<ArchitectCopyStoreyDialog> {
                   onSaved: (value) => count = int.parse(value!.trim()),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  key: const ValueKey('architect-copy-batch-height'),
+                ArchitectNumericFormField(
+                  fieldKey: const ValueKey('architect-copy-batch-height'),
                   initialValue: height.toStringAsFixed(2),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
+                  title: l.architectBatchAddHeight,
+                  decimals: 3,
+                  min: .000001,
                   decoration: InputDecoration(
                     labelText: l.architectBatchAddHeight,
                   ),

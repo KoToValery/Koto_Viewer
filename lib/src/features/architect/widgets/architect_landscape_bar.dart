@@ -4,6 +4,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../rendering/architect_2d_painter.dart';
 import '../services/architect_landscape_tool.dart';
+import 'architect_numeric_keypad.dart';
 
 /// Contextual sub-bar for the Landscape (`Ландшафт`) tools:
 /// Terrain, Pathway with Automatic Curb, Vegetation, and Site Fence / Gabion.
@@ -313,9 +314,14 @@ class ArchitectLandscapeBar extends StatelessWidget {
         title: Text(l.architectTerrainDatumDialogTitle),
         content: TextField(
           controller: textController,
-          keyboardType: const TextInputType.numberWithOptions(
-            decimal: true,
-            signed: true,
+          keyboardType: TextInputType.none,
+          onTap: () => openArchitectNumericKeypad(
+            context: ctx,
+            controller: textController,
+            title: l.architectTerrainDatum,
+            unitLabel: 'm',
+            decimals: 3,
+            allowNegative: true,
           ),
           autofocus: true,
           decoration: InputDecoration(
@@ -366,9 +372,14 @@ class ArchitectLandscapeBar extends StatelessWidget {
         title: Text(l.architectTerrainAbsoluteElevation),
         content: TextField(
           controller: textController,
-          keyboardType: const TextInputType.numberWithOptions(
-            decimal: true,
-            signed: true,
+          keyboardType: TextInputType.none,
+          onTap: () => openArchitectNumericKeypad(
+            context: ctx,
+            controller: textController,
+            title: l.architectTerrainAbsoluteElevation,
+            unitLabel: 'm',
+            decimals: 3,
+            allowNegative: true,
           ),
           autofocus: true,
           decoration: InputDecoration(

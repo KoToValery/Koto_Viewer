@@ -6,6 +6,7 @@ import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import '../services/architect_element_id.dart';
 import '../services/architect_roof_drainage_geometry.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_roof_number_field.dart';
 
 class ArchitectRoofDrainageEditor extends StatelessWidget {
@@ -260,9 +261,22 @@ class _NumberState extends State<_Number> {
     child: TextFormField(
       controller: text,
       autovalidateMode: AutovalidateMode.onUserInteraction,
-      keyboardType: const TextInputType.numberWithOptions(
-        decimal: true,
-        signed: true,
+      keyboardType: TextInputType.none,
+      onTap: () => openArchitectNumericKeypad(
+        context: context,
+        controller: text,
+        title: widget.label,
+        unitLabel: widget.unit,
+        decimals: 3,
+        allowNegative: widget.min < 0,
+        min: widget.min.isFinite ? widget.min : null,
+        max: widget.max.isFinite ? widget.max : null,
+        onApplied: (s) {
+          final v = double.tryParse(s.replaceAll(',', '.'));
+          if (v != null && v.isFinite && v >= widget.min && v <= widget.max) {
+            widget.onChanged(v);
+          }
+        },
       ),
       decoration: InputDecoration(
         labelText: widget.label,

@@ -26,6 +26,7 @@ import '../services/architect_properties_session.dart';
 import '../services/architect_wall_compositions.dart';
 import '../services/architect_wall_library.dart';
 import 'architect_properties_shell.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_property_number_field.dart';
 import 'architect_properties_plan_preview.dart';
 import 'architect_wall_composition_editor.dart';
@@ -1008,16 +1009,19 @@ class _ArchitectElementPropertiesDialogState
         ),
     };
     return [
-      TextFormField(
-        key: ValueKey('architect-property-paper-text-$_resetTextSize'),
+      ArchitectNumericFormField(
+        fieldKey: ValueKey('architect-property-paper-text-$_resetTextSize'),
         initialValue: _resetTextSize
             ? null
             : (heights.length == 1 ? heights.single.toStringAsFixed(2) : ''),
+        title: l.architectTextPaperHeight,
+        unitLabel: 'mm',
+        decimals: 2,
+        min: .000001,
         decoration: InputDecoration(
           labelText: l.architectTextPaperHeight,
           hintText: l.wallMixedValue,
         ),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
         validator: (v) =>
             _resetTextSize || v == null || v.isEmpty && heights.length != 1
             ? null
@@ -2085,8 +2089,8 @@ class _ArchitectElementPropertiesDialogState
               tilePadding: EdgeInsets.zero,
               title: Text(l.wallColumnSupports),
               children: [
-                TextFormField(
-                  key: const ValueKey('wall-panel-offset'),
+                ArchitectNumericFormField(
+                  fieldKey: const ValueKey('wall-panel-offset'),
                   initialValue: widget.project.units
                       .toUnit(
                         (panelPlacement['mountingOffset'] as num?)
@@ -2094,13 +2098,13 @@ class _ArchitectElementPropertiesDialogState
                             0,
                       )
                       .toString(),
+                  title: l.wallMountingOffset,
+                  unitLabel: widget.project.units.symbol,
+                  decimals: architectNumericDecimals(widget.project.units),
+                  allowNegative: true,
                   decoration: InputDecoration(
                     labelText: l.wallMountingOffset,
                     suffixText: widget.project.units.symbol,
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                    signed: true,
                   ),
                   onChanged: (text) {
                     final value = double.tryParse(text.replaceAll(',', '.'));

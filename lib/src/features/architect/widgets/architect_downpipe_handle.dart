@@ -6,6 +6,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../services/architect_command_controller.dart';
 import '../services/architect_roof_drainage_geometry.dart';
+import 'architect_numeric_keypad.dart';
 
 /// An outlet owns its own hit area, leaving drawing/navigation gestures outside
 /// the pipe and its leader to the surrounding plan or projection editor.
@@ -148,11 +149,14 @@ class _DownpipeHandleState extends State<ArchitectDownpipeHandle> {
       context: context,
       builder: (context) => architectAlertDialog(
         title: Text(context.l10n.architectDrainageOffset),
-        content: TextFormField(
+        content: ArchitectNumericFormField(
           initialValue: text,
+          title: context.l10n.architectDrainageOffset,
+          unitLabel: project.units.symbol,
+          decimals: architectNumericDecimals(project.units),
+          min: 0,
           autofocus: true,
           onChanged: (v) => text = v,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(suffixText: project.units.symbol),
           onFieldSubmitted: (v) {
             final n = double.tryParse(v.replaceAll(',', '.'));

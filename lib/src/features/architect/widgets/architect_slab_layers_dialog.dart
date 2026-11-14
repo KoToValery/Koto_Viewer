@@ -15,6 +15,7 @@ import '../services/architect_slab_assemblies.dart';
 import '../services/architect_slab_geometry.dart';
 import 'architect_slab_labels.dart';
 import 'architect_composition_controls.dart';
+import 'architect_numeric_keypad.dart';
 
 class ArchitectSlabLayersDialog extends StatefulWidget {
   final ValueChanged<ArchitectProject>? onPreview;
@@ -501,9 +502,15 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
               TextField(
                 key: const ValueKey('slab-core-offset'),
                 controller: offset,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                  signed: true,
+                keyboardType: TextInputType.none,
+                onTap: () => openArchitectNumericKeypad(
+                  context: context,
+                  controller: offset,
+                  title: l.slabCoreOffset,
+                  unitLabel: unit.symbol,
+                  decimals: architectNumericDecimals(unit),
+                  allowNegative: true,
+                  onApplied: (_) => setState(() {}),
                 ),
                 decoration: InputDecoration(
                   labelText: l.slabCoreOffset,
@@ -524,8 +531,15 @@ class _SlabLayersState extends State<ArchitectSlabLayersDialog> {
                     child: TextField(
                       key: const ValueKey('slab-core-thickness'),
                       controller: thickness,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                      keyboardType: TextInputType.none,
+                      onTap: () => openArchitectNumericKeypad(
+                        context: context,
+                        controller: thickness,
+                        title: l.slabCore,
+                        unitLabel: unit.symbol,
+                        decimals: architectNumericDecimals(unit),
+                        min: .000001,
+                        onApplied: (_) => setState(() {}),
                       ),
                       decoration: InputDecoration(
                         labelText: l.slabCore,
@@ -887,8 +901,14 @@ class _LayerEditorState extends State<_LayerEditor> {
                     labelText: l.architectPropertyThickness,
                     suffixText: widget.unit.symbol,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                  keyboardType: TextInputType.none,
+                  onTap: () => openArchitectNumericKeypad(
+                    context: context,
+                    controller: thickness,
+                    title: l.architectPropertyThickness,
+                    unitLabel: widget.unit.symbol,
+                    decimals: architectNumericDecimals(widget.unit),
+                    min: .000001,
                   ),
                   validator: (v) => validate(v),
                 ),
@@ -896,8 +916,15 @@ class _LayerEditorState extends State<_LayerEditor> {
                   TextFormField(
                     controller: slope,
                     decoration: InputDecoration(labelText: l.slabSlope),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                    keyboardType: TextInputType.none,
+                    onTap: () => openArchitectNumericKeypad(
+                      context: context,
+                      controller: slope,
+                      title: l.slabSlope,
+                      unitLabel: '%',
+                      decimals: 2,
+                      min: 0,
+                      max: 100,
                     ),
                     validator: (v) => validate(v, zero: true),
                   ),

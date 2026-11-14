@@ -6,6 +6,7 @@ import '../../bim_editing/properties/bim_distance_unit.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_zone.dart';
 import '../models/architect_zone_presets.dart';
+import 'architect_numeric_keypad.dart';
 import 'architect_zone_preset_field.dart';
 import '../services/architect_zone_tool.dart';
 
@@ -498,8 +499,14 @@ class _ArchitectZonePropertiesCardState
                   // Clear Height
                   TextField(
                     controller: heightController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                    keyboardType: TextInputType.none,
+                    onTap: () => openArchitectNumericKeypad(
+                      context: ctx,
+                      controller: heightController,
+                      title: l10n.architectZoneClearHeight,
+                      unitLabel: 'm',
+                      decimals: 3,
+                      min: .01,
                     ),
                     style: TextStyle(color: colors.onSurface, fontSize: 13),
                     decoration: InputDecoration(

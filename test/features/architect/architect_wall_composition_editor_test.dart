@@ -200,4 +200,90 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'wall layer creation and editing use BimNumericKeypad instead of system keyboard',
+    (tester) async {
+      final p = data.project([]).copyWith(units: ArchitectUnit.centimeters);
+      ArchitectWallType? saved;
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => ArchitectWallCompositionEditor(
+                    project: p,
+                    type: data.composition,
+                    onApply: (value, _, _) {
+                      saved = value;
+                      return true;
+                    },
+                  ),
+                ),
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      final existingThickness = find.byKey(
+        const ValueKey('wall-layer-thickness-eps'),
+      );
+      await tester.ensureVisible(existingThickness);
+      await tester.tap(existingThickness);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('bim-numeric-dialog-input')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('bim-number-key-1')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('bim-number-key-5')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const ValueKey('wall-layer-add')));
+      await tester.tap(find.byKey(const ValueKey('wall-layer-add')));
+      await tester.pumpAndSettle();
+      final newThickness = find.byKey(
+        const ValueKey('wall-new-layer-thickness'),
+      );
+      await tester.tap(newThickness);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('bim-numeric-dialog-input')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('bim-number-key-2')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('bim-number-key-.')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('bim-number-key-5')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('wall-layer-insert')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('wall-composition-save')));
+      await tester.pumpAndSettle();
+
+      expect(saved, isNotNull);
+      expect(
+        saved!.layers.firstWhere((l) => l.id == 'eps').thickness,
+        closeTo(.15, 1e-9),
+      );
+      expect(saved!.layers.last.thickness, closeTo(.025, 1e-9));
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
