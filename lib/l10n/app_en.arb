@@ -7273,5 +7273,29 @@
   "architectFactoryPresetProtected": "Built-in factory presets cannot be deleted.",
   "@architectFactoryPresetProtected": {
     "description": "Warning message when attempting to delete a built-in factory preset"
+  },
+  "architectBackToPlan": "Back to plan",
+  "@architectBackToPlan": {
+    "description": "Action label and tooltip to return from 3D, section, elevation, or print preview to the active floor plan"
+  },
+  "architectView3DShort": "3D",
+  "@architectView3DShort": {
+    "description": "Compact 3D tab label in the architectural workspace view bar"
+  },
+  "architectExitProjectTitle": "Exit project?",
+  "@architectExitProjectTitle": {
+    "description": "Dialog title and tooltip when leaving the architectural workspace"
+  },
+  "architectExitProjectMessage": "Your project is saved automatically. Do you want to exit?",
+  "@architectExitProjectMessage": {
+    "description": "Confirmation message reminding the user that project changes are saved automatically before exiting"
+  },
+  "architectExitProjectUnattachedMessage": "This temporary workspace is not linked to a saved project. Do you want to exit?",
+  "@architectExitProjectUnattachedMessage": {
+    "description": "Confirmation message when leaving a scratch architectural workspace without a linked saved project"
+  },
+  "architectExitProjectConfirm": "Exit",
+  "@architectExitProjectConfirm": {
+    "description": "Confirmation button label to exit the architectural workspace"
   }
 }

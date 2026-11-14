@@ -13273,4 +13273,24 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectFactoryPresetProtected =>
       'Фабричните типове не могат да бъдат изтривани.';
+
+  @override
+  String get architectBackToPlan => 'Към плана';
+
+  @override
+  String get architectView3DShort => '3D';
+
+  @override
+  String get architectExitProjectTitle => 'Изход от проекта?';
+
+  @override
+  String get architectExitProjectMessage =>
+      'Проектът се запазва автоматично. Сигурни ли сте, че искате да излезете?';
+
+  @override
+  String get architectExitProjectUnattachedMessage =>
+      'Този временен работен екран не е обвързан със запазен проект. Искате ли да излезете?';
+
+  @override
+  String get architectExitProjectConfirm => 'Изход';
 }

@@ -17,9 +17,13 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
   final ArchitectWorkspaceView view;
   final String? viewId;
   final Map<ArchitectWorkspaceView, String> lastViewIds;
+  final bool is3D;
+  final bool isPrintPreview;
   final void Function(ArchitectWorkspaceView, String?) onSelected;
   final ValueChanged<ArchitectWorkspaceView> onManage;
   final void Function(ArchitectWorkspaceView, String?, String)? onDraft;
+  final VoidCallback? onReturnToPlan;
+  final VoidCallback? onToggle3D;
 
   const ArchitectWorkspaceViewBar({
     super.key,
@@ -27,10 +31,90 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
     required this.view,
     required this.viewId,
     required this.lastViewIds,
+    this.is3D = false,
+    this.isPrintPreview = false,
     required this.onSelected,
     required this.onManage,
     this.onDraft,
+    this.onReturnToPlan,
+    this.onToggle3D,
   });
+
+  Widget _buildTabContent({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required bool active,
+    required bool quickReturn,
+  }) {
+    final borderColor = active
+        ? Colors.cyanAccent
+        : (quickReturn
+              ? Colors.cyanAccent.withValues(alpha: 0.45)
+              : Colors.white12);
+    return Container(
+      height: heightFor(context),
+      decoration: BoxDecoration(
+        color: quickReturn ? Colors.cyanAccent.withValues(alpha: 0.12) : null,
+        border: Border(
+          bottom: BorderSide(
+            color: borderColor,
+            width: active ? 2 : (quickReturn ? 1.5 : 1),
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: [
+          if (quickReturn) ...[
+            const AppIcon(
+              AppIconId.back,
+              size: 14,
+              color: Colors.cyanAccent,
+            ),
+            const SizedBox(width: 4),
+          ],
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: quickReturn
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      color: (active || quickReturn)
+                          ? Colors.cyanAccent
+                          : Colors.white70,
+                    ),
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+          if (!quickReturn)
+            const AppIcon(
+              AppIconId.expandMore,
+              size: 16,
+              color: Colors.white70,
+            ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,45 +137,97 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                   : lastViewIds[ArchitectWorkspaceView.section]),
         )
         .firstOrNull;
+    final isPlanCanvas =
+        !is3D && !isPrintPreview && view == ArchitectWorkspaceView.plan;
     return Material(
       color: const Color(0xFF1E1E26),
       child: Row(
         children: [
           for (final type in ArchitectWorkspaceView.values)
             Expanded(
-              child: PopupMenuButton<String>(
-                key: ValueKey('architect-view-${type.name}'),
-                tooltip: switch (type) {
-                  ArchitectWorkspaceView.plan => l.architectStoreys,
-                  ArchitectWorkspaceView.elevation => l.architectFacades,
-                  ArchitectWorkspaceView.section => l.buildingSections,
-                },
-                onSelected: (id) {
-                  if ([
-                    'new',
-                    'edit',
-                    'depth',
-                    'step',
-                    'straight',
-                    'visibility',
-                    'copy_by_storey',
-                  ].contains(id)) {
-                    onDraft?.call(
-                      type,
-                      type == ArchitectWorkspaceView.section
-                          ? section?.id
-                          : elevation?.id,
-                      id,
+              child: Builder(
+                builder: (context) {
+                  final title = switch (type) {
+                    ArchitectWorkspaceView.plan => l.architectFacadePlan,
+                    ArchitectWorkspaceView.elevation => l.architectFacades,
+                    ArchitectWorkspaceView.section => l.buildingSections,
+                  };
+                  final subtitle = switch (type) {
+                    ArchitectWorkspaceView.plan =>
+                      project.activeStorey.isRoof
+                          ? l.architectRoofPlan
+                          : project.activeStorey.elevationLabel,
+                    ArchitectWorkspaceView.elevation =>
+                      elevation == null
+                          ? '—'
+                          : architectElevationLabel(
+                              l,
+                              elevation,
+                              (project.northSymbol?.angle ?? 0),
+                            ),
+                    ArchitectWorkspaceView.section =>
+                      section == null
+                          ? '—'
+                          : section.name.isNotEmpty
+                          ? section.name
+                          : l.architectSectionNumber(
+                              project.sections.indexOf(section) + 1,
+                            ),
+                  };
+                  final quickReturn =
+                      type == ArchitectWorkspaceView.plan &&
+                      !isPlanCanvas &&
+                      onReturnToPlan != null;
+                  if (quickReturn) {
+                    return Tooltip(
+                      message: l.architectBackToPlan,
+                      child: InkWell(
+                        key: ValueKey('architect-view-${type.name}'),
+                        onTap: onReturnToPlan,
+                        child: _buildTabContent(
+                          context: context,
+                          title: title,
+                          subtitle: subtitle,
+                          active: false,
+                          quickReturn: true,
+                        ),
+                      ),
                     );
-                    return;
                   }
-                  if (id == 'manage') {
-                    onManage(type);
-                  } else {
-                    onSelected(type, id);
-                  }
-                },
-                itemBuilder: (_) => [
+                  final active = !is3D && type == view;
+                  return PopupMenuButton<String>(
+                    key: ValueKey('architect-view-${type.name}'),
+                    tooltip: switch (type) {
+                      ArchitectWorkspaceView.plan => l.architectStoreys,
+                      ArchitectWorkspaceView.elevation => l.architectFacades,
+                      ArchitectWorkspaceView.section => l.buildingSections,
+                    },
+                    onSelected: (id) {
+                      if ([
+                        'new',
+                        'edit',
+                        'depth',
+                        'step',
+                        'straight',
+                        'visibility',
+                        'copy_by_storey',
+                      ].contains(id)) {
+                        onDraft?.call(
+                          type,
+                          type == ArchitectWorkspaceView.section
+                              ? section?.id
+                              : elevation?.id,
+                          id,
+                        );
+                        return;
+                      }
+                      if (id == 'manage') {
+                        onManage(type);
+                      } else {
+                        onSelected(type, id);
+                      }
+                    },
+                    itemBuilder: (_) => [
                   if (type == ArchitectWorkspaceView.plan) ...[
                     for (final s in project.orderedPlanStoreys)
                       CheckedPopupMenuItem(
@@ -251,81 +387,58 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                       ),
                     ),
                 ],
+                    child: _buildTabContent(
+                      context: context,
+                      title: title,
+                      subtitle: subtitle,
+                      active: active,
+                      quickReturn: false,
+                    ),
+                  );
+                },
+              ),
+            ),
+          if (onToggle3D != null)
+            Tooltip(
+              message: is3D ? l.architectView2D : l.architectView3D,
+              child: InkWell(
+                key: const ValueKey('architect-view-3d'),
+                onTap: onToggle3D,
                 child: Container(
+                  constraints: const BoxConstraints(minWidth: 46),
                   height: heightFor(context),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
                   decoration: BoxDecoration(
+                    color: is3D
+                        ? Colors.cyanAccent.withValues(alpha: 0.14)
+                        : null,
                     border: Border(
+                      left: const BorderSide(color: Colors.white12),
                       bottom: BorderSide(
-                        color: type == view
-                            ? Colors.cyanAccent
-                            : Colors.white12,
-                        width: type == view ? 2 : 1,
+                        color: is3D ? Colors.cyanAccent : Colors.white12,
+                        width: is3D ? 2 : 1,
                       ),
                     ),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              switch (type) {
-                                ArchitectWorkspaceView.plan =>
-                                  l.architectFacadePlan,
-                                ArchitectWorkspaceView.elevation =>
-                                  l.architectFacades,
-                                ArchitectWorkspaceView.section =>
-                                  l.buildingSections,
-                              },
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: type == view
-                                    ? Colors.cyanAccent
-                                    : Colors.white70,
-                              ),
-                            ),
-                            Text(
-                              switch (type) {
-                                ArchitectWorkspaceView.plan =>
-                                  project.activeStorey.isRoof
-                                      ? l.architectRoofPlan
-                                      : project.activeStorey.elevationLabel,
-                                ArchitectWorkspaceView.elevation =>
-                                  elevation == null
-                                      ? '—'
-                                      : architectElevationLabel(
-                                          l,
-                                          elevation,
-                                          (project.northSymbol?.angle ?? 0),
-                                        ),
-                                ArchitectWorkspaceView.section =>
-                                  section == null
-                                      ? '—'
-                                      : section.name.isNotEmpty
-                                      ? section.name
-                                      : l.architectSectionNumber(
-                                          project.sections.indexOf(section) + 1,
-                                        ),
-                              },
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
+                      AppIcon(
+                        AppIconId.view3D,
+                        size: 16,
+                        color: is3D ? Colors.cyanAccent : Colors.white70,
                       ),
-                      const AppIcon(
-                        AppIconId.expandMore,
-                        size: 18,
-                        color: Colors.white70,
+                      const SizedBox(height: 1),
+                      Text(
+                        l.architectView3DShort,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight:
+                              is3D ? FontWeight.w700 : FontWeight.w500,
+                          color: is3D ? Colors.cyanAccent : Colors.white,
+                        ),
                       ),
                     ],
                   ),

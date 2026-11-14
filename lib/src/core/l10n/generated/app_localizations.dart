@@ -24005,6 +24005,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Built-in factory presets cannot be deleted.'**
   String get architectFactoryPresetProtected;
+
+  /// Action label and tooltip to return from 3D, section, elevation, or print preview to the active floor plan
+  ///
+  /// In en, this message translates to:
+  /// **'Back to plan'**
+  String get architectBackToPlan;
+
+  /// Compact 3D tab label in the architectural workspace view bar
+  ///
+  /// In en, this message translates to:
+  /// **'3D'**
+  String get architectView3DShort;
+
+  /// Dialog title and tooltip when leaving the architectural workspace
+  ///
+  /// In en, this message translates to:
+  /// **'Exit project?'**
+  String get architectExitProjectTitle;
+
+  /// Confirmation message reminding the user that project changes are saved automatically before exiting
+  ///
+  /// In en, this message translates to:
+  /// **'Your project is saved automatically. Do you want to exit?'**
+  String get architectExitProjectMessage;
+
+  /// Confirmation message when leaving a scratch architectural workspace without a linked saved project
+  ///
+  /// In en, this message translates to:
+  /// **'This temporary workspace is not linked to a saved project. Do you want to exit?'**
+  String get architectExitProjectUnattachedMessage;
+
+  /// Confirmation button label to exit the architectural workspace
+  ///
+  /// In en, this message translates to:
+  /// **'Exit'**
+  String get architectExitProjectConfirm;
 }
 
 class _AppLocalizationsDelegate

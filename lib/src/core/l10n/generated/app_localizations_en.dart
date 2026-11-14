@@ -13223,4 +13223,24 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectFactoryPresetProtected =>
       'Built-in factory presets cannot be deleted.';
+
+  @override
+  String get architectBackToPlan => 'Back to plan';
+
+  @override
+  String get architectView3DShort => '3D';
+
+  @override
+  String get architectExitProjectTitle => 'Exit project?';
+
+  @override
+  String get architectExitProjectMessage =>
+      'Your project is saved automatically. Do you want to exit?';
+
+  @override
+  String get architectExitProjectUnattachedMessage =>
+      'This temporary workspace is not linked to a saved project. Do you want to exit?';
+
+  @override
+  String get architectExitProjectConfirm => 'Exit';
 }

@@ -16,10 +16,12 @@ import 'architect_projection_status.dart';
 class Architect3dViewport extends StatefulWidget {
   final ArchitectProject project;
   final Cad3DController controller;
+  final VoidCallback? onBackToPlan;
   const Architect3dViewport({
     super.key,
     required this.project,
     required this.controller,
+    this.onBackToPlan,
   });
 
   @override
@@ -146,6 +148,53 @@ class _Architect3dViewportState extends State<Architect3dViewport> {
             ),
           ),
         ),
+        if (widget.onBackToPlan != null)
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: SafeArea(
+              top: false,
+              left: false,
+              child: Material(
+                color: const Color(0xFF1E1E26).withValues(alpha: 0.92),
+                elevation: 3,
+                borderRadius: BorderRadius.circular(24),
+                child: InkWell(
+                  key: const ValueKey('architect-3d-back-to-plan'),
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: widget.onBackToPlan,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const AppIcon(
+                            AppIconId.back,
+                            size: 16,
+                            color: Color(0xFF00E5FF),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            l10n.architectView2D,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

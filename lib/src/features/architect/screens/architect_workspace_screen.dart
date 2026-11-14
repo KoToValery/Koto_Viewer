@@ -135,6 +135,7 @@ import '../widgets/architect_building_sections_screen.dart';
 import '../widgets/architect_section_visibility_dialog.dart';
 
 import '../widgets/architect_elevations_screen.dart';
+import '../widgets/architect_elevation_labels.dart';
 import '../widgets/architect_storeys_screen.dart';
 import '../widgets/architect_copy_storey_dialog.dart';
 
@@ -854,11 +855,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 lastViewIds: _lastViewIds,
 
+                is3D: _is3DView,
+
+                isPrintPreview: _printPreview,
+
                 onSelected: _selectWorkspaceView,
 
                 onManage: _manageWorkspaceViews,
 
                 onDraft: _draftWorkspaceView,
+
+                onReturnToPlan: _returnToPlan,
+
+                onToggle3D: _toggle3DView,
 
               ),
 
@@ -3712,6 +3721,114 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
 
+
+  bool _allowDirectPop = false;
+  bool _exitConfirmOpen = false;
+
+  bool get _isInPlanCanvas => !_is3DView && _commands.isPlan && !_printPreview;
+
+  String _workspaceModeLabel(AppLocalizations l) {
+    if (_is3DView) return l.architectView3D;
+    if (_printPreview) return l.architectPrintPreview;
+    if (_commands.view == ArchitectWorkspaceView.elevation) {
+      final elevation = _modelCommands.project.elevations
+          .where((e) => e.id == _commands.viewId)
+          .firstOrNull;
+      if (elevation == null) return l.architectFacades;
+      return architectElevationLabel(
+        l,
+        elevation,
+        _modelCommands.project.northSymbol?.angle ?? 0,
+      );
+    }
+    if (_commands.view == ArchitectWorkspaceView.section) {
+      final idx = _modelCommands.project.sections.indexWhere(
+        (s) => s.id == _commands.viewId,
+      );
+      if (idx < 0) return l.buildingSections;
+      final section = _modelCommands.project.sections[idx];
+      return section.name.isNotEmpty
+          ? section.name
+          : l.architectSectionNumber(idx + 1);
+    }
+    return _project.activeStorey.isRoof
+        ? l.architectRoofPlan
+        : _project.activeStorey.name;
+  }
+
+  void _returnToPlan() {
+    _cancelActiveDrags();
+    _touchCandidates = null;
+    _closeFreeStair();
+    if (!_commands.isPlan || _is3DView) {
+      _printPreview = false;
+      _selectWorkspaceView(
+        ArchitectWorkspaceView.plan,
+        _modelCommands.project.activeStoreyId,
+      );
+    } else if (_printPreview) {
+      setState(() => _printPreview = false);
+    }
+  }
+
+  Future<void> _handleWorkspaceBack() async {
+    if (!_isInPlanCanvas) {
+      _returnToPlan();
+      return;
+    }
+    await _confirmAndExitProject();
+  }
+
+  Future<void> _confirmAndExitProject() async {
+    if (!mounted || _exitConfirmOpen || _allowDirectPop) return;
+    final navigator = Navigator.of(context);
+    if (!navigator.canPop()) return;
+    _exitConfirmOpen = true;
+    final l10n = context.l10n;
+    final hasAutoSave = widget.bimProject != null;
+    bool? shouldExit;
+    try {
+      shouldExit = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => architectAlertDialog(
+          key: const ValueKey('architect-exit-project-dialog'),
+          title: Text(l10n.architectExitProjectTitle),
+          content: Text(
+            hasAutoSave
+                ? l10n.architectExitProjectMessage
+                : l10n.architectExitProjectUnattachedMessage,
+          ),
+          actions: [
+            TextButton(
+              key: const ValueKey('architect-exit-project-cancel'),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              key: const ValueKey('architect-exit-project-confirm'),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.architectExitProjectConfirm),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      _exitConfirmOpen = false;
+    }
+    if (shouldExit != true || !mounted) return;
+    _cancelActiveDrags();
+    _cancelDrafting();
+    if (_saveTimer != null) {
+      await _flushSave();
+    }
+    if (!mounted) return;
+    setState(() => _allowDirectPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && navigator.canPop()) {
+        navigator.pop();
+      }
+    });
+  }
 
   void _toggle3DView() {
 
@@ -30336,7 +30453,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         autofocus: true,
 
-        child: Scaffold(
+        child: PopScope(
+
+          canPop: _allowDirectPop ||
+              (_isInPlanCanvas && !Navigator.of(context).canPop()),
+
+          onPopInvokedWithResult: (didPop, result) {
+
+            if (!didPop) {
+
+              unawaited(_handleWorkspaceBack());
+
+            }
+
+          },
+
+          child: Scaffold(
 
           backgroundColor: const Color(0xFF141419),
 
@@ -30350,17 +30482,57 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             actionsIconTheme: const IconThemeData(color: Colors.white),
 
-            title: Text(
+            automaticallyImplyLeading: false,
 
-              _project.name,
+            leading: (!_isInPlanCanvas || Navigator.of(context).canPop())
+                ? IconButton(
+                    key: const ValueKey('architect-workspace-back'),
+                    tooltip: !_isInPlanCanvas
+                        ? l10n.architectBackToPlan
+                        : l10n.architectExitProjectTitle,
+                    onPressed: _handleWorkspaceBack,
+                    color: !_isInPlanCanvas
+                        ? const Color(0xFF00E5FF)
+                        : Colors.white,
+                    icon: const AppIcon(AppIconId.back),
+                  )
+                : null,
 
-              maxLines: 1,
-
-              overflow: TextOverflow.ellipsis,
-
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-
-            ),
+            title: _isInPlanCanvas
+                ? Text(
+                    _project.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _project.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        _workspaceModeLabel(l10n),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF00E5FF),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
 
             actions:
 
@@ -32113,6 +32285,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ],
 
           ),
+
+        ),
 
         ),
 
@@ -36639,6 +36813,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     project: _modelCommands.project,
 
     controller: _camera3D,
+
+    onBackToPlan: _returnToPlan,
 
   );
 
