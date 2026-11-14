@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 import 'dart:ui';
 
 import '../models/element_check_models.dart';
@@ -226,12 +226,12 @@ class LoadRundown {
     String? supportAt(Offset p) {
       for (final c in storey.columns) {
         if (StructuralPolygonDistance.inside(p, c.polygonVertices) ||
-            StructuralPolygonDistance.toCircle(c.polygonVertices, p, 0) <= tolerance) {
+            _distanceToPolygon(p, c.polygonVertices) <= tolerance) {
           return c.id;
         }
       }
       for (final w in storey.shearWalls) {
-        if (StructuralPolygonDistance.toCircle(w.polygonVertices, p, 0) <= tolerance) {
+        if (_distanceToPolygon(p, w.polygonVertices) <= tolerance) {
           return w.id;
         }
       }
@@ -267,14 +267,14 @@ class LoadRundown {
     for (final p in points) {
       String? target;
       for (final c in lower.columns) {
-        if (StructuralPolygonDistance.toCircle(c.polygonVertices, p, 0) <= tolerance) {
+        if (_distanceToPolygon(p, c.polygonVertices) <= tolerance) {
           target = c.id;
           break;
         }
       }
       if (target == null) {
         for (final w in lower.shearWalls) {
-          if (StructuralPolygonDistance.toCircle(w.polygonVertices, p, 0) <= tolerance) {
+          if (_distanceToPolygon(p, w.polygonVertices) <= tolerance) {
             target = w.id;
             break;
           }
@@ -308,8 +308,8 @@ class LoadRundown {
     slab ??= storey.slabs.isEmpty
         ? null
         : storey.slabs.reduce((a, b) =>
-            StructuralPolygonDistance.toCircle(a.polygon, col.center, 0) <=
-                    StructuralPolygonDistance.toCircle(b.polygon, col.center, 0)
+            _distanceToPolygon(col.center, a.polygon) <=
+                    _distanceToPolygon(col.center, b.polygon)
                 ? a
                 : b);
     if (slab == null) {
@@ -331,6 +331,18 @@ class LoadRundown {
   }
 
   // === SECTION: GEOMETRY HELPERS ===
+
+  /// Zero inside the polygon, otherwise the distance to its outline.
+  static double _distanceToPolygon(Offset p, List<Offset> poly) {
+    if (poly.length < 3) return double.infinity;
+    if (StructuralPolygonDistance.inside(p, poly)) return 0;
+    var best = double.infinity;
+    for (var i = 0; i < poly.length; i++) {
+      best = math.min(best,
+          StructuralPolygonDistance.pointToSegment(p, poly[i], poly[(i + 1) % poly.length]));
+    }
+    return best;
+  }
 
   /// Centre line of a 4-vertex wall/beam body (midpoints of the short ends).
   static (Offset, Offset) _bodyAxis(List<Offset> body) =>

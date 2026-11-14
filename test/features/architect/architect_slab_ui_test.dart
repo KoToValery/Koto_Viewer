@@ -1,6 +1,7 @@
 import 'architect_projection_test_helper.dart' as projection;
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -9,10 +10,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/models/architect_slab_assembly.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_building_section.dart';
+import 'package:kotoview/src/features/architect/services/architect_polygon_editor.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_building_sections_screen.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_slab_layers_dialog.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
+import 'package:kotoview/src/features/bim_editing/interaction/bim_polygon_editor.dart';
+import 'architect_drawing_controls_revision_test.dart' as revision;
+import 'architect_editing_test.dart' as editing;
 import 'architect_slab_assembly_test.dart' as fixture;
 import 'architect_workspace_interaction_test.dart' as workspace;
 import 'architect_tool_test_helper.dart' as tools;
@@ -292,6 +299,272 @@ void main() {
       controller.redo();
       await projection.settleProjection(tester);
       expect(controller.project.sections.single.details.single.id, detail.id);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'slab drafting avoids duplicate canvas confirmation overlay',
+    (tester) async {
+      final draftModel = workspace.commands();
+      addTearDown(draftModel.dispose);
+      await workspace.open(tester, draftModel);
+      await revision.tool(tester, ArchitectTool.slab);
+      for (final point in const [Offset(0, 0), Offset(4, 0), Offset(4, 3)]) {
+        await workspace.wallTap(tester, point);
+      }
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('slab-draft-finish')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('slab-draft-cancel')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-draft-confirm')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-draft-cancel')),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const ValueKey('slab-draft-finish')));
+      await tester.pumpAndSettle();
+      expect(draftModel.project.activeStorey.slabs, hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'slab new-point editing shows a single confirmation banner',
+    (tester) async {
+      final editModel = ArchitectCommandController(fixture.slabProject());
+      addTearDown(editModel.dispose);
+      await workspace.open(tester, editModel);
+      await workspace.wallTap(tester, const Offset(2, 2));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('hatch-edit-new-point')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('architect-new-point-banner')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-generic-command-overlay')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('polygon-edit-close')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-command-apply')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-command-cancel')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'offset edit handles stay constant in screen pixels at high zoom (> 80x)',
+    () {
+      const poly = [Offset(0, 0), Offset(4, 0), Offset(4, 4), Offset(0, 4)];
+      const highScale = 200.0;
+      const offsetLengthPx = 50.0;
+
+      final edgeHandle = ArchitectPolygonEditor.offsetEdgeHandle(
+        poly,
+        0,
+        highScale,
+        offsetLengthPx,
+      );
+      final vertexHandle = ArchitectPolygonEditor.offsetVertexHandle(
+        poly,
+        0,
+        highScale,
+        offsetLengthPx,
+      );
+
+      expect((edgeHandle - const Offset(2, 0)).distance, closeTo(0.25, 1e-9));
+      expect((vertexHandle - Offset.zero).distance, closeTo(0.25, 1e-9));
+
+      final editor = BimPolygonEditor<Offset>(
+        pointOf: (o) => o,
+        isSnapped: (_) => false,
+      );
+      expect(
+        editor.start(
+          'slab',
+          poly,
+          edgeHandle,
+          highScale,
+          offsetLengthPx: offsetLengthPx,
+        ),
+        isTrue,
+      );
+      expect(editor.isOffsetHandle, isTrue);
+      expect(editor.edge, isTrue);
+
+      editor.cancel();
+      final outdatedDistancePoint =
+          const Offset(2, 0) + (edgeHandle - const Offset(2, 0)) / 0.25 * 0.625;
+      expect(
+        editor.start(
+          'slab',
+          poly,
+          outdatedDistancePoint,
+          highScale,
+          offsetLengthPx: offsetLengthPx,
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets(
+    'slab new-point mode allows free off-grid positioning along the edge',
+    (tester) async {
+      final model = ArchitectCommandController(fixture.slabProject());
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      workspace.camera(tester).fit(const Rect.fromLTWH(-1, -1, 12, 6));
+      await tester.pumpAndSettle();
+
+      await workspace.wallTap(tester, const Offset(2, 2));
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).selectedElementId, 'slab');
+
+      await tester.tap(find.byKey(const ValueKey('hatch-edit-new-point')));
+      await tester.pumpAndSettle();
+
+      await tester.tapAt(workspace.screen(tester, const Offset(2.14, 0.005)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
+      await tester.pumpAndSettle();
+
+      final poly = model.project.activeStorey.slabs.single.polygon;
+      expect(poly, hasLength(5));
+      expect(poly[1].dy, closeTo(0, 1e-6));
+      expect(poly[1].dx, inInclusiveRange(2.11, 2.17));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'selected slab in correction mode moves only via Drag tool, not standard drag',
+    (tester) async {
+      final model = ArchitectCommandController(fixture.slabProject());
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      workspace.camera(tester).fit(const Rect.fromLTWH(-2, -2, 14, 8));
+      await tester.pumpAndSettle();
+
+      await workspace.wallTap(tester, const Offset(2, 2));
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).selectedElementId, 'slab');
+      final originalPolygon = List<Offset>.from(
+        model.project.activeStorey.slabs.single.polygon,
+      );
+
+      // Standard mouse drag inside slab body must not move it.
+      final mouseDrag = await tester.startGesture(
+        workspace.screen(tester, const Offset(2, 2)),
+        kind: PointerDeviceKind.mouse,
+      );
+      await mouseDrag.moveTo(workspace.screen(tester, const Offset(4, 3)));
+      await tester.pump();
+      await mouseDrag.up();
+      await tester.pumpAndSettle();
+      expect(model.project.activeStorey.slabs.single.polygon, originalPolygon);
+      expect(model.canUndo, isFalse);
+
+      // Standard drag near outside of slab contour must not grab or move it.
+      final nearDrag = await tester.startGesture(
+        workspace.screen(tester, const Offset(2.5, -0.3)),
+        kind: PointerDeviceKind.mouse,
+      );
+      await nearDrag.moveTo(workspace.screen(tester, const Offset(2.5, -1.3)));
+      await tester.pump();
+      await nearDrag.up();
+      await tester.pumpAndSettle();
+      expect(model.project.activeStorey.slabs.single.polygon, originalPolygon);
+      expect(model.canUndo, isFalse);
+
+      // Explicit Drag tool moves the selected slab cleanly.
+      final palette = tester.widget<ArchitectToolPalette>(
+        find.byType(ArchitectToolPalette),
+      );
+      palette.onToolChanged(ArchitectTool.drag);
+      await tester.pumpAndSettle();
+      await tester.tapAt(workspace.screen(tester, Offset.zero));
+      await tester.pump();
+      await tester.tapAt(workspace.screen(tester, const Offset(1.5, 1.0)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
+      await tester.pumpAndSettle();
+
+      expect(
+        model.project.activeStorey.slabs.single.polygon.first,
+        const Offset(1.5, 1.0),
+      );
+      expect(model.canUndo, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'tapping outside a selected slab deselects it and lets other elements select',
+    (tester) async {
+      final project = fixture.slabProject(
+        walls: [
+          editing.wall('w1', const Offset(12, 0), const Offset(12, 4)),
+          editing.wall('w2', const Offset(0, 0), const Offset(10, 0)),
+        ],
+      );
+      final model = ArchitectCommandController(project);
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      workspace.camera(tester).fit(const Rect.fromLTWH(-4, -4, 18, 12));
+      await tester.pumpAndSettle();
+
+      // Select slab.
+      await workspace.wallTap(tester, const Offset(2, 2));
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).selectedElementId, 'slab');
+
+      // Tapping empty space outside slab automatically deselects it.
+      await workspace.wallTap(tester, const Offset(-2, -2));
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).selectedElementId, isNull);
+      expect(find.byKey(const ValueKey('polygon-edit-close')), findsNothing);
+
+      // Other elements select normally after slab deselection.
+      await workspace.wallTap(tester, const Offset(12, 2));
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).selectedElementId, 'w1');
+
+      // Re-select slab and tap directly onto another element (both distant and on-edge).
+      await workspace.wallTap(tester, const Offset(2, 2));
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).selectedElementId, 'slab');
+
+      await workspace.wallTap(tester, const Offset(12, 2));
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).selectedElementId, 'w1');
+
+      await workspace.wallTap(tester, const Offset(2, 2));
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).selectedElementId, 'slab');
+
+      await workspace.wallTap(tester, const Offset(5, 0));
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).selectedElementId, 'w2');
       expect(tester.takeException(), isNull);
     },
   );

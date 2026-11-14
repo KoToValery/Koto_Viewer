@@ -1,6 +1,8 @@
 import 'architect_selection_painter.dart';
 import 'architect_roof_drainage_painter.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_line_style.dart';
+import '../services/architect_polygon_geometry.dart';
 import '../services/architect_polyline_editing.dart';
 import '../models/architect_hatch_pattern.dart';
 import 'architect_clearance_badge_layout.dart';
@@ -903,12 +905,12 @@ class Architect2dPainter extends CustomPainter {
 // === SECTION: [SEC-05-PAINT] CANVAS PAINTING & GEOMETRY RENDERING ===
 // --- SUBSECTION: [TAG:ARCH_PAINTER_DRAW_SELECTED] Canvas Painting & Geometry Rendering: `_drawSelectedElement`, `_d ---
   void _drawSelectedElement(Canvas canvas) {
-    if (newPointCandidate != null) return;
     if (selectedElementId == null) return;
     final walls = project.activeStorey.walls.where(
       (w) => w.id == selectedElementId,
     );
     if (walls.isNotEmpty) {
+      if (newPointCandidate != null) return;
       final wall = walls.first;
       canvas.drawLine(
         wall.startPoint,
@@ -975,7 +977,7 @@ class Architect2dPainter extends CustomPainter {
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
-      if (marqueePoints.isEmpty) {
+      if (marqueePoints.isEmpty && newPointCandidate == null) {
         final points = polyline.type == CadPrimitiveType.spline ? (polyline.polygon ?? polyline.linePoints) : polyline.linePoints;
         final scale = math.max(zoomScale, 80.0);
         const color = Color(0xFF00BCD4);
@@ -1190,6 +1192,75 @@ class Architect2dPainter extends CustomPainter {
     final candidateColor = newPointValid
         ? const Color(0xFF006E91) : const Color(0xFFB3261E);
 
+    // Highlight the active target polygon edge and sub-segment dimensions for closed contours (slabs, hatches, etc.).
+    final targetId = selectedElementId ?? selectedZoneId;
+    if (targetId != null) {
+      final (polygon, holes) = _editablePolygonContours(targetId);
+      final holeIdx = polygonEditHoleIndex;
+      final activeContour =
+          holeIdx != null && holeIdx >= 0 && holeIdx < holes.length
+              ? holes[holeIdx]
+              : polygon;
+      if (activeContour != null && activeContour.length >= 3) {
+        final hit = BimLineGeometry.insertion(
+          activeContour,
+          newPointCandidate!,
+          closed: true,
+        );
+        if (hit != null) {
+          final edgeP1 = activeContour[hit.edge];
+          final edgeP2 = activeContour[(hit.edge + 1) % activeContour.length];
+          canvas.drawLine(
+            edgeP1,
+            edgeP2,
+            Paint()
+              ..color = const Color(0x55000000)
+              ..strokeWidth = 4.0 / draftingScale
+              ..strokeCap = StrokeCap.round
+              ..style = PaintingStyle.stroke,
+          );
+          canvas.drawLine(
+            edgeP1,
+            edgeP2,
+            Paint()
+              ..color = const Color(0xFF00E5FF)
+              ..strokeWidth = 2.4 / draftingScale
+              ..strokeCap = StrokeCap.round
+              ..style = PaintingStyle.stroke,
+          );
+          canvas.drawCircle(
+            edgeP1,
+            3.5 / draftingScale,
+            Paint()..color = const Color(0xFF00E5FF),
+          );
+          canvas.drawCircle(
+            edgeP2,
+            3.5 / draftingScale,
+            Paint()..color = const Color(0xFF00E5FF),
+          );
+          final edgeNormal = ArchitectPolygonGeometry.normal(activeContour, hit.edge);
+          ArchitectPolygonPainter.dimension(
+            canvas,
+            edgeP1,
+            newPointCandidate!,
+            edgeNormal,
+            zoomScale,
+            _project.units,
+            decimals: _project.distanceDecimals,
+          );
+          ArchitectPolygonPainter.dimension(
+            canvas,
+            newPointCandidate!,
+            edgeP2,
+            edgeNormal,
+            zoomScale,
+            _project.units,
+            decimals: _project.distanceDecimals,
+          );
+        }
+      }
+    }
+
     if (newPointLeaderLine != null) {
       final from = newPointCandidate!;
       final to = newPointHandleOffset == null ? newPointLeaderLine!.$2
@@ -1233,9 +1304,7 @@ class Architect2dPainter extends CustomPainter {
     }
   }
 
-  void _drawPolygonEditing(Canvas canvas) {
-    final targetId = selectedElementId ?? selectedZoneId;
-    if (targetId == null) return;
+  (List<Offset>?, List<List<Offset>>) _editablePolygonContours(String targetId) {
     List<Offset>? polygon;
     List<List<Offset>> holes = const [];
     for (final p in _project.activeStorey.cadPrimitives) {
@@ -1259,14 +1328,22 @@ class Architect2dPainter extends CustomPainter {
     for (final drain in _project.activeStorey.floorDrains) {
       if (drain.id == targetId) { polygon = drain.polygon; holes = drain.holes; }
     }
+    return (polygon, holes);
+  }
+
+  void _drawPolygonEditing(Canvas canvas) {
+    final targetId = selectedElementId ?? selectedZoneId;
+    if (targetId == null) return;
+    final (polygon, holes) = _editablePolygonContours(targetId);
     if (polygon == null) return;
+    final showHandles = newPointCandidate == null;
     ArchitectPolygonPainter.draw(
       canvas: canvas,
       polygon: polygon,
       scale: zoomScale,
       unit: _project.units,
       decimals: _project.distanceDecimals,
-      handles: true,
+      handles: showHandles,
       invalid: polygonEditInvalid && polygonEditHoleIndex == null,
       leaderLine: polygonEditHoleIndex == null ? polygonLeaderLine : null,
       offsetLengthPx: handleOffsetLength,
@@ -1278,7 +1355,7 @@ class Architect2dPainter extends CustomPainter {
       ArchitectPolygonPainter.draw(
         canvas: canvas, polygon: holes[i], scale: zoomScale,
         unit: _project.units, decimals: _project.distanceDecimals,
-        handles: true,
+        handles: showHandles,
         invalid: polygonEditInvalid && polygonEditHoleIndex == i,
         leaderLine: polygonEditHoleIndex == i ? polygonLeaderLine : null,
         offsetLengthPx: handleOffsetLength,

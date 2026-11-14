@@ -122,7 +122,6 @@ class BimPolygonEditor<TSnap> {
     if (!BimPolygonGeometry.valid(polygon)) return false;
     final directRadius = 18.0 / scale;
     final offsetRadius = 24.0 / scale;
-    final proximityRadius = 48.0 / scale;
 
     int? hit;
     var best = directRadius;
@@ -182,32 +181,6 @@ class BimPolygonEditor<TSnap> {
           hitIsEdge = true;
           hitIsOffset = true;
           chosenHandle = h;
-        }
-      }
-    }
-
-    // 5. Proximity outside tap fallback (tap near contour to activate closest handle)
-    if (hit == null && offsetLengthPx > 0) {
-      var proximityBest = proximityRadius;
-      for (var i = 0; i < polygon.length; i++) {
-        final hv = offsetVertexHandle(polygon, i, scale, offsetLengthPx);
-        final dv = (raw - hv).distance;
-        if (dv < proximityBest) {
-          hit = i;
-          proximityBest = dv;
-          hitIsEdge = false;
-          hitIsOffset = true;
-          chosenHandle = hv;
-        }
-
-        final he = offsetEdgeHandle(polygon, i, scale, offsetLengthPx);
-        final de = (raw - he).distance;
-        if (de < proximityBest) {
-          hit = i;
-          proximityBest = de;
-          hitIsEdge = true;
-          hitIsOffset = true;
-          chosenHandle = he;
         }
       }
     }
