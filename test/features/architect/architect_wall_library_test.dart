@@ -14,24 +14,35 @@ void main() {
     '17 complete generic templates validate and preserve exact build-ups',
     () {
       final expected = <String, double>{
-        'factory_brick_120': .15,
-        'factory_brick_250': .28,
-        'factory_aerated_100': .13,
-        'factory_aerated_150': .18,
-        'factory_concrete_200': .23,
-        'factory_concrete_250': .28,
+        'factory_brick_120': .12,
+        'factory_brick_250': .25,
+        'factory_aerated_100': .10,
+        'factory_aerated_150': .15,
+        'factory_concrete_200': .20,
+        'factory_concrete_250': .25,
         'factory_stud_100': .10,
         'factory_stud_150': .15,
-        'factory_brick_250_eps_120': .39,
-        'factory_brick_250_eps_150': .42,
-        'factory_brick_250_wool_150': .42,
-        'factory_aerated_250_wool_120': .39,
-        'factory_concrete_200_wool_150': .37,
+        'factory_brick_250_eps_120': .37,
+        'factory_brick_250_eps_150': .40,
+        'factory_brick_250_wool_150': .40,
+        'factory_aerated_250_wool_120': .37,
+        'factory_concrete_200_wool_150': .35,
         'factory_sandwich_100': .20,
         'factory_sandwich_150': .25,
         'factory_logs_200': .20,
         'factory_logs_240': .24,
       };
+      for (final type in ArchitectWallLibrary.presets) {
+        expect(
+          type.layers.where(
+            (l) =>
+                l.material == ArchitectMaterial.plaster ||
+                l.material == ArchitectMaterial.render,
+          ),
+          isEmpty,
+          reason: '${type.id} must not include default plaster/render',
+        );
+      }
       expect(ArchitectWallLibrary.presets, hasLength(17));
       expect(
         ArchitectWallLibrary.templates.map((t) => t.family).toSet(),

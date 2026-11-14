@@ -47,14 +47,14 @@ class ArchitectDimensionLayout {
         lines;
   }
 
-  /// Resolve finish picks against the real wall faces, without changing the
-  /// saved snap point or moving the positioned dimension line.
-  static ({Offset core, Offset finish}) _wallReference(
+  /// Resolve dimension picks against the structural wall core faces, without
+  /// changing the saved snap point or moving the positioned dimension line.
+  static Offset _wallCoreReference(
     Offset point,
     Offset direction,
     List<ArchitectWall> walls,
   ) {
-    ({Offset core, Offset finish}) result = (core: point, finish: point);
+    var result = point;
     var bestAlignment = 1e-6;
     for (final wall in walls) {
       if (wall.isCurved || wall.length < 1e-6) continue;
@@ -80,10 +80,7 @@ class ArchitectDimensionLayout {
           continue;
         }
         bestAlignment = alignment.abs();
-        result = (
-          core: point + direction * (toCore / alignment),
-          finish: point + direction * (toFinish / alignment),
-        );
+        result = point + direction * (toCore / alignment);
       }
     }
     return result;
@@ -209,34 +206,28 @@ class ArchitectDimensionLayout {
     }
 
     if (dimension.style != ArchitectDimensionStyle.exterior) {
-      row(1, dimension.witnessPoints.map(along));
+      row(
+        1,
+        dimension.witnessPoints
+            .map((p) => _wallCoreReference(p, u, storey?.walls ?? const []))
+            .map(along),
+      );
       return tiers;
     }
 
-    final references = [
+    final corePoints = [
       if (!dimension.isChain)
         for (final point in [dimension.startPoint, dimension.endPoint])
-          _wallReference(point, u, storey?.walls ?? const []),
+          _wallCoreReference(point, u, storey?.walls ?? const []),
       for (final anchor in dimension.anchors)
         if (anchor.feature != 'opening')
-          _wallReference(anchor.point, u, storey?.walls ?? const []),
+          _wallCoreReference(anchor.point, u, storey?.walls ?? const []),
     ];
-    if (references.length < 2) {
-      references.addAll([
-        (core: dimension.startPoint, finish: dimension.startPoint),
-        (core: dimension.endPoint, finish: dimension.endPoint),
-      ]);
+    if (corePoints.length < 2) {
+      corePoints.addAll([dimension.startPoint, dimension.endPoint]);
     }
-    final corePositions = references.map((r) => along(r.core)).toList()..sort();
+    final corePositions = corePoints.map(along).toList()..sort();
     final low = corePositions.first, high = corePositions.last;
-    final finishLow = references
-        .where((r) => (along(r.core) - low).abs() < 1e-6)
-        .map((r) => math.min(low, along(r.finish)))
-        .reduce(math.min);
-    final finishHigh = references
-        .where((r) => (along(r.core) - high).abs() < 1e-6)
-        .map((r) => math.max(high, along(r.finish)))
-        .reduce(math.max);
     bool inSpan(double t) => t >= low - 1e-6 && t <= high + 1e-6;
     final structural = List<double>.of(corePositions);
     final openings = [
@@ -327,7 +318,7 @@ class ArchitectDimensionLayout {
 
     if (openings.isNotEmpty) row(1, [low, ...openings, high]);
     row(2, structural);
-    if (dimension.showOverall) row(3, [finishLow, low, high, finishHigh]);
+    if (dimension.showOverall) row(3, [low, high]);
 
     // Grid axes are infinite references; only the perpendicular family in the
     // measured span contributes to the outermost row.

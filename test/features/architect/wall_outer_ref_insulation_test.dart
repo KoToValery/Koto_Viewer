@@ -37,21 +37,9 @@ void main() {
     final catalog = ArchitectWallType.standardCatalog();
     final layers = ArchitectWallLayers.build([wallA, wallB], catalog);
 
-    print('Body bounds: ${layers.body.getBounds()}');
-    print('Core bounds: ${layers.core.getBounds()}');
-    print('Insulation bounds: ${layers.insulation.getBounds()}');
-
-    final ptInInsulationA = const Offset(4.75, -0.06);
-    final ptInInsulationB = const Offset(4.94, -0.25);
-    final ptInCornerInsulation = const Offset(4.94, -0.06);
-
-    print('Does core contain ptInInsulationA (4.75, -0.06)? ${layers.core.contains(ptInInsulationA)}');
-    print('Does core contain ptInInsulationB (4.94, -0.25)? ${layers.core.contains(ptInInsulationB)}');
-    print('Does core contain ptInCornerInsulation (4.94, -0.06)? ${layers.core.contains(ptInCornerInsulation)}');
-
-    print('Does insulation contain ptInInsulationA? ${layers.insulation.contains(ptInInsulationA)}');
-    print('Does insulation contain ptInInsulationB? ${layers.insulation.contains(ptInInsulationB)}');
-    print('Does insulation contain ptInCornerInsulation? ${layers.insulation.contains(ptInCornerInsulation)}');
+    final ptInInsulationA = const Offset(4.75, 0.06);
+    final ptInInsulationB = const Offset(5.06, -0.25);
+    final ptInCornerInsulation = const Offset(5.06, 0.06);
 
     expect(layers.core.contains(ptInCornerInsulation), isFalse, reason: 'Core must not enter outer corner insulation');
     expect(layers.core.contains(ptInInsulationA), isFalse, reason: 'Core must not enter Wall A insulation');
@@ -60,5 +48,9 @@ void main() {
     expect(layers.insulation.contains(ptInCornerInsulation), isTrue, reason: 'Insulation must be present at outer corner');
     expect(layers.insulation.contains(ptInInsulationA), isTrue, reason: 'Insulation must be present along Wall A');
     expect(layers.insulation.contains(ptInInsulationB), isTrue, reason: 'Insulation must be present along Wall B');
+
+    // Outer leading line sits strictly on the outer core face (Y = 0 for A, X = 5 for B).
+    expect(wallA.coreCenterStart.dy, closeTo(-0.125, 1e-9));
+    expect(wallB.coreCenterStart.dx, closeTo(4.875, 1e-9));
   });
 }

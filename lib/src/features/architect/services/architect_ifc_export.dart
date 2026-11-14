@@ -598,7 +598,7 @@ class _IfcPreparation {
         'height': door.height,
         'width': door.width,
         'typeId': door.styleId ?? door.specId,
-        'operation': door.isHingeLeft
+        'operation': door.isLeftHand
             ? 'SINGLE_SWING_LEFT'
             : 'SINGLE_SWING_RIGHT',
         'shapes': [

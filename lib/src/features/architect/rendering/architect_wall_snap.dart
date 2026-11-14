@@ -22,7 +22,7 @@ class ArchitectWallSnap {
     required double scale,
     double capturePixels = 14,
     bool magnetic = true,
-    bool coreOnly = false,
+    bool coreOnly = true,
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
@@ -103,18 +103,16 @@ class ArchitectWallSnap {
         if (wall.isCurved) {
           final r = wall.arc!.parameter(result.point).clamp(0.0, 1.0),
               n = wall.normalAt(r) * wall.exteriorSign;
+          final coreCenter = wall.centerPointAt(r) - n * wall.coreAsymmetry / 2;
           for (final face in [
-            (
-              WallReferenceLine.center,
-              wall.centerPointAt(r) - n * wall.coreAsymmetry / 2,
-            ),
+            (WallReferenceLine.center, coreCenter),
             (
               WallReferenceLine.outer,
-              wall.centerPointAt(r) + n * wall.thickness / 2,
+              coreCenter + n * wall.coreThickness / 2,
             ),
             (
               WallReferenceLine.inner,
-              wall.centerPointAt(r) - n * wall.thickness / 2,
+              coreCenter - n * wall.coreThickness / 2,
             ),
           ]) {
             if ((result.point - face.$2).distance < .0001 &&
@@ -126,15 +124,12 @@ class ArchitectWallSnap {
           continue;
         }
         final inner =
-            wall.centerStart - wall.exteriorNormal * wall.thickness / 2;
-        final outer =
-            wall.centerStart + wall.exteriorNormal * wall.thickness / 2;
+            wall.coreCenterStart - wall.exteriorNormal * wall.coreThickness / 2;
         final coreOuter =
             wall.coreCenterStart + wall.exteriorNormal * wall.coreThickness / 2;
         for (final face in [
           (WallReferenceLine.center, wall.coreCenterStart),
           (WallReferenceLine.inner, inner),
-          (WallReferenceLine.outer, outer),
           (WallReferenceLine.outer, coreOuter),
         ]) {
           final d = result.point - face.$2;

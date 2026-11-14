@@ -275,6 +275,7 @@ void main() {
             width: 0.9,
             height: 2.1,
             isHingeLeft: true,
+            specId: "1'",
           ),
         ],
         windows: [
@@ -316,6 +317,7 @@ void main() {
       expect(mirrored.doors.length, 1);
       expect(mirrored.doors.first.isHingeLeft, true);
       expect(mirrored.doors.first.openInward, false);
+      expect(mirrored.doors.first.specId, '1');
       expect(mirrored.doors.first.offsetRatio, closeTo(0.3, 0.001));
       // Window is kept
       expect(mirrored.windows.length, 1);

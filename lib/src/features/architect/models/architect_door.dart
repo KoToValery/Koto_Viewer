@@ -85,13 +85,51 @@ class ArchitectDoor {
     return (hinge: hinge, direction: direction, normal: normal);
   }
 
-  /// Formats the parametric spec ID based on base number and hinge orientation.
-  /// Left-hinged doors append a prime (') symbol to distinguish from right-hinged doors.
+  /// Returns whether a door has left-hand architectural swing (prime `'` mark).
+  ///
+  /// Viewed from the pull side of the leaf (facing back along the swing normal):
+  /// - When [openInward] is `true`, the left jamb (`wallStart` side) is on the viewer's left,
+  ///   so [isHingeLeft] = `true` is left-hand (`'`).
+  /// - When [openInward] is `false`, the viewer stands on the opposite side of the wall,
+  ///   so [isHingeLeft] = `false` puts the hinge on the viewer's left (`'`).
+  static bool isLeftHanded({
+    required bool isHingeLeft,
+    required bool openInward,
+  }) => isHingeLeft == openInward;
+
+  /// Whether this door has left-hand architectural swing (prime `'` mark).
+  bool get isLeftHand => isLeftHanded(
+    isHingeLeft: isHingeLeft,
+    openInward: openInward,
+  );
+
+  /// Formats the parametric spec ID based on base number and door handing.
+  /// Left-hand doors append a prime (') symbol to distinguish from right-hand doors.
   static String formatSpecId({
     required int baseNumber,
     required bool isHingeLeft,
+    bool openInward = true,
   }) {
-    return isHingeLeft ? "$baseNumber'" : '$baseNumber';
+    return isLeftHanded(isHingeLeft: isHingeLeft, openInward: openInward)
+        ? "$baseNumber'"
+        : '$baseNumber';
+  }
+
+  /// Returns [specId] updated for the handing derived from [isHingeLeft] and [openInward],
+  /// preserving its numeric base number if present.
+  static String? updateSpecIdHanding({
+    required String? specId,
+    required bool isHingeLeft,
+    required bool openInward,
+  }) {
+    if (specId == null || specId.isEmpty) return specId;
+    final base = extractBaseNumber(specId);
+    if (base == null) return specId;
+    return formatSpecId(
+      baseNumber: base,
+      isHingeLeft: isHingeLeft,
+      openInward: openInward,
+    );
   }
 
   /// Size key matching width, height, and sill height within millimeter precision.
@@ -115,13 +153,14 @@ class ArchitectDoor {
 
   /// Resolves the parametric door ID for a door specification against existing doors.
   /// Doors of identical dimensions (width, height, sillHeight) share the same base number.
-  /// Left-hinged doors append a prime (') symbol to the base number.
+  /// Left-hand doors append a prime (') symbol to the base number.
   static String resolveSpecId({
     required Iterable<ArchitectDoor> existingDoors,
     required double width,
     required double height,
     required double sillHeight,
     required bool isHingeLeft,
+    bool openInward = true,
   }) {
     final targetKey = sizeKey(
       width: width,
@@ -149,7 +188,11 @@ class ArchitectDoor {
     }
 
     final effectiveBase = matchedBase ?? (maxBase + 1);
-    return formatSpecId(baseNumber: effectiveBase, isHingeLeft: isHingeLeft);
+    return formatSpecId(
+      baseNumber: effectiveBase,
+      isHingeLeft: isHingeLeft,
+      openInward: openInward,
+    );
   }
 
   ArchitectDoor copyWith({

@@ -903,20 +903,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
           if (!{'true', 'false'}.contains(value.value)) {
             throw ArgumentError('Invalid boolean value');
           }
-          final boolVal = value.value == 'true';
-          e[value.key] = boolVal;
-          if (value.key == 'isHingeLeft' && !textValues.containsKey('specId')) {
-            final currentSpec = e['specId'] as String?;
-            if (currentSpec != null && currentSpec.isNotEmpty) {
-              final base = ArchitectDoor.extractBaseNumber(currentSpec);
-              if (base != null) {
-                e['specId'] = ArchitectDoor.formatSpecId(
-                  baseNumber: base,
-                  isHingeLeft: boolVal,
-                );
-              }
-            }
-          }
+          e[value.key] = value.value == 'true';
         } else if (value.key == 'followStoreyHeight' ||
             value.key == 'clipToRoof') {
           if (!{'true', 'false'}.contains(value.value)) {
@@ -951,6 +938,18 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
                   (side) => side.name == value.value,
                 )) {
           throw ArgumentError('Invalid side or reference');
+        }
+      }
+      if ((textValues.containsKey('isHingeLeft') ||
+              textValues.containsKey('openInward')) &&
+          !textValues.containsKey('specId')) {
+        final updatedSpec = ArchitectDoor.updateSpecIdHanding(
+          specId: e['specId'] as String?,
+          isHingeLeft: e['isHingeLeft'] as bool? ?? true,
+          openInward: e['openInward'] as bool? ?? true,
+        );
+        if (updatedSpec != null) {
+          e['specId'] = updatedSpec;
         }
       }
       if (e.containsKey('referenceLine')) {

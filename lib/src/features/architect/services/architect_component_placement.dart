@@ -23,10 +23,10 @@ class ArchitectComponentPlacement {
     }
     var bestDistance = tolerance;
     var result = (raw, rotation);
-    final planWalls = walls is List<ArchitectWall>
-        ? ArchitectWallGeometry.planWalls(walls)
-        : ArchitectWallGeometry.planWalls(walls.toList());
-    for (final wall in planWalls) {
+    final coreWalls = walls is List<ArchitectWall>
+        ? ArchitectWallGeometry.coreWalls(walls)
+        : ArchitectWallGeometry.coreWalls(walls.toList());
+    for (final wall in coreWalls) {
       if (wall.length < .001) continue;
       final (ratio, _) = wall.projectPoint(raw);
       if (ratio < 0 || ratio > 1) continue;

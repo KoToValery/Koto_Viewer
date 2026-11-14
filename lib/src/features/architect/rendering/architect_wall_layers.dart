@@ -54,7 +54,6 @@ class ArchitectWallLayers {
         storeyElevation: project.activeStorey.elevation,
         storey: project.activeStorey,
         project: project,
-        includeInteriorPlaster: false,
       );
 
   static ArchitectWallLayers build(

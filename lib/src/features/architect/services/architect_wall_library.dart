@@ -49,12 +49,6 @@ class ArchitectWallLibrary {
   }) {
     final exterior = insulation != null;
     final layers = List<ArchitectMaterialLayer>.unmodifiable([
-      _layer(
-        'outer_finish',
-        exterior ? ArchitectMaterial.render : ArchitectMaterial.plaster,
-        ArchitectLayerRole.finish,
-        exterior ? .005 : .015,
-      ),
       if (insulation != null)
         _layer(
           'insulation',
@@ -63,12 +57,6 @@ class ArchitectWallLibrary {
           insulationDepth,
         ),
       _layer('core', core, ArchitectLayerRole.core, depth),
-      _layer(
-        'inner_finish',
-        ArchitectMaterial.plaster,
-        ArchitectLayerRole.finish,
-        .015,
-      ),
     ]);
     return ArchitectWallTemplate(
       family,

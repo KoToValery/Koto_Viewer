@@ -225,7 +225,7 @@ void main() {
       expect(plan.bounds.height, closeTo(2.20, 1e-4));
     });
 
-    test('Task 3.2: Interior plaster is stripped in planWall but preserved in sections/3D build', () {
+    test('Task 3.2: Custom wall plaster is preserved in planWall and ArchitectWallLayers.forProject', () {
       const composition = ArchitectWallType(
         id: 'comp_plaster',
         name: 'Plastered Brick',
@@ -263,13 +263,21 @@ void main() {
         location: composition.resolvedLocation,
       );
       final planW = ArchitectWallGeometry.planWall(wallWithPlaster);
-      expect(planW.thickness, closeTo(0.25, 1e-6));
-      expect(planW.layers.length, 1);
+      expect(planW.thickness, closeTo(0.28, 1e-6));
+      expect(planW.layers.length, 3);
 
-      final modelLayers = ArchitectWallLayers.build(
-        [wallWithPlaster],
-        const [composition],
+      final customProject = ArchitectProject(
+        id: 'p_plaster',
+        name: 'Plaster Project',
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+        wallTypes: const [composition],
+        storeys: [
+          ArchitectStorey(id: 's1', name: '0', walls: [wallWithPlaster]),
+        ],
+        activeStoreyId: 's1',
       );
+      final modelLayers = ArchitectWallLayers.forProject(customProject);
       expect(
         modelLayers.materials.any(
           (r) => r.layer.material == ArchitectMaterial.plaster,

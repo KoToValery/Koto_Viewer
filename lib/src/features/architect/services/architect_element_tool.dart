@@ -1541,6 +1541,11 @@ class ArchitectElementTool extends ChangeNotifier {
             wallId: targetId,
             uuid: isDuplicate ? '${targetId}_uuid_${d.uuid}' : d.uuid,
             openInward: !d.openInward,
+            specId: ArchitectDoor.updateSpecIdHanding(
+              specId: d.specId,
+              isHingeLeft: d.isHingeLeft,
+              openInward: !d.openInward,
+            ),
           ),
       ];
       final newWindows = [

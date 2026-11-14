@@ -269,4 +269,95 @@ void main() {
       },
     );
   }
+
+  test(
+    'Default snaps use structural core only and leading line inner/outer sit on core faces',
+    () {
+      const customLayers = [
+        ArchitectMaterialLayer(
+          id: 'render',
+          material: ArchitectMaterial.render,
+          role: ArchitectLayerRole.finish,
+          thickness: .005,
+        ),
+        ArchitectMaterialLayer(
+          id: 'eps',
+          material: ArchitectMaterial.eps,
+          role: ArchitectLayerRole.insulation,
+          thickness: .12,
+        ),
+        ArchitectMaterialLayer(
+          id: 'brick',
+          material: ArchitectMaterial.brick,
+          role: ArchitectLayerRole.core,
+          thickness: .25,
+        ),
+        ArchitectMaterialLayer(
+          id: 'plaster',
+          material: ArchitectMaterial.plaster,
+          role: ArchitectLayerRole.finish,
+          thickness: .015,
+        ),
+      ];
+      for (final ref in [
+        WallReferenceLine.center,
+        WallReferenceLine.inner,
+        WallReferenceLine.outer,
+      ]) {
+        final wall = ArchitectWall(
+          id: 'w_${ref.name}',
+          startPoint: Offset.zero,
+          endPoint: const Offset(4, 0),
+          thickness: .39,
+          layers: customLayers,
+          referenceLine: ref,
+        );
+        final coreCenterY = wall.coreCenterStart.dy;
+        final expectedCenterY = switch (ref) {
+          WallReferenceLine.center => 0.0,
+          WallReferenceLine.inner => .125,
+          WallReferenceLine.outer => -.125,
+          _ => 0.0,
+        };
+        expect(coreCenterY, closeTo(expectedCenterY, 1e-9));
+
+        final model = project([wall]);
+        // Inner plaster finish face & outer render finish face must NOT snap by default.
+        final innerFinish = Offset(2, coreCenterY - .125 - .015);
+        final outerFinish = Offset(2, coreCenterY + .125 + .12 + .005);
+        for (final finishPt in [innerFinish, outerFinish]) {
+          final freeSnap = ArchitectSnapHelper.snapFree(
+            rawPoint: finishPt,
+            project: model,
+            tolerance: .005,
+          );
+          expect(freeSnap.isSnapped, isFalse);
+          final wallSnap = ArchitectWallSnap.resolve(
+            raw: finishPt,
+            project: model,
+            scale: 10000,
+          );
+          expect(
+            (wallSnap.point - finishPt).distance > .001 || !wallSnap.isSnapped,
+            isTrue,
+          );
+        }
+
+        // Core faces and core centerline snap accurately by default.
+        for (final corePt in [
+          Offset(2, coreCenterY),
+          Offset(2, coreCenterY - .125),
+          Offset(2, coreCenterY + .125),
+        ]) {
+          final snap = ArchitectSnapHelper.snapFree(
+            rawPoint: corePt + const Offset(0, .0002),
+            project: model,
+            tolerance: .005,
+          );
+          expect(snap.isSnapped, isTrue);
+          expect((snap.point - corePt).distance, lessThan(1e-3));
+        }
+      }
+    },
+  );
 }

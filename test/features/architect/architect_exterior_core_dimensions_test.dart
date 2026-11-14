@@ -78,14 +78,18 @@ void expectLengths(DimensionTier row, List<double> expected) =>
 
 void main() {
   test(
-    'Small insulation labels remain on their row and clear the end ticks',
+    'Short labels on row 3 stay clear of ticks when overall span is narrow',
     () {
-      final rows = ArchitectDimensionLayout.layoutTiers(
-        dimension: dimension(),
-        scale: 100,
-        storey: storey,
+      final overall = DimensionTier(
+        tierIndex: 3,
+        points: const [Offset(0, -1), Offset(.1, -1), Offset(6.35, -1), Offset(6.55, -1)],
+        line: const (Offset(0, -1), Offset(6.55, -1)),
+        segments: const [
+          (Offset(0, -1), Offset(.1, -1)),
+          (Offset(.1, -1), Offset(6.35, -1)),
+          (Offset(6.35, -1), Offset(6.55, -1)),
+        ],
       );
-      final overall = rows[2];
       final first = ArchitectDimensionLayout.segmentTextCenter(
         tier: overall,
         segmentIndex: 0,
@@ -115,7 +119,7 @@ void main() {
     },
   );
   test(
-    'Finish picks use core for opening and wall rows, with separate end insulation on overall',
+    'Finish picks resolve to structural core on opening, structural, and overall rows',
     () {
       final dim = dimension();
       final rows = ArchitectDimensionLayout.layoutTiers(
@@ -127,19 +131,19 @@ void main() {
       expect(rows.map((r) => r.tierIndex), [1, 2, 3, 4]);
       expectLengths(rows[0], [1.525, 1.2, 3.525]);
       expectLengths(rows[1], [3.125, 3.125]);
-      expectLengths(rows[2], [.1, 6.25, .2]);
+      expectLengths(rows[2], [6.25]);
       expectLengths(rows[3], [6]);
       expect(rows[0].points.first.dx, closeTo(-.125, 1e-9));
       expect(rows[1].points.last.dx, closeTo(6.125, 1e-9));
-      expect(rows[2].points.first.dx, closeTo(-.225, 1e-9));
-      expect(rows[2].points.last.dx, closeTo(6.325, 1e-9));
+      expect(rows[2].points.first.dx, closeTo(-.125, 1e-9));
+      expect(rows[2].points.last.dx, closeTo(6.125, 1e-9));
       expect(dim.anchors.first.point.dx, -.225);
       expect(rows.first.line.$1.dy, dim.lineStart.dy);
     },
   );
 
   test(
-    'Core and finish selections produce identical rows without a duplicate overall span',
+    'Core and finish selections produce identical core-only rows',
     () {
       final fromFinish = ArchitectDimensionLayout.layoutTiers(
         dimension: dimension(),
@@ -155,7 +159,7 @@ void main() {
       for (var i = 0; i < fromCore.length; i++) {
         expectLengths(fromCore[i], lengths(fromFinish[i]));
       }
-      expect(fromCore[2].segments, hasLength(3));
+      expect(fromCore[2].segments, hasLength(1));
     },
   );
 
@@ -176,10 +180,10 @@ void main() {
       scale: 100,
       storey: storey.copyWith(walls: [walls[0], right, front]),
     );
-    expectLengths(oneSide[2], [6.25, .2]);
+    expectLengths(oneSide[2], [6.25]);
   });
 
-  test('Insulation thickness updates only the small overall segments', () {
+  test('Insulation thickness never alters overall core-only dimension', () {
     final walls = [
       left.copyWith(thickness: .43, insulationThicknessOverride: .18),
       right.copyWith(thickness: .5, insulationThicknessOverride: .25),
@@ -192,7 +196,7 @@ void main() {
     );
     expectLengths(rows[0], [1.525, 1.2, 3.525]);
     expectLengths(rows[1], [3.125, 3.125]);
-    expectLengths(rows[2], [.18, 6.25, .25]);
+    expectLengths(rows[2], [6.25]);
   });
 
   test(
@@ -216,12 +220,12 @@ void main() {
         storey: storey,
       );
       expectLengths(rows[0], [1.525, 1.2, 3.525]);
-      expectLengths(rows[2], [.1, 6.25, .2]);
+      expectLengths(rows[2], [6.25]);
     },
   );
 
   test(
-    'Core measurement and insulation segments stay fixed through rotation, reverse picks and zoom',
+    'Core measurements stay fixed through rotation, reverse picks and zoom',
     () {
       for (final angle in [0.0, math.pi / 2, .61]) {
         Offset rotate(Offset p) => Offset(
@@ -255,14 +259,14 @@ void main() {
               reverse ? [3.525, 1.2, 1.525] : [1.525, 1.2, 3.525],
             );
             expectLengths(rows[1], [3.125, 3.125]);
-            expectLengths(rows[2], reverse ? [.2, 6.25, .1] : [.1, 6.25, .2]);
+            expectLengths(rows[2], [6.25]);
           }
         }
       }
     },
   );
 
-  test('Interior dimensions retain their selected faces', () {
+  test('Interior dimensions also resolve wall picks to core faces', () {
     final dim = dimension().copyWith(style: ArchitectDimensionStyle.interior);
     final rows = ArchitectDimensionLayout.layoutTiers(
       dimension: dim,
@@ -270,6 +274,6 @@ void main() {
       storey: storey,
     );
     expect(rows, hasLength(1));
-    expectLengths(rows.single, [3.225, 3.325]);
+    expectLengths(rows.single, [3.125, 3.125]);
   });
 }

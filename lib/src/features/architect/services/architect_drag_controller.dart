@@ -32,9 +32,7 @@ enum ArchitectDragPhase { idle, pickingBasePoint, draggingToTarget }
 /// 3. Commit:
 ///    - Commits the displacement strictly to the architectural model via CommandController / Underlay config.
 class ArchitectDragController extends ChangeNotifier {
-  bool _usesWallCores(ArchitectProject project) =>
-      !_isUnderlay &&
-      project.activeStorey.walls.any((wall) => _elementIds.contains(wall.id));
+  bool _usesWallCores(ArchitectProject project) => !_isUnderlay;
   ArchitectDragPhase _phase = ArchitectDragPhase.idle;
 
   Set<String> _elementIds = {};

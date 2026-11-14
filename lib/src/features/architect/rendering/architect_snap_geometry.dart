@@ -32,7 +32,7 @@ class ArchitectSnapGeometry {
 
   static ArchitectSnapGeometry of(
     ArchitectProject project, {
-    bool wallCoresOnly = false,
+    bool wallCoresOnly = true,
   }) => wallCoresOnly
       ? (_coreCache[project] ??= ArchitectSnapGeometry._(
           project,
@@ -42,7 +42,7 @@ class ArchitectSnapGeometry {
 
   ArchitectSnapGeometry._(
     ArchitectProject project, {
-    bool wallCoresOnly = false,
+    bool wallCoresOnly = true,
   }) {
     void point(Offset p, String label, String owner) {
       if (!p.dx.isFinite || !p.dy.isFinite) return;

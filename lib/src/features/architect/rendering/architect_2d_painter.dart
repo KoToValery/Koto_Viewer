@@ -2197,7 +2197,6 @@ class Architect2dPainter extends CustomPainter {
         ArchitectWallLayers.build(
           [wall],
           _project.wallTypes,
-          includeInteriorPlaster: false,
         ),
         Paint()
           ..color = const Color(0xFF00E5FF)

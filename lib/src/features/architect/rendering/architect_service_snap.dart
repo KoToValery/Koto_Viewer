@@ -51,7 +51,7 @@ class ArchitectServiceSnap {
     final rawWalls = floor.walls.isNotEmpty
         ? floor.walls
         : (activeIdx > 0 ? project.storeys[activeIdx - 1].walls : floor.walls);
-    final referenceWalls = ArchitectWallGeometry.planWalls(rawWalls);
+    final referenceWalls = ArchitectWallGeometry.coreWalls(rawWalls);
 
     var bestScoreDist = double.infinity;
     var bestOriginDist = double.infinity;

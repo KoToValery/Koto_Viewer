@@ -518,8 +518,10 @@ class ArchitectWall {
       normalVector *
       switch (referenceLine) {
         WallReferenceLine.center => exteriorSign * coreAsymmetry / 2,
-        WallReferenceLine.inner => exteriorSign * thickness / 2,
-        WallReferenceLine.outer => -exteriorSign * thickness / 2,
+        WallReferenceLine.inner =>
+          exteriorSign * (coreThickness / 2 + coreAsymmetry / 2),
+        WallReferenceLine.outer =>
+          exteriorSign * (-coreThickness / 2 + coreAsymmetry / 2),
         WallReferenceLine.left => -thickness / 2,
         WallReferenceLine.right => thickness / 2,
       };

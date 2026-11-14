@@ -113,8 +113,9 @@ void main() {
         final updated1 = cmdSwing.apply(project);
         final updatedDoor1 = updated1.activeStorey.walls.first.doors.first;
         expect(updatedDoor1.openInward, isFalse);
+        expect(updatedDoor1.specId, equals('1'));
 
-        // Flip hinge right
+        // Flip hinge right (keeping openInward: true)
         final cmdHinge = SetArchitectElementProperties(
           storeyId: 'storey-1',
           elementIds: {'door-1'},
@@ -124,6 +125,93 @@ void main() {
         final updatedDoor2 = updated2.activeStorey.walls.first.doors.first;
         expect(updatedDoor2.isHingeLeft, isFalse);
         expect(updatedDoor2.specId, equals('1'));
+
+        // Flip BOTH hinge and swing simultaneously: (true, true) -> (false, false) stays left-hand ("1'")
+        final cmdBoth = SetArchitectElementProperties(
+          storeyId: 'storey-1',
+          elementIds: {'door-1'},
+          textValues: {'isHingeLeft': 'false', 'openInward': 'false'},
+        );
+        final updatedBoth = cmdBoth.apply(project);
+        final doorBoth = updatedBoth.activeStorey.walls.first.doors.first;
+        expect(doorBoth.isHingeLeft, isFalse);
+        expect(doorBoth.openInward, isFalse);
+        expect(doorBoth.specId, equals("1'"));
+      },
+    );
+
+    test(
+      'ArchitectDoor.resolveSpecId assigns prime based on true door handing (isHingeLeft == openInward)',
+      () {
+        const rightInward = ArchitectDoor(
+          id: 'd1',
+          wallId: 'w1',
+          offsetRatio: 0.3,
+          width: 0.7,
+          height: 2.0,
+          isHingeLeft: false,
+          openInward: true,
+          specId: '3',
+          uuid: 'u1',
+        );
+        // Same 70/200 door swung opposite side with opposite hinge is ALSO right-hand -> '3'
+        expect(
+          ArchitectDoor.resolveSpecId(
+            existingDoors: const [rightInward],
+            width: 0.7,
+            height: 2.0,
+            sillHeight: 0.0,
+            isHingeLeft: true,
+            openInward: false,
+          ),
+          equals('3'),
+        );
+        // Left-hand 70/200 combinations -> "3'"
+        expect(
+          ArchitectDoor.resolveSpecId(
+            existingDoors: const [rightInward],
+            width: 0.7,
+            height: 2.0,
+            sillHeight: 0.0,
+            isHingeLeft: true,
+            openInward: true,
+          ),
+          equals("3'"),
+        );
+        expect(
+          ArchitectDoor.resolveSpecId(
+            existingDoors: const [rightInward],
+            width: 0.7,
+            height: 2.0,
+            sillHeight: 0.0,
+            isHingeLeft: false,
+            openInward: false,
+          ),
+          equals("3'"),
+        );
+        // Different dimensions (90/200) increments base number to 4 / 4'
+        expect(
+          ArchitectDoor.resolveSpecId(
+            existingDoors: const [rightInward],
+            width: 0.9,
+            height: 2.0,
+            sillHeight: 0.0,
+            isHingeLeft: true,
+            openInward: false,
+          ),
+          equals('4'),
+        );
+        expect(
+          ArchitectDoor.resolveSpecId(
+            existingDoors: const [rightInward],
+            width: 0.9,
+            height: 2.0,
+            sillHeight: 0.0,
+            isHingeLeft: true,
+            openInward: true,
+          ),
+          equals("4'"),
+        );
       },
     );
   });

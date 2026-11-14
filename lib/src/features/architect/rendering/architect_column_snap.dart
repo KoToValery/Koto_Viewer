@@ -11,6 +11,7 @@ import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import 'architect_snap_helper.dart';
 import 'architect_midpoint_tracking.dart';
+import 'architect_wall_geometry.dart';
 
 // === SECTION: ARCHITECT COLUMN SNAP ENGINE ===
 
@@ -48,9 +49,10 @@ class ArchitectColumnSnap {
 
     final floor = project.activeStorey;
     final activeIdx = project.storeys.indexWhere((s) => s.id == floor.id);
-    final referenceWalls = floor.walls.isNotEmpty
+    final rawWalls = floor.walls.isNotEmpty
         ? floor.walls
         : (activeIdx > 0 ? project.storeys[activeIdx - 1].walls : floor.walls);
+    final referenceWalls = ArchitectWallGeometry.coreWalls(rawWalls);
 
     for (final wall in referenceWalls) {
       if (excludedIds.contains(wall.id)) continue;

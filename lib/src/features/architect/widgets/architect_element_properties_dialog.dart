@@ -687,6 +687,32 @@ class _ArchitectElementPropertiesDialogState
     return all.length == 1 ? all.single : null;
   }
 
+  void _setDoorOrientation(String key, bool val) {
+    setState(() {
+      texts[key] = '$val';
+      final effectiveLeft = texts.containsKey('isHingeLeft')
+          ? texts['isHingeLeft'] == 'true'
+          : _common('isHingeLeft') as bool?;
+      final effectiveInward = texts.containsKey('openInward')
+          ? texts['openInward'] == 'true'
+          : _common('openInward') as bool?;
+      if (effectiveLeft == null || effectiveInward == null) return;
+      final currentSpec = texts['specId'] ?? (_common('specId') as String?);
+      final updated = ArchitectDoor.updateSpecIdHanding(
+        specId: currentSpec,
+        isHingeLeft: effectiveLeft,
+        openInward: effectiveInward,
+      );
+      if (updated != null && updated != currentSpec) {
+        texts['specId'] = updated;
+        final controller = _textControllers['specId'];
+        if (controller != null && controller.text != updated) {
+          controller.text = updated;
+        }
+      }
+    });
+  }
+
   Map<String, String> get _patch => {
     if (!_preserveWallPosition && texts.containsKey('referenceLine'))
       'preserveWallPosition': 'false',
@@ -1532,24 +1558,9 @@ class _ArchitectElementPropertiesDialogState
                       _common('isHingeLeft') as bool,
                   },
                   onSelectionChanged: (sel) {
-                    setState(() {
-                      if (sel.isEmpty) return;
-                      final isLeft = sel.first;
-                      texts['isHingeLeft'] = '$isLeft';
-                      final currentSpec =
-                          texts['specId'] ?? (_common('specId') as String?);
-                      if (currentSpec != null && currentSpec.isNotEmpty) {
-                        final base = ArchitectDoor.extractBaseNumber(
-                          currentSpec,
-                        );
-                        if (base != null) {
-                          texts['specId'] = ArchitectDoor.formatSpecId(
-                            baseNumber: base,
-                            isHingeLeft: isLeft,
-                          );
-                        }
-                      }
-                    });
+                    if (sel.isNotEmpty) {
+                      _setDoorOrientation('isHingeLeft', sel.first);
+                    }
                   },
                   showSelectedIcon: false,
                 ),
@@ -1597,7 +1608,7 @@ class _ArchitectElementPropertiesDialogState
                   },
                   onSelectionChanged: (sel) {
                     if (sel.isNotEmpty) {
-                      setState(() => texts['openInward'] = '${sel.first}');
+                      _setDoorOrientation('openInward', sel.first);
                     }
                   },
                   showSelectedIcon: false,

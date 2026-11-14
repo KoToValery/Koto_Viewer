@@ -49,7 +49,7 @@ class ArchitectMidpointTracking {
     required double scale,
     required Object context,
     bool enabled = true,
-    bool wallCoresOnly = false,
+    bool wallCoresOnly = true,
     double hoverPixels = 12,
     double capturePixels = 8,
     Set<String> excludedIds = const {},

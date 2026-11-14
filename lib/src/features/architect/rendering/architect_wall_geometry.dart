@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_wall.dart';
-import '../models/architect_wall_type.dart';
 import 'architect_wall_network.dart';
 import 'architect_railing_geometry.dart';
 import 'architect_path_solid.dart';
@@ -9,50 +8,11 @@ import 'architect_path_solid.dart';
 /// Physical body and material boundaries, independent of the reference line.
 class ArchitectWallGeometry {
   static final _cores = Expando<List<ArchitectWall>>();
-  static final _planWallsCache = Expando<List<ArchitectWall>>();
 
-  static bool _isHiddenPlanPlaster(ArchitectMaterialLayer l) =>
-      l.role == ArchitectLayerRole.finish &&
-      l.material == ArchitectMaterial.plaster;
+  /// Plan projection keeps custom wall plaster and finish layers intact.
+  static ArchitectWall planWall(ArchitectWall wall) => wall;
 
-  /// Plan projection strips interior wall plaster so floor plans, ghost
-  /// storeys, openings, and plan snapping work against structural/insulation faces
-  /// while the full geometric layers stay intact for sections and 3D.
-  static ArchitectWall planWall(ArchitectWall wall) {
-    if (wall.railing != null ||
-        wall.system.isSpecial ||
-        wall.layers.isEmpty ||
-        !wall.layers.any(_isHiddenPlanPlaster)) {
-      return wall;
-    }
-    final remaining =
-        wall.layers.where((l) => !_isHiddenPlanPlaster(l)).toList();
-    if (remaining.isEmpty) return wall;
-    final newThickness =
-        remaining.fold<double>(0.0, (s, l) => s + l.thickness);
-    return wall.copyWith(
-      startPoint: wall.coreCenterStart,
-      endPoint: wall.coreCenterEnd,
-      referenceLine: WallReferenceLine.center,
-      thickness: newThickness,
-      layers: remaining,
-    );
-  }
-
-  static List<ArchitectWall> planWalls(List<ArchitectWall> walls) {
-    final cached = _planWallsCache[walls];
-    if (cached != null) return cached;
-    var changed = false;
-    final out = List<ArchitectWall>.generate(walls.length, (i) {
-      final w = walls[i];
-      final pw = planWall(w);
-      if (!identical(w, pw)) changed = true;
-      return pw;
-    }, growable: false);
-    final res = changed ? out : walls;
-    _planWallsCache[walls] = res;
-    return res;
-  }
+  static List<ArchitectWall> planWalls(List<ArchitectWall> walls) => walls;
 
   /// Snap proxies retain the physical core, independently of finish thickness
   /// and the saved leading line. Railings keep their mounting geometry.
@@ -164,21 +124,22 @@ class ArchitectWallGeometry {
 class ArchitectWallAlignment {
   static double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
 
-  /// Align to extensions of neighboring faces and corners at any rotation.
+  /// Align to extensions of neighboring core faces and corners at any rotation.
   static (Offset, List<(Offset, Offset)>) point(
     Offset raw,
     List<ArchitectWall> walls,
     double scale,
   ) {
+    final coreWallList = ArchitectWallGeometry.coreWalls(walls);
     final radius = math.min(22.0 / scale, 0.4);
     var best = radius;
     Offset? snapped;
     (Offset, Offset)? guide;
-    for (final wall in walls) {
+    for (final wall in coreWallList) {
       if (wall.isCurved) continue;
       for (final corner in ArchitectWallGeometry.physicalPolygons(
         wall,
-        walls,
+        coreWallList,
       ).expand((polygon) => polygon)) {
         for (final direction in [wall.unitVector, wall.normalVector]) {
           final along = dot(raw - corner, direction);
@@ -212,7 +173,7 @@ class ArchitectWallAlignment {
     Offset delta,
     double scale, {
     bool parallelOnly = false,
-    bool coreOnly = false,
+    bool coreOnly = true,
   }) {
     if (coreOnly) walls = ArchitectWallGeometry.coreWalls(walls);
     final moving = walls.where((w) => ids.contains(w.id)).toList();

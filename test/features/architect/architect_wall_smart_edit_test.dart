@@ -31,19 +31,19 @@ void main() {
           ArchitectStorey(id: 's', name: 's', walls: [source]),
         );
         addTearDown(model.dispose);
-        final midpoint = (source.centerStart + source.centerEnd) / 2;
+        final midpoint = (source.coreCenterStart + source.coreCenterEnd) / 2;
         for (final face in [
           (
             WallReferenceLine.inner,
-            midpoint - source.exteriorNormal * source.thickness / 2,
+            midpoint - source.exteriorNormal * source.coreThickness / 2,
           ),
           (
             WallReferenceLine.outer,
-            midpoint + source.exteriorNormal * source.thickness / 2,
+            midpoint + source.exteriorNormal * source.coreThickness / 2,
           ),
           (
             WallReferenceLine.center,
-            (source.coreCenterStart + source.coreCenterEnd) / 2,
+            midpoint,
           ),
         ]) {
           final snap = ArchitectWallSnap.resolve(

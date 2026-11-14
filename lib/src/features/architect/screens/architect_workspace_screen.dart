@@ -3873,7 +3873,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       context: (_activeTool, _workspaceViewKey),
 
       enabled: _showMidpointReferences,
-      wallCoresOnly: _activeTool == ArchitectTool.wall,
+      wallCoresOnly: true,
 
       capturePixels: _touchInput ? 12 : 8,
 
@@ -8399,9 +8399,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       project: session.original,
 
       elementIds: {_duplicateMoveId!, _duplicateSourceId!},
-      wallCoresOnly: session.original.activeStorey.walls.any(
-        (w) => w.id == _duplicateMoveId! || w.id == _duplicateSourceId!,
-      ),
+      wallCoresOnly: true,
 
       delta: delta,
 
@@ -10501,6 +10499,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       isHingeLeft: preview.isHingeLeft,
 
+      openInward: preview.openInward,
+
     );
 
     return ArchitectDoor(
@@ -10643,7 +10643,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       scale: _currentScale,
       capturePixels: _touchInput ? 12 : 8,
       magnetic: _magnetEnabled,
-      coreOnly: _activeTool == ArchitectTool.wall,
+      coreOnly: true,
       underlay: _currentUnderlayDoc,
       frame: _effectiveUnderlayFrame,
       visibility: _effectiveUnderlayLayerVisibility,
@@ -11035,15 +11035,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-        final nWall = wall.normalVector * (wall.thickness / 2);
+        final nCore = wall.normalVector * (wall.coreThickness / 2);
 
-        final outer1 = wall.centerStart + nWall;
+        final core1 = wall.coreCenterStart + nCore;
 
-        final outer2 = wall.centerStart - nWall;
+        final core2 = wall.coreCenterStart - nCore;
 
         targets.add((
 
-          pos: ArchitectDimensionChain.dot(outer1 - p0, n),
+          pos: ArchitectDimensionChain.dot(core1 - p0, n),
 
           name: 'wall',
 
@@ -11051,39 +11051,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         targets.add((
 
-          pos: ArchitectDimensionChain.dot(outer2 - p0, n),
+          pos: ArchitectDimensionChain.dot(core2 - p0, n),
 
           name: 'wall',
 
         ));
-
-
-
-        if (wall.hasInsulation) {
-
-          final nCore = wall.normalVector * (wall.coreThickness / 2);
-
-          final core1 = wall.coreCenterStart + nCore;
-
-          final core2 = wall.coreCenterStart - nCore;
-
-          targets.add((
-
-            pos: ArchitectDimensionChain.dot(core1 - p0, n),
-
-            name: 'wallCore',
-
-          ));
-
-          targets.add((
-
-            pos: ArchitectDimensionChain.dot(core2 - p0, n),
-
-            name: 'wallCore',
-
-          ));
-
-        }
 
       }
 
@@ -11280,9 +11252,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       project: _elementMoveOriginal!,
 
       elementIds: ids,
-      wallCoresOnly: _elementMoveOriginal!.activeStorey.walls.any(
-        (w) => ids.contains(w.id),
-      ),
+      wallCoresOnly: true,
 
       delta: delta,
 
@@ -11842,9 +11812,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               visibility: _effectiveUnderlayLayerVisibility,
             )
           : ArchitectWallSnap.resolve(
-              coreOnly: _elementMoveOriginal!.activeStorey.walls.any(
-                (w) => w.id == original.id,
-              ),
+              coreOnly: true,
               midpointReferences: _midpointTracking.references,
               raw: rawTarget,
               magnetic: _magnetEnabled,
@@ -19661,6 +19629,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       sillHeight: _doorSill,
 
       isHingeLeft: placement.isHingeLeft,
+
+      openInward: placement.openInward,
 
     );
 
