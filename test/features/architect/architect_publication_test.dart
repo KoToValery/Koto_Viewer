@@ -1,6 +1,7 @@
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -516,6 +517,156 @@ void main() {
       );
       image.dispose();
       picture.dispose();
+    },
+  );
+  test(
+    'PDF export preserves exact sharp wall corners and miter joins without chamfering',
+    () async {
+      // Non-0.2mm-multiple vertices intentionally expose uniform arc resampling bugs.
+      const vertices = <Offset>[
+        Offset(10.13, 20.07),
+        Offset(73.49, 20.07),
+        Offset(73.49, 25.31),
+        Offset(46.87, 25.31),
+        Offset(46.87, 68.19),
+        Offset(41.63, 68.19),
+        Offset(41.63, 25.31),
+        Offset(10.13, 25.31),
+      ];
+      final tWallPath = Path()..addPolygon(vertices, true);
+      final contours = ArchitectPdfExport.extractPathContours(tWallPath);
+      expect(contours, hasLength(1));
+      expect(contours.single.closed, isTrue);
+      expect(contours.single.points, hasLength(vertices.length));
+      for (final expected in vertices) {
+        final match = contours.single.points.any(
+          (p) => (p - expected).distance < 1e-4,
+        );
+        expect(match, isTrue, reason: 'Missing exact corner $expected');
+      }
+
+      // Smooth arc/circle retains tight curve fidelity.
+      final circle = Path()
+        ..addOval(Rect.fromCircle(center: const Offset(50, 50), radius: 18));
+      final arcContours = ArchitectPdfExport.extractPathContours(circle);
+      expect(arcContours, hasLength(1));
+      expect(arcContours.single.closed, isTrue);
+      for (final pt in arcContours.single.points) {
+        expect((pt - const Offset(50, 50)).distance, closeTo(18, .01));
+      }
+
+      // Vector canvas preserves stroke join/cap/miterLimit separately from round strokes.
+      final canvas = ArchitectVectorCanvas();
+      canvas.drawPath(
+        tWallPath,
+        Paint()
+          ..color = const Color(0xFF212121)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.5,
+      );
+      canvas.drawPath(
+        Path()
+          ..moveTo(15, 15)
+          ..lineTo(35, 15)
+          ..lineTo(35, 30),
+        Paint()
+          ..color = const Color(0xFF0000FF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.5
+          ..strokeJoin = StrokeJoin.round
+          ..strokeCap = StrokeCap.round,
+      );
+      expect(canvas.operations, hasLength(2));
+      final firstOp = canvas.operations[0] as ArchitectVectorPath;
+      final secondOp = canvas.operations[1] as ArchitectVectorPath;
+      expect(firstOp.strokeJoin, StrokeJoin.miter);
+      expect(firstOp.strokeCap, StrokeCap.butt);
+      expect(secondOp.strokeJoin, StrokeJoin.round);
+      expect(secondOp.strokeCap, StrokeCap.round);
+
+      // Export a real T-wall plan to PDF and verify PDF graphics stream uses miter join (`0 j`)
+      // and never rounds wall borders (`1 j`) unless explicitly requested.
+      final wallProject = ArchitectProject(
+        id: 't_walls',
+        name: 'T Walls',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        activeStoreyId: 's',
+        storeys: [
+          ArchitectStorey(
+            id: 's',
+            name: 'Floor 1',
+            walls: [
+              ArchitectWall(
+                id: 'w1',
+                startPoint: const Offset(0, 0),
+                endPoint: const Offset(4.37, 0),
+                thickness: .25,
+              ),
+              ArchitectWall(
+                id: 'w2',
+                startPoint: const Offset(2.13, 0),
+                endPoint: const Offset(2.13, 3.19),
+                thickness: .25,
+              ),
+            ],
+          ),
+        ],
+        document: ArchitectDocument(
+          drawings: const [
+            ArchitectSavedDrawing(
+              id: 'plan:s',
+              kind: ArchitectDrawingKind.plan,
+              sourceId: 's',
+            ),
+          ],
+          sheets: const [
+            ArchitectSheet(
+              id: 'sheet',
+              name: 'Sheet',
+              placements: [
+                ArchitectDrawingPlacement(
+                  id: 'place',
+                  drawingId: 'plan:s',
+                  frame: Rect.fromLTWH(10, 10, 200, 160),
+                  anchor: Offset(-1, -1),
+                  scale: 50,
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      final bytes = await ArchitectPdfExport.export(
+        wallProject,
+        wallProject.document.sheets,
+        l,
+      );
+      final decodedStreams = StringBuffer();
+      var searchOffset = 0;
+      final rawLatin = latin1.decode(bytes);
+      while (true) {
+        final startToken = rawLatin.indexOf('stream', searchOffset);
+        if (startToken < 0) break;
+        var bodyStart = startToken + 'stream'.length;
+        if (bodyStart < bytes.length && bytes[bodyStart] == 13) bodyStart++;
+        if (bodyStart < bytes.length && bytes[bodyStart] == 10) bodyStart++;
+        final endToken = rawLatin.indexOf('endstream', bodyStart);
+        if (endToken < 0) break;
+        var bodyEnd = endToken;
+        if (bodyEnd > bodyStart && bytes[bodyEnd - 1] == 10) bodyEnd--;
+        if (bodyEnd > bodyStart && bytes[bodyEnd - 1] == 13) bodyEnd--;
+        final chunk = bytes.sublist(bodyStart, bodyEnd);
+        try {
+          decodedStreams.writeln(latin1.decode(zlib.decode(chunk)));
+        } catch (_) {
+          decodedStreams.writeln(latin1.decode(chunk));
+        }
+        searchOffset = endToken + 'endstream'.length;
+      }
+      final streamText = decodedStreams.toString();
+      expect(streamText, contains('0 j'));
+      expect(streamText, isNot(contains('1 j')));
     },
   );
   testWidgets('phone sheet editor creates a sheet and places a linked source', (

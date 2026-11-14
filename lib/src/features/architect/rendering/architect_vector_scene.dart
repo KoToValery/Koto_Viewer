@@ -231,6 +231,9 @@ class ArchitectVectorPath extends ArchitectVectorOp {
   final Color color;
   final double width;
   final bool fill;
+  final StrokeJoin strokeJoin;
+  final StrokeCap strokeCap;
+  final double strokeMiterLimit;
   ArchitectVectorPath(
     this.path,
     this.color,
@@ -238,8 +241,11 @@ class ArchitectVectorPath extends ArchitectVectorOp {
     this.fill,
     super.clip,
     super.sources,
-    super.role,
-  );
+    super.role, {
+    this.strokeJoin = StrokeJoin.miter,
+    this.strokeCap = StrokeCap.butt,
+    this.strokeMiterLimit = 4.0,
+  });
   @override
   late final Rect bounds = _measureBounds();
   Rect _measureBounds() {
@@ -258,7 +264,9 @@ class ArchitectVectorPath extends ArchitectVectorOp {
       ..color = color
       ..strokeWidth = width
       ..style = fill ? PaintingStyle.fill : PaintingStyle.stroke
-      ..strokeJoin = StrokeJoin.round,
+      ..strokeJoin = strokeJoin
+      ..strokeCap = strokeCap
+      ..strokeMiterLimit = strokeMiterLimit,
   );
 }
 
@@ -458,6 +466,9 @@ class ArchitectVectorCanvas implements Canvas {
         _clip,
         _owners ?? sourceIds,
         _role ?? paint.style.name,
+        strokeJoin: paint.strokeJoin,
+        strokeCap: paint.strokeCap,
+        strokeMiterLimit: paint.strokeMiterLimit,
       ),
     );
   }
@@ -549,6 +560,9 @@ class ArchitectVectorCanvas implements Canvas {
     Paint()
       ..color = paint.color
       ..strokeWidth = paint.strokeWidth
+      ..strokeJoin = paint.strokeJoin
+      ..strokeCap = paint.strokeCap
+      ..strokeMiterLimit = paint.strokeMiterLimit
       ..style = PaintingStyle.stroke,
   );
   @override
