@@ -7227,5 +7227,21 @@
   "architectVisibilityUnderlays": "Underlays",
   "@architectVisibilityUnderlays": {
     "description": "Visibility category label for CAD/raster/ghost storey underlays"
+  },
+  "architectGridAddBay": "Add bay",
+  "@architectGridAddBay": {
+    "description": "Action to add a bay spacing in custom axis grid mode"
+  },
+  "architectGridRemoveBay": "Remove last bay",
+  "@architectGridRemoveBay": {
+    "description": "Action to remove the last bay spacing in custom axis grid mode"
+  },
+  "architectWizardCreatingProject": "Creating project...",
+  "@architectWizardCreatingProject": {
+    "description": "Loading indicator text while creating a new architectural project"
+  },
+  "architectWizardLoadingUnderlay": "Loading underlay...",
+  "@architectWizardLoadingUnderlay": {
+    "description": "Loading indicator text while importing CAD underlay during project creation"
   }
 }

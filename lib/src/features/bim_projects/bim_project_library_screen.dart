@@ -1,15 +1,13 @@
-import 'dart:io';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/l10n/l10n_extensions.dart';
 import '../architect/screens/architect_workspace_screen.dart';
-import '../architect/services/architect_underlay_service.dart';
-import '../architect/models/architect_underlay_models.dart';
 import '../architect/widgets/architect_project_wizard_dialog.dart';
 import 'models/bim_work_project.dart';
 import 'models/bim_coordinate_frame.dart';
 import 'screens/bim_alignment_screen.dart';
 import 'screens/bim_workspace_screen.dart';
+import 'services/architect_project_creation_helper.dart';
 import 'services/bim_export_service.dart';
 import 'services/bim_project_library_service.dart';
 import 'services/bim_underlay_loader.dart';
@@ -91,62 +89,21 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
   }
 
   Future<void> _openArchitectProjectWizard() async {
-    final archProject = await ArchitectProjectWizardDialog.show(context);
-    if (archProject == null || !mounted) return;
-
-    final storeys = archProject.storeys.map((s) {
-      final underlayConfig = archProject.cadUnderlays[s.id];
-      return BimStoreyUnderlay(
-        storeyId: s.id,
-        name: s.name,
-        elevation: s.elevation,
-        height: s.height,
-        sourceFileName: underlayConfig?.fileName,
-      );
-    }).toList();
-
-    final bimProject = await _library.createProject(
-      name: archProject.name,
-      storeys: storeys,
-      projectType: BimProjectType.architectural,
-      initialArchitectProject: archProject,
+    BimWorkProject? bimProject;
+    await ArchitectProjectWizardDialog.show(
+      context,
+      onCreate: (archProject) async {
+        final created = await createArchitectWorkProject(
+          library: _library,
+          archProject: archProject,
+        );
+        bimProject = created.$1;
+      },
     );
-
-    // Import and attach any selected CAD underlays into the created project
-    final configs = <String, ArchitectCadUnderlayConfig>{};
-    for (final entry in archProject.cadUnderlays.entries) {
-      final file = entry.value.externalSourcePath != null
-          ? File(entry.value.externalSourcePath!)
-          : null;
-      if (file != null && await file.exists()) {
-        try {
-          final res = await ArchitectUnderlayService.instance
-              .importOrReloadCadUnderlay(
-                projectId: bimProject.id,
-                storeyId: entry.key,
-                sourceFile: file,
-                existingConfig: null,
-              );
-          configs[entry.key] = res.config;
-          await _library.attachUnderlayFile(bimProject.id, entry.key, file);
-        } catch (e) {
-          debugPrint('[BimProjectLibrary] import underlay error: $e');
-        }
-      }
-    }
-
-    if (configs.isNotEmpty) {
-      final updated = archProject.copyWith(
-        id: bimProject.id,
-        cadUnderlays: configs,
-      );
-      await _library.saveArchitectProject(bimProject.id, updated);
-    }
+    if (bimProject == null || !mounted) return;
 
     _loadProjects();
-    if (mounted) {
-      _openProject(bimProject);
-    }
+    _openProject(bimProject!);
   }
 
   Future<void> _openProject(BimWorkProject project) async {

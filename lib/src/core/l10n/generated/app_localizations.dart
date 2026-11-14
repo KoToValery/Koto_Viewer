@@ -23945,6 +23945,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Underlays'**
   String get architectVisibilityUnderlays;
+
+  /// Action to add a bay spacing in custom axis grid mode
+  ///
+  /// In en, this message translates to:
+  /// **'Add bay'**
+  String get architectGridAddBay;
+
+  /// Action to remove the last bay spacing in custom axis grid mode
+  ///
+  /// In en, this message translates to:
+  /// **'Remove last bay'**
+  String get architectGridRemoveBay;
+
+  /// Loading indicator text while creating a new architectural project
+  ///
+  /// In en, this message translates to:
+  /// **'Creating project...'**
+  String get architectWizardCreatingProject;
+
+  /// Loading indicator text while importing CAD underlay during project creation
+  ///
+  /// In en, this message translates to:
+  /// **'Loading underlay...'**
+  String get architectWizardLoadingUnderlay;
 }
 
 class _AppLocalizationsDelegate

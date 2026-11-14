@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/bim_work_project.dart';
+import '../services/architect_project_creation_helper.dart';
 import '../services/bim_project_library_service.dart';
 import '../services/bim_underlay_picker_helper.dart';
 import '../../architect/widgets/architect_project_wizard_dialog.dart';
@@ -307,35 +308,27 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
   }
 
   Future<void> _openArchitectWizardFromHere() async {
-    final archProject = await ArchitectProjectWizardDialog.show(
+    BimWorkProject? bimProject;
+    await ArchitectProjectWizardDialog.show(
       context,
       initialProjectName: _nameController.text.trim().isNotEmpty
           ? _nameController.text.trim()
           : null,
+      onCreate: (archProject) async {
+        if (mounted) setState(() => _isCreating = true);
+        final created = await createArchitectWorkProject(
+          library: BimProjectLibraryService.instance,
+          archProject: archProject,
+          location: _locationController.text.trim(),
+        );
+        bimProject = created.$1;
+      },
     );
-    if (archProject == null || !mounted) return;
+    if (bimProject == null || !mounted) return;
 
-    final storeys = archProject.storeys.map((s) {
-      return BimStoreyUnderlay(
-        storeyId: s.id,
-        name: s.name,
-        elevation: s.elevation,
-        height: s.height,
-      );
-    }).toList();
-
-    final bimProject = await BimProjectLibraryService.instance.createProject(
-      name: archProject.name,
-      location: _locationController.text.trim(),
-      storeys: storeys,
-      projectType: BimProjectType.architectural,
-      initialArchitectProject: archProject,
-    );
-
-    if (!mounted) return;
     Navigator.of(context).pop();
     if (widget.onProjectCreatedWithProject != null) {
-      widget.onProjectCreatedWithProject!(bimProject);
+      widget.onProjectCreatedWithProject!(bimProject!);
     } else {
       widget.onProjectCreated?.call();
     }

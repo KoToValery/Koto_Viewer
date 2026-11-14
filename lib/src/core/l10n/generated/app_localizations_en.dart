@@ -13187,4 +13187,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectVisibilityUnderlays => 'Underlays';
+
+  @override
+  String get architectGridAddBay => 'Add bay';
+
+  @override
+  String get architectGridRemoveBay => 'Remove last bay';
+
+  @override
+  String get architectWizardCreatingProject => 'Creating project...';
+
+  @override
+  String get architectWizardLoadingUnderlay => 'Loading underlay...';
 }

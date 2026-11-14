@@ -1,14 +1,13 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../../bim_projects/models/bim_work_project.dart';
+import '../../bim_projects/services/architect_project_creation_helper.dart';
 import '../../bim_projects/services/bim_export_service.dart';
 import '../../bim_projects/services/bim_project_library_service.dart';
 import '../../bim_projects/services/bim_underlay_loader.dart';
 import '../models/architect_project.dart';
-import '../services/architect_underlay_service.dart';
 import '../widgets/architect_project_wizard_dialog.dart';
 import 'architect_workspace_screen.dart';
 
@@ -54,65 +53,29 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
   }
 
   Future<void> _openArchitectProjectWizard() async {
-    final archProject = await ArchitectProjectWizardDialog.show(context);
-    if (archProject == null || !mounted) return;
-
-    final storeys = archProject.storeys.map((s) {
-      final underlayConfig = archProject.cadUnderlays[s.id];
-      return BimStoreyUnderlay(
-        storeyId: s.id,
-        name: s.name,
-        elevation: s.elevation,
-        height: s.height,
-        sourceFileName: underlayConfig?.fileName,
-      );
-    }).toList();
-
-    final bimProject = await _library.createProject(
-      name: archProject.name,
-      storeys: storeys,
-      projectType: BimProjectType.architectural,
-      initialArchitectProject: archProject,
+    BimWorkProject? bimProject;
+    ArchitectProject? updatedArchProject;
+    await ArchitectProjectWizardDialog.show(
+      context,
+      onCreate: (archProject) async {
+        final created = await createArchitectWorkProject(
+          library: _library,
+          archProject: archProject,
+        );
+        bimProject = created.$1;
+        updatedArchProject = created.$2;
+      },
     );
-
-    // Import and attach any selected CAD underlays into the created project
-    final configs = <String, ArchitectCadUnderlayConfig>{};
-    for (final entry in archProject.cadUnderlays.entries) {
-      final file = entry.value.externalSourcePath != null
-          ? File(entry.value.externalSourcePath!)
-          : null;
-      if (file != null && await file.exists()) {
-        try {
-          final res = await ArchitectUnderlayService.instance
-              .importOrReloadCadUnderlay(
-                projectId: bimProject.id,
-                storeyId: entry.key,
-                sourceFile: file,
-                existingConfig: null,
-              );
-          configs[entry.key] = res.config;
-          await _library.attachUnderlayFile(bimProject.id, entry.key, file);
-        } catch (e) {
-          debugPrint('[ArchitectStudioTab] import underlay error: $e');
-        }
-      }
-    }
-
-    var updatedArchProject = archProject.copyWith(id: bimProject.id);
-    if (configs.isNotEmpty) {
-      updatedArchProject = updatedArchProject.copyWith(cadUnderlays: configs);
-      await _library.saveArchitectProject(bimProject.id, updatedArchProject);
-    }
+    if (bimProject == null || updatedArchProject == null || !mounted) return;
 
     refreshProjects();
 
-    if (!mounted) return;
     Navigator.of(context)
         .push(
           MaterialPageRoute(
             builder: (_) => ArchitectWorkspaceScreen(
-              initialProject: updatedArchProject,
-              bimProject: bimProject,
+              initialProject: updatedArchProject!,
+              bimProject: bimProject!,
             ),
           ),
         )

@@ -13236,4 +13236,16 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectVisibilityUnderlays => 'Подложки';
+
+  @override
+  String get architectGridAddBay => 'Добави поле';
+
+  @override
+  String get architectGridRemoveBay => 'Премахни последното поле';
+
+  @override
+  String get architectWizardCreatingProject => 'Създаване на проект...';
+
+  @override
+  String get architectWizardLoadingUnderlay => 'Зареждане на подложка...';
 }

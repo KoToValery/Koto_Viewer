@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -74,21 +75,49 @@ void main() {
         );
         await tester.pumpAndSettle();
       }
-      await tester.enterText(field('height', 0), '320,5');
-      await tester.pump();
-      expect(input(tester, 'elevation', 1), '+3.205');
-      expect(input(tester, 'elevation', 2), '+6.205');
-      await tester.enterText(field('elevation', 1), '3.50');
-      await tester.pump();
-      expect(input(tester, 'height', 0), '350.0');
-      expect(input(tester, 'height', 1), '270.5');
-      expect(input(tester, 'elevation', 2), '+6.205');
-      await tester.enterText(field('height', 2), 'NaN');
-      await tester.tap(find.text('Create'));
+      expect(input(tester, 'height', 1), '290.0');
+      expect(input(tester, 'height', 2), '290.0');
+      expect(input(tester, 'elevation', 1), '+3.000');
+      expect(input(tester, 'elevation', 2), '+5.900');
+
+      // Elevation & height fields are read-only and open programmatic keypad.
+      final elevWidget = tester.widget<TextField>(
+        find.descendant(of: field('elevation', 1), matching: find.byType(TextField)),
+      );
+      expect(elevWidget.readOnly, isTrue);
+
+      await tester.tap(field('height', 0));
       await tester.pumpAndSettle();
-      expect(result, isNull);
-      expect(find.text('Check the levels and heights.'), findsOneWidget);
-      await tester.enterText(field('height', 2), '290');
+      for (final key in ['3', '2', '0', '.', '5']) {
+        await tester.tap(find.byKey(ValueKey('bim-number-key-$key')));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+      await tester.pumpAndSettle();
+      expect(input(tester, 'elevation', 1), '+3.205');
+      expect(input(tester, 'elevation', 2), '+6.105');
+
+      await tester.tap(field('elevation', 1));
+      await tester.pumpAndSettle();
+      for (final key in ['3', '.', '5', '0']) {
+        await tester.tap(find.byKey(ValueKey('bim-number-key-$key')));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+      await tester.pumpAndSettle();
+      expect(input(tester, 'height', 0), '350.0');
+      expect(input(tester, 'height', 1), '260.5');
+      expect(input(tester, 'elevation', 2), '+6.105');
+
+      await tester.tap(field('height', 2));
+      await tester.pumpAndSettle();
+      for (final key in ['2', '9', '5']) {
+        await tester.tap(find.byKey(ValueKey('bim-number-key-$key')));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+      await tester.pumpAndSettle();
+
       await tester.tap(find.text('Create'));
       await tester.pumpAndSettle();
       expect(result, isNotNull);
@@ -96,9 +125,10 @@ void main() {
       expect(result!.distanceDecimals, 1);
       expect(
         result!.storeys.map((s) => s.elevation),
-        orderedEquals([0, 3.5, 6.205]),
+        orderedEquals([0, 3.5, 6.105]),
       );
-      expect(result!.storeys[1].height, closeTo(2.705, 1e-9));
+      expect(result!.storeys[1].height, closeTo(2.605, 1e-9));
+      expect(result!.storeys[2].height, closeTo(2.95, 1e-9));
       final restored = ArchitectProject.fromJson(result!.toJson());
       expect(restored.distanceDecimals, 1);
       expect(restored.formatLength(1.234), '123.4 cm');
@@ -280,6 +310,98 @@ void main() {
     // Tap 2
     await tester.tap(find.byKey(const ValueKey('architect-wizard-precision-2')));
     await tester.pump();
-    expect(tester.widget<Text>(exampleFinder).data, '0.00');
+    final exampleText = tester.widget<Text>(exampleFinder);
+    expect(exampleText.data, '0.00');
+    expect(exampleText.style?.color, Colors.black);
   });
+
+  testWidgets(
+    'Grid preset stays selected on bay resize, preview stays compact, custom scheme adds spans, and Create shows loading state',
+    (tester) async {
+      tester.view.physicalSize = const Size(500, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final completer = Completer<void>();
+      ArchitectProject? createdProject;
+      await tester.pumpWidget(
+        app(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => ArchitectProjectWizardDialog.show(
+                context,
+                onCreate: (p) async {
+                  createdProject = p;
+                  await completer.future;
+                },
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // Switch to Axes tab.
+      await tester.tap(find.byKey(const ValueKey('architect-wizard-step-1')));
+      await tester.pumpAndSettle();
+
+      // Select 4.50 / 4.50 preset (2x2 bays) and check compact preview height.
+      await tester.tap(find.widgetWithText(ChoiceChip, '4.50 / 4.50'));
+      await tester.pumpAndSettle();
+      final previewSize = tester.getSize(
+        find.byKey(const ValueKey('architect-grid-preview')),
+      );
+      expect(previewSize.height, lessThan(200));
+
+      // Change bay count using picker -> preset 4.50 / 4.50 remains selected (not Custom).
+      final pickerRect = tester.getRect(
+        find.byKey(const ValueKey('architect-grid-picker')),
+      );
+      await tester.tapAt(
+        pickerRect.topLeft + Offset(pickerRect.width * 3.5 / 8, pickerRect.height * 2.5 / 6),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '4.50 / 4.50')).selected,
+        isTrue,
+      );
+      expect(
+        tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Custom')).selected,
+        isFalse,
+      );
+
+      // Select Custom -> exposes arbitrary X/Y span editor and allows adding a bay.
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Custom'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('architect-grid-custom-editor')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('grid-add-x')));
+      await tester.pumpAndSettle();
+      for (final d in ['6', '2', '5']) {
+        await tester.tap(find.byKey(ValueKey('wall-key-$d')));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const ValueKey('wall-end')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('grid-custom-x-4')), findsOneWidget);
+
+      // Move to Storeys tab and press Create with async onCreate -> shows loading state instead of wizard steps.
+      await tester.tap(find.byKey(const ValueKey('architect-wizard-step-2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Create'));
+      await tester.pump();
+      expect(createdProject, isNotNull);
+      expect(find.byKey(const ValueKey('architect-wizard-creating')), findsOneWidget);
+      expect(find.byKey(const ValueKey('architect-wizard-step-2')), findsNothing);
+
+      completer.complete();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('architect-wizard-creating')), findsNothing);
+    },
+  );
 }

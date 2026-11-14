@@ -9,6 +9,7 @@ class ArchitectGridScheme extends StatelessWidget {
   final List<double> spacingsX, spacingsY;
   final ArchitectUnit unit;
   final int? decimals;
+  final bool customMode;
   final void Function(List<double>, List<double>) onChanged;
   const ArchitectGridScheme({
     super.key,
@@ -16,6 +17,7 @@ class ArchitectGridScheme extends StatelessWidget {
     required this.spacingsY,
     required this.unit,
     this.decimals,
+    this.customMode = false,
     required this.onChanged,
   });
 
@@ -66,6 +68,49 @@ class ArchitectGridScheme extends StatelessWidget {
     );
   }
 
+  Future<void> _addSpan(BuildContext context, bool x) async {
+    final list = x ? spacingsX : spacingsY;
+    var value = list.isNotEmpty ? list.last : 4.0;
+    final nextIndex = list.length;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: SizedBox(
+          width: 240,
+          child: ArchitectWallDraftingPanel(
+            title: x
+                ? '${nextIndex + 1}–${nextIndex + 2}'
+                : '${_letter(nextIndex)}–${_letter(nextIndex + 1)}',
+            endLabel: context.l10n.save,
+            length: unit.toUnit(value),
+            unit: unit.symbol,
+            decimals: decimals ?? 2,
+            minimumLength: unit.toUnit(.05),
+            keypadInitiallyOpen: true,
+            showContinue: false,
+            showDirection: false,
+            onLength: (v) => value = unit.fromUnit(v),
+            onEnd: () {
+              final next = [...list, value];
+              onChanged(x ? next : spacingsX, x ? spacingsY : next);
+              Navigator.of(ctx).pop();
+            },
+            onContinue: () {},
+            onUnlock: () {},
+            onCancel: () => Navigator.of(ctx).pop(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _removeLastSpan(bool x) {
+    final list = x ? spacingsX : spacingsY;
+    if (list.length <= 1) return;
+    final next = list.sublist(0, list.length - 1);
+    onChanged(x ? next : spacingsX, x ? spacingsY : next);
+  }
+
   static String _letter(int index) => String.fromCharCode(65 + index);
 
   @override
@@ -76,51 +121,65 @@ class ArchitectGridScheme extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(l.architectGridBays(spacingsX.length, spacingsY.length)),
-        Tooltip(
-          message: l.architectGridPickerHelp,
-          child: LayoutBuilder(
-            builder: (ctx, constraints) {
-              const columns = 8, rows = 6, height = 132.0;
-              void pick(Offset p) => _resize(
-                (p.dx / (constraints.maxWidth / columns)).floor().clamp(
-                      0,
-                      columns - 1,
-                    ) +
-                    1,
-                (p.dy / (height / rows)).floor().clamp(0, rows - 1) + 1,
-              );
-              return GestureDetector(
-                key: const ValueKey('architect-grid-picker'),
-                onTapDown: (d) => pick(d.localPosition),
-                onPanStart: (d) => pick(d.localPosition),
-                onPanUpdate: (d) => pick(d.localPosition),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: colors.outline.withValues(alpha: 0.35)),
-                  ),
-                  child: SizedBox(
-                    height: height,
-                    child: CustomPaint(
-                      painter: _BayPickerPainter(
-                        spacingsX.length,
-                        spacingsY.length,
-                        columns,
-                        rows,
-                        colors.primary,
-                        colors.surfaceContainerHighest.withValues(alpha: 0.5),
-                        borderColor: colors.outline.withValues(alpha: 0.5),
+        const SizedBox(height: 6),
+        if (!customMode)
+          Tooltip(
+            message: l.architectGridPickerHelp,
+            child: LayoutBuilder(
+              builder: (ctx, constraints) {
+                const columns = 8, rows = 6, height = 108.0;
+                void pick(Offset p) => _resize(
+                  (p.dx / (constraints.maxWidth / columns)).floor().clamp(
+                        0,
+                        columns - 1,
+                      ) +
+                      1,
+                  (p.dy / (height / rows)).floor().clamp(0, rows - 1) + 1,
+                );
+                return GestureDetector(
+                  key: const ValueKey('architect-grid-picker'),
+                  onTapDown: (d) => pick(d.localPosition),
+                  onPanStart: (d) => pick(d.localPosition),
+                  onPanUpdate: (d) => pick(d.localPosition),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: colors.outline.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: SizedBox(
+                      height: height,
+                      child: CustomPaint(
+                        painter: _BayPickerPainter(
+                          spacingsX.length,
+                          spacingsY.length,
+                          columns,
+                          rows,
+                          colors.primary,
+                          colors.surfaceContainerHighest.withValues(alpha: 0.5),
+                          borderColor: colors.outline.withValues(alpha: 0.5),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
+          )
+        else
+          _CustomAxisSchemeEditor(
+            spacingsX: spacingsX,
+            spacingsY: spacingsY,
+            unit: unit,
+            decimals: decimals,
+            onEdit: (x, i) => _edit(context, x, i),
+            onAdd: (x) => _addSpan(context, x),
+            onRemoveLast: _removeLastSpan,
           ),
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         LayoutBuilder(
           builder: (context, constraints) {
             final layout = _GridSchemeLayout(
@@ -160,40 +219,134 @@ class ArchitectGridScheme extends StatelessWidget {
 
             return SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                key: const ValueKey('architect-grid-preview'),
-                width: layout.size.width,
-                height: layout.size.height,
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _GridSchemePainter(layout, colors.primary),
-                      ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: Center(
+                  child: SizedBox(
+                    key: const ValueKey('architect-grid-preview'),
+                    width: layout.size.width,
+                    height: layout.size.height,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _GridSchemePainter(layout, colors.primary),
+                          ),
+                        ),
+                        for (var i = 0; i < spacingsX.length; i++)
+                          Positioned(
+                            left: layout.xs[i],
+                            top: 0,
+                            width: layout.xs[i + 1] - layout.xs[i],
+                            height: 28,
+                            child: dimension(true, i),
+                          ),
+                        for (var i = 0; i < spacingsY.length; i++)
+                          Positioned(
+                            left: 0,
+                            top: layout.ys[i],
+                            width: 48,
+                            height: layout.ys[i + 1] - layout.ys[i],
+                            child: dimension(false, i),
+                          ),
+                      ],
                     ),
-                    for (var i = 0; i < spacingsX.length; i++)
-                      Positioned(
-                        left: layout.xs[i],
-                        top: 0,
-                        width: layout.xs[i + 1] - layout.xs[i],
-                        height: 36,
-                        child: dimension(true, i),
-                      ),
-                    for (var i = 0; i < spacingsY.length; i++)
-                      Positioned(
-                        left: 0,
-                        top: layout.ys[i],
-                        width: 52,
-                        height: layout.ys[i + 1] - layout.ys[i],
-                        child: dimension(false, i),
-                      ),
-                  ],
+                  ),
                 ),
               ),
             );
           },
         ),
       ],
+    );
+  }
+}
+
+class _CustomAxisSchemeEditor extends StatelessWidget {
+  final List<double> spacingsX, spacingsY;
+  final ArchitectUnit unit;
+  final int? decimals;
+  final void Function(bool x, int index) onEdit;
+  final void Function(bool x) onAdd;
+  final void Function(bool x) onRemoveLast;
+  const _CustomAxisSchemeEditor({
+    required this.spacingsX,
+    required this.spacingsY,
+    required this.unit,
+    required this.decimals,
+    required this.onEdit,
+    required this.onAdd,
+    required this.onRemoveLast,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final colors = Theme.of(context).colorScheme;
+    Widget axisRow(String title, bool isX, List<double> spans) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (var i = 0; i < spans.length; i++)
+              ActionChip(
+                key: ValueKey('grid-custom-${isX ? 'x' : 'y'}-$i'),
+                visualDensity: VisualDensity.compact,
+                label: Text(
+                  '${isX ? '${i + 1}–${i + 2}' : '${ArchitectGridScheme._letter(i)}–${ArchitectGridScheme._letter(i + 1)}'}: ${unit.format(spans[i], decimals: decimals)}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onPressed: () => onEdit(isX, i),
+              ),
+            if (spans.length < 19)
+              IconButton.outlined(
+                key: ValueKey('grid-add-${isX ? 'x' : 'y'}'),
+                tooltip: l.architectGridAddBay,
+                visualDensity: VisualDensity.compact,
+                iconSize: 18,
+                onPressed: () => onAdd(isX),
+                icon: const Icon(Icons.add),
+              ),
+            if (spans.length > 1)
+              IconButton.outlined(
+                key: ValueKey('grid-remove-${isX ? 'x' : 'y'}'),
+                tooltip: l.architectGridRemoveBay,
+                visualDensity: VisualDensity.compact,
+                iconSize: 18,
+                onPressed: () => onRemoveLast(isX),
+                icon: const Icon(Icons.remove),
+              ),
+          ],
+        ),
+      ],
+    );
+
+    return Container(
+      key: const ValueKey('architect-grid-custom-editor'),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.outline.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          axisRow(l.architectGridAxesX, true, spacingsX),
+          const SizedBox(height: 8),
+          axisRow(l.architectGridAxesY, false, spacingsY),
+        ],
+      ),
     );
   }
 }
@@ -253,16 +406,19 @@ class _BayPickerPainter extends CustomPainter {
 }
 
 class _GridSchemeLayout {
-  final List<double> xs = [56], ys = [40];
+  final List<double> xs = [52], ys = [30];
   late final Size size;
   _GridSchemeLayout(List<double> xSteps, List<double> ySteps, double width) {
     final totalX = xSteps.fold(0.0, (a, b) => a + b);
     final totalY = ySteps.fold(0.0, (a, b) => a + b);
-    // Keep labels touchable; scroll larger schemes instead of overlapping them.
-    var scale = math.max(
-      (width - 64) / totalX,
-      math.max(64 / xSteps.reduce(math.min), 44 / ySteps.reduce(math.min)),
+    // Keep preview compact even with few axes, while keeping labels touchable.
+    const maxGridHeight = 120.0;
+    final fitScale = math.min((width - 64) / totalX, maxGridHeight / totalY);
+    final minTouchScale = math.max(
+      52 / xSteps.reduce(math.min),
+      34 / ySteps.reduce(math.min),
     );
+    var scale = math.max(fitScale, minTouchScale);
     scale = math.min(scale, 8192 / math.max(totalX, totalY));
     for (final step in xSteps) {
       xs.add(xs.last + step * scale);
@@ -270,7 +426,7 @@ class _GridSchemeLayout {
     for (final step in ySteps) {
       ys.add(ys.last + step * scale);
     }
-    size = Size(math.max(width, xs.last + 8), ys.last + 8);
+    size = Size(xs.last + 12, ys.last + 8);
   }
 }
 

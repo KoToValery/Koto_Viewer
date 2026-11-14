@@ -13,15 +13,24 @@ import 'architect_structural_scheme_labels.dart';
 
 class ArchitectProjectWizardDialog extends StatefulWidget {
   final String? initialProjectName;
-  const ArchitectProjectWizardDialog({super.key, this.initialProjectName});
+  final Future<void> Function(ArchitectProject project)? onCreate;
+  const ArchitectProjectWizardDialog({
+    super.key,
+    this.initialProjectName,
+    this.onCreate,
+  });
 
   static Future<ArchitectProject?> show(
     BuildContext context, {
     String? initialProjectName,
+    Future<void> Function(ArchitectProject project)? onCreate,
   }) => showDialog<ArchitectProject>(
     context: context,
-    builder: (_) =>
-        ArchitectProjectWizardDialog(initialProjectName: initialProjectName),
+    barrierDismissible: onCreate == null,
+    builder: (_) => ArchitectProjectWizardDialog(
+      initialProjectName: initialProjectName,
+      onCreate: onCreate,
+    ),
   );
 
   @override
@@ -45,10 +54,13 @@ class _LevelDraft {
 
 class _ArchitectProjectWizardDialogState
     extends State<ArchitectProjectWizardDialog> {
+  static const double _defaultUpperStoreyHeightMeters = 2.9;
+
   late final TextEditingController _name;
   final _levelsForm = GlobalKey<FormState>();
   final _levels = [_LevelDraft(0, 3)];
   int _step = 0, _decimals = 1;
+  bool _isCreating = false;
   ArchitectUnit _unit = ArchitectUnit.centimeters;
   ArchitectStructuralScheme _structuralScheme =
       ArchitectStructuralScheme.flatSlab;
@@ -113,8 +125,8 @@ class _ArchitectProjectWizardDialogState
       _levels[index].height = height;
       for (var i = index + 1; i < _levels.length; i++) {
         _levels[i].elevation = _levels[i - 1].elevation + _levels[i - 1].height;
-        _levels[i].elevationInput.text = _elevationNumber(_levels[i].elevation);
       }
+      _refreshLevelInputs();
     });
   }
 
@@ -132,11 +144,10 @@ class _ArchitectProjectWizardDialogState
       level.elevation = elevation;
       final previous = _levels[index - 1];
       previous.height = elevation - previous.elevation;
-      previous.heightInput.text = _number(previous.height);
       if (index + 1 < _levels.length) {
         level.height = _levels[index + 1].elevation - elevation;
-        level.heightInput.text = _number(level.height);
       }
+      _refreshLevelInputs();
     });
   }
 
@@ -144,14 +155,18 @@ class _ArchitectProjectWizardDialogState
     if (!_levelsForm.currentState!.validate()) return;
     setState(() {
       final last = _levels.last;
-      final next = _LevelDraft(last.elevation + last.height, last.height);
+      final next = _LevelDraft(
+        last.elevation + last.height,
+        _defaultUpperStoreyHeightMeters,
+      );
       next.elevationInput.text = _elevationNumber(next.elevation);
       next.heightInput.text = _number(next.height);
       _levels.add(next);
     });
   }
 
-  void _create() {
+  Future<void> _create() async {
+    if (_isCreating) return;
     if (!_levelsForm.currentState!.validate()) return;
     final l = context.l10n;
     final storeys = [
@@ -198,7 +213,21 @@ class _ArchitectProjectWizardDialogState
       cadUnderlays: configs,
       distanceDecimals: _decimals,
     );
-    Navigator.pop(context, project);
+    if (widget.onCreate == null) {
+      Navigator.pop(context, project);
+      return;
+    }
+    setState(() => _isCreating = true);
+    try {
+      await widget.onCreate!(project);
+      if (mounted) Navigator.pop(context, project);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCreating = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${l.error}: $e')));
+    }
   }
 
   @override
@@ -211,88 +240,121 @@ class _ArchitectProjectWizardDialogState
       l.architectWizardStoreysShort,
     ];
     final icons = [Icons.straighten, Icons.grid_on, Icons.layers_outlined];
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 700),
-        child: Padding(
-          padding: EdgeInsets.all(compact ? 16 : 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      compact
-                          ? l.architectWizardTitleShort
-                          : l.architectWizardTitle,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: l.close,
-                    onPressed: () => Navigator.pop(context),
-                    icon: const AppIcon(AppIconId.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  for (var i = 0; i < 3; i++)
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: ChoiceChip(
-                          key: ValueKey('architect-wizard-step-$i'),
-                          avatar: compact ? null : AppIcon.fromMaterial(icons[i], size: 16),
-                          label: Text(
-                            labels[i],
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+    return PopScope(
+      canPop: !_isCreating,
+      child: Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 580, maxHeight: 700),
+          child: Padding(
+            padding: EdgeInsets.all(compact ? 16 : 20),
+            child: _isCreating
+                ? SizedBox(
+                    key: const ValueKey('architect-wizard-creating'),
+                    height: 220,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          Text(
+                            _levels.any((e) => e.overlayFile != null)
+                                ? l.architectWizardLoadingUnderlay
+                                : l.architectWizardCreatingProject,
+                            style: Theme.of(context).textTheme.titleMedium,
+                            textAlign: TextAlign.center,
                           ),
-                          showCheckmark: false,
-                          selected: _step == i,
-                          onSelected: (_) => setState(() => _step = i),
-                        ),
+                        ],
                       ),
                     ),
-                ],
-              ),
-              const Divider(height: 24),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: switch (_step) {
-                    0 => _units(),
-                    1 => _axes(),
-                    _ => _storeys(),
-                  },
-                ),
-              ),
-              const Divider(height: 24),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: _step == 0
-                        ? () => Navigator.pop(context)
-                        : () => setState(() => _step--),
-                    child: Text(_step == 0 ? l.cancel : l.architectWizardBack),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              compact
+                                  ? l.architectWizardTitleShort
+                                  : l.architectWizardTitle,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: l.close,
+                            onPressed: () => Navigator.pop(context),
+                            icon: const AppIcon(AppIconId.close),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          for (var i = 0; i < 3; i++)
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                ),
+                                child: ChoiceChip(
+                                  key: ValueKey('architect-wizard-step-$i'),
+                                  avatar: compact
+                                      ? null
+                                      : AppIcon.fromMaterial(
+                                          icons[i],
+                                          size: 16,
+                                        ),
+                                  label: Text(
+                                    labels[i],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  showCheckmark: false,
+                                  selected: _step == i,
+                                  onSelected: (_) => setState(() => _step = i),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const Divider(height: 24),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: switch (_step) {
+                            0 => _units(),
+                            1 => _axes(),
+                            _ => _storeys(),
+                          },
+                        ),
+                      ),
+                      const Divider(height: 24),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: _step == 0
+                                ? () => Navigator.pop(context)
+                                : () => setState(() => _step--),
+                            child: Text(
+                              _step == 0 ? l.cancel : l.architectWizardBack,
+                            ),
+                          ),
+                          const Spacer(),
+                          FilledButton(
+                            onPressed: _step == 2
+                                ? _create
+                                : () => setState(() => _step++),
+                            child: Text(
+                              _step == 2
+                                  ? l.architectWizardCreateShort
+                                  : l.architectWizardNext,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _step == 2
-                        ? _create
-                        : () => setState(() => _step++),
-                    child: Text(
-                      _step == 2
-                          ? l.architectWizardCreateShort
-                          : l.architectWizardNext,
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
         ),
       ),
@@ -367,28 +429,31 @@ class _ArchitectProjectWizardDialogState
               ],
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Theme.of(context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: const Color(0xFFF3F5F7),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white24),
+                border: Border.all(color: Colors.black26),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     '${l.architectWizardExample} ',
-                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
                   ),
                   Text(
                     _decimals == 0 ? '0' : '0.${'0' * _decimals}',
                     key: const ValueKey('architect-wizard-precision-example'),
                     style: const TextStyle(
                       fontFamily: 'monospace',
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.cyanAccent,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black,
                     ),
                   ),
                 ],
@@ -424,6 +489,16 @@ class _ArchitectProjectWizardDialogState
     );
   }
 
+  bool _matchesPresetSpacings(
+    ArchitectGridPreset preset,
+    List<double> x,
+    List<double> y,
+  ) =>
+      preset.type != GridPresetType.none &&
+      preset.type != GridPresetType.custom &&
+      x.every((v) => (v - preset.spacingX).abs() < 1e-6) &&
+      y.every((v) => (v - preset.spacingY).abs() < 1e-6);
+
   Widget _axes() {
     final l = context.l10n;
     return Column(
@@ -440,8 +515,22 @@ class _ArchitectProjectWizardDialogState
                   label: Text(preset.label(l)),
                   selected: _grid.id == preset.id,
                   onSelected: (_) => setState(() {
+                    final prevType = _grid.type;
                     _grid = preset;
-                    if (preset.type != GridPresetType.none) {
+                    if (preset.type == GridPresetType.custom) {
+                      if (prevType == GridPresetType.none ||
+                          _spacingsX.isEmpty ||
+                          _spacingsY.isEmpty) {
+                        _spacingsX = List.filled(
+                          preset.axesX - 1,
+                          preset.spacingX,
+                        );
+                        _spacingsY = List.filled(
+                          preset.axesY - 1,
+                          preset.spacingY,
+                        );
+                      }
+                    } else if (preset.type != GridPresetType.none) {
                       _spacingsX = List.filled(
                         preset.axesX - 1,
                         preset.spacingX,
@@ -463,12 +552,16 @@ class _ArchitectProjectWizardDialogState
             spacingsY: _spacingsY,
             unit: _unit,
             decimals: _decimals,
+            customMode: _grid.type == GridPresetType.custom,
             onChanged: (x, y) => setState(() {
               _spacingsX = x;
               _spacingsY = y;
-              _grid = ArchitectGridPreset.standardPresets().firstWhere(
-                (p) => p.type == GridPresetType.custom,
-              );
+              if (_grid.type != GridPresetType.custom &&
+                  !_matchesPresetSpacings(_grid, x, y)) {
+                _grid = ArchitectGridPreset.standardPresets().firstWhere(
+                  (p) => p.type == GridPresetType.custom,
+                );
+              }
             }),
           ),
         ],
@@ -524,20 +617,38 @@ class _ArchitectProjectWizardDialogState
                         child: TextFormField(
                           key: ValueKey('architect-wizard-elevation-$i'),
                           controller: _levels[i].elevationInput,
-                          readOnly: i == 0,
+                          readOnly: true,
+                          showCursor: false,
+                          enableInteractiveSelection: false,
                           keyboardType: TextInputType.none,
                           onTap: i == 0
                               ? null
-                              : () => openArchitectNumericKeypad(
-                                  context: context,
-                                  controller: _levels[i].elevationInput,
-                                  title: l.architectWizardElevation,
-                                  unitLabel: 'm',
-                                  decimals: 3,
-                                  allowNegative: true,
-                                  onApplied: (text) =>
-                                      _elevationChanged(i, text),
-                                ),
+                              : () async {
+                                  FocusScope.of(context).unfocus();
+                                  final temp = TextEditingController(
+                                    text: _levels[i].elevation
+                                        .toStringAsFixed(_elevationDecimals),
+                                  );
+                                  await openArchitectNumericKeypad(
+                                    context: context,
+                                    controller: temp,
+                                    title: l.architectWizardElevation,
+                                    unitLabel: 'm',
+                                    decimals: _elevationDecimals,
+                                    allowNegative: true,
+                                    validate: (v) {
+                                      if (v <= _levels[i - 1].elevation ||
+                                          (i + 1 < _levels.length &&
+                                              v >= _levels[i + 1].elevation)) {
+                                        return l.architectWizardInvalidLevel;
+                                      }
+                                      return null;
+                                    },
+                                    onApplied: (text) =>
+                                        _elevationChanged(i, text),
+                                  );
+                                  temp.dispose();
+                                },
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
                           ),
@@ -558,16 +669,22 @@ class _ArchitectProjectWizardDialogState
                         child: TextFormField(
                           key: ValueKey('architect-wizard-height-$i'),
                           controller: _levels[i].heightInput,
+                          readOnly: true,
+                          showCursor: false,
+                          enableInteractiveSelection: false,
                           keyboardType: TextInputType.none,
-                          onTap: () => openArchitectNumericKeypad(
-                            context: context,
-                            controller: _levels[i].heightInput,
-                            title: l.architectWizardHeight,
-                            unitLabel: _unit.symbol,
-                            decimals: architectNumericDecimals(_unit),
-                            min: .000001,
-                            onApplied: (text) => _heightChanged(i, text),
-                          ),
+                          onTap: () {
+                            FocusScope.of(context).unfocus();
+                            openArchitectNumericKeypad(
+                              context: context,
+                              controller: _levels[i].heightInput,
+                              title: l.architectWizardHeight,
+                              unitLabel: _unit.symbol,
+                              decimals: architectNumericDecimals(_unit),
+                              min: .000001,
+                              onApplied: (text) => _heightChanged(i, text),
+                            );
+                          },
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
                           ),
