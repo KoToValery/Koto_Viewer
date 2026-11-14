@@ -3131,6 +3131,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _roofTool.draftPoints.length,
 
+      _landscapeTool.revision,
+
+      _landscapeTool.draftPoints.length,
+
     );
 
     if (state != _toolUiState && mounted) {

@@ -36,110 +36,120 @@ class ArchitectLandscapeBar extends StatelessWidget {
   VoidCallback? get onUndoDraftPoint => onUndoPoint;
   VoidCallback? get onSyncFromGeodesy => onSyncTerrainFromGeodesy;
 
+  void _notifyChanged() {
+    controller.notifyChanged();
+    onChanged.call();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final l = context.l10n;
-    final colors = Theme.of(context).colorScheme;
-    final canCommit = controller.canCommit(activeTool.name);
-    final hasDraft = controller.draftPoints.isNotEmpty;
+    return ListenableBuilder(
+      listenable: landscapeTool,
+      builder: (context, _) {
+        final l = context.l10n;
+        final colors = Theme.of(context).colorScheme;
+        final canCommit = controller.canCommit(activeTool.name);
+        final hasDraft = controller.draftPoints.isNotEmpty;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (activeTool == ArchitectTool.terrain ||
-                activeTool == ArchitectTool.contour)
-              ..._buildTerrainControls(context, l, colors)
-            else if (activeTool == ArchitectTool.pathway)
-              ..._buildPathwayControls(context, l, colors)
-            else if (activeTool == ArchitectTool.street)
-              ..._buildStreetControls(context, l, colors)
-            else if (activeTool == ArchitectTool.vegetation)
-              ..._buildVegetationControls(context, l, colors)
-            else if (activeTool == ArchitectTool.siteFence)
-              ..._buildSiteFenceControls(context, l, colors),
-            if (onTriggerFillet != null || onTriggerChamfer != null) ...[
-              const SizedBox(width: 8),
-              _divider(colors),
-              const SizedBox(width: 4),
-              if (onTriggerFillet != null)
-                IconButton(
-                  key: const ValueKey('architect-landscape-fillet'),
-                  tooltip: l.architectFillet,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onTriggerFillet,
-                  icon: const AppIcon(AppIconId.fillet, size: 18),
-                ),
-              if (onTriggerChamfer != null)
-                IconButton(
-                  key: const ValueKey('architect-landscape-chamfer'),
-                  tooltip: l.architectChamfer,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onTriggerChamfer,
-                  icon: const AppIcon(AppIconId.chamfer, size: 18),
-                ),
-            ],
-            if (hasDraft) ...[
-              const SizedBox(width: 8),
-              _divider(colors),
-              const SizedBox(width: 6),
-              if (canCommit && onCommitDraft != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: FilledButton.tonalIcon(
-                    key: const ValueKey('architect-landscape-commit'),
-                    onPressed: onCommitDraft,
-                    style: FilledButton.styleFrom(
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colors.outlineVariant),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (activeTool == ArchitectTool.terrain ||
+                    activeTool == ArchitectTool.contour)
+                  ..._buildTerrainControls(context, l, colors)
+                else if (activeTool == ArchitectTool.pathway)
+                  ..._buildPathwayControls(context, l, colors)
+                else if (activeTool == ArchitectTool.street)
+                  ..._buildStreetControls(context, l, colors)
+                else if (activeTool == ArchitectTool.vegetation)
+                  ..._buildVegetationControls(context, l, colors)
+                else if (activeTool == ArchitectTool.siteFence)
+                  ..._buildSiteFenceControls(context, l, colors),
+                if (onTriggerFillet != null || onTriggerChamfer != null) ...[
+                  const SizedBox(width: 8),
+                  _divider(colors),
+                  const SizedBox(width: 4),
+                  if (onTriggerFillet != null)
+                    IconButton(
+                      key: const ValueKey('architect-landscape-fillet'),
+                      tooltip: l.architectFillet,
                       visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
+                      onPressed: onTriggerFillet,
+                      icon: const AppIcon(AppIconId.fillet, size: 18),
+                    ),
+                  if (onTriggerChamfer != null)
+                    IconButton(
+                      key: const ValueKey('architect-landscape-chamfer'),
+                      tooltip: l.architectChamfer,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onTriggerChamfer,
+                      icon: const AppIcon(AppIconId.chamfer, size: 18),
+                    ),
+                ],
+                if (hasDraft) ...[
+                  const SizedBox(width: 8),
+                  _divider(colors),
+                  const SizedBox(width: 6),
+                  if (canCommit && onCommitDraft != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: FilledButton.tonalIcon(
+                        key: const ValueKey('architect-landscape-commit'),
+                        onPressed: onCommitDraft,
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                        ),
+                        icon: const Icon(Icons.check_rounded, size: 16),
+                        label: Text(
+                          l.architectZoneClose,
+                          style: const TextStyle(fontSize: 12),
+                        ),
                       ),
                     ),
-                    icon: const Icon(Icons.check_rounded, size: 16),
-                    label: Text(
-                      l.architectZoneClose,
-                      style: const TextStyle(fontSize: 12),
+                  if (onUndoDraftPoint != null)
+                    IconButton(
+                      key: const ValueKey('architect-landscape-undo-point'),
+                      tooltip: l.architectZoneUndoPoint,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onUndoDraftPoint,
+                      icon: AppIcon(
+                        AppIconId.undo,
+                        size: 16,
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ),
-              if (onUndoDraftPoint != null)
-                IconButton(
-                  key: const ValueKey('architect-landscape-undo-point'),
-                  tooltip: l.architectZoneUndoPoint,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onUndoDraftPoint,
-                  icon: AppIcon(
-                    AppIconId.undo,
-                    size: 16,
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-              if (onCancelDraft != null)
-                IconButton(
-                  key: const ValueKey('architect-landscape-cancel'),
-                  tooltip: l.cancel,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onCancelDraft,
-                  icon: Icon(
-                    Icons.close_rounded,
-                    size: 18,
-                    color: colors.error,
-                  ),
-                ),
-            ],
-          ],
-        ),
-      ),
+                  if (onCancelDraft != null)
+                    IconButton(
+                      key: const ValueKey('architect-landscape-cancel'),
+                      tooltip: l.cancel,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onCancelDraft,
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: colors.error,
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -159,7 +169,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
         label: l.architectTerrainStateExisting,
         onTap: () {
           controller.terrainState = ArchitectTerrainState.existing;
-          onChanged();
+          _notifyChanged();
         },
       ),
       const SizedBox(width: 4),
@@ -169,7 +179,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
         label: l.architectTerrainStateProposed,
         onTap: () {
           controller.terrainState = ArchitectTerrainState.proposed;
-          onChanged();
+          _notifyChanged();
         },
       ),
       const SizedBox(width: 8),
@@ -184,7 +194,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
             onTap: () {
               controller.terrainMode = mode;
               controller.clearDraft();
-              onChanged();
+              _notifyChanged();
             },
           ),
           const SizedBox(width: 4),
@@ -218,14 +228,14 @@ class ArchitectLandscapeBar extends StatelessWidget {
                 ((controller.contourAbsoluteElevation - 0.50) * 100).round() / 100.0;
             controller.terrainElevation = controller.contourAbsoluteElevation -
                 controller.terrainDatumElevation;
-            onChanged();
+            _notifyChanged();
           },
           onInc: () {
             controller.contourAbsoluteElevation =
                 ((controller.contourAbsoluteElevation + 0.50) * 100).round() / 100.0;
             controller.terrainElevation = controller.contourAbsoluteElevation -
                 controller.terrainDatumElevation;
-            onChanged();
+            _notifyChanged();
           },
           onTapLabel: () => _promptAbsoluteElevationDialog(context, l),
         ),
@@ -246,7 +256,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
             label: l.architectTerrainContourMajor,
             onTap: () {
               controller.contourMajor = !controller.contourMajor;
-              onChanged();
+              _notifyChanged();
             },
           ),
           const SizedBox(width: 4),
@@ -256,7 +266,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
             label: l.architectTerrainContourClosed,
             onTap: () {
               controller.contourClosed = !controller.contourClosed;
-              onChanged();
+              _notifyChanged();
             },
           ),
         ],
@@ -270,14 +280,14 @@ class ArchitectLandscapeBar extends StatelessWidget {
                 ((controller.terrainElevation - 0.10) * 100).round() / 100.0;
             controller.contourAbsoluteElevation =
                 controller.terrainElevation + controller.terrainDatumElevation;
-            onChanged();
+            _notifyChanged();
           },
           onInc: () {
             controller.terrainElevation =
                 ((controller.terrainElevation + 0.10) * 100).round() / 100.0;
             controller.contourAbsoluteElevation =
                 controller.terrainElevation + controller.terrainDatumElevation;
-            onChanged();
+            _notifyChanged();
           },
         ),
       ],
@@ -355,7 +365,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
         controller.contourAbsoluteElevation =
             controller.terrainElevation + res;
       }
-      onChanged();
+      _notifyChanged();
     }
   }
 
@@ -407,7 +417,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
     if (res != null) {
       controller.contourAbsoluteElevation = res;
       controller.terrainElevation = res - controller.terrainDatumElevation;
-      onChanged();
+      _notifyChanged();
     }
   }
 
@@ -426,14 +436,14 @@ class ArchitectLandscapeBar extends StatelessWidget {
             0.40,
             12.0,
           );
-          onChanged();
+          _notifyChanged();
         },
         onInc: () {
           controller.pathwayWidth = (controller.pathwayWidth + 0.10).clamp(
             0.40,
             12.0,
           );
-          onChanged();
+          _notifyChanged();
         },
       ),
       const SizedBox(width: 8),
@@ -446,7 +456,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           label: _curbModeLabel(l, curb),
           onTap: () {
             controller.pathwayCurbMode = curb;
-            onChanged();
+            _notifyChanged();
           },
         ),
         const SizedBox(width: 4),
@@ -460,12 +470,12 @@ class ArchitectLandscapeBar extends StatelessWidget {
           onDec: () {
             controller.pathwayCurbWidth = (controller.pathwayCurbWidth - 0.02)
                 .clamp(0.06, 0.35);
-            onChanged();
+            _notifyChanged();
           },
           onInc: () {
             controller.pathwayCurbWidth = (controller.pathwayCurbWidth + 0.02)
                 .clamp(0.06, 0.35);
-            onChanged();
+            _notifyChanged();
           },
         ),
       ],
@@ -479,7 +489,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           label: _pavingMaterialLabel(l, mat),
           onTap: () {
             controller.pathwayMaterial = mat;
-            onChanged();
+            _notifyChanged();
           },
         ),
         const SizedBox(width: 4),
@@ -491,7 +501,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
         label: l.architectPathwayClosedPad,
         onTap: () {
           controller.pathwayClosed = !controller.pathwayClosed;
-          onChanged();
+          _notifyChanged();
         },
       ),
     ];
@@ -510,12 +520,12 @@ class ArchitectLandscapeBar extends StatelessWidget {
         onDec: () {
           controller.streetRoadWidth =
               (controller.streetRoadWidth - 0.50).clamp(2.50, 30.0);
-          onChanged();
+          _notifyChanged();
         },
         onInc: () {
           controller.streetRoadWidth =
               (controller.streetRoadWidth + 0.50).clamp(2.50, 30.0);
-          onChanged();
+          _notifyChanged();
         },
       ),
       const SizedBox(width: 8),
@@ -528,7 +538,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           label: style.label(l),
           onTap: () {
             controller.streetMarkingStyle = style;
-            onChanged();
+            _notifyChanged();
           },
         ),
         const SizedBox(width: 4),
@@ -542,7 +552,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
         label: l.architectStreetSidewalkLeft,
         onTap: () {
           controller.streetHasLeftSidewalk = !controller.streetHasLeftSidewalk;
-          onChanged();
+          _notifyChanged();
         },
       ),
       if (controller.streetHasLeftSidewalk) ...[
@@ -553,12 +563,12 @@ class ArchitectLandscapeBar extends StatelessWidget {
           onDec: () {
             controller.streetLeftSidewalkWidth =
                 (controller.streetLeftSidewalkWidth - 0.20).clamp(0.40, 8.0);
-            onChanged();
+            _notifyChanged();
           },
           onInc: () {
             controller.streetLeftSidewalkWidth =
                 (controller.streetLeftSidewalkWidth + 0.20).clamp(0.40, 8.0);
-            onChanged();
+            _notifyChanged();
           },
         ),
       ],
@@ -570,7 +580,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
         onTap: () {
           controller.streetHasRightSidewalk =
               !controller.streetHasRightSidewalk;
-          onChanged();
+          _notifyChanged();
         },
       ),
       if (controller.streetHasRightSidewalk) ...[
@@ -581,12 +591,12 @@ class ArchitectLandscapeBar extends StatelessWidget {
           onDec: () {
             controller.streetRightSidewalkWidth =
                 (controller.streetRightSidewalkWidth - 0.20).clamp(0.40, 8.0);
-            onChanged();
+            _notifyChanged();
           },
           onInc: () {
             controller.streetRightSidewalkWidth =
                 (controller.streetRightSidewalkWidth + 0.20).clamp(0.40, 8.0);
-            onChanged();
+            _notifyChanged();
           },
         ),
       ],
@@ -600,12 +610,12 @@ class ArchitectLandscapeBar extends StatelessWidget {
         onDec: () {
           controller.streetCurbWidth =
               (controller.streetCurbWidth - 0.02).clamp(0.08, 0.40);
-          onChanged();
+          _notifyChanged();
         },
         onInc: () {
           controller.streetCurbWidth =
               (controller.streetCurbWidth + 0.02).clamp(0.08, 0.40);
-          onChanged();
+          _notifyChanged();
         },
       ),
       const SizedBox(width: 6),
@@ -615,7 +625,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
         label: l.architectPathwayClosedPad,
         onTap: () {
           controller.streetClosed = !controller.streetClosed;
-          onChanged();
+          _notifyChanged();
         },
       ),
     ];
@@ -635,7 +645,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           onTap: () {
             controller.applySpeciesDefaults(sp);
             controller.clearDraft();
-            onChanged();
+            _notifyChanged();
           },
         ),
         const SizedBox(width: 4),
@@ -654,7 +664,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
             controller.plantPlacementMode =
                 ArchitectVegetationPlacementMode.single;
             controller.clearDraft();
-            onChanged();
+            _notifyChanged();
           },
         ),
         const SizedBox(width: 4),
@@ -668,7 +678,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
             controller.plantPlacementMode =
                 ArchitectVegetationPlacementMode.row;
             controller.clearDraft();
-            onChanged();
+            _notifyChanged();
           },
         ),
         const SizedBox(width: 8),
@@ -679,12 +689,12 @@ class ArchitectLandscapeBar extends StatelessWidget {
           onDec: () {
             controller.plantCrownDiameter =
                 (controller.plantCrownDiameter - 0.2).clamp(0.4, 16.0);
-            onChanged();
+            _notifyChanged();
           },
           onInc: () {
             controller.plantCrownDiameter =
                 (controller.plantCrownDiameter + 0.2).clamp(0.4, 16.0);
-            onChanged();
+            _notifyChanged();
           },
         ),
         const SizedBox(width: 6),
@@ -697,12 +707,12 @@ class ArchitectLandscapeBar extends StatelessWidget {
             onDec: () {
               controller.plantRowSpacing = (controller.plantRowSpacing - 0.5)
                   .clamp(0.5, 25.0);
-              onChanged();
+              _notifyChanged();
             },
             onInc: () {
               controller.plantRowSpacing = (controller.plantRowSpacing + 0.5)
                   .clamp(0.5, 25.0);
-              onChanged();
+              _notifyChanged();
             },
           ),
           const SizedBox(width: 6),
@@ -717,14 +727,14 @@ class ArchitectLandscapeBar extends StatelessWidget {
               0.30,
               2.50,
             );
-            onChanged();
+            _notifyChanged();
           },
           onInc: () {
             controller.hedgeWidth = (controller.hedgeWidth + 0.10).clamp(
               0.30,
               2.50,
             );
-            onChanged();
+            _notifyChanged();
           },
         ),
         const SizedBox(width: 6),
@@ -738,14 +748,14 @@ class ArchitectLandscapeBar extends StatelessWidget {
             0.4,
             24.0,
           );
-          onChanged();
+          _notifyChanged();
         },
         onInc: () {
           controller.plantHeight = (controller.plantHeight + 0.3).clamp(
             0.4,
             24.0,
           );
-          onChanged();
+          _notifyChanged();
         },
       ),
     ];
@@ -764,7 +774,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           label: _fencePresetLabel(l, preset),
           onTap: () {
             controller.applyFencePresetDefaults(preset);
-            onChanged();
+            _notifyChanged();
           },
         ),
         const SizedBox(width: 4),
@@ -781,14 +791,14 @@ class ArchitectLandscapeBar extends StatelessWidget {
             0.50,
             4.50,
           );
-          onChanged();
+          _notifyChanged();
         },
         onInc: () {
           controller.fenceHeight = (controller.fenceHeight + 0.10).clamp(
             0.50,
             4.50,
           );
-          onChanged();
+          _notifyChanged();
         },
       ),
       const SizedBox(width: 6),
@@ -801,14 +811,14 @@ class ArchitectLandscapeBar extends StatelessWidget {
             0.12,
             1.50,
           );
-          onChanged();
+          _notifyChanged();
         },
         onInc: () {
           controller.fenceThickness = (controller.fenceThickness + 0.05).clamp(
             0.12,
             1.50,
           );
-          onChanged();
+          _notifyChanged();
         },
       ),
       if (controller.fencePreset != ArchitectSiteFencePreset.rcRetaining &&
@@ -821,12 +831,12 @@ class ArchitectLandscapeBar extends StatelessWidget {
           onDec: () {
             controller.fencePierSpacing = (controller.fencePierSpacing - 0.20)
                 .clamp(1.20, 6.00);
-            onChanged();
+            _notifyChanged();
           },
           onInc: () {
             controller.fencePierSpacing = (controller.fencePierSpacing + 0.20)
                 .clamp(1.20, 6.00);
-            onChanged();
+            _notifyChanged();
           },
         ),
       ],

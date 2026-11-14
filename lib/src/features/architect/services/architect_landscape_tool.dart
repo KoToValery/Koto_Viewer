@@ -58,8 +58,22 @@ class ArchitectLandscapeTool extends ChangeNotifier {
 
   // --- Active Polyline/Polygon Draft Chain ---
   final List<Offset> draftPoints = <Offset>[];
+  int _revision = 0;
+
+  /// Increments on every controller notification so UI state tuples and listeners
+  /// detect any landscape tool property or draft mutation cleanly.
+  int get revision => _revision;
 
   bool get isDrafting => draftPoints.isNotEmpty;
+
+  @override
+  void notifyListeners() {
+    _revision++;
+    super.notifyListeners();
+  }
+
+  /// Notifies attached listeners after external property mutations.
+  void notifyChanged() => notifyListeners();
 
   void clearDraft() {
     draftPoints.clear();
@@ -125,6 +139,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           plantPlacementMode = ArchitectVegetationPlacementMode.single;
         }
     }
+    notifyListeners();
   }
 
   void applyFencePresetDefaults(ArchitectSiteFencePreset preset) {
@@ -155,6 +170,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
         fenceThickness = 0.30;
         fencePierSpacing = 3.00;
     }
+    notifyListeners();
   }
 
   bool canCommit(String toolName) {
