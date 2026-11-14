@@ -27,6 +27,7 @@ import '../services/component_geometry_cache.dart';
 import '../services/component_library_service.dart';
 import '../services/architect_service_geometry.dart';
 import '../services/architect_decorative_geometry.dart';
+import 'architect_fence_3d_mesh.dart';
 
 /// Real-time 3D solid mesh builder for architectural projects.
 class Architect3dBuilder {
@@ -1735,93 +1736,13 @@ class Architect3dBuilder {
         for (final fence in storey.siteFences) {
           if (fence.points.length < 2) continue;
           final first = allTris.length;
-          final halfT = fence.thickness * 0.5;
-          final left = ArchitectPathway.offsetChain(
-            fence.points,
-            halfT,
-            closed: fence.closed,
+          allTris.addAll(
+            ArchitectFence3dMesh.build(
+              fence,
+              groundZAt: (p) =>
+                  groundZ(p, storey.elevation) + fence.elevationOffset,
+            ),
           );
-          final right = ArchitectPathway.offsetChain(
-            fence.points,
-            -halfT,
-            closed: fence.closed,
-          );
-          final bodyPath = Path()
-            ..addPolygon([...left, ...right.reversed], true);
-          if (fence.preset == ArchitectSiteFencePreset.gabionFence ||
-              fence.preset == ArchitectSiteFencePreset.gabionRetaining ||
-              fence.preset == ArchitectSiteFencePreset.rcRetaining) {
-            final topCol = fence.preset == ArchitectSiteFencePreset.rcRetaining
-                ? const Color(0xFF94A3B8)
-                : const Color(0xFF8C857B);
-            allTris.addAll(
-              _extrude(
-                bodyPath,
-                (p) => groundZ(p, storey.elevation) - 0.10,
-                (p) => groundZ(p, storey.elevation) + fence.height,
-                topCol,
-                topCol,
-                topCol,
-              ),
-            );
-          } else {
-            // Plinth + Piers + Slat/Louver/Iron Panel
-            allTris.addAll(
-              _extrude(
-                bodyPath,
-                (p) => groundZ(p, storey.elevation) - 0.08,
-                (p) => groundZ(p, storey.elevation) + 0.42,
-                const Color(0xFFCBD5E1),
-                const Color(0xFF94A3B8),
-                const Color(0xFF94A3B8),
-              ),
-            );
-            final panelLeft = ArchitectPathway.offsetChain(
-              fence.points,
-              0.03,
-              closed: fence.closed,
-            );
-            final panelRight = ArchitectPathway.offsetChain(
-              fence.points,
-              -0.03,
-              closed: fence.closed,
-            );
-            final panelColor =
-                fence.preset == ArchitectSiteFencePreset.piersAndSlats
-                ? const Color(0xFFA47148)
-                : const Color(0xFF334155);
-            allTris.addAll(
-              _extrude(
-                Path()
-                  ..addPolygon([...panelLeft, ...panelRight.reversed], true),
-                (p) => groundZ(p, storey.elevation) + 0.42,
-                (p) => groundZ(p, storey.elevation) + fence.height - 0.06,
-                panelColor,
-                panelColor,
-                panelColor,
-              ),
-            );
-            final pierHalf = math.max(halfT * 1.25, 0.18);
-            for (final (pierCenter, _) in fence.pierPositions) {
-              allTris.addAll(
-                _extrude(
-                  Path()
-                    ..addRect(
-                      Rect.fromCenter(
-                        center: pierCenter,
-                        width: pierHalf * 2,
-                        height: pierHalf * 2,
-                      ),
-                    ),
-                  (p) => groundZ(p, storey.elevation) - 0.08,
-                  (p) => groundZ(p, storey.elevation) + fence.height,
-                  const Color(0xFFE2E8F0),
-                  const Color(0xFFCBD5E1),
-                  const Color(0xFFCBD5E1),
-                ),
-              );
-            }
-          }
           mark(fence.id, first);
         }
       }
