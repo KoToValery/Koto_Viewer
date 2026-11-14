@@ -24,14 +24,15 @@ class ArchitectSlabDraftBar extends StatelessWidget {
       String key,
       String tooltip,
       AppIconId icon,
-      VoidCallback? onPressed,
-    ) => IconButton(
+      VoidCallback? onPressed, {
+      Color? iconColor,
+    }) => IconButton(
       key: ValueKey(key),
       tooltip: tooltip,
       constraints: const BoxConstraints.tightFor(width: 44, height: 44),
       padding: EdgeInsets.zero,
       onPressed: onPressed,
-      icon: AppIcon(icon, size: 20),
+      icon: AppIcon(icon, size: 20, color: iconColor),
     );
     return Material(
       color: colors.surface,
@@ -56,6 +57,7 @@ class ArchitectSlabDraftBar extends StatelessWidget {
               l.applyAction,
               AppIconId.confirm,
               canFinish ? onFinish : null,
+              iconColor: canFinish ? const Color(0xFF16A34A) : null,
             ),
             action('slab-draft-cancel', l.cancel, AppIconId.close, onCancel),
           ] else

@@ -33049,7 +33049,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                         shape: BoxShape.circle,
 
-                        color: Color(0xFF2E7D32),
+                        color: Color(0xFF16A34A),
 
                       ),
 
@@ -33060,7 +33060,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         height: 22,
 
                         child: AppIcon(
-                          AppIconId.confirm, size: 15, color: Colors.white,
+                          AppIconId.confirm, size: 16, color: Colors.white,
                         ),
 
                       ),
@@ -35007,7 +35007,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                           tooltip: context.l10n.bimGroupDone,
 
-                          icon: const AppIcon(AppIconId.confirm), onPressed: _finishChainedWall,
+                          icon: const AppIcon(
+                            AppIconId.confirm,
+                            color: Color(0xFF00E676),
+                            size: 22,
+                          ), onPressed: _finishChainedWall,
                                 ),
 
                     ],

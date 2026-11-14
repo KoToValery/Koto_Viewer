@@ -93,7 +93,7 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
                   discKey: const ValueKey('architect-command-apply-disc'),
                   tooltip: confirmTooltip ?? l.applyAction,
                   icon: AppIconId.confirm,
-                  color: const Color(0xFF18846B),
+                  color: const Color(0xFF16A34A),
                   onPressed: ready ? onConfirm : null,
                 ),
               ],
@@ -150,7 +150,7 @@ class ArchitectFloatingCommandOverlay extends StatelessWidget {
         child: AppIcon(
           icon,
           color: enabled ? color : const Color(0xFFBFC8CD),
-          size: 18,
+          size: icon == AppIconId.confirm ? 20 : 18,
         ),
       ),
       onPressed: onPressed,
