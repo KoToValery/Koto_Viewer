@@ -108,27 +108,10 @@ class ArchitectOpeningPlanPainter {
     // Position above and below the dimension line
     tpWidth.paint(canvas, Offset(-tpWidth.width / 2.0, -tpWidth.height - 2.0));
     tpHeight.paint(canvas, Offset(-tpHeight.width / 2.0, 3.0));
-
-    // Sill height text if > 0 (e.g. h=15)
-    if (sillHeight > 0 && !outsideWall) {
-      final tpSill = ArchitectTextPainter(
-        elementId: annotationId,
-        role: ArchitectAnnotationRole.opening,
-        modelScale: dimensionFontScale,
-        text: TextSpan(text: 'h=$sillCm', style: textStyle),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tpSill.paint(
-        canvas,
-        Offset(
-          math.max(tpWidth.width, tpHeight.width) / 2.0 + 4.0,
-          -tpSill.height / 2.0,
-        ),
-      );
-    }
     canvas.restore();
 
-    if (outsideWall && sillHeight > 0) {
+    // Sill height text on the opposite side of the dimension line, perpendicular to it
+    if (sillHeight > 0.001) {
       final sill = ArchitectTextPainter(
         elementId: annotationId,
         role: ArchitectAnnotationRole.opening,
@@ -237,7 +220,7 @@ class ArchitectOpeningPlanPainter {
       )..layout();
       reach = .16 + numbers.width * .20 / numbers.height;
     }
-    if (outsideWall && sillHeight > .001) {
+    if (sillHeight > .001) {
       final sill = ArchitectTextPainter(
         text: TextSpan(
           text: 'h=${(sillHeight * 100).round()}',

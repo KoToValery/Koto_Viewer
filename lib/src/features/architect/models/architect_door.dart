@@ -594,6 +594,7 @@ class ArchitectDoor {
         normal: n,
         wallThickness: wallThickness,
         tolerance: tolerance,
+        sillHeight: sillHeight,
       );
     }
     // Use the exact leaf and jamb dimensions that are drawn.
@@ -604,16 +605,15 @@ class ArchitectDoor {
       return true;
     }
 
-    // 3. ID circle badge & dimension line
-    const badgeR = 0.16;
-    final extDist = halfThick + 0.22;
-    final badgeCenter = centerPos + n * (extDist + badgeR);
-    if ((point - badgeCenter).distance <= badgeR + tolerance) {
-      return true;
-    }
-    final dimStart = centerPos - n * (halfThick + 0.08);
-    final dimEnd = centerPos + n * extDist;
-    if (_distToSegment(point, dimStart, dimEnd) <= tolerance + 0.05) {
+    // 3. ID circle badge, dimension line & sill label
+    if (ArchitectOpeningPlanPainter.containsPoint(
+      point,
+      center: centerPos,
+      normal: n,
+      wallThickness: wallThickness,
+      tolerance: tolerance,
+      sillHeight: sillHeight,
+    )) {
       return true;
     }
 

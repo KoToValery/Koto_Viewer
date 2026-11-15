@@ -340,4 +340,74 @@ void main() {
       }
     }
   });
+
+  test(
+    'Doors paint h= sill perpendicular on the opposite side of the line like windows and support hit testing',
+    () {
+      final doorStyle = style.copyWith(kind: FenestrationKind.door);
+      for (final angle in [0.0, math.pi / 2, 2.6]) {
+        final end = Offset(4 * math.cos(angle), 4 * math.sin(angle));
+        final n = Offset(-math.sin(angle), math.cos(angle));
+        double along(Offset p) =>
+            (p - end / 2).dx * n.dx + (p - end / 2).dy * n.dy;
+
+        final windowCanvas = _PlanCanvas();
+        window
+            .copyWith(sillHeight: 0.15)
+            .paint2D(
+              canvas: windowCanvas,
+              wallStart: Offset.zero,
+              wallEnd: end,
+              wallThickness: .37,
+              zoomScale: 100,
+            );
+
+        for (final candidate in [door, door.copyWith(style: doorStyle)]) {
+          final withStep = _PlanCanvas();
+          candidate
+              .copyWith(sillHeight: 0.15)
+              .paint2D(
+                canvas: withStep,
+                wallStart: Offset.zero,
+                wallEnd: end,
+                wallThickness: .37,
+                zoomScale: 100,
+              );
+          expect(withStep.texts, hasLength(4));
+          // Opposite side of the wall/line (-n), perpendicular to the dimension line (same angle as window sill).
+          expect(
+            withStep.textCorners[2].every((p) => along(p) < -.37 / 2 - .07),
+            isTrue,
+          );
+          expect(withStep.texts[2].$3, closeTo(windowCanvas.texts[2].$3, 1e-9));
+          final sillCenter =
+              withStep.textCorners[2].reduce((a, b) => a + b) / 4;
+          expect(
+            candidate
+                .copyWith(sillHeight: 0.15)
+                .containsPoint(
+                  sillCenter,
+                  wallStart: Offset.zero,
+                  wallEnd: end,
+                  wallThickness: .37,
+                  tolerance: 0,
+                ),
+            isTrue,
+          );
+
+          final floorLevel = _PlanCanvas();
+          candidate
+              .copyWith(sillHeight: 0.0)
+              .paint2D(
+                canvas: floorLevel,
+                wallStart: Offset.zero,
+                wallEnd: end,
+                wallThickness: .37,
+                zoomScale: 100,
+              );
+          expect(floorLevel.texts, hasLength(3));
+        }
+      }
+    },
+  );
 }
