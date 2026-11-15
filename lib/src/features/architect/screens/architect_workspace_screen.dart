@@ -31627,8 +31627,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       _elementTool.activeDoorStyle ??
                       FenestrationLibraryService.instance.activeDoorStyle,
 
-                  selectedDoor: selectedDoor,
-                  selectedWindow: selectedWindow,
+                  selectedDoor: _touchHoldSelecting ? null : selectedDoor,
+                  selectedWindow: _touchHoldSelecting ? null : selectedWindow,
 
                   doorHasCasing: selectedDoor?.effectiveHasCasing ?? _doorHasCasing,
                   onDoorHasCasingChanged: (c) {

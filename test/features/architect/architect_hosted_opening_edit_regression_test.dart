@@ -8,7 +8,7 @@ import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/models/architect_window.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart'
-    show ArchitectTool;
+    show ArchitectTool, WallDraftingMode;
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -151,21 +151,35 @@ void main() {
 
       expect(_paletteChip('70 cm'), findsNothing);
       expect(_paletteChip('210 cm'), findsNothing);
+      expect(_paletteChip(l.architectDoorSillNone), findsNothing);
+      expect(_paletteChip(l.architectDoorSillStep), findsNothing);
       expect(
         find.byKey(const ValueKey('door-height-input')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('door-sill-input')),
         findsOneWidget,
       );
       await _enterOpeningDimension(tester, 'door-width-input', '90 cm', '80');
       expect(_door(commands.project).width, .8);
       expect(_door(commands.project).isHingeLeft, isFalse);
       expect(commands.undoCount, 2);
+      await _enterOpeningDimension(tester, 'door-sill-input', '0 cm', '12');
+      expect(_door(commands.project).sillHeight, closeTo(.12, 1e-9));
+      expect(commands.undoCount, 3);
       final persisted = _persisted(commands);
       expect(_door(persisted).width, .8);
+      expect(_door(persisted).sillHeight, closeTo(.12, 1e-9));
       expect(_door(persisted).isHingeLeft, isFalse);
       expect(_door(persisted).offsetRatio, .15);
       expect(persisted.activeStorey.walls.last.toJson(), legacyWall.toJson());
       expect(find.text(l.architectOperationRejected), findsNothing);
 
+      commands.undo();
+      await tester.pumpAndSettle();
+      expect(commands.undoCount, 2);
+      expect(_door(commands.project).sillHeight, 0);
       commands.undo();
       await tester.pumpAndSettle();
       expect(commands.undoCount, 1);
@@ -179,9 +193,11 @@ void main() {
 
       commands.redo();
       commands.redo();
+      commands.redo();
       await tester.pumpAndSettle();
-      expect(commands.undoCount, 2);
+      expect(commands.undoCount, 3);
       expect(_door(commands.project).width, .8);
+      expect(_door(commands.project).sillHeight, closeTo(.12, 1e-9));
       expect(_door(commands.project).isHingeLeft, isFalse);
       expect(tester.takeException(), isNull);
     },
@@ -255,6 +271,205 @@ void main() {
       expect(_window(commands.project).width, .8);
       expect(_window(commands.project).isFlipped, isTrue);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'initial door placement uses single direct width, height, and sill inputs without presets',
+    (tester) async {
+      const host = ArchitectWall(
+        id: _hostId,
+        startPoint: Offset.zero,
+        endPoint: Offset(4, 0),
+        thickness: .25,
+      );
+      final commands = workspace.seededController(walls: [host]);
+      addTearDown(commands.dispose);
+
+      await workspace.openWorkspace(tester, commands);
+      workspace
+          .camera(tester)
+          .fit(const Rect.fromLTRB(-.5, -1, 4.5, 2), padding: 64);
+      await tester.pumpAndSettle();
+
+      await tool_ui.choose(tester, Icons.meeting_room_rounded);
+      await tester.pumpAndSettle();
+
+      final palette = tester.widget<ArchitectToolPalette>(
+        find.byType(ArchitectToolPalette),
+      );
+      expect(palette.activeTool, ArchitectTool.door);
+      expect(palette.selectedDoor, isNull);
+
+      final l = AppLocalizations.of(
+        tester.element(find.byType(ArchitectToolPalette)),
+      )!;
+      expect(_paletteChip('60 cm'), findsNothing);
+      expect(_paletteChip('70 cm'), findsNothing);
+      expect(_paletteChip('210 cm'), findsNothing);
+      expect(_paletteChip(l.architectDoorSillNone), findsNothing);
+      expect(_paletteChip(l.architectDoorSillStep), findsNothing);
+      expect(find.byKey(const ValueKey('door-width-input')), findsOneWidget);
+      expect(find.byKey(const ValueKey('door-height-input')), findsOneWidget);
+      expect(find.byKey(const ValueKey('door-sill-input')), findsOneWidget);
+
+      await _enterOpeningDimension(tester, 'door-width-input', '90 cm', '85');
+      await _enterOpeningDimension(
+        tester,
+        'door-height-input',
+        '200 cm',
+        '215',
+      );
+      await _enterOpeningDimension(tester, 'door-sill-input', '0 cm', '12');
+
+      await tester.tapAt(workspace.screen(tester, const Offset(2.0, 0)));
+      await tester.pumpAndSettle();
+
+      expect(_host(commands.project).doors, hasLength(1));
+      final placed = _door(commands.project);
+      expect(placed.width, closeTo(.85, 1e-9));
+      expect(placed.height, closeTo(2.15, 1e-9));
+      expect(placed.sillHeight, closeTo(.12, 1e-9));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'initial window placement uses single direct width, height, and sill inputs without presets',
+    (tester) async {
+      const host = ArchitectWall(
+        id: _hostId,
+        startPoint: Offset.zero,
+        endPoint: Offset(4, 0),
+        thickness: .25,
+      );
+      final commands = workspace.seededController(walls: [host]);
+      addTearDown(commands.dispose);
+
+      await workspace.openWorkspace(tester, commands);
+      workspace
+          .camera(tester)
+          .fit(const Rect.fromLTRB(-.5, -1, 4.5, 2), padding: 64);
+      await tester.pumpAndSettle();
+
+      await tool_ui.choose(tester, Icons.window_rounded);
+      await tester.pumpAndSettle();
+
+      final palette = tester.widget<ArchitectToolPalette>(
+        find.byType(ArchitectToolPalette),
+      );
+      expect(palette.activeTool, ArchitectTool.window);
+      expect(palette.selectedWindow, isNull);
+
+      expect(_paletteChip('80 cm'), findsNothing);
+      expect(_paletteChip('150 cm'), findsNothing);
+      expect(_paletteChip('180 cm'), findsNothing);
+      expect(find.byKey(const ValueKey('window-width-input')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('window-height-input')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('window-sill-input')), findsOneWidget);
+
+      await _enterOpeningDimension(
+        tester,
+        'window-width-input',
+        '120 cm',
+        '135',
+      );
+      await _enterOpeningDimension(
+        tester,
+        'window-height-input',
+        '140 cm',
+        '145',
+      );
+      await _enterOpeningDimension(tester, 'window-sill-input', '90 cm', '85');
+
+      await tester.tapAt(workspace.screen(tester, const Offset(2.0, 0)));
+      await tester.pumpAndSettle();
+
+      expect(_host(commands.project).windows, hasLength(1));
+      final placed = _window(commands.project);
+      expect(placed.width, closeTo(1.35, 1e-9));
+      expect(placed.height, closeTo(1.45, 1e-9));
+      expect(placed.sillHeight, closeTo(.85, 1e-9));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'door and window placement sub-bars fit cleanly on narrow phone in bg locale',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 780);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      for (final tool in [ArchitectTool.door, ArchitectTool.window]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('bg'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              bottomNavigationBar: ArchitectToolPalette(
+                activeTool: tool,
+                onToolChanged: (_) {},
+                onZoneCategoryChanged: (_) {},
+                wallThickness: 0.25,
+                onWallThicknessChanged: (_) {},
+                wallMode: WallDraftingMode.singleLine,
+                onWallModeChanged: (_) {},
+                doorWidth: 0.90,
+                onDoorWidthChanged: (_) {},
+                doorHeight: 2.00,
+                onDoorHeightChanged: (_) {},
+                doorSill: 0.0,
+                onDoorSillChanged: (_) {},
+                isHingeLeft: true,
+                onHingeSideChanged: (_) {},
+                windowWidth: 1.20,
+                onWindowWidthChanged: (_) {},
+                windowHeight: 1.40,
+                onWindowHeightChanged: (_) {},
+                windowSill: 0.90,
+                onWindowSillChanged: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final l = AppLocalizations.of(
+          tester.element(find.byType(ArchitectToolPalette)),
+        )!;
+        if (tool == ArchitectTool.door) {
+          expect(find.byKey(const ValueKey('door-width-input')), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('door-height-input')),
+            findsOneWidget,
+          );
+          expect(find.byKey(const ValueKey('door-sill-input')), findsOneWidget);
+          expect(find.text(l.architectDoorSill), findsOneWidget);
+          expect(find.text(l.architectDoorSillNone), findsNothing);
+          expect(find.text(l.architectDoorSillStep), findsNothing);
+        } else {
+          expect(
+            find.byKey(const ValueKey('window-width-input')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('window-height-input')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('window-sill-input')),
+            findsOneWidget,
+          );
+          expect(find.text(l.architectWindowSill), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+      }
     },
   );
 }

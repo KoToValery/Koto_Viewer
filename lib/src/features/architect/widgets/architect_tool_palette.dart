@@ -1004,9 +1004,41 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     ),
   );
 
+  Widget _buildOpeningDimensionsRow(
+    List<
+      ({
+        Key key,
+        String label,
+        double valueMeters,
+        double minCm,
+        double maxCm,
+        ValueChanged<double>? onChangedMeters,
+      })
+    >
+    fields,
+  ) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    physics: const BouncingScrollPhysics(),
+    child: Row(
+      children: [
+        for (var i = 0; i < fields.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          _buildOpeningDimensionLabel(fields[i].label),
+          _buildOpeningDimensionChip(
+            key: fields[i].key,
+            label: fields[i].label,
+            valueMeters: fields[i].valueMeters,
+            minCm: fields[i].minCm,
+            maxCm: fields[i].maxCm,
+            onChangedMeters: fields[i].onChangedMeters,
+          ),
+        ],
+      ],
+    ),
+  );
+
   Widget _buildDoorSubBar(BuildContext context) {
     final l10n = context.l10n;
-    final isSelected = widget.selectedDoor != null;
     final effectiveDoorStyle =
         widget.selectedDoor?.resolvedStyle ?? activeDoorStyle;
     final effectiveWidth = widget.selectedDoor?.width ?? doorWidth;
@@ -1109,128 +1141,39 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
         ),
         const SizedBox(height: 4),
 
-        if (isSelected)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                _buildOpeningDimensionLabel(l10n.architectDoorWidth),
-                _buildOpeningDimensionChip(
-                  key: const ValueKey('door-width-input'),
-                  label: l10n.architectDoorWidth,
-                  valueMeters: effectiveWidth,
-                  minCm: 30,
-                  maxCm: 600,
-                  onChangedMeters: onDoorWidthChanged,
-                ),
-                const SizedBox(width: 10),
-                _buildOpeningDimensionLabel(l10n.architectDoorHeight),
-                _buildOpeningDimensionChip(
-                  key: const ValueKey('door-height-input'),
-                  label: l10n.architectDoorHeight,
-                  valueMeters: effectiveHeight,
-                  minCm: 100,
-                  maxCm: 500,
-                  onChangedMeters: onDoorHeightChanged,
-                ),
-                const SizedBox(width: 10),
-                ChoiceChip(
-                  label: Text(l10n.architectDoorSillNone),
-                  selected: effectiveSill <= 0.001,
-                  onSelected: (sel) {
-                    if (sel) onDoorSillChanged(0.0);
-                  },
-                  visualDensity: VisualDensity.compact,
-                ),
-                const SizedBox(width: 5),
-                ChoiceChip(
-                  label: Text(l10n.architectDoorSillStep),
-                  selected: effectiveSill > 0.001,
-                  onSelected: (sel) {
-                    if (sel) onDoorSillChanged(0.15);
-                  },
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
-          )
-        else ...[
-          // ROW 2: Widths (placement presets)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                _buildOpeningDimensionLabel(l10n.architectDoorWidth),
-                for (final w in [
-                  0.60, 0.70, 0.80, 0.90, 1.00, 1.20,
-                  1.40, 1.50, 1.60, 1.80, 2.10, 2.50,
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: ChoiceChip(
-                      label: Text('${(w * 100).round()} cm'),
-                      selected: (effectiveWidth - w).abs() < 1e-3,
-                      onSelected: (sel) {
-                        if (sel) onDoorWidthChanged(w);
-                      },
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-              ],
-            ),
+        // ROW 2: Width, Height, Sill (direct value input)
+        _buildOpeningDimensionsRow([
+          (
+            key: const ValueKey('door-width-input'),
+            label: l10n.architectDoorWidth,
+            valueMeters: effectiveWidth,
+            minCm: 30,
+            maxCm: 600,
+            onChangedMeters: onDoorWidthChanged,
           ),
-          const SizedBox(height: 4),
-
-          // ROW 3: Height & Sill (placement presets)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                _buildOpeningDimensionLabel(l10n.architectDoorHeight),
-                for (final h in [2.00, 2.10, 2.20])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: ChoiceChip(
-                      label: Text('${(h * 100).round()} cm'),
-                      selected: (effectiveHeight - h).abs() < 1e-3,
-                      onSelected: (sel) {
-                        if (sel) onDoorHeightChanged(h);
-                      },
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: Text(l10n.architectDoorSillNone),
-                  selected: effectiveSill <= 0.001,
-                  onSelected: (sel) {
-                    if (sel) onDoorSillChanged(0.0);
-                  },
-                  visualDensity: VisualDensity.compact,
-                ),
-                const SizedBox(width: 5),
-                ChoiceChip(
-                  label: Text(l10n.architectDoorSillStep),
-                  selected: effectiveSill > 0.001,
-                  onSelected: (sel) {
-                    if (sel) onDoorSillChanged(0.15);
-                  },
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
+          (
+            key: const ValueKey('door-height-input'),
+            label: l10n.architectDoorHeight,
+            valueMeters: effectiveHeight,
+            minCm: 100,
+            maxCm: 500,
+            onChangedMeters: onDoorHeightChanged,
           ),
-        ],
+          (
+            key: const ValueKey('door-sill-input'),
+            label: l10n.architectDoorSill,
+            valueMeters: effectiveSill,
+            minCm: 0,
+            maxCm: 300,
+            onChangedMeters: onDoorSillChanged,
+          ),
+        ]),
       ],
     );
   }
 
   Widget _buildWindowSubBar(BuildContext context) {
     final l10n = context.l10n;
-    final isSelected = widget.selectedWindow != null;
     final effectiveWindowStyle =
         widget.selectedWindow?.resolvedStyle ?? activeWindowStyle;
     final effectiveWidth = widget.selectedWindow?.width ?? windowWidth;
@@ -1330,105 +1273,33 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
         ),
         const SizedBox(height: 4),
 
-        if (isSelected)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                _buildOpeningDimensionLabel(l10n.architectWindowWidth),
-                _buildOpeningDimensionChip(
-                  key: const ValueKey('window-width-input'),
-                  label: l10n.architectWindowWidth,
-                  valueMeters: effectiveWidth,
-                  minCm: 20,
-                  maxCm: 1000,
-                  onChangedMeters: onWindowWidthChanged,
-                ),
-                const SizedBox(width: 10),
-                _buildOpeningDimensionLabel(l10n.architectWindowHeight),
-                _buildOpeningDimensionChip(
-                  key: const ValueKey('window-height-input'),
-                  label: l10n.architectWindowHeight,
-                  valueMeters: effectiveHeight,
-                  minCm: 20,
-                  maxCm: 500,
-                  onChangedMeters: onWindowHeightChanged,
-                ),
-                const SizedBox(width: 10),
-                _buildOpeningDimensionLabel(l10n.architectWindowSill),
-                _buildOpeningDimensionChip(
-                  key: const ValueKey('window-sill-input'),
-                  label: l10n.architectWindowSill,
-                  valueMeters: effectiveSill,
-                  minCm: 0,
-                  maxCm: 300,
-                  onChangedMeters: onWindowSillChanged,
-                ),
-              ],
-            ),
-          )
-        else ...[
-          // ROW 2: Widths (placement presets)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                _buildOpeningDimensionLabel(l10n.architectWindowWidth),
-                for (final w in [
-                  0.60, 0.80, 0.90, 1.00, 1.20,
-                  1.40, 1.50, 1.80, 2.00, 2.40,
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: ChoiceChip(
-                      label: Text('${(w * 100).round()} cm'),
-                      selected: (effectiveWidth - w).abs() < 1e-3,
-                      onSelected: (sel) {
-                        if (sel) onWindowWidthChanged?.call(w);
-                      },
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-              ],
-            ),
+        // ROW 2: Width, Height, Sill (direct value input)
+        _buildOpeningDimensionsRow([
+          (
+            key: const ValueKey('window-width-input'),
+            label: l10n.architectWindowWidth,
+            valueMeters: effectiveWidth,
+            minCm: 20,
+            maxCm: 1000,
+            onChangedMeters: onWindowWidthChanged,
           ),
-          const SizedBox(height: 4),
-
-          // ROW 3: Height & Sill (placement presets + direct sill input)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                _buildOpeningDimensionLabel(l10n.architectWindowHeight),
-                for (final h in [0.60, 0.90, 1.20, 1.40, 1.50, 1.60, 1.80])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: ChoiceChip(
-                      label: Text('${(h * 100).round()} cm'),
-                      selected: (effectiveHeight - h).abs() < 1e-3,
-                      onSelected: (sel) {
-                        if (sel) onWindowHeightChanged?.call(h);
-                      },
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                const SizedBox(width: 8),
-                _buildOpeningDimensionLabel(l10n.architectWindowSill),
-                _buildOpeningDimensionChip(
-                  key: const ValueKey('window-sill-input'),
-                  label: l10n.architectWindowSill,
-                  valueMeters: effectiveSill,
-                  minCm: 0,
-                  maxCm: 300,
-                  onChangedMeters: onWindowSillChanged,
-                ),
-              ],
-            ),
+          (
+            key: const ValueKey('window-height-input'),
+            label: l10n.architectWindowHeight,
+            valueMeters: effectiveHeight,
+            minCm: 20,
+            maxCm: 500,
+            onChangedMeters: onWindowHeightChanged,
           ),
-        ],
+          (
+            key: const ValueKey('window-sill-input'),
+            label: l10n.architectWindowSill,
+            valueMeters: effectiveSill,
+            minCm: 0,
+            maxCm: 300,
+            onChangedMeters: onWindowSillChanged,
+          ),
+        ]),
       ],
     );
   }

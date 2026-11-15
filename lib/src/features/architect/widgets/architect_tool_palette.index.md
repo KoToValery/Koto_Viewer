@@ -12,11 +12,12 @@ Both supported ARB locales provide the entry label and its drafting messages.
 
 ## 1. How to use this map
 
-Opening size shortcuts: `_buildDoorSubBar` and `_buildWindowSubBar` under
-`[TAG:ARCH_PALETTE_FENEST_OPENINGS]` offer metric dimension chips, including
-150 cm window width/height and 60/140/160/180 cm door widths. The existing
-parameter callbacks update drafting defaults or the selected opening through
-the workspace's normal editing/history path.
+Opening dimensions: `_buildDoorSubBar` and `_buildWindowSubBar` under
+`[TAG:ARCH_PALETTE_FENEST_OPENINGS]` share `_buildOpeningDimensionsRow` to show
+one direct numeric-keypad chip each for width, height, and sill in both
+placement and selected-opening editing modes. The existing parameter callbacks
+update drafting defaults or the selected opening through the workspace's normal
+editing/history path.
 
 Object controls: `_buildComponentSubBar` under `[TAG:ARCH_PALETTE_COMPONENT_SUB]`
 keeps the Object toggle distinct from the library opener. Its compact row is
