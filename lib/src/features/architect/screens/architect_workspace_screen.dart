@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:file_picker/file_picker.dart';
 import '../services/architect_underlay_service.dart';
 import '../services/architect_drag_controller.dart';
@@ -510,11 +511,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       () => source.copyWith(
 
-        dimensionScale: ArchitectDimensionScale.values.firstWhere(
-
-          (s) => s.denominator == n,
-
-        ),
+        dimensionScale: ArchitectDimensionScale.forDenominator(n),
 
       ),
 
@@ -632,6 +629,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       }
 
+      if (key == 'fonts') {
+
+        showArchitectTypographySettings(
+
+          context,
+
+          _modelCommands,
+
+          initialScale: _publicationScale,
+
+        );
+
+      }
+
     }
 
 
@@ -640,7 +651,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       isExpanded: compact,
 
-      value: _publicationScale,
+      value: ArchitectDrawingScale.presets.contains(_publicationScale)
+          ? _publicationScale
+          : ArchitectDimensionScale.forDenominator(_publicationScale).denominator,
 
       dropdownColor: const Color(0xFF1E1E26),
 
@@ -696,128 +709,207 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (compact) {
 
-      return Row(
+      final sheetsButton = PopupMenuButton<String>(
 
-        children: [
+        tooltip: l.architectSheets,
 
-          Expanded(child: scale),
+        key: const ValueKey('architect-model-sheets'),
 
-          PopupMenuButton<String>(
+        icon: const AppIcon(AppIconId.sheets, color: Colors.white),
 
-            tooltip: l.architectSheets,
+        onSelected: action,
 
-            key: const ValueKey('architect-model-sheets'),
+        itemBuilder: (_) => [
 
-            icon: const AppIcon(AppIconId.sheets, color: Colors.white),
+          if (_printPreview)
 
-            onSelected: action,
+            PopupMenuItem(
 
-            itemBuilder: (_) => [
+              value: 'model',
 
-              PopupMenuItem(value: 'model', child: AppMenuLabel(
-                  icon: AppIconId.view3D,
-                  child: Text(l.architectModel),
-                ),
-              ),
+              child: AppMenuLabel(
 
-              PopupMenuItem(value: 'sheets', child: AppMenuLabel(
-                  icon: AppIconId.file,
-                  child: Text(l.architectSheets),
-                ),
-              ),
+                icon: AppIconId.view3D,
 
-              PopupMenuItem(
-
-                value: 'preview',
-
-                enabled: available,
-
-                child: AppMenuLabel(
-                  icon: AppIconId.print,
-                  child: Text(l.architectPrintPreview),
-
-              ),
-              ),
-
-              PopupMenuItem(
-
-                value: 'annotations',
-
-                enabled: available,
-
-                child: AppMenuLabel(
-                  icon: AppIconId.properties,
-                  child: Text(l.architectAnnotationSettings),
-                ),
+                child: Text(l.architectModel),
 
               ),
 
-            ],
+            ),
+
+          PopupMenuItem(
+
+            value: 'sheets',
+
+            child: AppMenuLabel(
+
+              icon: AppIconId.file,
+
+              child: Text(l.architectSheets),
+
+            ),
 
           ),
+
+          PopupMenuItem(
+
+            value: 'preview',
+
+            enabled: available,
+
+            child: AppMenuLabel(
+
+              icon: AppIconId.print,
+
+              child: Text(l.architectPrintPreview),
+
+            ),
+
+          ),
+
+          if (_printPreview) ...[
+
+            PopupMenuItem(
+
+              value: 'fonts',
+
+              child: AppMenuLabel(
+
+                icon: AppIconId.text,
+
+                child: Text(l.architectLayoutFonts),
+
+              ),
+
+            ),
+
+            PopupMenuItem(
+
+              value: 'annotations',
+
+              enabled: available,
+
+              child: AppMenuLabel(
+
+                icon: AppIconId.properties,
+
+                child: Text(l.architectAnnotationSettings),
+
+              ),
+
+            ),
+
+          ],
 
         ],
 
       );
 
+      if (!_printPreview) return sheetsButton;
+
+      return SizedBox(
+
+        width: 120,
+
+        child: Row(
+
+          children: [
+
+            Expanded(child: scale),
+
+            sheetsButton,
+
+          ],
+
+        ),
+
+      );
+
     }
 
-    return SingleChildScrollView(
+    return ConstrainedBox(
 
-      scrollDirection: Axis.horizontal,
+      constraints: BoxConstraints(maxWidth: _printPreview ? 390 : 200),
 
-      child: Row(
+      child: SingleChildScrollView(
 
-        children: [
+        scrollDirection: Axis.horizontal,
 
-          TextButton(
+        child: Row(
 
-            style: TextButton.styleFrom(foregroundColor: Colors.white),
+          children: [
 
-            onPressed: () => action('model'),
+            if (_printPreview)
 
-            child: Text(l.architectModel),
+              TextButton(
 
-          ),
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
 
-          TextButton(
+                onPressed: () => action('model'),
 
-            style: TextButton.styleFrom(foregroundColor: Colors.white),
+                child: Text(l.architectModel),
 
-            onPressed: () => action('sheets'),
+              ),
 
-            child: Text(l.architectSheets),
+            TextButton(
 
-          ),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
 
-          scale,
+              onPressed: () => action('sheets'),
 
-          IconButton(
+              child: Text(l.architectSheets),
 
-            color: Colors.white,
-
-            tooltip: l.architectPrintPreview,
-
-            onPressed: available ? () => action('preview') : null,
-
-            icon: AppIcon.fromMaterial(_printPreview ? Icons.visibility : Icons.print_outlined,
             ),
 
-          ),
+            if (_printPreview) scale,
 
-          IconButton(
+            IconButton(
 
-            color: Colors.white,
+              color: Colors.white,
 
-            tooltip: l.architectAnnotationSettings,
+              tooltip: l.architectPrintPreview,
 
-            onPressed: available ? () => action('annotations') : null,
+              onPressed: available ? () => action('preview') : null,
 
-            icon: const AppIcon(AppIconId.text),
+              icon: AppIcon.fromMaterial(
 
-          ),
+                _printPreview ? Icons.visibility : Icons.print_outlined,
 
-        ],
+              ),
+
+            ),
+
+            if (_printPreview) ...[
+
+              IconButton(
+
+                color: Colors.white,
+
+                tooltip: l.architectLayoutFonts,
+
+                onPressed: () => action('fonts'),
+
+                icon: const AppIcon(AppIconId.text),
+
+              ),
+
+              IconButton(
+
+                color: Colors.white,
+
+                tooltip: l.architectAnnotationSettings,
+
+                onPressed: available ? () => action('annotations') : null,
+
+                icon: const AppIcon(AppIconId.properties),
+
+              ),
+
+            ],
+
+          ],
+
+        ),
 
       ),
 
@@ -873,13 +965,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             ),
 
-            SizedBox(
-
-              width: compact ? 120 : 340,
-
-              child: _publicationToolbar(compact: compact),
-
-            ),
+            _publicationToolbar(compact: compact),
 
           ],
 
@@ -1930,7 +2016,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ArchitectTool.stair => storey.stairs.any((s) => s.id == id),
 
-      ArchitectTool.component || ArchitectTool.services => storey.components.any((c) => c.id == id),
+      ArchitectTool.component || ArchitectTool.services => storey.components.any(
+        (c) => c.id == id && c.isServiceComponent == (tool == ArchitectTool.services),
+      ),
 
       ArchitectTool.dimension => storey.dimensions.any((d) => d.id == id),
 
@@ -2037,7 +2125,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _elementTool,
       point,
       _currentScale,
-      includeComponents: _showFurnitureLayer,
+      includeComponents: _showFurnitureLayer || _activeTool == ArchitectTool.services,
       drawingViewKey: _workspaceViewKey,
       allowed: (id) =>
           (_editingGroup == null || _editingGroup!.elementIds.contains(id)) &&
@@ -3113,6 +3201,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _elementTool.columnDepth,
 
+      _elementTool.columnHeight,
+
+      _elementTool.columnBaseOffset,
+
       _elementTool.beamWidth,
 
       _elementTool.beamDepth,
@@ -3278,6 +3370,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _elementTool.columnShape = column.shape;
           _elementTool.columnWidth = column.width;
           _elementTool.columnDepth = column.depth;
+          _elementTool.columnHeight = column.height;
+          _elementTool.columnBaseOffset = column.baseOffset;
           _columnPreviewRotation = column.rotationDeg;
           break;
         case ArchitectTool.beam:
@@ -3623,6 +3717,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           handleOffsetLength: _handleOffsetLength,
 
+          profileMm: _project.document.profileMm,
+
         ),
 
       ),
@@ -3638,6 +3734,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _commands.setDimensionScale(result.dimensionScale);
 
     _commands.setDistanceDecimals(result.distanceDecimals);
+
+    if (!mapEquals(result.profileMm, _project.document.profileMm)) {
+
+      _commands.commit(
+
+        _project.copyWith(
+
+          document: _project.document.copyWith(profileMm: result.profileMm),
+
+        ),
+
+      );
+
+    }
 
     _changeViewPreference(() {
 
@@ -5819,6 +5929,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _componentPlacementPoint = null;
 
+      _placementStaged = false;
+
     }
 
     _selectionContextActive = false;
@@ -5836,6 +5948,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _columnPreviewPoint = null;
 
       _componentPlacementPoint = null;
+
+      _placementStaged = false;
 
     });
 
@@ -5972,6 +6086,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _columnPreviewRotation = 0.0;
     _componentPlacementPoint = null;
+    _placementStaged = false;
     _cursorModel = null;
 
     _resetWallDraft();
@@ -6024,6 +6139,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _isCadUnderlaySelected = false;
       _selectedRasterId = null;
+      _columnPreviewPoint = null;
+      _componentPlacementPoint = null;
+      _placementStaged = false;
+      _cursorModel = null;
 
       _radialMenuScreenPosition = null;
 
@@ -6228,6 +6347,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (target != null) {
       _selectWallType(target);
     }
+    _elementTool.applyColumnSchemeDefaults(scheme, resetVertical: true);
   }
 
   // --- SUBSECTION: [TAG:ARC_EXACT_PLACEMENT] Chord input, shaping, exact rise, commit ---
@@ -7400,6 +7520,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _placingWithHold = false;
 
+  bool _touchHoldSelecting = false;
+
   bool _wallPrecisionMode = true;
 
   Offset? _touchPosition;
@@ -8401,6 +8523,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   double _componentPlacementRotation = 0.0;
 
+  bool _placementStaged = false;
+
+  bool get _hasStagedColumnPlacement =>
+      _activeTool == ArchitectTool.column &&
+      _effectiveSelection.isEmpty &&
+      _columnPreviewPoint != null &&
+      _placementStaged;
+
+  bool get _hasStagedComponentPlacement =>
+      _placingComponent && _componentPlacementPoint != null && _placementStaged;
+
   bool get _columnPreviewIsOccupied =>
 
       _columnPreviewPoint != null &&
@@ -8799,6 +8932,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     _elementTool = ArchitectElementTool()..addListener(_repaintPreview);
+    _elementTool.applyColumnSchemeDefaults(
+      _project.structuralScheme,
+      notify: false,
+    );
 
 
 
@@ -8905,6 +9042,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _commands.restore(loaded);
 
         _restoreWallType();
+
+        _elementTool.applyColumnSchemeDefaults(
+          loaded.structuralScheme,
+          resetVertical: true,
+        );
 
         _activeTool = ArchitectTool.pan;
 
@@ -9234,6 +9376,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onPointerDown(PointerDownEvent event) {
+    _touchHoldSelecting = false;
     if (_stairDraft != null) {
       _touchInput = event.kind == PointerDeviceKind.touch;
       _handlePointerDown = event.localPosition;
@@ -10461,7 +10604,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    _updatePointerPreview(_placementPosition(event.localPosition));
+    if (_isDraggingVertexOrHandle ||
+        _groupDragIds.isNotEmpty ||
+        _placingWithHold ||
+        (_activeTool != ArchitectTool.column && !_placingComponent)) {
+      _updatePointerPreview(_placementPosition(event.localPosition));
+    }
 
   }
 
@@ -10519,6 +10667,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     _placingWithHold = true;
+
+    _placementStaged = false;
 
     _touchPosition = point;
 
@@ -13116,7 +13266,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _aimFreeStair(event.localPosition);
       return;
     }
-    if (_commandReady) return;
+    if (_commandReady || _placementStaged) return;
     if (_interactionMode == ArchitectInteractionMode.navigation &&
         !_terrainDrafting && !_dragController.isActive) return;
 
@@ -13132,6 +13282,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // --- SUBSECTION: [TAG:TOUCH_UP] _onPointerUp Input Dispatch & Tool Commits ---
   void _onPointerUp(PointerUpEvent event) {
+    if (_touchHoldSelecting) {
+      setState(() => _touchHoldSelecting = false);
+    }
     if (_stairDraft != null) {
       _stairDraft!.pick(_freeStairPoint(event.localPosition), tolerance: 18 / _viewport.scale);
       if (_stairDraft case ArchitectStairPerimeterDraft chain) chain.endPointer();
@@ -13288,7 +13441,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // differ from the last move. Preview and commit share the same resolver.
 
-    _updatePointerPreview(_placementPosition(event.localPosition));
+    if (_placingWithHold ||
+        (_activeTool != ArchitectTool.column && !_placingComponent)) {
+      _updatePointerPreview(_placementPosition(event.localPosition));
+    }
 
     if (_wallCutIds.isNotEmpty && _wallCutStart != null) {
 
@@ -13383,6 +13539,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _cancelActiveDrags() {
+    _touchHoldSelecting = false;
     _rasterDragOriginal = _rasterDragPreview = null;
     _rasterDragSource = null;
     _underlayCropEditor.cancel();
@@ -14700,9 +14857,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // column, and an existing column always takes priority over placement.
 
-    if (_activeTool == ArchitectTool.column &&
-
-        (!_placingWithHold || _hitSelection(rawModel) != null)) {
+    if ((_activeTool == ArchitectTool.column || _activeTool.usesComponent) &&
+        (!_placingWithHold ||
+            (_activeTool == ArchitectTool.column && _hitSelection(rawModel) != null))) {
 
       if (!_selectAt(rawModel)) _clearSelection();
 
@@ -15478,18 +15635,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 7. In Column tool
 
-    // Explicit Object placement never silently changes to selection.
     if (_placingComponent) {
+      if (!_placingWithHold) {
+        if (!_selectAt(rawModel)) _clearSelection();
+        return;
+      }
       _updateComponentPlacement(rawModel);
-      _commitComponentPlacement();
+      setState(() {
+        _placementStaged = _componentPlacementPoint != null;
+      });
+      _repaintPreview();
       return;
     }
 
     if (_activeTool == ArchitectTool.column) {
-      if (_project.activeStorey.columns.any(
-        (column) => column.containsPoint(rawModel, tolerance: 10 / _currentScale),
-      )) {
-        _selectAt(rawModel);
+      if (!_placingWithHold ||
+          _project.activeStorey.columns.any(
+            (column) => column.containsPoint(rawModel, tolerance: 10 / _currentScale),
+          )) {
+        if (!_selectAt(rawModel)) _clearSelection();
         return;
       }
 
@@ -15515,8 +15679,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _columnPreviewPoint = pt;
         _columnPreviewRotation = snap.angleDeg ?? _columnPreviewRotation;
         _cursorModel = pt;
+        _placementStaged = true;
       });
-      _commitColumnPlacement();
       _repaintPreview();
       return;
     }
@@ -20123,6 +20287,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _onSelectionHold(Offset screenPoint) {
+    if (_placingComponent) return false;
     if (_marqueeTool.isDrafting || _curvingEdgeElementId != null) return false;
 
     if (_wallCutIds.isNotEmpty ||
@@ -23754,6 +23919,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _cancelActiveDrags();
 
+    _columnPreviewPoint = null;
+    _componentPlacementPoint = null;
+    _placementStaged = false;
+
     _polygonEditId = null;
 
     _polygonSelectedEdge = null;
@@ -26039,6 +26208,37 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _repaintPreview();
   }
 
+  Offset _placeOverlayClearOfBounds(
+    Offset screenPos,
+    List<Rect> objectBounds, {
+    double width = 132.0,
+    double height = 60.0,
+  }) {
+    final canvasSize = _viewport.size;
+    final safe = (Offset.zero & canvasSize).deflate(8);
+    final candidates = [
+      // Do not turn a tap near object bounds into an accidental Cancel.
+      for (final bounds in objectBounds) ...[
+        Offset(bounds.right + 8, bounds.top),
+        Offset(bounds.left - width - 8, bounds.top),
+        Offset(bounds.left, bounds.top - height - 8),
+        Offset(bounds.left, bounds.bottom + 8),
+      ],
+      screenPos + const Offset(24, 32),
+      screenPos + Offset(24, -height - 36),
+      screenPos + Offset(-width - 24, 32),
+      screenPos + Offset(-width - 24, -height - 36),
+    ];
+    return candidates.where((position) =>
+      safe.contains(position) && safe.contains(position + Offset(width, height)) &&
+        objectBounds.every((bounds) => !bounds.overlaps(
+          position & Size(width, height))),
+    ).firstOrNull ?? Offset(
+      (screenPos.dx + 24).clamp(8.0, math.max(8.0, canvasSize.width - width - 8)),
+      (screenPos.dy + 32).clamp(8.0, math.max(8.0, canvasSize.height - height - 8)),
+    );
+  }
+
   Widget _buildDragFloatingOverlay() {
     final targetModel = _dragController.currentPointModel ??
         _dragController.defaultHandleAnchor ??
@@ -26049,9 +26249,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // Keep the pill below the target, clear of its snap and length badges,
     // and clamp against the canvas rather than the whole phone screen.
     final width = isPicking ? 76.0 : 132.0;
-    final canvasSize = _viewport.size;
-    const height = 60.0;
-    final safe = (Offset.zero & canvasSize).deflate(8);
     final objectBounds = [
       for (final component in _drawingProject.activeStorey.components)
         if (_dragController.elementIds.contains(component.id))
@@ -26060,26 +26257,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _viewport.toScreen(component.worldBoundingRect.bottomRight),
           ).inflate(8),
     ];
-    final candidates = [
-      // Do not turn a base-point pick on furniture into an accidental Cancel.
-      for (final bounds in objectBounds) ...[
-        Offset(bounds.right + 8, bounds.top),
-        Offset(bounds.left - width - 8, bounds.top),
-        Offset(bounds.left, bounds.top - height - 8),
-        Offset(bounds.left, bounds.bottom + 8),
-      ],
-      screenPos + const Offset(24, 32),
-      screenPos + const Offset(24, -height - 36),
-      screenPos + Offset(-width - 24, 32),
-      screenPos + Offset(-width - 24, -height - 36),
-    ];
-    final clamped = candidates.where((position) =>
-      safe.contains(position) && safe.contains(position + Offset(width, height)) &&
-        objectBounds.every((bounds) => !bounds.overlaps(
-          position & Size(width, height))),
-    ).firstOrNull ?? Offset(
-      (screenPos.dx + 24).clamp(8.0, math.max(8.0, canvasSize.width - width - 8)),
-      (screenPos.dy + 32).clamp(8.0, math.max(8.0, canvasSize.height - height - 8)),
+    final clamped = _placeOverlayClearOfBounds(
+      screenPos,
+      objectBounds,
+      width: width,
     );
     return ArchitectFloatingCommandOverlay(
       surfaceKey: const ValueKey('architect-drag-command-overlay'),
@@ -26089,6 +26270,77 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       showConfirm: !isPicking,
       onCancel: _cancelDragPlacement,
       onConfirm: _confirmDragPlacement,
+    );
+  }
+
+  Widget _buildPlacementFloatingOverlay() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_viewport, _previewRevision]),
+      builder: (context, _) {
+        if (_placingComponent && _componentPlacementPoint != null) {
+          final pt = _componentPlacementPoint!;
+          final component = ArchitectComponentInstance(
+            id: 'preview',
+            definitionId: ComponentLibraryService.instance.activeDefinition.id,
+            position: pt,
+            rotation: _componentPlacementRotation * math.pi / 180.0,
+            parameters: ComponentLibraryService.instance.activeParameters,
+          );
+          final rect = component.worldBoundingRect;
+          final bounds = [
+            Rect.fromPoints(
+              _viewport.toScreen(rect.topLeft),
+              _viewport.toScreen(rect.bottomRight),
+            ).inflate(8),
+          ];
+          return ArchitectFloatingCommandOverlay(
+            surfaceKey: const ValueKey('architect-placement-command-overlay'),
+            position: _placeOverlayClearOfBounds(_viewport.toScreen(pt), bounds),
+            label: '',
+            ready: true,
+            onCancel: () => setState(_cancelDrafting),
+            onConfirm: _commitComponentPlacement,
+          );
+        }
+        final center = _columnPreviewPoint;
+        if (center == null) return const SizedBox.shrink();
+        final halfWidth = _elementTool.columnWidth / 2;
+        final double extentX;
+        final double extentY;
+        if (_elementTool.columnShape == ColumnShape.circular) {
+          extentX = extentY = halfWidth;
+        } else {
+          final angle = _columnPreviewRotation * math.pi / 180;
+          final cosine = math.cos(angle).abs();
+          final sine = math.sin(angle).abs();
+          final halfDepth = _elementTool.columnDepth / 2;
+          extentX = halfWidth * cosine + halfDepth * sine;
+          extentY = halfWidth * sine + halfDepth * cosine;
+        }
+        final rect = Rect.fromLTRB(
+          center.dx - extentX,
+          center.dy - extentY,
+          center.dx + extentX,
+          center.dy + extentY,
+        );
+        final bounds = [
+          Rect.fromPoints(
+            _viewport.toScreen(rect.topLeft),
+            _viewport.toScreen(rect.bottomRight),
+          ).inflate(8),
+        ];
+        return ArchitectFloatingCommandOverlay(
+          surfaceKey: const ValueKey('architect-placement-command-overlay'),
+          position: _placeOverlayClearOfBounds(
+            _viewport.toScreen(center),
+            bounds,
+          ),
+          label: '',
+          ready: !_columnPreviewIsOccupied,
+          onCancel: () => setState(_cancelDrafting),
+          onConfirm: _commitColumnPlacement,
+        );
+      },
     );
   }
 
@@ -28599,6 +28851,39 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  void _updateSelectedColumn({
+    ColumnShape? shape,
+    double? width,
+    double? depth,
+    double? height,
+    double? baseOffset,
+  }) {
+    final id = _selectedElementId;
+    if (id == null) return;
+    final values = <String, double>{
+      if (width != null) 'width': width,
+      if (depth != null) 'depth': depth,
+      if (height != null) 'height': height,
+      if (baseOffset != null) 'baseOffset': baseOffset,
+    };
+    final texts = <String, String>{if (shape != null) 'shape': shape.name};
+    try {
+      _commands.execute(
+        SetArchitectElementProperties(
+          storeyId: _project.activeStoreyId,
+          elementIds: {id},
+          values: values,
+          textValues: texts,
+        ),
+      );
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      setState(() {});
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
   void _performLinearSelectionAction(String action, Set<String> segmentIds) {
     if (action == 'cut') {
       _startCutSession(Set.of(segmentIds));
@@ -30379,6 +30664,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _restoreWallType();
 
+        _elementTool.applyColumnSchemeDefaults(
+          newProj.structuralScheme,
+          resetVertical: true,
+        );
+
         _draftStart = null;
 
         _wallArcEnd = null;
@@ -30420,6 +30710,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ? _project.activeStorey.walls
             .expand((w) => w.windows)
             .where((w) => w.id == _selectedElementId)
+            .firstOrNull
+        : null;
+    final selectedColumn = _selectedElementId != null
+        ? _project.activeStorey.columns
+            .where((c) => c.id == _selectedElementId)
             .firstOrNull
         : null;
 
@@ -31315,23 +31610,66 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     }
                   },
 
-                  columnShape: _elementTool.columnShape,
+                  selectedColumn: _touchHoldSelecting ? null : selectedColumn,
 
-                  onColumnShapeChanged: (sh) =>
+                  columnShape:
+                      selectedColumn?.shape ?? _elementTool.columnShape,
 
-                      _elementTool.setColumnParams(shape: sh),
+                  onColumnShapeChanged: (sh) {
+                    if (selectedColumn != null) {
+                      _updateSelectedColumn(shape: sh);
+                    } else {
+                      _elementTool.setColumnParams(shape: sh);
+                    }
+                  },
 
-                  columnWidth: _elementTool.columnWidth,
+                  columnWidth:
+                      selectedColumn?.width ?? _elementTool.columnWidth,
 
-                  onColumnWidthChanged: (cw) =>
+                  onColumnWidthChanged: (cw) {
+                    if (selectedColumn != null) {
+                      _updateSelectedColumn(width: cw);
+                    } else {
+                      _elementTool.setColumnParams(width: cw);
+                    }
+                  },
 
-                      _elementTool.setColumnParams(width: cw),
+                  columnDepth:
+                      selectedColumn?.depth ?? _elementTool.columnDepth,
 
-                  columnDepth: _elementTool.columnDepth,
+                  onColumnDepthChanged: (cd) {
+                    if (selectedColumn != null) {
+                      _updateSelectedColumn(depth: cd);
+                    } else {
+                      _elementTool.setColumnParams(depth: cd);
+                    }
+                  },
 
-                  onColumnDepthChanged: (cd) =>
+                  columnHeight: selectedColumn != null
+                      ? selectedColumn.height
+                      : _elementTool.columnHeight,
 
-                      _elementTool.setColumnParams(depth: cd),
+                  onColumnHeightChanged: (ch) {
+                    if (selectedColumn != null) {
+                      _updateSelectedColumn(height: ch);
+                    } else {
+                      _elementTool.setColumnParams(height: ch);
+                    }
+                  },
+
+                  columnBaseOffset:
+                      selectedColumn?.baseOffset ??
+                      _elementTool.columnBaseOffset,
+
+                  onColumnBaseOffsetChanged: (cb) {
+                    if (selectedColumn != null) {
+                      _updateSelectedColumn(baseOffset: cb);
+                    } else {
+                      _elementTool.setColumnParams(baseOffset: cb);
+                    }
+                  },
+
+                  activeStoreyHeight: _project.activeStorey.height,
 
                   beamWidth: _elementTool.beamWidth,
 
@@ -32218,6 +32556,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       ),
                     if (_dragController.isActive && !_is3DView)
                       _buildDragFloatingOverlay(),
+                    if (!_is3DView &&
+                        !_placingWithHold &&
+                        (_hasStagedColumnPlacement ||
+                            _hasStagedComponentPlacement))
+                      _buildPlacementFloatingOverlay(),
                     if (_pendingDetachWallIds != null && !_is3DView)
                       _buildDetachFloatingOverlay(),
                     if (_wallAttachSourceId != null && !_is3DView)
@@ -32518,52 +32861,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Offset? get _draftCancelAnchor {
 
-    if (_activeTool == ArchitectTool.column && _effectiveSelection.isEmpty) {
-
-      final center = _columnPreviewPoint ?? _cursorModel;
-
-      if (center == null) return null;
-
-      final halfWidth = _elementTool.columnWidth / 2;
-
-      if (_elementTool.columnShape == ColumnShape.circular) {
-
-        return center + Offset(halfWidth, -halfWidth);
-
-      }
-
-      final angle = _columnPreviewRotation * math.pi / 180;
-
-      final cosine = math.cos(angle).abs();
-
-      final sine = math.sin(angle).abs();
-
-      final halfDepth = _elementTool.columnDepth / 2;
-
-      return center + Offset(
-
-        halfWidth * cosine + halfDepth * sine,
-
-        -(halfWidth * sine + halfDepth * cosine),
-
-      );
-
-    }
-
-    if (_placingComponent) {
-      final pt = _componentPlacementPoint ?? _cursorModel;
-      if (pt != null) {
-        final component = ArchitectComponentInstance(
-          id: 'preview',
-          definitionId: ComponentLibraryService.instance.activeDefinition.id,
-          position: pt,
-          rotation: _componentPlacementRotation * math.pi / 180,
-          parameters: ComponentLibraryService.instance.activeParameters,
-        );
-        return component.worldBoundingRect.topRight;
-      }
-    }
-
     if (_activeTool == ArchitectTool.opening && _draftStart != null && _draftEnd != null) {
       return _draftEnd!;
     }
@@ -32685,6 +32982,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         applyDraftingDefaults: true,
       );
       _columnPreviewPoint = null;
+      _placementStaged = false;
+      _cursorModel = null;
     });
     _saveBiMProjectIfAttached();
     HapticFeedback.lightImpact();
@@ -32692,7 +32991,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       SnackBar(
         content: Text(
           context.l10n.architectColumnPlaced(
-            '${(newCol.width * 100).round()}x${(newCol.depth * 100).round()}',
+            newCol.shape == ColumnShape.circular
+                ? 'Ø${(newCol.width * 100).round()}'
+                : '${(newCol.width * 100).round()}x${(newCol.depth * 100).round()}',
           ),
         ),
         duration: const Duration(seconds: 1),
@@ -32729,7 +33030,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         applyDraftingDefaults: true,
       );
       _componentPlacementPoint = null;
-      _cursorModel = pt;
+      _placementStaged = false;
+      _cursorModel = null;
     });
     _saveBiMProjectIfAttached();
     HapticFeedback.lightImpact();
@@ -33371,9 +33673,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         onToolHoldStart: _beginPlacementHold,
 
-        onSelectionHold: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSelectionHold: _stairDraft == null && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
 
-            ? _onSelectionHold
+            ? (screenPoint) {
+                final hadSelection = _selectedElementId != null;
+                final handled = _onSelectionHold(screenPoint);
+                if (handled && !hadSelection && _selectedElementId != null) {
+                  _touchHoldSelecting = true;
+                }
+                return handled;
+              }
 
             : null,
 
@@ -33406,6 +33715,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         onToolUp: _onPointerUp,
 
         onToolCancel: () {
+          if (_touchHoldSelecting) {
+            setState(() => _touchHoldSelecting = false);
+          }
           if (_stairDraft != null) {
             if (_stairDraft case ArchitectStairPerimeterDraft chain) chain.cancelPointer();
             _placingWithHold = false;
@@ -36509,6 +36821,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             depth: _elementTool.columnDepth,
 
             shape: _elementTool.columnShape,
+
+            height: _elementTool.columnHeight,
+
+            baseOffset: _elementTool.columnBaseOffset,
 
             rotationDeg: _columnPreviewRotation,
 

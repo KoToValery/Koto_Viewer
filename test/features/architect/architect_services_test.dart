@@ -355,16 +355,62 @@ void main() {
     );
     ComponentLibraryService.instance.setActiveDefinition(definition);
     await tester.pumpAndSettle();
+    // Quick tap on empty space does not place or stage a service.
     await workspace.wallTap(tester, const Offset(1, 1));
     await tester.pumpAndSettle();
     expect(commands.project.activeStorey.components, isEmpty);
-    await tester.tap(find.byKey(const ValueKey('architect-draft-confirm')));
-    await tester.pumpAndSettle();
     expect(
-      commands.project.activeStorey.components.single.definitionId,
-      definition.id,
+      find.byKey(const ValueKey('architect-placement-command-overlay')),
+      findsNothing,
     );
+    expect(find.byKey(const ValueKey('architect-draft-cancel')), findsNothing);
+
+    // Hold stages preview with the shared command overlay; check commits once.
+    final held = await tester.startGesture(
+      workspace.screen(tester, const Offset(1, 1)),
+    );
+    await tester.pump(const Duration(milliseconds: 281));
+    await held.up();
+    await tester.pumpAndSettle();
+    expect(commands.project.activeStorey.components, isEmpty);
+    expect(find.byKey(const ValueKey('architect-draft-cancel')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('architect-placement-command-overlay')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
+    await tester.pumpAndSettle();
+    final placed = commands.project.activeStorey.components.single;
+    expect(placed.definitionId, definition.id);
     expect(commands.undoCount, 1);
+
+    // Quick tap selects existing service and deselects on empty space.
+    await tester.tapAt(workspace.screen(tester, placed.position));
+    await tester.pumpAndSettle();
+    expect(workspace.overlay(tester).selectedElementId, placed.id);
+    expect(commands.project.activeStorey.components, hasLength(1));
+    await workspace.wallTap(tester, const Offset(-2, -2));
+    await tester.pumpAndSettle();
+    expect(workspace.overlay(tester).selectedElementId, isNull);
+    expect(commands.project.activeStorey.components, hasLength(1));
+
+    // Cancelling staged placement via X discards it and exits to pan.
+    final cancelled = await tester.startGesture(
+      workspace.screen(tester, const Offset(-1, 1)),
+    );
+    await tester.pump(const Duration(milliseconds: 281));
+    await cancelled.up();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('architect-command-cancel')));
+    await tester.pumpAndSettle();
+    expect(commands.project.activeStorey.components, hasLength(1));
+    expect(
+      tester
+          .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
+          .activeTool,
+      ArchitectTool.pan,
+    );
+
     commands.undo();
     await tester.pumpAndSettle();
     expect(commands.project.activeStorey.components, isEmpty);

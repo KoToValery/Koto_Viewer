@@ -423,7 +423,9 @@ void main() {
                 for (final endpoint in [segment.$1, segment.$2]) {
                   expect(
                     dimension.witnessPoints.every(
-                      (p) => (endpoint - p).distance > 4,
+                      (p) =>
+                          (endpoint - p).distance >
+                          offset.abs() - scale.denominator / 1000.0 - 1e-6,
                     ),
                     isTrue,
                   );
@@ -439,8 +441,10 @@ void main() {
   test(
     'Dimension text has requested paper sizes and scale survives save and geometry undo',
     () {
-      expect(ArchitectDimensionScale.scale50.textHeight, closeTo(.075, 1e-9));
-      expect(ArchitectDimensionScale.scale100.textHeight, closeTo(.22, 1e-9));
+      expect(ArchitectDimensionScale.scale50.textHeight, closeTo(.115, 1e-9));
+      expect(ArchitectDimensionScale.scale100.textHeight, closeTo(.16, 1e-9));
+      expect(ArchitectDimensionScale.scale5.textHeight, closeTo(.0125, 1e-9));
+      expect(ArchitectDimensionScale.scale1000.textHeight, closeTo(2.5, 1e-9));
       final s = scene();
       final model = editing.seeded(s.copyWith(dimensions: [chain(s)]));
       addTearDown(model.dispose);

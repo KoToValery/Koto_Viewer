@@ -130,19 +130,27 @@ class ArchitectSheetLayout {
     return drawing == null ? '' : drawingName(drawing, l);
   }
 
-  static Rect? titleRect(ArchitectDrawingPlacement place, String title) =>
-      place.showTitle
+  static Rect? titleRect(
+    ArchitectDrawingPlacement place,
+    String title, {
+    double? mm,
+  }) =>
+      place.showTitle && ArchitectSheetGeometry.valid(place)
       ? Rect.fromLTWH(
           place.frame.left,
           place.frame.bottom,
           place.frame.width,
-          titleHeight(title, place.frame.width),
+          titleHeight(title, place.frame.width, mm: mm),
         )
       : null;
 
-  static Path occupiedPath(ArchitectDrawingPlacement place, String title) {
+  static Path occupiedPath(
+    ArchitectDrawingPlacement place,
+    String title, {
+    double? mm,
+  }) {
     final path = ArchitectSheetGeometry.clipPath(place);
-    if (titleRect(place, title) case final rect?) path.addRect(rect);
+    if (titleRect(place, title, mm: mm) case final rect?) path.addRect(rect);
     return path;
   }
 
@@ -181,8 +189,10 @@ class ArchitectSheetLayout {
   static ArchitectTextPainter textPainter(
     String text,
     double capMm,
-    double width,
-  ) => ArchitectTextPainter(
+    double width, {
+    ArchitectAnnotationRole role = ArchitectAnnotationRole.ordinary,
+  }) => ArchitectTextPainter(
+    role: role,
     text: TextSpan(
       text: text,
       style: TextStyle(
@@ -193,8 +203,18 @@ class ArchitectSheetLayout {
     textDirection: TextDirection.ltr,
   )..layout(maxWidth: math.max(.1, width));
 
-  static double titleHeight(String title, double width) =>
-      textPainter(title, 2.2, width).height + 1;
+  static double titleHeight(String title, double width, {double? mm}) =>
+      textPainter(
+        title,
+        mm ??
+            ArchitectDrawingScale.defaultMmFor(
+              ArchitectAnnotationRole.title,
+              100,
+            ),
+        width,
+        role: ArchitectAnnotationRole.title,
+      ).height +
+      1;
 
   static bool _contains(Rect outer, Rect inner) =>
       inner.left >= outer.left - .01 &&
@@ -254,7 +274,18 @@ class ArchitectSheetLayout {
       }
       final name = drawingNames[place.drawingId] ?? source?.name ?? '';
       final title = '${place.number}  $name  1:${place.scale}';
-      final path = occupiedPath(place, title);
+      final path = occupiedPath(
+        place,
+        title,
+        mm: source == null
+            ? null
+            : p.document.textMm(
+                source.sourceKey,
+                '',
+                ArchitectAnnotationRole.title,
+                place.scale,
+              ),
+      );
       if (!_contains(bounds, path.getBounds())) {
         messages.add(l.architectSheetOutside);
       }

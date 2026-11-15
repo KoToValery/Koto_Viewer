@@ -1,7 +1,8 @@
 import 'dart:ui';
-import 'package:flutter/painting.dart' show TextStyle, FontWeight, TextPainter, TextSpan, TextDirection;
+import 'package:flutter/painting.dart' show FontWeight, TextDirection, TextSpan, TextStyle;
 import '../models/architect_project.dart';
 import '../services/architect_roof_drainage_geometry.dart';
+import 'architect_vector_scene.dart';
 
 class ArchitectRoofDrainagePainter {
   static void paint(
@@ -54,9 +55,12 @@ class ArchitectRoofDrainagePainter {
         canvas.drawCircle(inlet, r, sumpPaint);
         canvas.drawCircle(inlet, r * 1.5, sumpPaint);
 
-        if (scale > 15.0) {
+        if (ArchitectTextScope.current != null || scale > 15.0) {
           final mm = (route.pipe.diameter * 1000).round();
-          final tp = TextPainter(
+          final tp = ArchitectTextPainter(
+            elementId: route.pipe.id,
+            role: ArchitectAnnotationRole.ordinary,
+            modelScale: 1,
             text: TextSpan(
               text: 'ВТ ∅$mm',
               style: TextStyle(
@@ -138,9 +142,12 @@ class ArchitectRoofDrainagePainter {
           canvas.drawLine(pos - Offset(-d, d), pos + Offset(-d, d), ink);
 
           // Text label ВТ ∅110
-          if (scale > 15.0) {
+          if (ArchitectTextScope.current != null || scale > 15.0) {
             final mm = (pipe.diameter * 1000).round();
-            final textPainter = TextPainter(
+            final textPainter = ArchitectTextPainter(
+              elementId: pipe.id,
+              role: ArchitectAnnotationRole.ordinary,
+              modelScale: 1,
               text: TextSpan(
                 text: 'ВТ ∅$mm',
                 style: TextStyle(

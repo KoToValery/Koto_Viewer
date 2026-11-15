@@ -14,10 +14,15 @@ import 'package:kotoview/src/features/architect/models/architect_window.dart';
 import 'package:kotoview/src/features/architect/models/architect_door.dart';
 import 'package:kotoview/src/features/architect/models/architect_zone.dart';
 import 'package:kotoview/src/features/architect/models/architect_grid_axis.dart';
+import 'package:kotoview/src/features/architect/models/architect_landscape_models.dart';
+import 'package:kotoview/src/features/architect/models/architect_overhang.dart';
+import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_dimension_layout.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_dimension_chain_preview.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_elements_painter_helper.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_canvas_palette.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_landscape_painter_helper.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_overhang_painter_helper.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_vector_scene.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:kotoview/src/features/architect/services/architect_dimension_chain.dart';
@@ -140,13 +145,66 @@ void main() {
       return;
     }
     for (final denominator in [50, 100, 500]) {
-      var p = project(
-        document: ArchitectDocument(viewScales: {'plan:s': denominator}),
-      );
+      ArchitectProject p;
       if (denominator == 500) {
-        // A situation drawing uses a site-sized subject, rather than forcing
-        // detailed room and opening annotations into a 20 mm building plan.
-        p = p.copyWith(
+        // A situation drawing uses a site-sized subject with terrain contours
+        // and spot elevations under ArchitectAnnotationRole.site.
+        p = ArchitectProject(
+          id: 'p500',
+          name: 'Site preview',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          activeStoreyId: 's',
+          document: const ArchitectDocument(viewScales: {'plan:s': 500}),
+          existingTerrain: const ArchitectTerrainSurface(
+            id: 'ter-ex',
+            state: ArchitectTerrainState.existing,
+            datumElevation: 100.0,
+            contours: [
+              ArchitectTerrainContour(
+                id: 'c1',
+                elevation: 1.0,
+                isMajor: true,
+                points: [Offset(2, 10), Offset(40, 14), Offset(96, 8)],
+              ),
+              ArchitectTerrainContour(
+                id: 'c2',
+                elevation: 2.0,
+                isMajor: true,
+                points: [Offset(4, 48), Offset(48, 52), Offset(95, 44)],
+              ),
+            ],
+            spots: [
+              ArchitectTerrainSpot(
+                id: 'sp1',
+                position: Offset(15, 30),
+                elevation: 1.5,
+              ),
+              ArchitectTerrainSpot(
+                id: 'sp2',
+                position: Offset(78, 28),
+                elevation: 1.8,
+              ),
+            ],
+          ),
+          proposedTerrain: const ArchitectTerrainSurface(
+            id: 'ter-pr',
+            state: ArchitectTerrainState.proposed,
+            datumElevation: 100.0,
+            boundaries: [
+              ArchitectTerrainBoundary(
+                id: 'pad1',
+                isFlatPad: true,
+                elevation: 1.6,
+                polygon: [
+                  Offset(24, 18),
+                  Offset(58, 18),
+                  Offset(58, 36),
+                  Offset(24, 36),
+                ],
+              ),
+            ],
+          ),
           storeys: [
             ArchitectStorey(
               id: 's',
@@ -154,29 +212,29 @@ void main() {
               walls: const [
                 ArchitectWall(
                   id: 'w1',
-                  startPoint: Offset(20, 20),
-                  endPoint: Offset(45, 20),
+                  startPoint: Offset(28, 20),
+                  endPoint: Offset(53, 20),
                 ),
                 ArchitectWall(
                   id: 'w2',
-                  startPoint: Offset(45, 20),
-                  endPoint: Offset(45, 32),
+                  startPoint: Offset(53, 20),
+                  endPoint: Offset(53, 32),
                 ),
                 ArchitectWall(
                   id: 'w3',
-                  startPoint: Offset(45, 32),
-                  endPoint: Offset(20, 32),
+                  startPoint: Offset(53, 32),
+                  endPoint: Offset(28, 32),
                 ),
                 ArchitectWall(
                   id: 'w4',
-                  startPoint: Offset(20, 32),
-                  endPoint: Offset(20, 20),
+                  startPoint: Offset(28, 32),
+                  endPoint: Offset(28, 20),
                 ),
               ],
               zones: const [
                 ArchitectZone(
                   id: 'site',
-                  name: 'Site',
+                  name: 'УПИ XII-45',
                   number: '1',
                   category: ArchitectZoneCategory.living,
                   polygon: [
@@ -194,15 +252,192 @@ void main() {
                   offset: -7,
                   anchors: const [
                     ArchitectDimensionAnchor(point: Offset(0, 0)),
-                    ArchitectDimensionAnchor(point: Offset(20, 0)),
-                    ArchitectDimensionAnchor(point: Offset(45, 0)),
+                    ArchitectDimensionAnchor(point: Offset(28, 0)),
+                    ArchitectDimensionAnchor(point: Offset(53, 0)),
                     ArchitectDimensionAnchor(point: Offset(100, 0)),
                   ],
                 ),
               ],
             ),
           ],
-          gridAxes: const [],
+          gridAxes: const [
+            StructuralGridAxis(
+              id: 'axA',
+              name: 'A',
+              start: Offset(28, 12),
+              end: Offset(28, 40),
+            ),
+            StructuralGridAxis(
+              id: 'ax1',
+              name: '1',
+              start: Offset(20, 20),
+              end: Offset(62, 20),
+            ),
+          ],
+        );
+      } else {
+        p = ArchitectProject(
+          id: 'p$denominator',
+          name: 'Plan preview',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          activeStoreyId: 's',
+          document: ArchitectDocument(viewScales: {'plan:s': denominator}),
+          sections: const [
+            ArchitectSection(
+              id: 'secA',
+              name: 'A',
+              start: Offset(-1.2, 2.5),
+              end: Offset(9.2, 2.5),
+            ),
+          ],
+          gridAxes: const [
+            StructuralGridAxis(
+              id: 'axA',
+              name: 'A',
+              start: Offset(0, -1.2),
+              end: Offset(0, 6.2),
+            ),
+            StructuralGridAxis(
+              id: 'axB',
+              name: 'B',
+              start: Offset(8, -1.2),
+              end: Offset(8, 6.2),
+            ),
+            StructuralGridAxis(
+              id: 'ax1',
+              name: '1',
+              start: Offset(-1.8, 0),
+              end: Offset(9.4, 0),
+            ),
+            StructuralGridAxis(
+              id: 'ax2',
+              name: '2',
+              start: Offset(-1.8, 5),
+              end: Offset(9.4, 5),
+            ),
+          ],
+          storeys: [
+            ArchitectStorey(
+              id: 's',
+              name: 'Floor 1',
+              dimensions: [ArchitectDimensionChain.build(
+                id: 'dim',
+                direction: const Offset(1, 0),
+                offset: -3.2,
+                anchors: const [
+                ArchitectDimensionAnchor(point: Offset(0, 0)),
+                ArchitectDimensionAnchor(point: Offset(8, 0)),
+                ArchitectDimensionAnchor(point: Offset(2.3, 0), feature: 'opening'),
+                ArchitectDimensionAnchor(point: Offset(3.5, 0), feature: 'opening'),
+              ])],
+              walls: const [
+                ArchitectWall(
+                  id: 'w_bot',
+                  startPoint: Offset(0, 0),
+                  endPoint: Offset(8, 0),
+                  windows: [
+                    ArchitectWindow(
+                      id: 'win1',
+                      wallId: 'w_bot',
+                      offsetRatio: .36,
+                      width: 1.2,
+                      specId: 'П1',
+                      uuid: 'win1',
+                    ),
+                  ],
+                  doors: [
+                    ArchitectDoor(
+                      id: 'door1',
+                      wallId: 'w_bot',
+                      offsetRatio: .72,
+                      width: .9,
+                      specId: 'В1',
+                      uuid: 'door1',
+                    ),
+                  ],
+                ),
+                ArchitectWall(
+                  id: 'w_right',
+                  startPoint: Offset(8, 0),
+                  endPoint: Offset(8, 5),
+                ),
+                ArchitectWall(
+                  id: 'w_top',
+                  startPoint: Offset(8, 5),
+                  endPoint: Offset(0, 5),
+                ),
+                ArchitectWall(
+                  id: 'w_left',
+                  startPoint: Offset(0, 5),
+                  endPoint: Offset(0, 0),
+                ),
+              ],
+              columns: const [
+                ArchitectColumn(
+                  id: 'col1',
+                  position: Offset(8, 0),
+                  label: 'К1',
+                  width: .3,
+                  depth: .3,
+                ),
+              ],
+              zones: const [
+                ArchitectZone(
+                  id: 'z1',
+                  number: '1',
+                  name: 'Дневна',
+                  category: ArchitectZoneCategory.living,
+                  floorFinish: 'Паркет',
+                  wallFinish: 'Латекс',
+                  ceilingFinish: 'Гипскартон',
+                  polygon: [
+                    Offset(0, 0),
+                    Offset(8, 0),
+                    Offset(8, 5),
+                    Offset(0, 5),
+                  ],
+                ),
+              ],
+              zoneScheduleOrigin: const Offset(10.5, 0),
+              slabs: const [
+                ArchitectSlab(
+                  id: 'slab1',
+                  label: 'Плоча к.+0.00',
+                  polygon: [
+                    Offset(10.5, 3.6),
+                    Offset(14.0, 3.6),
+                    Offset(14.0, 5.2),
+                    Offset(10.5, 5.2),
+                  ],
+                ),
+              ],
+              elevationMarkers: const [
+                ArchitectElevationMarker(
+                  id: 'elv1',
+                  position: Offset(6.2, 4.1),
+                  elevation: 0.0,
+                ),
+              ],
+            ),
+            const ArchitectStorey(
+              id: 's2',
+              name: 'Floor 2',
+              elevation: 3.0,
+              slabs: [
+                ArchitectSlab(
+                  id: 'balcony2',
+                  label: 'Балкон',
+                  polygon: [
+                    Offset(1.0, 5.0),
+                    Offset(5.5, 5.0),
+                    Offset(5.5, 6.4),
+                    Offset(1.0, 6.4),
+                  ],
+                ),
+              ],
+            ),
+          ],
         );
       }
       final scene = ArchitectDrawingPublisher.build(p, drawing, denominator, l);
@@ -280,35 +515,46 @@ void main() {
         ).operations.whereType<ArchitectVectorText>().toList();
         expect(published.any((t) => t.sources.contains('roof')), isTrue);
         expect(published.any((t) => t.sources.contains('stair')), isTrue);
-        for (final zoom in [5.0, 80.0, 320.0]) {
-          final canvas = ArchitectVectorCanvas()..scale(zoom);
-          ArchitectTextScope(p.document, 'plan:s', denominator, zoom).run(() {
-            Architect2dPainter(
-              project: p,
-              activeTool: ArchitectTool.select,
-              zoomScale: zoom,
-              l10n: l,
-              layer: ArchitectPaintLayer.model,
-              paintGrid: false,
-            ).paint(canvas, const Size(2000, 2000));
-          });
-          final texts = canvas.operations
-              .whereType<ArchitectVectorText>()
-              .toList();
-          expect(texts.length, published.length);
-          for (var i = 0; i < texts.length; i++) {
-            expect(texts[i].text, published[i].text);
-            expect(
-              texts[i].size / zoom,
-              closeTo(published[i].size * denominator / 1000, 1e-7),
-            );
-            expect(
-              (texts[i].position / zoom -
-                      published[i].position * (denominator / 1000))
-                  .distance,
-              lessThan(ArchitectDrawingScale(denominator).paperToModel(.1)),
-              reason: texts[i].text,
-            );
+        for (final publication in [false, true]) {
+          for (final zoom in [5.0, 80.0, 320.0]) {
+            final canvas = ArchitectVectorCanvas()..scale(zoom);
+            ArchitectTextScope(
+              p.document,
+              'plan:s',
+              denominator,
+              zoom,
+              publication: publication,
+            ).run(() {
+              Architect2dPainter(
+                project: p,
+                activeTool: ArchitectTool.select,
+                zoomScale: zoom,
+                l10n: l,
+                layer: ArchitectPaintLayer.model,
+                paintGrid: false,
+              ).paint(canvas, const Size(2000, 2000));
+            });
+            final texts = canvas.operations
+                .whereType<ArchitectVectorText>()
+                .toList();
+            expect(texts.length, published.length);
+            for (var i = 0; i < texts.length; i++) {
+              expect(texts[i].text, published[i].text);
+              final pubModelHeight = published[i].size * denominator / 1000;
+              if (publication || zoom <= 5.5 * 1000 / denominator - 1e-6) {
+                expect(texts[i].size / zoom, closeTo(pubModelHeight, 1e-7));
+                expect(
+                  (texts[i].position / zoom -
+                          published[i].position * (denominator / 1000))
+                      .distance,
+                  lessThan(ArchitectDrawingScale(denominator).paperToModel(.1)),
+                  reason: texts[i].text,
+                );
+              } else {
+                // Working viewport caps oversized lettering when zoomed in.
+                expect(texts[i].size / zoom, lessThanOrEqualTo(pubModelHeight + 1e-7));
+              }
+            }
           }
         }
       }
@@ -349,7 +595,7 @@ void main() {
         profileMm: {'100/dimension': 3.3},
         overrideMm: {
           'plan:s/dim/dimension/100': 4.4,
-          'plan:s/dim/dimension/50': 3,
+          'plan:s/dim/dimension/50': 4.6,
         },
       );
       expect(
@@ -368,7 +614,7 @@ void main() {
           document: noViewScale,
           viewKey: 'plan:s',
         ),
-        closeTo(.8, 1e-9),
+        closeTo(1.1, 1e-9),
       );
       expect(
         ArchitectDimensionLayout.rowSpacingFor(
@@ -376,14 +622,14 @@ void main() {
           document: noViewScale,
           viewKey: 'plan:s',
         ),
-        closeTo(.6, 1e-9),
+        closeTo(.825, 1e-9),
       );
       // A sheet placement can use another scale from the saved working view.
       ArchitectTextScope(document, 'plan:s', 100, 30, publication: true).run(
         () {
           expect(
             ArchitectDimensionLayout.rowSpacingFor(dimension()),
-            closeTo(.8, 1e-9),
+            closeTo(1.1, 1e-9),
           );
         },
       );
@@ -391,29 +637,91 @@ void main() {
   );
 
   test(
-    '1:500 uses modest paper lettering while retaining special symbol sizes',
+    'Optimal scale defaults keep plan text compact while axes and sections stand out',
     () {
       const document = ArchitectDocument();
+      // 1:50 working plan: crisp dimensions & openings, compact room stamps.
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.dimension, 50),
+        2.3,
+      );
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.opening, 50),
+        2.0,
+      );
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.roomName, 50),
+        1.6,
+      );
+      // 1:100 floor plan defaults preserved.
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.dimension, 100),
+        1.6,
+      );
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.opening, 100),
+        1.5,
+      );
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.roomName, 100),
+        1.5,
+      );
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.axis, 100),
+        3.0,
+      );
+      // 1:500 situation & defaults across 1:5..1:1000.
       expect(
         document.textMm('plan:s', '', ArchitectAnnotationRole.dimension, 500),
-        2.5,
+        2.4,
       );
       expect(
         document.textMm('plan:s', '', ArchitectAnnotationRole.ordinary, 500),
-        2.5,
+        2.2,
       );
       expect(
         document.textMm('plan:s', '', ArchitectAnnotationRole.roomName, 500),
-        3,
+        2.2,
       );
       expect(
         document.textMm('plan:s', '', ArchitectAnnotationRole.title, 500),
-        3.75,
+        3.6,
       );
       expect(
-        document.textMm('plan:s', '', ArchitectAnnotationRole.symbol, 500),
-        2.2,
+        document.textMm('plan:s', '', ArchitectAnnotationRole.axis, 500),
+        3.5,
       );
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.section, 500),
+        3.5,
+      );
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.site, 500),
+        2.3,
+      );
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.opening, 500),
+        1.8,
+      );
+      expect(
+        document.textMm('plan:s', '', ArchitectAnnotationRole.table, 500),
+        2.1,
+      );
+      expect(ArchitectDrawingScale.presets, containsAll([5, 20, 50, 100, 200, 500, 1000]));
+      for (final denom in ArchitectDrawingScale.presets) {
+        expect(
+          document.textMm('plan:s', '', ArchitectAnnotationRole.axis, denom),
+          greaterThan(
+            document.textMm('plan:s', '', ArchitectAnnotationRole.roomName, denom),
+          ),
+        );
+        expect(
+          document.textMm('plan:s', '', ArchitectAnnotationRole.section, denom),
+          greaterThan(
+            document.textMm('plan:s', '', ArchitectAnnotationRole.opening, denom),
+          ),
+        );
+      }
       expect(
         ArchitectDimensionScale.scale500.textHeightMm,
         const ArchitectDrawingScale(500).defaultTextMm,
@@ -421,9 +729,67 @@ void main() {
     },
   );
 
+  test('Slab omits area label, overhang omits text, terrain uses site role', () {
+    final p = project();
+    final scene = ArchitectDrawingPublisher.build(p, drawing, 50, l);
+    final texts = scene.operations.whereType<ArchitectVectorText>().toList();
+    expect(texts.any((t) => t.sources.contains('slab') && t.text == 'Slab'), isTrue);
+    expect(
+      texts.any((t) => t.sources.contains('slab') && t.text.contains('m²')),
+      isFalse,
+    );
+
+    final overhangCanvas = ArchitectVectorCanvas();
+    ArchitectOverhangPainterHelper.drawOverhangs(
+      canvas: overhangCanvas,
+      palette: const ArchitectCanvasPalette.light(),
+      overhangs: const [
+        ArchitectOverhang(
+          id: 'ov1',
+          kind: ArchitectOverhangKind.balcony,
+          polygon: [Offset(0, 0), Offset(3, 0), Offset(3, 1.2), Offset(0, 1.2)],
+          sourceStoreyId: 's2',
+          sourceStoreyName: 'Floor 2',
+          sourceStoreyElevation: 3.0,
+        ),
+      ],
+      zoomScale: 20,
+      l10n: l,
+    );
+    expect(overhangCanvas.operations.whereType<ArchitectVectorPath>(), isNotEmpty);
+    expect(overhangCanvas.operations.whereType<ArchitectVectorText>(), isEmpty);
+
+    final siteProject = p.copyWith(
+      existingTerrain: const ArchitectTerrainSurface(
+        id: 't1',
+        state: ArchitectTerrainState.existing,
+        spots: [
+          ArchitectTerrainSpot(id: 'sp', position: Offset(2, 2), elevation: 1.5),
+        ],
+      ),
+    );
+    final siteCanvas = ArchitectVectorCanvas()..scale(5);
+    ArchitectTextScope(siteProject.document, 'plan:s', 500, 5, publication: true)
+        .run(() {
+      ArchitectLandscapePainterHelper.drawTerrain(
+        canvas: siteCanvas,
+        project: siteProject,
+        zoomScale: 5,
+        selectedIds: const {},
+      );
+    });
+    final siteTexts = siteCanvas.operations.whereType<ArchitectVectorText>().toList();
+    expect(siteTexts, isNotEmpty);
+    expect(siteTexts.every((t) => t.role == 'site'), isTrue);
+    expect(
+      siteTexts.first.size / 5 * 2 * ArchitectDrawingScale.fontCapRatio,
+      closeTo(2.3, 1e-7),
+    );
+  });
+
   for (final denominator in [50, 100, 500]) {
     test(
-      '1:$denominator working text, zones, symbols and dimensions match publication through zoom',
+      '1:$denominator working text, zones, symbols and dimensions match publication at readable zoom',
       () {
         final p = project(
           document: ArchitectDocument(viewScales: {'plan:s': denominator}),
@@ -435,7 +801,12 @@ void main() {
           l,
         ).operations.whereType<ArchitectVectorText>().toList();
         expect(published, isNotEmpty);
-        for (final zoom in [5.0, 20.0, 80.0, 320.0]) {
+        final uncappedZoom = denominator >= 500
+            ? 5.0
+            : denominator >= 100
+                ? 20.0
+                : 80.0;
+        for (final zoom in [5.0, uncappedZoom, 320.0]) {
           final canvas = ArchitectVectorCanvas()..scale(zoom);
           Architect2dPainter(
             activeTool: ArchitectTool.select,
@@ -454,17 +825,20 @@ void main() {
             expect(actual.text, expected.text);
             expect(actual.role, expected.role);
             expect(actual.sources, expected.sources);
-            expect(
-              actual.size / zoom,
-              closeTo(expected.size * denominator / 1000, 1e-7),
-            );
-            expect(
-              (actual.position / zoom -
-                      expected.position * (denominator / 1000))
-                  .distance,
-              lessThan(.001),
-              reason: '${actual.role}: ${actual.text}',
-            );
+            final pubModelSize = expected.size * denominator / 1000;
+            if (zoom <= uncappedZoom) {
+              expect(actual.size / zoom, closeTo(pubModelSize, 1e-7));
+              expect(
+                (actual.position / zoom -
+                        expected.position * (denominator / 1000))
+                    .distance,
+                lessThan(.001),
+                reason: '${actual.role}: ${actual.text}',
+              );
+            } else {
+              // At deep zoom, dynamic working-view cap keeps labels from covering walls/rooms.
+              expect(actual.size / zoom, lessThanOrEqualTo(pubModelSize + 1e-7));
+            }
           }
         }
       },
@@ -511,7 +885,7 @@ void main() {
       expect(lines.length, greaterThanOrEqualTo(3));
       expect(
         (rows[1].line.$1.dy - rows[0].line.$1.dy).abs(),
-        closeTo(.8, 1e-9),
+        closeTo(1.1, 1e-9),
       );
     },
   );
@@ -602,7 +976,7 @@ void main() {
           document: preview.document,
           viewKey: preview.viewKey,
         ),
-        closeTo(.8, 1e-9),
+        closeTo(1.1, 1e-9),
       );
       expect(tester.takeException(), isNull);
     },

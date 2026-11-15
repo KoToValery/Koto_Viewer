@@ -124,12 +124,18 @@ class ArchitectToolPalette extends StatefulWidget {
   final ArchitectWindow? selectedWindow;
 
   // Column options
+  final ArchitectColumn? selectedColumn;
   final ColumnShape columnShape;
   final ValueChanged<ColumnShape>? onColumnShapeChanged;
   final double columnWidth;
   final ValueChanged<double>? onColumnWidthChanged;
   final double columnDepth;
   final ValueChanged<double>? onColumnDepthChanged;
+  final double? columnHeight;
+  final ValueChanged<double>? onColumnHeightChanged;
+  final double columnBaseOffset;
+  final ValueChanged<double>? onColumnBaseOffsetChanged;
+  final double activeStoreyHeight;
 
   // Beam options
   final double beamWidth;
@@ -233,12 +239,18 @@ class ArchitectToolPalette extends StatefulWidget {
     this.windowIsFlipped,
     this.onWindowFlippedChanged,
     this.selectedWindow,
+    this.selectedColumn,
     this.columnShape = ColumnShape.rectangular,
     this.onColumnShapeChanged,
     this.columnWidth = 0.25,
     this.onColumnWidthChanged,
     this.columnDepth = 0.25,
     this.onColumnDepthChanged,
+    this.columnHeight,
+    this.onColumnHeightChanged,
+    this.columnBaseOffset = 0.0,
+    this.onColumnBaseOffsetChanged,
+    this.activeStoreyHeight = 3.0,
     this.beamWidth = 0.25,
     this.onBeamWidthChanged,
     this.beamDepth = 0.50,
@@ -402,6 +414,12 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   ValueChanged<double>? get onColumnWidthChanged => widget.onColumnWidthChanged;
   double get columnDepth => widget.columnDepth;
   ValueChanged<double>? get onColumnDepthChanged => widget.onColumnDepthChanged;
+  double? get columnHeight => widget.columnHeight;
+  ValueChanged<double>? get onColumnHeightChanged =>
+      widget.onColumnHeightChanged;
+  double get columnBaseOffset => widget.columnBaseOffset;
+  ValueChanged<double>? get onColumnBaseOffsetChanged =>
+      widget.onColumnBaseOffsetChanged;
   double get beamWidth => widget.beamWidth;
   ValueChanged<double>? get onBeamWidthChanged => widget.onBeamWidthChanged;
   double get beamDepth => widget.beamDepth;
@@ -448,7 +466,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             children: [
               if (mode == ArchitectInteractionMode.drawing ||
                   widget.selectedDoor != null ||
-                  widget.selectedWindow != null) ...[
+                  widget.selectedWindow != null ||
+                  widget.selectedColumn != null) ...[
                 // Contextual Sub-bar for Active Tool parameters or Selection
                 if (widget.selectedDoor != null ||
                     activeTool == ArchitectTool.door)
@@ -456,6 +475,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 else if (widget.selectedWindow != null ||
                     activeTool == ArchitectTool.window)
                   _buildWindowSubBar(context)
+                else if (widget.selectedColumn != null)
+                  _buildColumnSubBar(context)
                 else if (activeTool == ArchitectTool.zone)
                   _buildZoneSubBar(context)
                 else if (activeTool == ArchitectTool.wall)
@@ -899,6 +920,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     required double valueMeters,
     required double minCm,
     required double maxCm,
+    bool allowNegative = false,
     required ValueChanged<double>? onChangedMeters,
   }) {
     final l10n = context.l10n;
@@ -917,6 +939,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                 initialText: formatted,
                 unitLabel: 'cm',
                 decimals: 1,
+                allowNegative: allowNegative,
                 min: minCm,
                 max: maxCm,
                 cancelLabel: l10n.cancel,
@@ -1371,6 +1394,16 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   // --- SUBSECTION: [TAG:ARCH_PALETTE_COMPONENT_SUB] Widget Build & HUD Layout: `_buildComponentSubBar`, `_buildColumnSubBar`, `_buildStairSubBar`, `_buildBeamSubBar` (4 methods) ---
   Widget _buildColumnSubBar(BuildContext context) {
     final l10n = context.l10n;
+    final selected = widget.selectedColumn;
+    final effectiveShape = selected?.shape ?? columnShape;
+    final effectiveWidth = selected?.width ?? columnWidth;
+    final effectiveDepth = selected?.depth ?? columnDepth;
+    final effectiveHeight =
+        selected?.height ?? columnHeight ?? widget.activeStoreyHeight;
+    final effectiveBaseOffset = selected?.baseOffset ?? columnBaseOffset;
+    final isCircular = effectiveShape == ColumnShape.circular;
+    final widthLabel =
+        isCircular ? l10n.propertiesDiameter : l10n.architectPropertyWidth;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1378,9 +1411,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       child: Row(
         children: [
           ChoiceChip(
+            key: const ValueKey('column-shape-rect'),
             avatar: AppIcon(AppIconId.rectangle, size: 14),
             label: Text(l10n.architectColumnRect),
-            selected: columnShape == ColumnShape.rectangular,
+            selected: !isCircular,
             onSelected: (sel) {
               if (sel) onColumnShapeChanged?.call(ColumnShape.rectangular);
             },
@@ -1388,37 +1422,58 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           ),
           const SizedBox(width: 4),
           ChoiceChip(
+            key: const ValueKey('column-shape-circle'),
             avatar: AppIcon(AppIconId.radioOff, size: 14),
             label: Text(l10n.architectColumnCircle),
-            selected: columnShape == ColumnShape.circular,
+            selected: isCircular,
             onSelected: (sel) {
               if (sel) onColumnShapeChanged?.call(ColumnShape.circular);
             },
             visualDensity: VisualDensity.compact,
           ),
-          const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text(
-              l10n.architectColumnSize,
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-            ),
+          const SizedBox(width: 10),
+          _buildOpeningDimensionLabel(widthLabel),
+          _buildOpeningDimensionChip(
+            key: const ValueKey('column-width-input'),
+            label: widthLabel,
+            valueMeters: effectiveWidth,
+            minCm: 5,
+            maxCm: 500,
+            onChangedMeters: onColumnWidthChanged,
           ),
-          for (final sz in [0.25, 0.30, 0.40])
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: ChoiceChip(
-                label: Text('${(sz * 100).round()} cm'),
-                selected: (columnWidth - sz).abs() < 1e-3,
-                onSelected: (sel) {
-                  if (sel) {
-                    onColumnWidthChanged?.call(sz);
-                    onColumnDepthChanged?.call(sz);
-                  }
-                },
-                visualDensity: VisualDensity.compact,
-              ),
+          if (!isCircular) ...[
+            const SizedBox(width: 10),
+            _buildOpeningDimensionLabel(l10n.architectPropertyDepth),
+            _buildOpeningDimensionChip(
+              key: const ValueKey('column-depth-input'),
+              label: l10n.architectPropertyDepth,
+              valueMeters: effectiveDepth,
+              minCm: 5,
+              maxCm: 500,
+              onChangedMeters: onColumnDepthChanged,
             ),
+          ],
+          const SizedBox(width: 10),
+          _buildOpeningDimensionLabel(l10n.architectPropertyHeight),
+          _buildOpeningDimensionChip(
+            key: const ValueKey('column-height-input'),
+            label: l10n.architectPropertyHeight,
+            valueMeters: effectiveHeight,
+            minCm: 30,
+            maxCm: 2000,
+            onChangedMeters: onColumnHeightChanged,
+          ),
+          const SizedBox(width: 10),
+          _buildOpeningDimensionLabel(l10n.architectColumnBaseOffset),
+          _buildOpeningDimensionChip(
+            key: const ValueKey('column-base-offset-input'),
+            label: l10n.architectColumnBaseOffset,
+            valueMeters: effectiveBaseOffset,
+            minCm: -1000,
+            maxCm: 1000,
+            allowNegative: true,
+            onChangedMeters: onColumnBaseOffsetChanged,
+          ),
         ],
       ),
     );

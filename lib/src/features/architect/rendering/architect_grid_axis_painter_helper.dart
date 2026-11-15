@@ -13,6 +13,7 @@ import 'architect_line_pattern.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import '../models/architect_document.dart';
 import '../models/architect_grid_axis.dart';
 import '../models/architect_project.dart';
 import '../services/architect_axis_geometry.dart';
@@ -333,12 +334,40 @@ class ArchitectGridAxisPainterHelper {
     canvas.translate(center.dx, center.dy);
     final scope = ArchitectTextScope.current;
     final localScale = scope != null
-        ? scope.height(elementId ?? label, ArchitectAnnotationRole.symbol) / 11
+        ? scope.height(elementId ?? label, ArchitectAnnotationRole.axis) / 11
         : 1 / zoomScale;
     canvas.scale(localScale);
     center = Offset.zero;
     zoomScale = 1;
-    final double bubbleRadius = 12.0 / zoomScale;
+
+    final textSpan = TextSpan(
+      text: label,
+      style: TextStyle(
+        color: isGhost
+            ? const Color(0xFF00E5FF)
+            : (palette.isDark ? Colors.white : const Color(0xFFC62828)),
+        fontFamily: 'Roboto',
+        fontSize: 10.5 / zoomScale,
+        fontWeight: FontWeight.bold,
+        height: 1.0,
+      ),
+    );
+
+    // The bubble and label share paper proportions on screen and in print.
+    final tp = ArchitectTextPainter(
+      elementId: scope == null ? null : elementId ?? label,
+      role: ArchitectAnnotationRole.axis,
+      modelScale: localScale,
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    // Hug the rendered glyph closely with minimal uniform air around corners.
+    final visualH = scope != null
+        ? 11.0
+        : tp.height * ArchitectDrawingScale.fontCapRatio;
+    final double bubbleRadius =
+        Offset(tp.width / 2, visualH / 2).distance + (scope != null ? 2.0 : 1.5);
 
     final bgPaint = Paint()
       ..color = isGhost
@@ -360,28 +389,11 @@ class ArchitectGridAxisPainterHelper {
     canvas.drawCircle(center, bubbleRadius, bgPaint);
     canvas.drawCircle(center, bubbleRadius, borderPaint);
 
-    final textSpan = TextSpan(
-      text: label,
-      style: TextStyle(
-        color: isGhost
-            ? const Color(0xFF00E5FF)
-            : (palette.isDark ? Colors.white : const Color(0xFFC62828)),
-        fontFamily: 'Roboto',
-        fontSize: 10.5 / zoomScale,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-
-    // The bubble and label share paper proportions on screen and in print.
-    final tp = ArchitectTextPainter(
-      elementId: scope == null ? null : elementId ?? label,
-      role: ArchitectAnnotationRole.symbol,
-      modelScale: localScale,
-      text: textSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
+    final metrics = tp.computeLineMetrics();
+    final glyphCenterY = metrics.isNotEmpty
+        ? metrics.first.baseline - visualH / 2
+        : tp.height / 2;
+    tp.paint(canvas, center - Offset(tp.width / 2, glyphCenterY));
     canvas.restore();
   }
 

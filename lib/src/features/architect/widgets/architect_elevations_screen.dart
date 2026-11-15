@@ -712,6 +712,8 @@ class ArchitectFacadePainter extends CustomPainter {
           ? slope.percent.round().toString()
           : slope.percent.toStringAsFixed(1);
       final text = ArchitectTextPainter(
+        elementId: 'slope',
+        role: ArchitectAnnotationRole.dimension,
         text: TextSpan(
           text: '$percent%',
           style: TextStyle(color: stroke, fontSize: 12, fontFamily: fontFamily),

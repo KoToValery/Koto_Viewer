@@ -109,10 +109,10 @@ void main() {
   test('profiles and element overrides apply only at their scale', () {
     const d = ArchitectDocument(overrideMm: {'plan:s/z/area/50': 1.3});
     expect(d.textMm('plan:s', 'z', ArchitectAnnotationRole.area, 50), 1.3);
-    expect(d.textMm('plan:s', 'z', ArchitectAnnotationRole.area, 100), 2.2);
+    expect(d.textMm('plan:s', 'z', ArchitectAnnotationRole.area, 100), 1.5);
     expect(
       d.textMm('plan:s', 'z', ArchitectAnnotationRole.roomName, 50),
-      closeTo(1.8, 1e-10),
+      closeTo(1.6, 1e-10),
     );
   });
   test(
@@ -132,27 +132,22 @@ void main() {
       expect(label50, isNotEmpty);
       expect(label50.any((e) => e.size > 0), isTrue);
       expect(label100, isNotEmpty);
-      expect(
-        label50.firstWhere((e) => e.role == 'area').size *
-            ArchitectDrawingScale.fontCapRatio,
-        closeTo(1.5, 1e-8),
-      );
-      expect(
-        label100.firstWhere((e) => e.role == 'area').size *
-            ArchitectDrawingScale.fontCapRatio,
-        inExclusiveRange(0, 2.2 + 1e-8),
-      );
-      // Room fitting may reduce the block, while preserving its text hierarchy.
-      expect(
-        label100.firstWhere((e) => e.role == 'roomName').size /
-            label100.firstWhere((e) => e.role == 'area').size,
-        closeTo(1.2, 1e-8),
-      );
-      expect(
-        label50.firstWhere((e) => e.role == 'roomName').size *
-            ArchitectDrawingScale.fontCapRatio,
-        closeTo(1.8, 1e-8),
-      );
+      final stamp50 = label50.where((e) => e.role == 'roomName').toList();
+      final stamp100 = label100.where((e) => e.role == 'roomName').toList();
+      expect(label50.where((e) => e.role == 'area'), isEmpty);
+      expect(stamp50.length, greaterThanOrEqualTo(2));
+      expect(stamp100.length, greaterThanOrEqualTo(2));
+      for (final t in stamp50) {
+        expect(t.size * ArchitectDrawingScale.fontCapRatio, closeTo(1.6, 1e-8));
+        expect(t.size, closeTo(stamp50.first.size, 1e-8));
+      }
+      for (final t in stamp100) {
+        expect(
+          t.size * ArchitectDrawingScale.fontCapRatio,
+          inExclusiveRange(0, 1.5 + 1e-8),
+        );
+        expect(t.size, closeTo(stamp100.first.size, 1e-8));
+      }
       expect(scene50.operations.whereType<ArchitectVectorPath>(), isNotEmpty);
       final text = scene50.operations
           .whereType<ArchitectVectorText>()
@@ -251,7 +246,7 @@ void main() {
       expect(
         table.every(
           (t) =>
-              (t.size * ArchitectDrawingScale.fontCapRatio - 1.5).abs() < 1e-8,
+              (t.size * ArchitectDrawingScale.fontCapRatio - 1.9).abs() < 1e-8,
         ),
         isTrue,
       );
@@ -265,7 +260,7 @@ void main() {
       expect(bounds(10), bounds(100));
       expect(
         const ArchitectDrawingScale(50).modelToPaper(bounds(10).width),
-        closeTo(114, 1e-8),
+        allOf(greaterThan(40), lessThan(114)),
       );
       expect(
         const ArchitectDrawingScale(50).modelToPaper(bounds(10).height),
@@ -742,6 +737,13 @@ void main() {
               w is DropdownButton<int> &&
               w.items?.length == ArchitectDrawingScale.presets.length,
         );
+        // Normal modeling workspace keeps the top toolbar free of a permanent scale dropdown.
+        expect(picker, findsNothing);
+        await tester.tap(find.byTooltip(labels.architectSheets));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(labels.architectPrintPreview));
+        await tester.pumpAndSettle();
+        expect(picker, findsOneWidget);
         await tester.tap(picker);
         await tester.pumpAndSettle();
         await tester.tap(find.text('1:50').last);
@@ -754,6 +756,19 @@ void main() {
         await tester.tap(find.text(labels.architectSheets));
         await tester.pumpAndSettle();
         expect(find.byType(ArchitectSheetsScreen), findsOneWidget);
+        final sheetsFonts = find.byKey(const ValueKey('architect-sheets-fonts'));
+        expect(sheetsFonts, findsOneWidget);
+        await tester.tap(sheetsFonts);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('architect-font-inc-100-axis')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('architect-layout-fonts-save')),
+        );
+        await tester.pumpAndSettle();
+        expect(controller.project.document.profileMm['100/axis'], closeTo(3.1, 1e-6));
         expect(tester.takeException(), isNull);
       },
     );

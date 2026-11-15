@@ -250,79 +250,61 @@ class ArchitectZonePainterHelper {
     required double zoomScale,
     required bool isSelected,
   }) {
-    final annotationScale = ArchitectPaperStyle.annotationScale;
+    final scope = ArchitectTextScope.current;
+    final roomScale = scope == null
+        ? ArchitectPaperStyle.annotationScale
+        : scope.height(zone.id, ArchitectAnnotationRole.roomName) / 11;
     final numberText = '№ ${zone.number.isNotEmpty ? zone.number : '1'}';
     final nameText = zone.name;
     final areaText =
-        ArchitectTextScope.current?.area(zone.area) ??
+        scope?.area(zone.area) ??
         '${BimDistanceUnit.trimZeros(zone.area.toStringAsFixed(2))} m²';
 
-    ArchitectTextPainter label(
-      String text,
-      ArchitectAnnotationRole role,
-      double fontSize,
-      FontWeight weight,
-    ) => ArchitectTextPainter(
+    ArchitectTextPainter label(String text) => ArchitectTextPainter(
       elementId: zone.id,
-      role: role,
-      modelScale: annotationScale,
+      role: ArchitectAnnotationRole.roomName,
+      modelScale: roomScale,
       text: TextSpan(
         text: text,
         style: TextStyle(
           color: ArchitectPaperStyle.ink,
           fontFamily: 'Roboto',
-          fontSize: fontSize,
-          fontWeight: weight,
-          height: 1.05,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w500,
+          height: 1.0,
         ),
       ),
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
     );
 
-    final number = label(
-      numberText,
-      ArchitectAnnotationRole.ordinary,
-      9,
-      FontWeight.w500,
-    )..layout();
-    final area = label(
-      areaText,
-      ArchitectAnnotationRole.area,
-      9,
-      FontWeight.w500,
-    )..layout();
-    final name = label(
-      nameText,
-      ArchitectAnnotationRole.roomName,
-      10,
-      FontWeight.w500,
-    )..layout();
+    final number = label(numberText)..layout();
+    final area = label(areaText)..layout();
+    final name = label(nameText)..layout();
 
-    // Name above one compact number/area row. Fit the complete name with the
-    // block; wrapping it first would add rows and force smaller lettering.
-    final metadataGap = math.max(number.height, area.height) * .55;
+    // Name above one compact number/area row using a single unified font size.
+    final metadataGap = math.max(number.height, area.height) * .38;
     final metadataWidth = number.width + metadataGap + area.width;
-    final rowGap = math.max(number.height, area.height) * .16;
+    final rowGap = math.max(number.height, area.height) * .22;
     final metadataHeight = math.max(number.height, area.height);
     final size = Size(
       math.max(name.width, metadataWidth),
       name.height + rowGap + metadataHeight,
     );
-    const paddingH = 2.0, paddingV = 1.5;
+    const paddingH = 0.7, paddingV = 0.4;
     final paddedSize = Size(
       size.width + paddingH * 2,
       size.height + paddingV * 2,
     );
     final placement = zone.isApartment
         ? (centroid, 1.0)
-        : _fitRoomStamp(zone, centroid, paddedSize * annotationScale);
+        : _fitRoomStamp(zone, centroid, paddedSize * roomScale);
 
     canvas.save();
     canvas.translate(placement.$1.dx, placement.$1.dy);
     // Fit in model space, never enlarge with camera zoom. Publication and the
     // workspace use the same compact layout and retain selectable vector text.
-    canvas.scale(annotationScale * placement.$2);
+    canvas.scale(roomScale * placement.$2);
 
     final badgeRect = Rect.fromCenter(
       center: Offset.zero,
@@ -331,7 +313,7 @@ class ArchitectZonePainterHelper {
     );
     if (isSelected) {
       canvas.drawRRect(
-        RRect.fromRectAndRadius(badgeRect, const Radius.circular(2)),
+        RRect.fromRectAndRadius(badgeRect, const Radius.circular(1.2)),
         Paint()
           ..color = const Color(0xFF00E5FF).withValues(alpha: .95)
           ..strokeWidth = 1
@@ -1443,10 +1425,6 @@ class ArchitectZonePainterHelper {
     final scope = ArchitectTextScope.current!;
     final scale = ArchitectDrawingScale(scope.denominator);
     double u(double mm) => scale.paperToModel(mm);
-    // Paper dimensions: keep padding small without reducing the text profile.
-    const widths = [7.0, 25.0, 16.0, 22.0, 22.0, 22.0];
-    final width = u(widths.reduce((a, b) => a + b));
-    final operations = <void Function(Canvas)>[];
     final rows = [...storey.zones]
       ..sort((a, b) => a.number.compareTo(b.number));
     final headers = [
@@ -1457,6 +1435,59 @@ class ArchitectZonePainterHelper {
       l.architectZoneScheduleColWalls,
       l.architectZoneScheduleColCeiling,
     ];
+    final maxColWidth = u(26.0);
+    final colPadH = u(0.7);
+    final rowPadV = u(0.35);
+    final colWidths = List<double>.filled(headers.length, u(3.5));
+
+    ArchitectTextPainter measureCell(
+      String text, {
+      String id = '',
+      bool heading = false,
+      double? maxWidth,
+    }) => ArchitectTextPainter(
+      elementId: id,
+      role: ArchitectAnnotationRole.table,
+      modelScale: 1,
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: ArchitectPaperStyle.ink,
+          fontSize: u(1.8),
+          fontWeight: heading ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: maxWidth ?? double.infinity);
+
+    final rowMatrix = <(String, List<String>)>[
+      for (final z in rows)
+        (
+          z.id,
+          [
+            z.number,
+            z.name,
+            scope.area(z.area),
+            z.resolvedFloorFinish(l),
+            z.resolvedWallFinish(l),
+            z.resolvedCeilingFinish(l),
+          ],
+        ),
+    ];
+
+    for (var i = 0; i < headers.length; i++) {
+      var w = measureCell(headers[i], heading: true).width + colPadH;
+      for (final (id, values) in rowMatrix) {
+        w = math.max(
+          w,
+          measureCell(values[i], id: id).width + colPadH,
+        );
+      }
+      colWidths[i] = w.clamp(u(3.5), maxColWidth);
+    }
+
+    final width = colWidths.reduce((a, b) => a + b);
+    final operations = <void Function(Canvas)>[];
     double y = 0;
     void row(
       List<String> values, {
@@ -1465,24 +1496,20 @@ class ArchitectZonePainterHelper {
       bool fullWidth = false,
     }) {
       final painters = <ArchitectTextPainter>[];
-      var height = u(3);
+      var height = 0.0;
       for (var i = 0; i < values.length; i++) {
-        final tp = ArchitectTextPainter(
-          elementId: id,
-          role: ArchitectAnnotationRole.table,
-          modelScale: 1,
-          text: TextSpan(
-            text: values[i],
-            style: TextStyle(
-              color: ArchitectPaperStyle.ink,
-              fontSize: u(2.2),
-              fontWeight: heading ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: (fullWidth ? width : u(widths[i])) - u(1.2));
+        final maxW = math.max(
+          u(1.0),
+          (fullWidth ? width : colWidths[i]) - colPadH,
+        );
+        final tp = measureCell(
+          values[i],
+          id: id,
+          heading: heading,
+          maxWidth: maxW,
+        );
         painters.add(tp);
-        height = math.max(height, tp.height + u(.8));
+        height = math.max(height, tp.height + rowPadV);
       }
       final top = y, h = height;
       if (heading) {
@@ -1495,11 +1522,13 @@ class ArchitectZonePainterHelper {
       }
       var x = 0.0;
       for (var i = 0; i < painters.length; i++) {
-        final tp = painters[i], left = x;
+        final tp = painters[i], colW = fullWidth ? width : colWidths[i];
+        final centered = !fullWidth && i == 0;
+        final left = centered ? x + (colW - tp.width) / 2 : x + colPadH / 2;
         operations.add(
-          (c) => tp.paint(c, Offset(left + u(.6), top + (h - tp.height) / 2)),
+          (c) => tp.paint(c, Offset(left, top + (h - tp.height) / 2)),
         );
-        x += fullWidth ? width : u(widths[i]);
+        x += colW;
         if (!fullWidth && i < painters.length - 1) {
           final edge = x;
           operations.add(
@@ -1532,15 +1561,8 @@ class ArchitectZonePainterHelper {
       fullWidth: true,
     );
     row(headers, heading: true);
-    for (final z in rows) {
-      row([
-        z.number,
-        z.name,
-        scope.area(z.area),
-        z.resolvedFloorFinish(l),
-        z.resolvedWallFinish(l),
-        z.resolvedCeilingFinish(l),
-      ], id: z.id);
+    for (final (id, values) in rowMatrix) {
+      row(values, id: id);
     }
     if (apartment != null) {
       row(

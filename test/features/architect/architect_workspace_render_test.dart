@@ -47,17 +47,19 @@ void main() {
       ],
     );
     for (final denominator in [50, 100, 500]) {
-      final widths = <double>[];
+      final pubWidths = <double>[];
       for (final publication in [false, true]) {
-        for (final zoom in [20.0, 80.0, 320.0]) {
+        for (final zoom in [5.0, 20.0, 80.0, 320.0]) {
           final canvas = ArchitectVectorCanvas()..scale(zoom);
           const document = ArchitectDocument();
           final capMm = document.textMm(
             'plan:s',
             'axis',
-            ArchitectAnnotationRole.symbol,
+            ArchitectAnnotationRole.axis,
             denominator,
           );
+          final uncapped = !publication &&
+              zoom <= (5.5 * 1000 / denominator) - 1e-6;
           ArchitectTextScope(
             document,
             'plan:s',
@@ -76,34 +78,45 @@ void main() {
               .toList();
           expect(labels, hasLength(2));
           expect(labels.every((t) => t.sources.contains('axis')), isTrue);
-          expect(
-            ArchitectDrawingScale(
-                  denominator,
-                ).modelToPaper(labels.first.size / zoom) *
-                ArchitectDrawingScale.fontCapRatio,
-            closeTo(capMm, 1e-8),
-          );
-          widths.add(labels.first.bounds.width / zoom);
-          final bubbleWidth =
+          if (publication || uncapped) {
+            expect(
+              ArchitectDrawingScale(
+                    denominator,
+                  ).modelToPaper(labels.first.size / zoom) *
+                  ArchitectDrawingScale.fontCapRatio,
+              closeTo(capMm, 1e-8),
+            );
+          } else {
+            expect(
+              labels.first.size,
+              lessThanOrEqualTo(capMm * 5.5 / ArchitectDrawingScale.fontCapRatio + 1e-8),
+            );
+          }
+          if (publication) {
+            pubWidths.add(labels.first.bounds.width / zoom);
+          }
+          final maxBubbleWidth =
               ArchitectDrawingScale(denominator).paperToModel(capMm) /
               11 *
               24 *
               zoom;
+          final minTightDiameter = labels.first.bounds.width;
           expect(
             canvas.operations.whereType<ArchitectVectorPath>().any(
               (p) =>
                   p.fill &&
-                  (p.bounds.width - bubbleWidth).abs() < 1e-4 &&
-                  (p.bounds.height - bubbleWidth).abs() < 1e-4,
+                  (p.bounds.width - p.bounds.height).abs() < 1e-3 &&
+                  p.bounds.width >= minTightDiameter - 1e-3 &&
+                  p.bounds.width < maxBubbleWidth,
             ),
             isTrue,
           );
         }
       }
       expect(
-        widths.every((w) => (w - widths.first).abs() < 1e-4),
+        pubWidths.every((w) => (w - pubWidths.first).abs() < 1e-4),
         isTrue,
-        reason: '$denominator: $widths',
+        reason: '$denominator: $pubWidths',
       );
     }
   });
@@ -114,22 +127,27 @@ void main() {
       const column = ArchitectColumn(
         id: 'col',
         position: Offset.zero,
-        width: .4,
-        depth: .4,
+        label: 'K1',
+        width: .6,
+        depth: .6,
       );
       ArchitectTextScope(
         const ArchitectDocument(),
         'plan:s',
         50,
         zoom,
+        publication: true,
       ).run(() => column.paint2D(canvas: canvas, zoomScale: zoom));
-      final label = canvas.operations
+      final texts = canvas.operations
           .whereType<ArchitectVectorText>()
-          .firstWhere((e) => e.role == 'dimension');
+          .toList();
+      expect(texts.where((e) => e.role == 'dimension'), isEmpty);
+      final label = texts.single;
+      expect(label.role, 'ordinary');
       widths.add(label.bounds.width);
       expect(
         label.size / zoom * 20 * ArchitectDrawingScale.fontCapRatio,
-        closeTo(1.5, 1e-8),
+        closeTo(1.9, 1e-8),
       );
     }
     expect(widths[1] / widths[0], closeTo(4, 1e-5));

@@ -133,6 +133,7 @@ class ArchitectSheetComposer {
       Offset point,
       double size, {
       Color color = Colors.black,
+      ArchitectAnnotationRole role = ArchitectAnnotationRole.ordinary,
     }) => canvas.text(
       value,
       point,
@@ -142,7 +143,7 @@ class ArchitectSheetComposer {
         color: color,
       ),
       null,
-      ArchitectAnnotationRole.ordinary,
+      role,
     );
     for (final place in sheet.placements) {
       if (excludePlacements.contains(place.id)) continue;
@@ -184,10 +185,17 @@ class ArchitectSheetComposer {
       if (place.showTitle) {
         final title =
             '${place.number}  ${drawingName(drawing, l)}  1:${place.scale}';
+        final titleCapMm = p.document.textMm(
+          drawing.sourceKey,
+          '',
+          ArchitectAnnotationRole.title,
+          place.scale,
+        );
         final tp = ArchitectSheetLayout.textPainter(
           title,
-          2.2,
+          titleCapMm,
           place.frame.width,
+          role: ArchitectAnnotationRole.title,
         );
         tp.paint(canvas, place.frame.bottomLeft + const Offset(0, 1));
       }

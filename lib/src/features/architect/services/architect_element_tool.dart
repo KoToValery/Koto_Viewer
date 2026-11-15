@@ -57,7 +57,38 @@ class ArchitectElementTool extends ChangeNotifier {
   // Column options
   ColumnShape columnShape = ColumnShape.rectangular;
   double columnWidth = 0.25;
-  double columnDepth = 0.25;
+  double columnDepth = 0.40;
+  double? columnHeight;
+  double columnBaseOffset = 0.0;
+
+  static ({ColumnShape shape, double width, double depth})
+  columnDefaultsForScheme(ArchitectStructuralScheme scheme) => switch (scheme) {
+    ArchitectStructuralScheme.flatSlab => (
+      shape: ColumnShape.rectangular,
+      width: 0.25,
+      depth: 0.40,
+    ),
+    ArchitectStructuralScheme.beamAndSlab => (
+      shape: ColumnShape.rectangular,
+      width: 0.25,
+      depth: 0.25,
+    ),
+    ArchitectStructuralScheme.sandwichPanels => (
+      shape: ColumnShape.rectangular,
+      width: 0.20,
+      depth: 0.20,
+    ),
+    ArchitectStructuralScheme.roundLogs => (
+      shape: ColumnShape.circular,
+      width: 0.24,
+      depth: 0.24,
+    ),
+    ArchitectStructuralScheme.studFrame => (
+      shape: ColumnShape.rectangular,
+      width: 0.15,
+      depth: 0.15,
+    ),
+  };
 
   // Beam options
   double beamWidth = 0.25;
@@ -118,11 +149,42 @@ class ArchitectElementTool extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setColumnParams({ColumnShape? shape, double? width, double? depth}) {
+  void setColumnParams({
+    ColumnShape? shape,
+    double? width,
+    double? depth,
+    double? height,
+    bool clearHeight = false,
+    double? baseOffset,
+  }) {
     if (shape != null) columnShape = shape;
     if (width != null) columnWidth = width;
     if (depth != null) columnDepth = depth;
+    if (clearHeight) {
+      columnHeight = null;
+    } else if (height != null) {
+      columnHeight = height;
+    }
+    if (baseOffset != null) columnBaseOffset = baseOffset;
     notifyListeners();
+  }
+
+  void applyColumnSchemeDefaults(
+    ArchitectStructuralScheme scheme, {
+    bool resetVertical = false,
+    bool notify = true,
+  }) {
+    final defaults = columnDefaultsForScheme(scheme);
+    columnShape = defaults.shape;
+    columnWidth = defaults.width;
+    columnDepth = defaults.depth;
+    if (resetVertical) {
+      columnHeight = null;
+      columnBaseOffset = 0.0;
+    }
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   void setBeamParams({double? width, double? depth}) {
@@ -234,6 +296,8 @@ class ArchitectElementTool extends ChangeNotifier {
       shape: columnShape,
       width: columnWidth,
       depth: columnDepth,
+      height: columnHeight,
+      baseOffset: columnBaseOffset,
       rotationDeg: rotationDeg,
       label: colLabel,
     );

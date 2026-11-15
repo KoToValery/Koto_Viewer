@@ -3680,9 +3680,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     // 4. If a column, shear wall or opening was already selected and user taps somewhere outside
+    var clearedSelection = false;
     if (_selectedColumn != null && !_isMovingColumn) {
       final hit = _hitTestColumn(event.localPosition);
       if (hit == null) {
+        clearedSelection = true;
         setState(() {
           _selectedColumn = null;
         });
@@ -3691,6 +3693,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_selectedShearWall != null && !_isMovingShearWall) {
       final hit = _hitTestShearWall(event.localPosition);
       if (hit == null) {
+        clearedSelection = true;
         setState(() {
           _selectedShearWall = null;
         });
@@ -3699,6 +3702,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_selectedOpening != null && !_isMovingOpening) {
       final hit = _hitTestOpening(event.localPosition);
       if (hit == null) {
+        clearedSelection = true;
         setState(() {
           _selectedOpening = null;
           _selectedOpeningVertexIndex = null;
@@ -3750,7 +3754,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           return;
         }
       }
-      if (!_isEditingSlab) {
+      if (!_isEditingSlab && !clearedSelection) {
         _isPlacingWithHold = true;
         _updatePointer(event.localPosition, isMouse: true);
       }
@@ -5467,44 +5471,38 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     switch (_activeTool) {
       case StructuralDrawTool.column:
         final hitCol = _hitTestColumn(details.localPosition);
+        setState(() {
+          _selectedColumn = hitCol;
+          _selectedShearWall = null;
+          _selectedBeam = null;
+          _selectedOpening = null;
+          _selectedOpeningVertexIndex = null;
+          _selectedGridAxis = null;
+          _editingSlab = null;
+          _selectedSlabVertexIndex = null;
+          _isMovingColumn = false;
+        });
         if (hitCol != null) {
-          setState(() {
-            _selectedColumn = hitCol;
-            _selectedShearWall = null;
-            _selectedBeam = null;
-            _selectedOpening = null;
-            _selectedOpeningVertexIndex = null;
-            _selectedGridAxis = null;
-            _editingSlab = null;
-            _selectedSlabVertexIndex = null;
-            _isMovingColumn = false;
-          });
           HapticFeedback.selectionClick();
-          return;
         }
-        final cadPt = _screenToCad(details.localPosition);
-        _commitPlacement(cadPt);
         return;
 
       case StructuralDrawTool.shearWall:
         final hitWall = _hitTestShearWall(details.localPosition);
+        setState(() {
+          _selectedShearWall = hitWall;
+          _selectedColumn = null;
+          _selectedBeam = null;
+          _selectedOpening = null;
+          _selectedOpeningVertexIndex = null;
+          _selectedGridAxis = null;
+          _editingSlab = null;
+          _selectedSlabVertexIndex = null;
+          _isMovingShearWall = false;
+        });
         if (hitWall != null) {
-          setState(() {
-            _selectedShearWall = hitWall;
-            _selectedColumn = null;
-            _selectedBeam = null;
-            _selectedOpening = null;
-            _selectedOpeningVertexIndex = null;
-            _selectedGridAxis = null;
-            _editingSlab = null;
-            _selectedSlabVertexIndex = null;
-            _isMovingShearWall = false;
-          });
           HapticFeedback.selectionClick();
-          return;
         }
-        final cadPt = _screenToCad(details.localPosition);
-        _commitPlacement(cadPt);
         return;
 
       case StructuralDrawTool.beam:

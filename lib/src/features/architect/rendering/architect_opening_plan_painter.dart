@@ -32,10 +32,10 @@ class ArchitectOpeningPlanPainter {
     final annotationId = elementId ?? specId;
     final dimensionFontScale = scope == null
         ? null
-        : scope.fontSize(annotationId, ArchitectAnnotationRole.dimension) / 10;
+        : scope.fontSize(annotationId, ArchitectAnnotationRole.opening) / 10;
     final symbolFontScale = scope == null
         ? null
-        : scope.fontSize(annotationId, ArchitectAnnotationRole.symbol) / 14;
+        : scope.fontSize(annotationId, ArchitectAnnotationRole.opening) / 14;
     final halfThick = wallThickness / 2;
     final n = normal;
     final dimLinePaint = Paint()
@@ -69,7 +69,7 @@ class ArchitectOpeningPlanPainter {
 
     final tpWidth = ArchitectTextPainter(
       elementId: annotationId,
-      role: ArchitectAnnotationRole.dimension,
+      role: ArchitectAnnotationRole.opening,
       modelScale: dimensionFontScale,
       text: TextSpan(text: wCm, style: textStyle),
       textDirection: TextDirection.ltr,
@@ -77,7 +77,7 @@ class ArchitectOpeningPlanPainter {
 
     final tpHeight = ArchitectTextPainter(
       elementId: annotationId,
-      role: ArchitectAnnotationRole.dimension,
+      role: ArchitectAnnotationRole.opening,
       modelScale: dimensionFontScale,
       text: TextSpan(text: hCm, style: textStyle),
       textDirection: TextDirection.ltr,
@@ -113,7 +113,7 @@ class ArchitectOpeningPlanPainter {
     if (sillHeight > 0 && !outsideWall) {
       final tpSill = ArchitectTextPainter(
         elementId: annotationId,
-        role: ArchitectAnnotationRole.dimension,
+        role: ArchitectAnnotationRole.opening,
         modelScale: dimensionFontScale,
         text: TextSpan(text: 'h=$sillCm', style: textStyle),
         textDirection: TextDirection.ltr,
@@ -131,7 +131,7 @@ class ArchitectOpeningPlanPainter {
     if (outsideWall && sillHeight > 0) {
       final sill = ArchitectTextPainter(
         elementId: annotationId,
-        role: ArchitectAnnotationRole.dimension,
+        role: ArchitectAnnotationRole.opening,
         modelScale: dimensionFontScale,
         text: TextSpan(text: 'h=$sillCm', style: textStyle),
         textDirection: TextDirection.ltr,
@@ -149,13 +149,35 @@ class ArchitectOpeningPlanPainter {
       canvas.restore();
     }
 
-    // Specification circle badge follows door.dxf New_ID.
-    // Positioned at the end of the extended dimension line touching circumference.
-    // Static in model coordinates: never balloons up upon zoom-out.
-    // Circle interior is transparent (outline only, no solid hatch).
-    final badgeR = scope == null
-        ? badgeRadius
-        : scope.height(annotationId, ArchitectAnnotationRole.symbol) * 1.2;
+    // Text ID inside circle (measured first so the circle tightly wraps it).
+    final idPainter = ArchitectTextPainter(
+      elementId: annotationId,
+      role: ArchitectAnnotationRole.opening,
+      modelScale: symbolFontScale,
+      text: TextSpan(
+        text: specId,
+        style: TextStyle(
+          color: isSelected
+              ? const Color(0xFF00E5FF)
+              : palette.foreground(Colors.black),
+          fontSize: 14.0,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Arial',
+          height: 1.0,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final idScale = symbolFontScale ?? .10 / idPainter.height;
+    final textW = idPainter.width * idScale;
+    final visualH = scope == null
+        ? idPainter.height * idScale * ArchitectDrawingScale.fontCapRatio
+        : scope.height(annotationId, ArchitectAnnotationRole.opening);
+    final cornerPad = scope == null
+        ? 0.025
+        : ArchitectDrawingScale(scope.denominator).paperToModel(0.35);
+    final badgeR = Offset(textW / 2, visualH / 2).distance + cornerPad;
     final badgeCenter = centerPos + n * (extDist + badgeR);
 
     // Circle border (outline only, transparent interior)
@@ -170,32 +192,16 @@ class ArchitectOpeningPlanPainter {
         ..strokeWidth = (isSelected ? 1.6 : 1.0) / zoomScale,
     );
 
-    // Text ID inside circle (static ~0.14m height)
-    final idPainter = ArchitectTextPainter(
-      elementId: annotationId,
-      role: ArchitectAnnotationRole.symbol,
-      modelScale: symbolFontScale,
-      text: TextSpan(
-        text: specId,
-        style: TextStyle(
-          color: isSelected
-              ? const Color(0xFF00E5FF)
-              : palette.foreground(Colors.black),
-          fontSize: 14.0,
-          fontWeight: FontWeight.bold,
-          fontFamily: 'Arial',
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final idScale = symbolFontScale ?? .14 / idPainter.height;
+    final idMetrics = idPainter.computeLineMetrics();
+    final idCenterY = idMetrics.isNotEmpty
+        ? idMetrics.first.baseline - (visualH / idScale) / 2
+        : idPainter.height / 2.0;
     canvas.save();
     canvas.translate(badgeCenter.dx, badgeCenter.dy);
     canvas.scale(idScale);
     idPainter.paint(
       canvas,
-      Offset(-idPainter.width / 2.0, -idPainter.height / 2.0),
+      Offset(-idPainter.width / 2.0, -idCenterY),
     );
     canvas.restore();
   }

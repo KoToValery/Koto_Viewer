@@ -1,3 +1,4 @@
+import 'architect_annotation_settings.dart';
 import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../../../core/widgets/app_settings_screen.dart';
@@ -20,6 +21,7 @@ class ArchitectWorkspaceSettings {
   final bool ghostStoreys, upperOverhangs, grid, magnetic, underlay, darkCanvas;
   final double axisCoreThickness;
   final double handleOffsetLength;
+  final Map<String, double> profileMm;
   const ArchitectWorkspaceSettings({
     required this.units,
     this.structuralScheme = ArchitectStructuralScheme.flatSlab,
@@ -35,6 +37,7 @@ class ArchitectWorkspaceSettings {
     required this.darkCanvas,
     required this.axisCoreThickness,
     this.handleOffsetLength = 50.0,
+    this.profileMm = const {},
   });
 }
 
@@ -84,6 +87,8 @@ class _ArchitectWorkspaceSettingsDialogState
       dark = widget.settings.darkCanvas;
   late double core = widget.settings.axisCoreThickness;
   late double handleOffsetLength = widget.settings.handleOffsetLength;
+  late Map<String, double> profileMm = Map.of(widget.settings.profileMm);
+  int _tab = 0;
 
   Future<void> editCore() async {
     var value = units.toUnit(core);
@@ -120,13 +125,60 @@ class _ArchitectWorkspaceSettingsDialogState
   Widget build(BuildContext context) {
     final l = context.l10n;
     return architectAlertDialog(
-      title: Text(l.architectSettings),
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l.architectSettings),
+          const SizedBox(height: 10),
+          SegmentedButton<int>(
+            showSelectedIcon: false,
+            style: SegmentedButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            segments: [
+              ButtonSegment<int>(
+                value: 0,
+                label: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    l.architectSettingsTabGeneral,
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
+                ),
+              ),
+              ButtonSegment<int>(
+                value: 1,
+                label: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    l.architectSettingsTabFonts,
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
+                ),
+              ),
+            ],
+            selected: {_tab},
+            onSelectionChanged: (values) =>
+                setState(() => _tab = values.first),
+          ),
+        ],
+      ),
       content: SizedBox(
-        width: 300,
+        width: (MediaQuery.sizeOf(context).width - 80).clamp(240.0, 420.0),
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          child: _tab == 1
+              ? ArchitectTypographyProfilePanel(
+                  profileMm: profileMm,
+                  initialScale: dimensionScale.denominator,
+                  onChanged: (next) => setState(() => profileMm = next),
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
               ListTile(key: const ValueKey('architect-settings-ui'), contentPadding: EdgeInsets.zero,
                 title: Text(l.uiSettingsCategory), leading: const AppIcon(AppIconId.layoutCustom),
                 trailing: const AppIcon(AppIconId.chevronRight),
@@ -159,6 +211,7 @@ class _ArchitectWorkspaceSettingsDialogState
               ),
               DropdownButtonFormField<ArchitectStructuralScheme>(
                 key: const ValueKey('architect-settings-structural-scheme'),
+                isExpanded: true,
                 initialValue: structuralScheme,
                 decoration: InputDecoration(
                   labelText: l.architectStructuralScheme,
@@ -167,7 +220,11 @@ class _ArchitectWorkspaceSettingsDialogState
                   for (final scheme in ArchitectStructuralScheme.values)
                     DropdownMenuItem(
                       value: scheme,
-                      child: Text(scheme.label(l)),
+                      child: Text(
+                        scheme.label(l),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                 ],
                 onChanged: (value) {
@@ -203,11 +260,19 @@ class _ArchitectWorkspaceSettingsDialogState
                 ),
               DropdownButtonFormField<ArchitectUnit>(
                 key: const ValueKey('architect-settings-units'),
+                isExpanded: true,
                 initialValue: units,
                 decoration: InputDecoration(labelText: l.architectUnits),
                 items: [
                   for (final unit in ArchitectUnit.values)
-                    DropdownMenuItem(value: unit, child: Text(unit.symbol)),
+                    DropdownMenuItem(
+                      value: unit,
+                      child: Text(
+                        unit.symbol,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                 ],
                 onChanged: (value) {
                   if (value != null) setState(() => units = value);
@@ -215,6 +280,7 @@ class _ArchitectWorkspaceSettingsDialogState
               ),
               DropdownButtonFormField<int>(
                 key: const ValueKey('architect-settings-precision'),
+                isExpanded: true,
                 initialValue: distanceDecimals,
                 decoration: InputDecoration(
                   labelText: l.architectDistancePrecision,
@@ -229,13 +295,21 @@ class _ArchitectWorkspaceSettingsDialogState
               ),
               DropdownButtonFormField<ArchitectDimensionScale>(
                 key: const ValueKey('architect-settings-dimension-scale'),
+                isExpanded: true,
                 initialValue: dimensionScale,
                 decoration: InputDecoration(
                   labelText: l.architectDimensionScale,
                 ),
                 items: [
                   for (final scale in ArchitectDimensionScale.values)
-                    DropdownMenuItem(value: scale, child: Text(scale.ratio)),
+                    DropdownMenuItem(
+                      value: scale,
+                      child: Text(
+                        scale.ratio,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                 ],
                 onChanged: (value) {
                   if (value != null) setState(() => dimensionScale = value);
@@ -363,6 +437,7 @@ class _ArchitectWorkspaceSettingsDialogState
               darkCanvas: dark,
               axisCoreThickness: core,
               handleOffsetLength: handleOffsetLength,
+              profileMm: Map.unmodifiable(profileMm),
             ),
           ),
           child: Text(l.save),

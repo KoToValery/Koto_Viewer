@@ -496,4 +496,64 @@ void main() {
       expect(find.byType(Slider), findsOneWidget);
     },
   );
+
+  for (final language in ['en', 'bg']) {
+    testWidgets(
+      'Settings Layout fonts tab updates profileMm cleanly on phone in $language',
+      (tester) async {
+        final model = workspace.commands();
+        addTearDown(model.dispose);
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final l = await AppLocalizations.delegate.load(Locale(language));
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: Locale(language),
+            home: ArchitectWorkspaceScreen(commandController: model),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('architect-settings')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l.architectSettingsTabFonts));
+        await tester.pumpAndSettle();
+
+        final scale50 = find.byKey(const ValueKey('architect-font-scale-50'));
+        await tester.ensureVisible(scale50);
+        await tester.tap(scale50);
+        await tester.pumpAndSettle();
+        final scale100 = find.byKey(const ValueKey('architect-font-scale-100'));
+        await tester.ensureVisible(scale100);
+        await tester.tap(scale100);
+        await tester.pumpAndSettle();
+        final incAxis = find.byKey(
+          const ValueKey('architect-font-inc-100-axis'),
+        );
+        await tester.ensureVisible(incAxis);
+        await tester.tap(incAxis);
+        await tester.pumpAndSettle();
+        final decRoom = find.byKey(
+          const ValueKey('architect-font-dec-100-roomName'),
+        );
+        await tester.ensureVisible(decRoom);
+        await tester.tap(decRoom);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('architect-settings-save')));
+        await tester.pumpAndSettle();
+
+        expect(model.project.document.profileMm['100/axis'], closeTo(3.1, 1e-6));
+        expect(
+          model.project.document.profileMm['100/roomName'],
+          closeTo(1.4, 1e-6),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

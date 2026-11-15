@@ -287,6 +287,13 @@ void main() {
         .toModel(marker.effectivePlacementPosition);
     await g.up();
     await tester.pumpAndSettle();
+    expect(model.project.activeStorey.columns, isEmpty);
+    expect(
+      find.byKey(const ValueKey('architect-placement-command-overlay')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
+    await tester.pumpAndSettle();
     expect(
       (model.project.activeStorey.columns.single.position - target).distance,
       lessThan(1e-8),
@@ -320,6 +327,8 @@ void main() {
       findsOneWidget,
     );
     await g.up();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
     await tester.pumpAndSettle();
     expect(model.project.activeStorey.columns, hasLength(2));
     expect(tester.takeException(), isNull);

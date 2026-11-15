@@ -856,10 +856,15 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'wallFinish',
               'ceilingFinish',
               'isAutoBoundary',
+              'shape',
               'material',
               'showOnPlan',
               'clipToRoof',
             }.contains(value.key)) {
+          throw ArgumentError('Unsupported property');
+        }
+        if (value.key == 'shape' &&
+            !ColumnShape.values.any((s) => s.name == value.value)) {
           throw ArgumentError('Unsupported property');
         }
         if (value.key == 'material' &&

@@ -4369,6 +4369,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectColumnSize => 'Размер';
 
   @override
+  String get architectColumnBaseOffset => 'h от котата';
+
+  @override
   String get architectBeamSize => 'Размер';
 
   @override
@@ -7450,6 +7453,36 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectAnnotationSymbol => 'Символи';
+
+  @override
+  String get architectAnnotationAxis => 'Координатни оси';
+
+  @override
+  String get architectAnnotationSection => 'Разрези и фасади';
+
+  @override
+  String get architectAnnotationOpening => 'Прозорци и врати';
+
+  @override
+  String get architectAnnotationSite => 'Терен / Ситуация';
+
+  @override
+  String get architectAnnotationRooms => 'Помещения (№, име, m²)';
+
+  @override
+  String get architectSettingsTabGeneral => 'Основни';
+
+  @override
+  String get architectSettingsTabFonts => 'Шрифтове (Layout)';
+
+  @override
+  String get architectLayoutFonts => 'Шрифтове за печат (Layout)';
+
+  @override
+  String get architectLayoutFontsResetScale => 'Нулирай мащаба';
+
+  @override
+  String get architectLayoutFontsResetAll => 'Всички по подразбиране';
 
   @override
   String get architectSheetVisibility => 'Видимост';

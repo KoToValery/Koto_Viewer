@@ -174,18 +174,7 @@ class ArchitectElementsPainterHelper {
           role: ArchitectAnnotationRole.ordinary,
           modelScale: ArchitectPaperStyle.annotationScale,
           text: TextSpan(
-            children: [
-              ArchitectAnnotationSpan(
-                role: ArchitectAnnotationRole.ordinary,
-                text: '${slab.label}\n',
-              ),
-              ArchitectAnnotationSpan(
-                role: ArchitectAnnotationRole.area,
-                text:
-                    ArchitectTextScope.current?.area(slab.area) ??
-                    '${BimDistanceUnit.trimZeros(slab.area.toStringAsFixed(2))} m²',
-              ),
-            ],
+            text: slab.label,
             style: TextStyle(
               color: palette.foreground(const Color(0xFF37474F)),
               fontFamily: 'Roboto',
@@ -476,8 +465,8 @@ class ArchitectElementsPainterHelper {
       final paperScale = ArchitectDrawingScale(
         scope?.denominator ?? dimensionScale.denominator,
       );
-      final annotationScale = ArchitectDimensionScale.values.firstWhere(
-        (s) => s.denominator == paperScale.denominator,
+      final annotationScale = ArchitectDimensionScale.forDenominator(
+        paperScale.denominator,
       );
 
       final tiers = ArchitectDimensionLayout.layoutTiers(

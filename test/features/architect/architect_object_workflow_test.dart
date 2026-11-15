@@ -258,8 +258,44 @@ void main() {
             ),
             findsOneWidget,
           );
-          // Tapping places the object directly without selecting an existing bed.
+          // Quick taps select/deselect without placing or staging an object.
           await workspace.wallTap(tester, const Offset(-.5, 0));
+          await tester.pumpAndSettle();
+          expect(workspace.overlay(tester).selectedElementId, originalObject.id);
+          expect(commands.project.activeStorey.components.length, 1);
+          expect(
+            find.byKey(const ValueKey('architect-placement-command-overlay')),
+            findsNothing,
+          );
+          await workspace.wallTap(tester, const Offset(.2, 1.2));
+          await tester.pumpAndSettle();
+          expect(workspace.overlay(tester).selectedElementId, isNull);
+          expect(commands.project.activeStorey.components.length, 1);
+          expect(
+            find.byKey(const ValueKey('architect-placement-command-overlay')),
+            findsNothing,
+          );
+          // Hold places via offset handle and stages the shared X/check overlay.
+          final held = await tester.startGesture(
+            workspace.screen(tester, const Offset(.2, 1.2)),
+          );
+          await tester.pump(const Duration(milliseconds: 281));
+          await held.up();
+          await tester.pumpAndSettle();
+          expect(commands.project.activeStorey.components.length, 1);
+          expect(commands.undoCount, 0);
+          expect(workspace.overlay(tester).componentPreview, isNotNull);
+          expect(
+            find.byKey(const ValueKey('architect-draft-cancel')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('architect-placement-command-overlay')),
+            findsOneWidget,
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('architect-command-apply')),
+          );
           await tester.pumpAndSettle();
           expect(commands.project.activeStorey.components.length, 2);
           expect(commands.undoCount, 1);
@@ -277,7 +313,7 @@ void main() {
           expect(workspace.overlay(tester).componentPreview, isNull);
           expect(find.byType(ArchitectComponentLibraryDialog), findsNothing);
           // A new canvas tap after exiting no longer places an object.
-          await workspace.wallTap(tester, const Offset(2, 1));
+          await workspace.wallTap(tester, const Offset(.2, 1.2));
           await tester.pumpAndSettle();
           expect(commands.project.activeStorey.components.length, 2);
           commands.undo();
@@ -381,13 +417,23 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
     expect(find.byType(ArchitectRadialMenu), findsNothing);
-    expect(commands.project.activeStorey.components.length, 2);
-    expect(commands.undoCount, 1);
-    expect(workspace.overlay(tester).componentPreview, isNull);
-    await tester.tap(find.byKey(const ValueKey('architect-draft-cancel')));
+    expect(commands.project.activeStorey.components.length, 1);
+    expect(commands.undoCount, 0);
+    expect(workspace.overlay(tester).componentPreview, isNotNull);
+    expect(find.byKey(const ValueKey('architect-draft-cancel')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('architect-placement-command-overlay')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('architect-command-cancel')));
     await tester.pumpAndSettle();
     expect(workspace.overlay(tester).componentPreview, isNull);
-    expect(commands.project.activeStorey.components.length, 2);
+    expect(
+      find.byKey(const ValueKey('architect-placement-command-overlay')),
+      findsNothing,
+    );
+    expect(commands.project.activeStorey.components.length, 1);
+    expect(commands.undoCount, 0);
     expect(
       tester
           .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))

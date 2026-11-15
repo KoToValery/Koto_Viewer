@@ -4352,6 +4352,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectColumnSize => 'Size';
 
   @override
+  String get architectColumnBaseOffset => 'Offset h';
+
+  @override
   String get architectBeamSize => 'Size';
 
   @override
@@ -7425,6 +7428,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectAnnotationSymbol => 'Symbols';
+
+  @override
+  String get architectAnnotationAxis => 'Grid axes';
+
+  @override
+  String get architectAnnotationSection => 'Sections & elevations';
+
+  @override
+  String get architectAnnotationOpening => 'Doors & windows';
+
+  @override
+  String get architectAnnotationSite => 'Site & terrain';
+
+  @override
+  String get architectAnnotationRooms => 'Rooms (No., name, m²)';
+
+  @override
+  String get architectSettingsTabGeneral => 'General';
+
+  @override
+  String get architectSettingsTabFonts => 'Layout fonts';
+
+  @override
+  String get architectLayoutFonts => 'Layout font sizes';
+
+  @override
+  String get architectLayoutFontsResetScale => 'Reset scale';
+
+  @override
+  String get architectLayoutFontsResetAll => 'Reset all';
 
   @override
   String get architectSheetVisibility => 'Visibility';

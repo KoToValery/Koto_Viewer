@@ -372,4 +372,167 @@ void main() {
       }
     },
   );
+  testWidgets(
+    'touch quick tap selects/deselects columns and shear walls; only hold places',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(1000, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const column = StructuralColumn(
+        id: 'c1',
+        center: Offset(2, 5),
+        width: .5,
+        height: .5,
+      );
+      const wall = StructuralShearWall(
+        id: 'w1',
+        start: Offset(6, 4),
+        end: Offset(8, 6),
+        thickness: .3,
+      );
+      final doc = DxfDocument(
+        entities: [],
+        layers: {},
+        blocks: {},
+        headerVars: {},
+        bounds: const Rect.fromLTWH(0, 0, 10, 10),
+        entityStats: {},
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: StructuralDesignerScreen(
+            document: doc,
+            initialProject: const StructuralProject(
+              storeys: [
+                StoreyLevel(
+                  id: 'f',
+                  name: 'f',
+                  columns: [column],
+                  shearWalls: [wall],
+                ),
+              ],
+            ),
+            initialCadBounds: doc.bounds,
+            title: 'touch-select-only',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final l = await AppLocalizations.delegate.load(const Locale('en'));
+      Structural2dPainter model() => tester
+          .widgetList<CustomPaint>(find.byType(CustomPaint))
+          .map((w) => w.painter)
+          .whereType<Structural2dPainter>()
+          .first;
+      StructuralPointerPainter pointer() => tester
+          .widgetList<CustomPaint>(find.byType(CustomPaint))
+          .map((w) => w.painter)
+          .whereType<StructuralPointerPainter>()
+          .first;
+      final origin = tester.getTopLeft(find.byType(BimTransformRenderer).first);
+
+      // Column tool: quick touch tap selects/deselects without placing.
+      await tester.tap(find.text(l.toolColumn));
+      await tester.pumpAndSettle();
+      final emptyColPos = origin + model().cadToScene(const Offset(2, 2));
+      await tester.tapAt(emptyColPos, kind: PointerDeviceKind.touch);
+      await tester.pumpAndSettle();
+      expect(model().currentStorey.columns, hasLength(1));
+      expect(model().selectedColumnId, isNull);
+
+      await tester.tapAt(
+        origin + model().cadToScene(column.center),
+        kind: PointerDeviceKind.touch,
+      );
+      await tester.pumpAndSettle();
+      expect(model().currentStorey.columns, hasLength(1));
+      expect(model().selectedColumnId, column.id);
+
+      await tester.tapAt(emptyColPos, kind: PointerDeviceKind.touch);
+      await tester.pumpAndSettle();
+      expect(model().currentStorey.columns, hasLength(1));
+      expect(model().selectedColumnId, isNull);
+
+      // Column tool: only long-press hold with offset handle places.
+      final colHold = await tester.startGesture(
+        emptyColPos,
+        kind: PointerDeviceKind.touch,
+      );
+      await tester.pump(const Duration(milliseconds: 650));
+      expect(
+        (pointer().effectivePlacementPosition - pointer().touchPos).distance,
+        greaterThan(5),
+      );
+      await colHold.moveBy(const Offset(40, 20));
+      await tester.pump();
+      final expectedColPoly = List<Offset>.of(
+        pointer().previewElementPolygon!,
+      );
+      await colHold.up();
+      await tester.pumpAndSettle();
+      expect(model().currentStorey.columns, hasLength(2));
+      final actualColPoly = model().currentStorey.columns.last.polygonVertices
+          .map(model().cadToScene)
+          .toList();
+      for (var i = 0; i < expectedColPoly.length; i++) {
+        expect((actualColPoly[i] - expectedColPoly[i]).distance, lessThan(1e-6));
+      }
+
+      // Shear wall tool: quick touch tap selects/deselects without placing.
+      await tester.tap(find.text(l.toolShearWall));
+      await tester.pumpAndSettle();
+      final emptyWallPos = origin + model().cadToScene(const Offset(5, 2));
+      await tester.tapAt(emptyWallPos, kind: PointerDeviceKind.touch);
+      await tester.pumpAndSettle();
+      expect(model().currentStorey.shearWalls, hasLength(1));
+      expect(model().selectedShearWallId, isNull);
+
+      await tester.tapAt(
+        origin + model().cadToScene(wall.center),
+        kind: PointerDeviceKind.touch,
+      );
+      await tester.pumpAndSettle();
+      expect(model().currentStorey.shearWalls, hasLength(1));
+      expect(model().selectedShearWallId, wall.id);
+
+      await tester.tapAt(emptyWallPos, kind: PointerDeviceKind.touch);
+      await tester.pumpAndSettle();
+      expect(model().currentStorey.shearWalls, hasLength(1));
+      expect(model().selectedShearWallId, isNull);
+
+      // Shear wall tool: only long-press hold with offset handle places.
+      final wallHold = await tester.startGesture(
+        emptyWallPos,
+        kind: PointerDeviceKind.touch,
+      );
+      await tester.pump(const Duration(milliseconds: 650));
+      expect(
+        (pointer().effectivePlacementPosition - pointer().touchPos).distance,
+        greaterThan(5),
+      );
+      await wallHold.moveBy(const Offset(40, 20));
+      await tester.pump();
+      final expectedWallPoly = List<Offset>.of(
+        pointer().previewElementPolygon!,
+      );
+      await wallHold.up();
+      await tester.pumpAndSettle();
+      expect(model().currentStorey.shearWalls, hasLength(2));
+      final actualWallPoly = model().currentStorey.shearWalls.last.polygonVertices
+          .map(model().cadToScene)
+          .toList();
+      for (var i = 0; i < expectedWallPoly.length; i++) {
+        expect(
+          (actualWallPoly[i] - expectedWallPoly[i]).distance,
+          lessThan(1e-6),
+        );
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

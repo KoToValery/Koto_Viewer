@@ -1503,8 +1503,12 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       double height,
       Color c, {
       bool centred = false,
+      String? elementId,
+      ArchitectAnnotationRole role = ArchitectAnnotationRole.ordinary,
     }) {
       final tp = ArchitectTextPainter(
+        elementId: elementId,
+        role: role,
         text: TextSpan(
           text: value,
           style: TextStyle(
@@ -1566,8 +1570,16 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
         ArchitectTextScope.current?.level(floor.elevation) ??
             drawing.project.formatLevel(floor.elevation),
         a + const Offset(2, -2),
-        math.max(9, drawing.textHeight * scale),
+        ArchitectTextScope.current != null
+            ? ArchitectTextScope.current!.fontSize(
+                    floor.id,
+                    ArchitectAnnotationRole.ordinary,
+                  ) *
+                  scale
+            : math.max(9, drawing.textHeight * scale),
         color,
+        elementId: floor.id,
+        role: ArchitectAnnotationRole.ordinary,
       );
     }
     if (drawing.data.regions.isEmpty &&
@@ -1600,25 +1612,49 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
         p(Offset(d.anchor.dx, top)),
         paint,
       );
-      final radius = d.rowHeight * .45;
-      final circle = Offset(d.anchor.dx, top + radius);
+      final detailTp = ArchitectTextPainter(
+        elementId: detail.id,
+        role: ArchitectAnnotationRole.ordinary,
+        text: TextSpan(
+          text: d.number?.toString() ?? '?',
+          style: TextStyle(
+            fontSize: d.textHeight * scale,
+            color: c,
+            fontFamily: drawing.fontFamily,
+            height: 1.0,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final detailCapH =
+          detailTp.height * ArchitectDrawingScale.fontCapRatio;
+      final screenRadius =
+          Offset(
+            detailTp.width / 2,
+            detailCapH / 2,
+          ).distance +
+          2.0;
+      final detailMetrics = detailTp.computeLineMetrics();
+      final detailCenterY = detailMetrics.isNotEmpty
+          ? detailMetrics.first.baseline - detailCapH / 2
+          : detailTp.height / 2;
+      final circle = Offset(d.anchor.dx, top + screenRadius / scale);
       canvas.drawCircle(
         p(circle),
-        radius * scale,
+        screenRadius,
         paint..style = PaintingStyle.stroke,
       );
-      text(
-        d.number?.toString() ?? '?',
-        p(circle),
-        d.textHeight * scale,
-        c,
-        centred: true,
+      detailTp.paint(
+        canvas,
+        p(circle) - Offset(detailTp.width / 2, detailCenterY),
       );
       for (var i = 0; i < d.rows.length; i++) {
         final y = d.text.dy - i * d.rowHeight;
         final at = p(Offset(d.text.dx, y));
         final right = detail.textOffset.dx <= 0;
         final tp = ArchitectTextPainter(
+          elementId: detail.id,
+          role: ArchitectAnnotationRole.ordinary,
           text: TextSpan(
             text: d.rows[i],
             style: TextStyle(

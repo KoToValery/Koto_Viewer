@@ -4,6 +4,7 @@ import '../models/architect_hatch_pattern.dart';
 import '../models/architect_project.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_hatch_geometry.dart';
+import 'architect_vector_scene.dart';
 
 /// Vector paths for a single vegetation item projected into 2D Section or Elevation view.
 class ArchitectElevationPlantPaths {
@@ -133,6 +134,7 @@ class ArchitectLandscapePainterHelper {
         worldPos: boundary.polygon.first + const Offset(0.18, -0.18),
         zoomScale: zoomScale,
         color: borderPaint.color,
+        elementId: boundary.id,
       );
     }
 
@@ -168,6 +170,7 @@ class ArchitectLandscapePainterHelper {
         worldPos: contour.points[midIdx],
         zoomScale: zoomScale,
         color: strokePaint.color,
+        elementId: contour.id,
       );
     }
 
@@ -205,6 +208,7 @@ class ArchitectLandscapePainterHelper {
         worldPos: p + Offset(crossRadius * 1.2, -crossRadius * 0.9),
         zoomScale: zoomScale,
         color: color,
+        elementId: spot.id,
       );
     }
   }
@@ -1642,14 +1646,18 @@ class ArchitectLandscapePainterHelper {
     required Offset worldPos,
     required double zoomScale,
     required Color color,
+    String? elementId,
   }) {
-    final fontSize = (10.5 / zoomScale).clamp(0.12, 0.42);
-    final tp = TextPainter(
+    final scope = ArchitectTextScope.current;
+    final tp = ArchitectTextPainter(
+      elementId: elementId,
+      role: ArchitectAnnotationRole.site,
+      modelScale: scope != null ? 1 : null,
       text: TextSpan(
         text: text,
         style: TextStyle(
           color: color,
-          fontSize: fontSize,
+          fontSize: (10.5 / zoomScale).clamp(0.12, 0.42),
           fontWeight: FontWeight.w600,
         ),
       ),

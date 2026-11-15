@@ -160,6 +160,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 281));
       await placement.up();
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
+      await tester.pumpAndSettle();
       expect(model.project.activeStorey.columns.length, 1);
       await tool_ui.prepare(tester, Icons.view_column_rounded);
       await tester.pumpAndSettle();
@@ -392,6 +394,8 @@ void main() {
       await mouse.down(target);
       await tester.pump(const Duration(milliseconds: 281));
       await mouse.up();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
       await tester.pumpAndSettle();
       final column = model.project.activeStorey.columns.single;
       expect(column.position, preview.position);

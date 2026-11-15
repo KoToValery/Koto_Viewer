@@ -7607,6 +7607,12 @@ abstract class AppLocalizations {
   /// **'Size'**
   String get architectColumnSize;
 
+  /// Column vertical offset from storey level (h) label
+  ///
+  /// In en, this message translates to:
+  /// **'Offset h'**
+  String get architectColumnBaseOffset;
+
   /// Beam size label
   ///
   /// In en, this message translates to:
@@ -13234,6 +13240,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Symbols'**
   String get architectAnnotationSymbol;
+
+  /// Typography role label for structural grid axis bubbles and labels
+  ///
+  /// In en, this message translates to:
+  /// **'Grid axes'**
+  String get architectAnnotationAxis;
+
+  /// Typography role label for section cut markers, facade markers and north symbol
+  ///
+  /// In en, this message translates to:
+  /// **'Sections & elevations'**
+  String get architectAnnotationSection;
+
+  /// Typography role label for door and window dimensions and specification badges
+  ///
+  /// In en, this message translates to:
+  /// **'Doors & windows'**
+  String get architectAnnotationOpening;
+
+  /// Typography role label for terrain contours, spot elevations and site labels
+  ///
+  /// In en, this message translates to:
+  /// **'Site & terrain'**
+  String get architectAnnotationSite;
+
+  /// Typography role label for unified room number, name and area stamp
+  ///
+  /// In en, this message translates to:
+  /// **'Rooms (No., name, m²)'**
+  String get architectAnnotationRooms;
+
+  /// Tab title for general settings inside architectural workspace settings dialog
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get architectSettingsTabGeneral;
+
+  /// Tab title for layout print font size settings inside architectural workspace settings dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Layout fonts'**
+  String get architectSettingsTabFonts;
+
+  /// Title and tooltip for per-scale layout font sizes settings
+  ///
+  /// In en, this message translates to:
+  /// **'Layout font sizes'**
+  String get architectLayoutFonts;
+
+  /// Button label to restore default font sizes for the selected scale
+  ///
+  /// In en, this message translates to:
+  /// **'Reset scale'**
+  String get architectLayoutFontsResetScale;
+
+  /// Button label to restore default font sizes across all scales
+  ///
+  /// In en, this message translates to:
+  /// **'Reset all'**
+  String get architectLayoutFontsResetAll;
 
   /// No description provided for @architectSheetVisibility.
   ///

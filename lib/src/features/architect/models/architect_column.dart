@@ -184,7 +184,7 @@ class ArchitectColumn {
         ArchitectTextPainter(
           elementId: id,
           role: role,
-          modelScale: scope == null ? 1 : scope.fontSize(id, role) / fontSize,
+          modelScale: 1,
           text: TextSpan(
             text: text,
             style: TextStyle(
@@ -216,19 +216,6 @@ class ArchitectColumn {
       );
       canvas.restore();
     }
-
-    final w = scope?.number(width) ?? (width * 100).round().toString();
-    final d = scope?.number(depth) ?? (depth * 100).round().toString();
-    final dimension = lettering(
-      shape == ColumnShape.circular ? 'd=$w' : '$w/$d',
-      ArchitectAnnotationRole.dimension,
-    );
-    canvas.save();
-    canvas.translate(width / 2 + fontSize * fit * .4, 0);
-    canvas.scale(fit);
-    final dimensionOffset = Offset(0, -dimension.height / 2);
-    dimension.paint(canvas, dimensionOffset);
-    canvas.restore();
     canvas.restore();
   }
 

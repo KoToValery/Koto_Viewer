@@ -444,13 +444,13 @@ class ArchitectRoofPainterHelper {
   }) {
     final scope = ArchitectTextScope.current;
     if (scope != null) {
-      scale = 11 / scope.height(arrow.id, ArchitectAnnotationRole.symbol);
+      scale = 11 / scope.height(arrow.id, ArchitectAnnotationRole.ordinary);
     }
     final label = roof.formatSlope(arrow.format);
     final fontSize = 11.0 / scale;
     final tp = ArchitectTextPainter(
       elementId: arrow.id,
-      role: ArchitectAnnotationRole.symbol,
+      role: ArchitectAnnotationRole.ordinary,
       modelScale: 1,
       text: TextSpan(
         text: label,
@@ -555,7 +555,7 @@ class ArchitectRoofPainterHelper {
   }) {
     final scope = ArchitectTextScope.current;
     if (scope != null) {
-      scale = 11 / scope.height(roof.id, ArchitectAnnotationRole.symbol);
+      scale = 11 / scope.height(roof.id, ArchitectAnnotationRole.ordinary);
     }
     // Label: slope degrees, percent, and elevation badge
     final degText = roof.slopeDegrees.toStringAsFixed(
@@ -578,7 +578,7 @@ class ArchitectRoofPainterHelper {
     final fontSize = 11.0 / scale;
     final tp = ArchitectTextPainter(
       elementId: roof.id,
-      role: ArchitectAnnotationRole.symbol,
+      role: ArchitectAnnotationRole.ordinary,
       modelScale: 1,
       text: TextSpan(
         text: label,

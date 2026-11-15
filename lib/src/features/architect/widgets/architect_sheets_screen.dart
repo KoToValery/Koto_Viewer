@@ -17,6 +17,7 @@ import 'architect_numeric_keypad.dart';
 import '../services/architect_sheet_layout.dart';
 import '../services/architect_sheet_geometry.dart';
 import 'architect_sheet_viewport.dart';
+import 'architect_annotation_settings.dart';
 import 'architect_exchange_export_dialog.dart';
 
 // ============================================================================
@@ -839,6 +840,18 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
               tooltip: l.architectSheetExport,
               onPressed: busy || editing || s == null ? null : output,
               icon: const AppIcon(AppIconId.pdf),
+            ),
+            IconButton(
+              key: const ValueKey('architect-sheets-fonts'),
+              tooltip: l.architectLayoutFonts,
+              onPressed: busy || editing
+                  ? null
+                  : () => showArchitectTypographySettings(
+                      context,
+                      widget.controller,
+                      initialScale: p?.scale ?? 100,
+                    ),
+              icon: const AppIcon(AppIconId.text),
             ),
             PopupMenuButton<String>(
               key: const ValueKey('architect-sheet-more'),

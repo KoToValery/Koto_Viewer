@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
 import '../models/architect_project.dart';
-import '../models/architect_layer.dart';
 import '../rendering/architect_2d_painter.dart';
 import '../rendering/architect_vector_scene.dart';
 import '../rendering/architect_elements_painter_helper.dart';
@@ -213,18 +212,7 @@ class ArchitectDrawingPublisher {
         gridAxes: drawing.visibility['axes'] == false
             ? []
             : effectiveProject.gridAxes,
-        dimensionScale: ArchitectDimensionScale.values.firstWhere(
-          (s) => s.denominator == denominator,
-          // Legacy painters still accept the preset enum. Publication text and
-          // paper/model transforms use the exact denominator in this scope.
-          orElse: () => ArchitectDimensionScale.values.reduce(
-            (a, b) =>
-                (a.denominator - denominator).abs() <=
-                    (b.denominator - denominator).abs()
-                ? a
-                : b,
-          ),
-        ),
+        dimensionScale: ArchitectDimensionScale.forDenominator(denominator),
       );
       if (drawing.kind == ArchitectDrawingKind.plan) {
         var plan = scaled.copyWith(activeStoreyId: drawing.sourceId);

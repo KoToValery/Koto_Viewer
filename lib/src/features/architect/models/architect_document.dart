@@ -8,6 +8,23 @@ enum ArchitectAnnotationRole {
   title,
   table,
   symbol,
+  axis,
+  section,
+  opening,
+  site;
+
+  /// Canonical role categories exposed in layout typography settings.
+  static const List<ArchitectAnnotationRole> editableRoles = [
+    axis,
+    section,
+    title,
+    roomName,
+    dimension,
+    opening,
+    site,
+    ordinary,
+    table,
+  ];
 }
 
 enum ArchitectDrawingKind { plan, section, elevation }
@@ -63,17 +80,132 @@ class ArchitectDrawingScale {
   /// OS/2 sCapHeight / unitsPerEm of bundled Noto Sans. Paper text sizes
   /// describe capital-letter height, rather than the font's larger em square.
   static const fontCapRatio = .714;
-  static const presets = [20, 50, 100, 200, 500];
+  static const presets = [5, 10, 20, 50, 100, 200, 250, 500, 1000];
   final int denominator;
   const ArchitectDrawingScale(this.denominator) : assert(denominator > 0);
   double modelToPaper(double metres) => metres * 1000 / denominator;
   double paperToModel(double mm) => mm * denominator / 1000;
   String get ratio => '1:$denominator';
-  double get defaultTextMm => denominator <= 50
-      ? 1.5
-      : denominator >= 500
-      ? 2.5
-      : 2.2;
+
+  /// Default paper capital-letter height (mm) per annotation role and scale.
+  /// Plan texts remain compact to preserve space, while grid axes, section
+  /// cut markers and layout titles stand out larger.
+  static double defaultMmFor(ArchitectAnnotationRole role, int denominator) =>
+      switch (role) {
+        ArchitectAnnotationRole.axis || ArchitectAnnotationRole.section =>
+          denominator <= 10
+              ? 3.6
+              : denominator <= 20
+              ? 3.5
+              : denominator <= 50
+              ? 3.4
+              : denominator <= 200
+              ? 3.0
+              : denominator <= 250
+              ? 3.2
+              : denominator <= 500
+              ? 3.5
+              : 3.6,
+        ArchitectAnnotationRole.title =>
+          denominator <= 10
+              ? 3.8
+              : denominator <= 20
+              ? 3.6
+              : denominator <= 50
+              ? 3.5
+              : denominator <= 200
+              ? 3.2
+              : denominator <= 250
+              ? 3.4
+              : denominator <= 500
+              ? 3.6
+              : 3.8,
+        ArchitectAnnotationRole.roomName || ArchitectAnnotationRole.area =>
+          denominator <= 5
+              ? 2.0
+              : denominator <= 10
+              ? 1.9
+              : denominator <= 20
+              ? 1.8
+              : denominator <= 50
+              ? 1.6
+              : denominator <= 200
+              ? 1.5
+              : denominator <= 250
+              ? 1.8
+              : denominator <= 500
+              ? 2.2
+              : 2.3,
+        ArchitectAnnotationRole.opening =>
+          denominator <= 10
+              ? 2.2
+              : denominator <= 20
+              ? 2.1
+              : denominator <= 50
+              ? 2.0
+              : denominator <= 200
+              ? 1.5
+              : denominator <= 250
+              ? 1.6
+              : 1.8,
+        ArchitectAnnotationRole.dimension =>
+          denominator <= 10
+              ? 2.5
+              : denominator <= 20
+              ? 2.4
+              : denominator <= 50
+              ? 2.3
+              : denominator <= 200
+              ? 1.6
+              : denominator <= 250
+              ? 1.9
+              : denominator <= 500
+              ? 2.4
+              : 2.5,
+        ArchitectAnnotationRole.site =>
+          denominator <= 50
+              ? 1.9
+              : denominator <= 200
+              ? 1.6
+              : denominator <= 250
+              ? 1.9
+              : denominator <= 500
+              ? 2.3
+              : 2.4,
+        ArchitectAnnotationRole.ordinary =>
+          denominator <= 10
+              ? 2.2
+              : denominator <= 20
+              ? 2.0
+              : denominator <= 50
+              ? 1.9
+              : denominator <= 200
+              ? 1.6
+              : denominator <= 250
+              ? 1.8
+              : denominator <= 500
+              ? 2.2
+              : 2.3,
+        ArchitectAnnotationRole.table =>
+          denominator <= 10
+              ? 2.1
+              : denominator <= 20
+              ? 2.0
+              : denominator <= 50
+              ? 1.9
+              : denominator <= 200
+              ? 1.7
+              : denominator <= 250
+              ? 1.8
+              : denominator <= 500
+              ? 2.1
+              : 2.2,
+        ArchitectAnnotationRole.symbol =>
+          denominator >= 1000 ? 1.8 : 2.0,
+      };
+
+  double get defaultTextMm =>
+      defaultMmFor(ArchitectAnnotationRole.dimension, denominator);
 
   /// Paper spacing, with enough room for larger user-defined lettering.
   /// 6 mm at 1:50 = 30 cm; 4 mm at 1:100 = 40 cm in the model.
@@ -430,17 +562,18 @@ class ArchitectDocument {
     ArchitectAnnotationRole role,
     int scale,
   ) {
-    final base = role == ArchitectAnnotationRole.symbol && scale >= 500
-        ? 2.2
-        : ArchitectDrawingScale(scale).defaultTextMm;
-    return overrideMm['$view/$element/${role.name}/$scale'] ??
-        profileMm['$scale/${role.name}'] ??
-        base *
-            (role == ArchitectAnnotationRole.roomName
-                ? 1.2
-                : role == ArchitectAnnotationRole.title
-                ? 1.5
-                : 1);
+    final specific =
+        overrideMm['$view/$element/${role.name}/$scale'] ??
+        profileMm['$scale/${role.name}'];
+    if (specific != null) return specific;
+    if (role == ArchitectAnnotationRole.axis ||
+        role == ArchitectAnnotationRole.section) {
+      final legacy =
+          overrideMm['$view/$element/symbol/$scale'] ??
+          profileMm['$scale/symbol'];
+      if (legacy != null) return legacy;
+    }
+    return ArchitectDrawingScale.defaultMmFor(role, scale);
   }
 
   Map<String, dynamic> toJson() => {

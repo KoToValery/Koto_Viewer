@@ -18,7 +18,7 @@ void drawArchitectElevationMarkers(
   void label(String value, Offset point, {Color? ink, String id = 'north'}) {
     final text = ArchitectTextPainter(
       elementId: id,
-      role: ArchitectAnnotationRole.symbol,
+      role: ArchitectAnnotationRole.section,
       modelScale: 1,
       text: TextSpan(
         text: value,
@@ -32,10 +32,10 @@ void drawArchitectElevationMarkers(
     )..layout();
     canvas.drawRect(
       Rect.fromLTWH(
-        point.dx - text.width / 2 - 2 / scale,
-        point.dy - 1 / scale,
-        text.width + 4 / scale,
-        text.height + 2 / scale,
+        point.dx - text.width / 2 - 1 / scale,
+        point.dy - .5 / scale,
+        text.width + 2 / scale,
+        text.height + 1 / scale,
       ),
       Paint()
         ..color =
@@ -54,7 +54,7 @@ void drawArchitectElevationMarkers(
         : 11 /
               ArchitectTextScope.current!.height(
                 e.id,
-                ArchitectAnnotationRole.symbol,
+                ArchitectAnnotationRole.section,
               );
     final isSelected = selected == e.id || selectedIds.contains(e.id);
     final ink = isSelected ? const Color(0xFF00E5FF) : color;
@@ -111,6 +111,13 @@ void drawArchitectElevationMarkers(
   for (var i = 0; i < project.sections.length; i++) {
     final s = project.sections[i];
     if (s.length < .01) continue;
+    final sectionScale = ArchitectTextScope.current == null
+        ? scale
+        : 11 /
+              ArchitectTextScope.current!.height(
+                s.id,
+                ArchitectAnnotationRole.section,
+              );
     final isSelected = selected == s.id || selectedIds.contains(s.id);
     final ink = isSelected ? const Color(0xFF00E5FF) : color;
     final segments = s.segments;
@@ -124,29 +131,49 @@ void drawArchitectElevationMarkers(
     final paint = Paint()
       ..color = ink
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (isSelected ? 2.5 : 1.2) / scale;
+      ..strokeWidth = (isSelected ? 2.5 : 1.2) / sectionScale;
     canvas.drawPath(path, paint);
     for (final p in [segments.first.start, segments.last.end]) {
-      final tip = p + s.viewDirection * (18 / scale);
+      final tip = p + s.viewDirection * (18 / sectionScale);
       canvas.drawLine(p, tip, paint);
       final headPath = Path()
         ..moveTo(tip.dx, tip.dy)
         ..lineTo(
-          (tip - s.viewDirection * (6 / scale) + s.axis * (4 / scale)).dx,
-          (tip - s.viewDirection * (6 / scale) + s.axis * (4 / scale)).dy,
+          (tip -
+                  s.viewDirection * (6 / sectionScale) +
+                  s.axis * (4 / sectionScale))
+              .dx,
+          (tip -
+                  s.viewDirection * (6 / sectionScale) +
+                  s.axis * (4 / sectionScale))
+              .dy,
         )
         ..lineTo(
-          (tip - s.viewDirection * (6 / scale) - s.axis * (4 / scale)).dx,
-          (tip - s.viewDirection * (6 / scale) - s.axis * (4 / scale)).dy,
+          (tip -
+                  s.viewDirection * (6 / sectionScale) -
+                  s.axis * (4 / sectionScale))
+              .dx,
+          (tip -
+                  s.viewDirection * (6 / sectionScale) -
+                  s.axis * (4 / sectionScale))
+              .dy,
         )
         ..close();
       canvas.drawPath(headPath, Paint()..color = ink);
     }
-    canvas.drawCircle(segments.first.start, (isSelected ? 4.0 : 3.0) / scale, Paint()..color = ink);
-    canvas.drawCircle(segments.last.end, (isSelected ? 4.0 : 3.0) / scale, Paint()..color = ink);
+    canvas.drawCircle(
+      segments.first.start,
+      (isSelected ? 4.0 : 3.0) / sectionScale,
+      Paint()..color = ink,
+    );
+    canvas.drawCircle(
+      segments.last.end,
+      (isSelected ? 4.0 : 3.0) / sectionScale,
+      Paint()..color = ink,
+    );
     label(
       s.name.isEmpty ? l.architectSectionNumber(i + 1) : s.name,
-      segments.first.start - s.viewDirection * (20 / scale),
+      segments.first.start - s.viewDirection * (20 / sectionScale),
       ink: ink,
       id: s.id,
     );
@@ -158,7 +185,7 @@ void drawArchitectElevationMarkers(
       : 11 /
             ArchitectTextScope.current!.height(
               'north',
-              ArchitectAnnotationRole.symbol,
+              ArchitectAnnotationRole.section,
             );
   final p = north.position, d = north.direction;
   final side = Offset(-d.dy, d.dx);

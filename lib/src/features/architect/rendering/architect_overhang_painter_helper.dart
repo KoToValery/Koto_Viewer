@@ -1,10 +1,10 @@
-import 'architect_vector_scene.dart';
 // === SECTION: ARCHITECTURAL UPPER OVERHANG PAINTER HELPER ===
 import 'package:flutter/material.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
 import '../../dxf_viewer/rendering/dxf_linetype_helper.dart';
 import '../models/architect_overhang.dart';
 import 'architect_canvas_palette.dart';
+import 'architect_vector_scene.dart';
 
 /// Canvas painter helper for rendering upper storey erkers (еркери) and balconies (балкони)
 /// with thin dashed lines on the active storey floor plan.
@@ -62,36 +62,6 @@ class ArchitectOverhangPainterHelper {
         [dashLength, gapLength],
       );
       canvas.drawPath(dashedPath, paint);
-
-      // 3. Compact architectural label when zoomed in sufficiently
-      if (zoomScale > 14.0 && l10n != null) {
-        final labelText = overhang.displayLabel(l10n);
-        final depthStr = overhang.overhangDepth > 0.12
-            ? ' (${ArchitectTextScope.current?.length(overhang.overhangDepth) ?? '${overhang.overhangDepth.toStringAsFixed(2)}m'})'
-            : '';
-        final text = '$labelText$depthStr';
-
-        final tp = ArchitectTextPainter(elementId: overhang.id, modelScale: ArchitectPaperStyle.annotationScale,
-          text: TextSpan(
-            text: text,
-            style: TextStyle(
-              color: baseColor.withValues(alpha: 0.90),
-              fontSize: 10.0,
-              fontFamily: 'Roboto',
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
-
-        final center = overhang.centroid;
-        canvas.save();
-        canvas.translate(center.dx, center.dy);
-        canvas.scale(ArchitectPaperStyle.annotationScale);
-        tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
-        canvas.restore();
-      }
     }
   }
 }
