@@ -79,6 +79,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.interactionKey != widget.interactionKey ||
         (!_held &&
+            !widget.isDraggingHandle() &&
             (oldWidget.touchHoldToPlace != widget.touchHoldToPlace ||
                 oldWidget.holdToEdit != widget.holdToEdit))) {
       _holdTimer?.cancel();

@@ -79,7 +79,7 @@ class ArchitectDraftingSeed {
     ArchitectTool.door: {'frameThickness', 'leafThickness', 'openAngleDeg'},
     ArchitectTool.window: {'frameThickness', 'panesCount', 'isFlipped'},
     ArchitectTool.column: {'cutDisplayMode'},
-    ArchitectTool.beam: {'baseOffset', 'cutDisplayMode'},
+    ArchitectTool.beam: {'cutDisplayMode'},
     ArchitectTool.slab: {
       'thickness',
       'assemblyId',

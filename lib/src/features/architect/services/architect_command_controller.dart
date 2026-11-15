@@ -3165,6 +3165,42 @@ class UpdateArchitectElevation extends ArchitectModelCommand {
   }
 }
 
+class UpdateArchitectBeam extends ArchitectModelCommand {
+  final String storeyId;
+  final String beamId;
+  final Offset startPoint, endPoint;
+  const UpdateArchitectBeam({
+    required this.storeyId,
+    required this.beamId,
+    required this.startPoint,
+    required this.endPoint,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(startPoint);
+    ArchitectModelCommand.point(endPoint);
+    if ((endPoint - startPoint).distance < 0.05) {
+      throw ArgumentError('Beam too short');
+    }
+    final s = ArchitectModelCommand.storey(project, storeyId);
+    if (!s.beams.any((b) => b.id == beamId)) {
+      throw ArgumentError('Missing beam $beamId');
+    }
+    return ArchitectModelCommand.replace(
+      project,
+      s.copyWith(
+        beams: [
+          for (final b in s.beams)
+            if (b.id == beamId)
+              b.copyWith(startPoint: startPoint, endPoint: endPoint)
+            else
+              b,
+        ],
+      ),
+    );
+  }
+}
+
 class CreateArchitectDecorativeElement extends ArchitectModelCommand {
   final String storeyId;
   final ArchitectDecorativeElement element;

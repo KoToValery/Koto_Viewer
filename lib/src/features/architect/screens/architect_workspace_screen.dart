@@ -3209,6 +3209,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _elementTool.beamDepth,
 
+      _elementTool.beamBaseOffset,
+
       _elementTool.stairWidth,
 
       _elementTool.stairDesign,
@@ -3378,6 +3380,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           final beam = ArchitectBeam.fromJson(json);
           _elementTool.beamWidth = beam.width;
           _elementTool.beamDepth = beam.depth;
+          _elementTool.beamBaseOffset = beam.baseOffset;
           break;
         case ArchitectTool.stair:
           final stair = ArchitectStair.fromJson(json);
@@ -6348,6 +6351,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectWallType(target);
     }
     _elementTool.applyColumnSchemeDefaults(scheme, resetVertical: true);
+    _elementTool.applyBeamSchemeDefaults(scheme, resetVertical: true);
   }
 
   // --- SUBSECTION: [TAG:ARC_EXACT_PLACEMENT] Chord input, shaping, exact rise, commit ---
@@ -7535,7 +7539,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     child: AnimatedBuilder(
       animation: Listenable.merge([_viewport, _previewRevision]),
       builder: (context, _) {
-        final selected = _selectedWall;
+        final beamSegment = _selectedBeam != null
+            ? ArchitectLineEditing.beamSegment(_selectedBeam!)
+            : null;
+        final selected = _selectedWall ?? beamSegment;
         if (!_commands.isPlan ||
             _printPreview ||
             selected == null ||
@@ -7558,9 +7565,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _radialMenuScreenPosition != null) {
           return const SizedBox.shrink();
         }
-        final wall = _drawingProject.activeStorey.walls
-            .where((w) => w.id == selected.id)
-            .firstOrNull;
+        final wall =
+            _drawingProject.activeStorey.walls
+                .where((w) => w.id == selected.id)
+                .firstOrNull ??
+            _drawingProject.activeStorey.beams
+                .where((b) => b.id == selected.id)
+                .map(ArchitectLineEditing.beamSegment)
+                .firstOrNull;
         if (wall == null) return const SizedBox.shrink();
         return ArchitectWallAngleControl(
           wall: wall,
@@ -8255,6 +8267,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _activeTool == ArchitectTool.section ||
       _activeTool == ArchitectTool.elevation;
 
+  bool get _linearHandleTool =>
+      _linearDraftTool ||
+      _activeTool == ArchitectTool.beam ||
+      _activeTool == ArchitectTool.select;
+
 
 
   Set<String> get _selectedLineIds => _project.activeStorey.cadPrimitives
@@ -8275,6 +8292,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         .where((p) => p.id == id && (p.type == CadPrimitiveType.line || p.type == CadPrimitiveType.arc))
         .firstOrNull;
     if (line != null) return ArchitectLineEditing.segment(line);
+    final beam = _project.activeStorey.beams
+        .where((b) => b.id == id)
+        .firstOrNull;
+    if (beam != null) return ArchitectLineEditing.beamSegment(beam);
     final sec = _project.sections.where((s) => s.id == id).firstOrNull;
     if (sec != null) {
       return ArchitectWall(
@@ -8331,6 +8352,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           wallTypeId: 'elevation',
           thickness: 0.001,
         ),
+      ];
+    }
+    if (_activeTool == ArchitectTool.beam || _selectedBeam != null) {
+      return _project.activeStorey.beams
+          .map(ArchitectLineEditing.beamSegment)
+          .toList();
+    }
+    if (_activeTool == ArchitectTool.select) {
+      return [
+        ..._project.activeStorey.beams.map(ArchitectLineEditing.beamSegment),
+        ..._project.activeStorey.walls,
       ];
     }
     return _project.activeStorey.walls;
@@ -8466,6 +8498,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     return null;
 
+  }
+
+  ArchitectBeam? get _selectedBeam {
+    if (_effectiveSelection.length > 1) return null;
+    if (_activeTool != ArchitectTool.select &&
+        _activeTool != ArchitectTool.beam) {
+      return null;
+    }
+    final singleId = _selectedElementId ??
+        (_effectiveSelection.length == 1 ? _effectiveSelection.single : null);
+    if (singleId == null) return null;
+    for (final beam in _project.activeStorey.beams) {
+      if (beam.id == singleId) return beam;
+    }
+    return null;
   }
 
 
@@ -8936,6 +8983,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _project.structuralScheme,
       notify: false,
     );
+    _elementTool.applyBeamSchemeDefaults(
+      _project.structuralScheme,
+      notify: false,
+    );
 
 
 
@@ -9044,6 +9095,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _restoreWallType();
 
         _elementTool.applyColumnSchemeDefaults(
+          loaded.structuralScheme,
+          resetVertical: true,
+        );
+        _elementTool.applyBeamSchemeDefaults(
           loaded.structuralScheme,
           resetVertical: true,
         );
@@ -10002,9 +10057,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
 
-    // Wall endpoint handle check (works in Wall tool and Select tool)
+    // Wall/beam endpoint handle check (works in linear/beam/select/context modes)
 
-    if ((_linearDraftTool || _activeTool == ArchitectTool.select) &&
+    if ((_linearHandleTool || _selectionContextActive) &&
 
         _selectedLinearElement != null &&
 
@@ -10130,9 +10185,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    // Direct endpoint grab on unselected wall (auto-selects and starts point drag)
+    // Direct endpoint grab on unselected wall or beam (auto-selects and starts point drag)
 
-    if ((_linearDraftTool || _activeTool == ArchitectTool.select) &&
+    if (_linearHandleTool &&
 
         _selectedLinearElement == null &&
 
@@ -10166,7 +10221,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             if (_canAdoptPickedTool) {
 
-              _activeTool = ArchitectTool.wall;
+              _activeTool =
+                  ArchitectDraftingSeed.toolFor(_project, wall.id) ??
+                  ArchitectTool.wall;
 
               _selectionContextActive = true;
 
@@ -12080,6 +12137,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
               .toList(),
 
+          beams: _project.activeStorey.beams
+              .where((b) => b.id != original.id)
+              .toList(),
+
           cadPrimitives: _project.activeStorey.cadPrimitives
 
               .where((p) => p.id != original.id)
@@ -12104,10 +12165,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final origNormal = Offset(-origDir.dy, origDir.dx);
 
-      final isStraightWall =
-          !original.isCurved &&
-          _elementMoveOriginal!.activeStorey.walls.any((w) => w.id == original.id);
-      final snap = isStraightWall
+      final isStraightLinear =
+          (!original.isCurved &&
+              _elementMoveOriginal!.activeStorey.walls.any(
+                (w) => w.id == original.id,
+              )) ||
+          _elementMoveOriginal!.activeStorey.beams.any(
+            (b) => b.id == original.id,
+          );
+      final snap = isStraightLinear
           ? ArchitectWallEndpointSnap.resolve(
               wall: original,
               atStart: _wallDragStart,
@@ -28884,6 +28950,51 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  void _updateSelectedBeam({
+    double? width,
+    double? depth,
+    double? baseOffset,
+  }) {
+    final id = _selectedElementId;
+    if (id == null) return;
+    final beam = _project.activeStorey.beams
+        .where((b) => b.id == id)
+        .firstOrNull;
+    final values = <String, double>{
+      if (width != null) 'width': width,
+      if (depth != null) 'depth': depth,
+      if (baseOffset != null) 'baseOffset': baseOffset,
+    };
+    final texts = <String, String>{};
+    if (beam != null && (width != null || depth != null)) {
+      final expectedAuto = ArchitectElementTool.defaultBeamLabel(
+        beam.width,
+        beam.depth,
+      );
+      if (beam.label == expectedAuto || beam.label == 'B 25/50') {
+        texts['label'] = ArchitectElementTool.defaultBeamLabel(
+          width ?? beam.width,
+          depth ?? beam.depth,
+        );
+      }
+    }
+    try {
+      _commands.execute(
+        SetArchitectElementProperties(
+          storeyId: _project.activeStoreyId,
+          elementIds: {id},
+          values: values,
+          textValues: texts,
+        ),
+      );
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      setState(() {});
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
   void _performLinearSelectionAction(String action, Set<String> segmentIds) {
     if (action == 'cut') {
       _startCutSession(Set.of(segmentIds));
@@ -30668,6 +30779,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           newProj.structuralScheme,
           resetVertical: true,
         );
+        _elementTool.applyBeamSchemeDefaults(
+          newProj.structuralScheme,
+          resetVertical: true,
+        );
 
         _draftStart = null;
 
@@ -30715,6 +30830,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final selectedColumn = _selectedElementId != null
         ? _project.activeStorey.columns
             .where((c) => c.id == _selectedElementId)
+            .firstOrNull
+        : null;
+    final selectedBeam =
+        _selectedElementId != null && _effectiveSelection.length <= 1
+        ? _project.activeStorey.beams
+            .where((b) => b.id == _selectedElementId)
             .firstOrNull
         : null;
 
@@ -31671,17 +31792,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   activeStoreyHeight: _project.activeStorey.height,
 
-                  beamWidth: _elementTool.beamWidth,
+                  selectedBeam: _touchHoldSelecting ? null : selectedBeam,
 
-                  onBeamWidthChanged: (bw) =>
+                  beamWidth: selectedBeam?.width ?? _elementTool.beamWidth,
 
-                      _elementTool.setBeamParams(width: bw),
+                  onBeamWidthChanged: (bw) {
+                    if (selectedBeam != null) {
+                      _updateSelectedBeam(width: bw);
+                    } else {
+                      _elementTool.setBeamParams(width: bw);
+                    }
+                  },
 
-                  beamDepth: _elementTool.beamDepth,
+                  beamDepth: selectedBeam?.depth ?? _elementTool.beamDepth,
 
-                  onBeamDepthChanged: (bd) =>
+                  onBeamDepthChanged: (bd) {
+                    if (selectedBeam != null) {
+                      _updateSelectedBeam(depth: bd);
+                    } else {
+                      _elementTool.setBeamParams(depth: bd);
+                    }
+                  },
 
-                      _elementTool.setBeamParams(depth: bd),
+                  beamBaseOffset:
+                      selectedBeam?.baseOffset ?? _elementTool.beamBaseOffset,
+
+                  onBeamBaseOffsetChanged: (bo) {
+                    if (selectedBeam != null) {
+                      _updateSelectedBeam(baseOffset: bo);
+                    } else {
+                      _elementTool.setBeamParams(baseOffset: bo);
+                    }
+                  },
 
                   stairDesign: _elementTool.stairDesign,
 

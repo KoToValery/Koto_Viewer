@@ -924,6 +924,28 @@ class Architect2dPainter extends CustomPainter {
       return;
     }
     final selected = _filterElements(project.activeStorey, selectedOnly: true);
+    if (selected.beams.isNotEmpty) {
+      ArchitectElementsPainterHelper.drawBeams(
+        palette: palette,
+        canvas: canvas,
+        storey: selected,
+        zoomScale: zoomScale,
+        selectedElementId: selectedElementId,
+      );
+      if (newPointCandidate == null) {
+        final beam = selected.beams.first;
+        _drawSelectedWallHandles(
+          canvas,
+          ArchitectWall(
+            id: beam.id,
+            startPoint: beam.startPoint,
+            endPoint: beam.endPoint,
+            thickness: beam.width,
+          ),
+        );
+      }
+      return;
+    }
     if (selected.floorDrains.isNotEmpty) {
       ArchitectFloorDrainPainterHelper.draw(
         canvas: canvas,

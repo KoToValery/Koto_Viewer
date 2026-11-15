@@ -138,10 +138,13 @@ class ArchitectToolPalette extends StatefulWidget {
   final double activeStoreyHeight;
 
   // Beam options
+  final ArchitectBeam? selectedBeam;
   final double beamWidth;
   final ValueChanged<double>? onBeamWidthChanged;
   final double beamDepth;
   final ValueChanged<double>? onBeamDepthChanged;
+  final double beamBaseOffset;
+  final ValueChanged<double>? onBeamBaseOffsetChanged;
 
   final ArchitectStairDesign stairDesign;
   final ValueChanged<StairShape>? onStairShapeChanged;
@@ -251,10 +254,13 @@ class ArchitectToolPalette extends StatefulWidget {
     this.columnBaseOffset = 0.0,
     this.onColumnBaseOffsetChanged,
     this.activeStoreyHeight = 3.0,
+    this.selectedBeam,
     this.beamWidth = 0.25,
     this.onBeamWidthChanged,
     this.beamDepth = 0.50,
     this.onBeamDepthChanged,
+    this.beamBaseOffset = 2.20,
+    this.onBeamBaseOffsetChanged,
     this.stairDesign = const ArchitectStairDesign(),
     this.onStairShapeChanged,
     this.onStairProperties,
@@ -424,6 +430,9 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   ValueChanged<double>? get onBeamWidthChanged => widget.onBeamWidthChanged;
   double get beamDepth => widget.beamDepth;
   ValueChanged<double>? get onBeamDepthChanged => widget.onBeamDepthChanged;
+  double get beamBaseOffset => widget.beamBaseOffset;
+  ValueChanged<double>? get onBeamBaseOffsetChanged =>
+      widget.onBeamBaseOffsetChanged;
   double get stairWidth => widget.stairWidth;
   ValueChanged<double>? get onStairWidthChanged => widget.onStairWidthChanged;
   int get stairSteps => widget.stairSteps;
@@ -467,7 +476,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               if (mode == ArchitectInteractionMode.drawing ||
                   widget.selectedDoor != null ||
                   widget.selectedWindow != null ||
-                  widget.selectedColumn != null) ...[
+                  widget.selectedColumn != null ||
+                  widget.selectedBeam != null) ...[
                 // Contextual Sub-bar for Active Tool parameters or Selection
                 if (widget.selectedDoor != null ||
                     activeTool == ArchitectTool.door)
@@ -477,6 +487,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   _buildWindowSubBar(context)
                 else if (widget.selectedColumn != null)
                   _buildColumnSubBar(context)
+                else if (widget.selectedBeam != null)
+                  _buildBeamSubBar(context)
                 else if (activeTool == ArchitectTool.zone)
                   _buildZoneSubBar(context)
                 else if (activeTool == ArchitectTool.wall)
@@ -1481,38 +1493,46 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
 
   Widget _buildBeamSubBar(BuildContext context) {
     final l10n = context.l10n;
+    final selected = widget.selectedBeam;
+    final effectiveWidth = selected?.width ?? beamWidth;
+    final effectiveDepth = selected?.depth ?? beamDepth;
+    final effectiveBaseOffset = selected?.baseOffset ?? beamBaseOffset;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text(
-              l10n.architectBeamSize,
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-            ),
+          _buildOpeningDimensionLabel(l10n.architectPropertyWidth),
+          _buildOpeningDimensionChip(
+            key: const ValueKey('beam-width-input'),
+            label: l10n.architectPropertyWidth,
+            valueMeters: effectiveWidth,
+            minCm: 5,
+            maxCm: 500,
+            onChangedMeters: onBeamWidthChanged,
           ),
-          for (final sz in [(0.25, 0.40), (0.25, 0.50), (0.25, 0.60)])
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: ChoiceChip(
-                label: Text(
-                  '${(sz.$1 * 100).round()}x${(sz.$2 * 100).round()} cm',
-                ),
-                selected:
-                    (beamWidth - sz.$1).abs() < 1e-3 &&
-                    (beamDepth - sz.$2).abs() < 1e-3,
-                onSelected: (sel) {
-                  if (sel) {
-                    onBeamWidthChanged?.call(sz.$1);
-                    onBeamDepthChanged?.call(sz.$2);
-                  }
-                },
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
+          const SizedBox(width: 10),
+          _buildOpeningDimensionLabel(l10n.architectPropertyDepth),
+          _buildOpeningDimensionChip(
+            key: const ValueKey('beam-depth-input'),
+            label: l10n.architectPropertyDepth,
+            valueMeters: effectiveDepth,
+            minCm: 5,
+            maxCm: 500,
+            onChangedMeters: onBeamDepthChanged,
+          ),
+          const SizedBox(width: 10),
+          _buildOpeningDimensionLabel(l10n.architectColumnBaseOffset),
+          _buildOpeningDimensionChip(
+            key: const ValueKey('beam-base-offset-input'),
+            label: l10n.architectColumnBaseOffset,
+            valueMeters: effectiveBaseOffset,
+            minCm: -1000,
+            maxCm: 1000,
+            allowNegative: true,
+            onChangedMeters: onBeamBaseOffsetChanged,
+          ),
         ],
       ),
     );

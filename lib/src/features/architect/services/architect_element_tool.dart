@@ -93,6 +93,20 @@ class ArchitectElementTool extends ChangeNotifier {
   // Beam options
   double beamWidth = 0.25;
   double beamDepth = 0.40;
+  double beamBaseOffset = 2.20;
+
+  static ({double width, double depth}) beamDefaultsForScheme(
+    ArchitectStructuralScheme scheme,
+  ) => switch (scheme) {
+    ArchitectStructuralScheme.flatSlab => (width: 0.25, depth: 0.40),
+    ArchitectStructuralScheme.beamAndSlab => (width: 0.25, depth: 0.50),
+    ArchitectStructuralScheme.sandwichPanels => (width: 0.20, depth: 0.40),
+    ArchitectStructuralScheme.roundLogs => (width: 0.18, depth: 0.24),
+    ArchitectStructuralScheme.studFrame => (width: 0.14, depth: 0.24),
+  };
+
+  static String defaultBeamLabel(double width, double depth) =>
+      'B ${(width * 100).round()}/${(depth * 100).round()}';
 
   // Stair options
   double stairWidth = 1.20;
@@ -187,9 +201,26 @@ class ArchitectElementTool extends ChangeNotifier {
     }
   }
 
-  void setBeamParams({double? width, double? depth}) {
+  void applyBeamSchemeDefaults(
+    ArchitectStructuralScheme scheme, {
+    bool resetVertical = false,
+    bool notify = true,
+  }) {
+    final defaults = beamDefaultsForScheme(scheme);
+    beamWidth = defaults.width;
+    beamDepth = defaults.depth;
+    if (resetVertical) {
+      beamBaseOffset = 2.20;
+    }
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  void setBeamParams({double? width, double? depth, double? baseOffset}) {
     if (width != null) beamWidth = width;
     if (depth != null) beamDepth = depth;
+    if (baseOffset != null) beamBaseOffset = baseOffset;
     notifyListeners();
   }
 
@@ -345,6 +376,8 @@ class ArchitectElementTool extends ChangeNotifier {
       endPoint: end,
       width: beamWidth,
       depth: beamDepth,
+      baseOffset: beamBaseOffset,
+      label: defaultBeamLabel(beamWidth, beamDepth),
     );
 
     return (storey.copyWith(beams: [...storey.beams, newBeam]), newBeam);

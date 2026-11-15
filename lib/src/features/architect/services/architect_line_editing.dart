@@ -15,6 +15,14 @@ class ArchitectLineEditing {
     arcBulge: line.arcBulge ?? 0.0,
   );
 
+  static ArchitectWall beamSegment(ArchitectBeam beam) => ArchitectWall(
+    id: beam.id,
+    startPoint: beam.startPoint,
+    endPoint: beam.endPoint,
+    thickness: beam.width,
+    wallTypeId: beam.id,
+  );
+
   static ArchitectProject geometry(ArchitectProject project, String storeyId) {
     final floor = ArchitectModelCommand.storey(project, storeyId);
     return ArchitectModelCommand.replace(
@@ -38,6 +46,15 @@ class ArchitectLineEditing {
     ArchitectModelCommand command,
   ) {
     if (command is UpdateArchitectWall) {
+      final floor = ArchitectModelCommand.storey(project, command.storeyId);
+      if (floor.beams.any((b) => b.id == command.wall.id)) {
+        return UpdateArchitectBeam(
+          storeyId: command.storeyId,
+          beamId: command.wall.id,
+          startPoint: command.wall.startPoint,
+          endPoint: command.wall.endPoint,
+        );
+      }
       if (project.sections.any((s) => s.id == command.wall.id)) {
         return UpdateArchitectSection(
           sectionId: command.wall.id,
