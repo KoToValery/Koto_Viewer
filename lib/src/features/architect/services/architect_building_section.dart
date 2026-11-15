@@ -540,6 +540,22 @@ class ArchitectBuildingSection {
         }
       }
 
+      final columnCutouts = <Path>[];
+      for (final col in floor.columns) {
+        final colPath = sliceMesh(
+          col.build3D(
+            storeyElevation: floor.elevation,
+            storeyHeight: floor.height,
+          ),
+        );
+        if (colPath != null) {
+          columnCutouts.add(colPath);
+          regions.add(
+            ArchitectSectionRegion(col.id, SlabMaterial.concrete, colPath),
+          );
+        }
+      }
+
       final wallCutOpeningsByWall = <String, List<_CutOpeningSpan>>{};
       final floorCutOpeningIds = <String>{};
       for (final wall in floor.walls) {
@@ -702,10 +718,11 @@ class ArchitectBuildingSection {
           } catch (_) {}
         }
 
-        // Boolean-subtract overlapping roof envelopes (including Mauerlat & Ridge Purlin) and slabs
-        // so zero redundant lines appear at wall-to-roof and wall-to-slab junctions!
+        // Boolean-subtract overlapping roof envelopes (including Mauerlat & Ridge Purlin),
+        // slabs, and concrete columns so zero redundant lines or hatches overlap!
         for (final cutout in [
           ...highPriorityCutouts,
+          ...columnCutouts,
           if (!useCompositions || wall.system.isSpecial) ...[
             ...junctionPlan.wallCoreCutouts,
             ...?junctionPlan.wallBaseDetailCutouts[wall.id],
@@ -1168,20 +1185,6 @@ class ArchitectBuildingSection {
               path,
               customFillColor: const Color(0xffeeeeee),
             ),
-          );
-        }
-      }
-
-      for (final col in floor.columns) {
-        final colPath = sliceMesh(
-          col.build3D(
-            storeyElevation: floor.elevation,
-            storeyHeight: floor.height,
-          ),
-        );
-        if (colPath != null) {
-          regions.add(
-            ArchitectSectionRegion(col.id, SlabMaterial.concrete, colPath),
           );
         }
       }

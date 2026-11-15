@@ -10,7 +10,6 @@ import '../models/architect_line_style.dart';
 import '../models/architect_hatch_pattern.dart';
 import '../models/architect_drawing_color.dart';
 import 'dart:ui';
-import 'dart:math' as math;
 import 'architect_wall_arc_editing.dart';
 import 'architect_wall_operation_axis.dart';
 import '../models/architect_column.dart';
@@ -267,29 +266,7 @@ class ArchitectSelection {
       ..addPolygon([p - u - n, p + u - n, p + u + n, p - u + n], true);
   }
 
-  static Path columnOutline(ArchitectColumn column) {
-    if (column.shape == ColumnShape.circular) {
-      return Path()..addOval(
-        Rect.fromCircle(center: column.position, radius: column.width / 2),
-      );
-    }
-    final angle = column.rotationDeg * math.pi / 180;
-    Offset rotate(Offset p) =>
-        column.position +
-        Offset(
-          p.dx * math.cos(angle) - p.dy * math.sin(angle),
-          p.dx * math.sin(angle) + p.dy * math.cos(angle),
-        );
-    return Path()..addPolygon(
-      [
-        Offset(-column.width / 2, -column.depth / 2),
-        Offset(column.width / 2, -column.depth / 2),
-        Offset(column.width / 2, column.depth / 2),
-        Offset(-column.width / 2, column.depth / 2),
-      ].map(rotate).toList(),
-      true,
-    );
-  }
+  static Path columnOutline(ArchitectColumn column) => column.outlinePath();
 
   static Path outline(ArchitectProject project, String id) {
     final s = project.activeStorey;

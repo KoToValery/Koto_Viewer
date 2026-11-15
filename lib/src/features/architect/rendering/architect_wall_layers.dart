@@ -81,6 +81,8 @@ class ArchitectWallLayers {
         cutPlaneHeight: cutPlaneHeight,
         storeyElevation: storeyElevation,
         includeInteriorPlaster: includeInteriorPlaster,
+        storey: storey,
+        project: project,
       );
       var body = ordinary.body,
           core = ordinary.core,
@@ -310,12 +312,20 @@ class ArchitectWallLayers {
       body = Path.combine(PathOperation.difference, body, holes);
       core = Path.combine(PathOperation.difference, core, holes);
     }
+    final columnMask = _cutColumnMask(storey, cutPlaneHeight);
+    if (columnMask != null) {
+      body = Path.combine(PathOperation.difference, body, columnMask);
+      core = Path.combine(PathOperation.difference, core, columnMask);
+    }
     final rawUncutBody = ArchitectWallNetwork.body(uncutWalls);
-    final uncutBody = Path.combine(
+    var uncutBody = Path.combine(
       PathOperation.difference,
       rawUncutBody,
       body,
     );
+    if (columnMask != null) {
+      uncutBody = Path.combine(PathOperation.difference, uncutBody, columnMask);
+    }
 
     return ArchitectWallLayers(
       body,
@@ -529,6 +539,19 @@ class ArchitectWallLayers {
       if ((da >= 0) != (db >= 0)) result.add(a + (b - a) * (da / (da - db)));
     }
     return result;
+  }
+
+  static Path? _cutColumnMask(ArchitectStorey? storey, double cutPlaneHeight) {
+    if (storey == null || storey.columns.isEmpty) return null;
+    Path? mask;
+    for (final column in storey.columns) {
+      if (!column.isCutAt(cutPlaneHeight, storey.height)) continue;
+      final outline = column.outlinePath();
+      mask = mask == null
+          ? outline
+          : Path.combine(PathOperation.union, mask, outline);
+    }
+    return mask;
   }
 }
 

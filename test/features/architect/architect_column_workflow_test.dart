@@ -157,13 +157,20 @@ void main() {
               expect(corner.distance, lessThan(size / 2));
             }
           }
-          // Designation has transparent background, including inside the
-          // column: no fills, hatch, crosshair, or dimension masks.
+          // Cut columns paint an opaque mask fill (to cleanly cover masonry),
+          // clipped concrete hatch lines/triangles, and the heavy column border.
           final paths = canvas.operations
               .whereType<ArchitectVectorPath>()
               .toList();
-          expect(paths.where((p) => !p.fill), hasLength(1));
-          expect(paths.where((p) => p.fill), isEmpty);
+          expect(paths.where((p) => p.fill), hasLength(1));
+          expect(
+            paths.where((p) => !p.fill),
+            hasLength(2),
+          ); // 1 clipped concrete hatch + 1 column border
+          expect(
+            paths.where((p) => !p.fill && p.clip != null),
+            hasLength(1),
+          );
         }
       }
     });

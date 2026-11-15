@@ -1,8 +1,12 @@
 import 'architect_document.dart';
 import '../rendering/architect_vector_scene.dart';
 import '../rendering/architect_canvas_palette.dart';
+import '../rendering/architect_hatch_geometry.dart';
+import '../rendering/architect_line_presentation.dart';
+import '../rendering/architect_section_hatch.dart';
 // === SECTION: ARCHITECTURAL COLUMN MODEL & RENDERING ===
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import 'architect_elements.dart' show ArchitectCutDisplayMode;
@@ -133,6 +137,77 @@ class ArchitectColumn {
     return delta.dx.abs() <= halfW && delta.dy.abs() <= halfD;
   }
 
+  /// Local 2D footprint path centered at the column origin (before translation/rotation).
+  Path localOutlinePath() {
+    final path = Path();
+    if (shape == ColumnShape.circular) {
+      path.addOval(Rect.fromCircle(center: Offset.zero, radius: width / 2));
+    } else {
+      path.addRect(
+        Rect.fromCenter(center: Offset.zero, width: width, height: depth),
+      );
+    }
+    return path;
+  }
+
+  /// World-space 2D footprint path of this column in floor-plan coordinates.
+  Path outlinePath() {
+    final rad = rotationDeg * math.pi / 180.0;
+    final c = math.cos(rad);
+    final s = math.sin(rad);
+    return localOutlinePath().transform(
+      Float64List.fromList([
+        c,
+        s,
+        0,
+        0,
+        -s,
+        c,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        position.dx,
+        position.dy,
+        0,
+        1,
+      ]),
+    );
+  }
+
+  void _paintConcreteHatch(
+    Canvas canvas,
+    Path boundary, {
+    required ArchitectCanvasPalette palette,
+    required double zoomScale,
+    required double minDimension,
+  }) {
+    final pattern = ArchitectSectionHatch.preset('concrete');
+    final unitsPerMm = math.min(0.018, math.max(0.008, minDimension * 0.06));
+    final hatchPath = ArchitectHatchGeometry.path(
+      boundary: boundary,
+      pattern: pattern,
+      unitsPerMm: unitsPerMm,
+      angleDeg: -rotationDeg,
+      origin: Offset.zero,
+      visibleBounds: boundary.getBounds().inflate(0.05),
+    );
+    canvas.save();
+    canvas.clipPath(boundary);
+    canvas.drawPath(
+      hatchPath,
+      Paint()
+        ..color = palette.foreground(const Color(0xFF7D868E))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.65 / zoomScale
+        ..strokeJoin = StrokeJoin.round
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.restore();
+  }
+
   void paint2D({
     required Canvas canvas,
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
@@ -163,6 +238,25 @@ class ArchitectColumn {
     }
 
     final columnDepth = shape == ColumnShape.circular ? width : depth;
+    if (isCut) {
+      final shapePath = localOutlinePath();
+      canvas.drawPath(
+        shapePath,
+        Paint()
+          ..color = ArchitectLinePresentation.paper(canvas)
+              ? Colors.white
+              : palette.background
+          ..style = PaintingStyle.fill,
+      );
+      _paintConcreteHatch(
+        canvas,
+        shapePath,
+        palette: palette,
+        zoomScale: zoomScale,
+        minDimension: math.min(width, columnDepth),
+      );
+    }
+
     if (shape == ColumnShape.circular) {
       canvas.drawCircle(Offset.zero, width / 2, borderPaint);
     } else {
