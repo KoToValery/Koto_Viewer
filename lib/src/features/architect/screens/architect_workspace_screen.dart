@@ -258,6 +258,7 @@ import '../services/architect_stair_layout_resolver.dart';
 import '../widgets/architect_stair_draft_overlay.dart';
 
 import '../widgets/architect_stair_properties_dialog.dart';
+import '../widgets/architect_stair_setup_dialog.dart';
 
 import '../services/architect_polygon_editor.dart';
 
@@ -24344,21 +24345,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _repaintPreview();
   }
 
-  void _startFreeStair({ArchitectStair? stair, bool create = true}) {
+  Future<void> _startFreeStair({ArchitectStair? stair, bool create = true}) async {
     if (!_commands.isPlan) return;
-    _changeTool(ArchitectTool.stair, toggle: false);
     final original = _commands.documentProject;
     var seed = stair ?? _stairAt(Offset.zero, const Offset(1, 0),
       id: ArchitectElementId.next('stair'));
     if (create) seed = seed.copyWith(id: ArchitectElementId.next('stair'));
+    if (create && stair == null) {
+      final configured = await showDialog<ArchitectStair>(
+        context: context,
+        builder: (_) => ArchitectStairSetupDialog(
+          project: original,
+          stair: seed,
+        ),
+      );
+      if (!mounted || configured == null) return;
+      seed = configured;
+    }
+    _changeTool(ArchitectTool.stair, toggle: false);
+    final currentOriginal = _commands.documentProject;
     final draft = create ? ArchitectStairPerimeterDraft(seed) : ArchitectStairDraftController(seed, create: false);
     setState(() {
       _stairDraftDocument = _modelCommands.project;
       _stairDraft = draft;
       _interactionEpoch++;
       if (!create) {
-        _commands.editPreview = original.updateActiveStorey(original.activeStorey.copyWith(
-          stairs: original.activeStorey.stairs.where((s) => s.id != seed.id).toList()));
+        _commands.editPreview = currentOriginal.updateActiveStorey(currentOriginal.activeStorey.copyWith(
+          stairs: currentOriginal.activeStorey.stairs.where((s) => s.id != seed.id).toList()));
       }
     });
   }

@@ -19,6 +19,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String get stairCustom => 'Свободна';
 
   @override
+  String get stairSetupTitle => 'Свободна стълба';
+
+  @override
+  String get stairSetupConfirm => 'Потвърди';
+
+  @override
   String get stairCustomLayout => 'Форма на стълбището';
 
   @override

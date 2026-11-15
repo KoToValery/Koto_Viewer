@@ -252,30 +252,13 @@ class _PerimeterPainter extends CustomPainter {
       ..color = color
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
-    final segments = draft.visibleSegments;
-    for (var i = 0; i < segments.length; i++) {
-      final segment = segments[i];
-      final n =
-          Offset(-segment.axis.dy, segment.axis.dx) *
-          draft.drawingSide *
-          segment.width;
-      if (segment.part == StairPerimeterPart.landing &&
-          !segments
-              .skip(i + 1)
-              .any((s) => s.part == StairPerimeterPart.flight)) {
-        canvas.drawPath(
-          Path()..addPolygon(
-            [
-              segment.start,
-              segment.end,
-              segment.end + n,
-              segment.start + n,
-            ].map(toScreen).toList(),
-            true,
-          ),
-          paint,
-        );
-      }
+    for (final quad in draft.pendingLandingQuads) {
+      canvas.drawPath(
+        Path()..addPolygon(quad.map(toScreen).toList(), true),
+        paint,
+      );
+    }
+    for (final segment in draft.visibleSegments) {
       canvas.drawLine(toScreen(segment.start), toScreen(segment.end), paint);
     }
   }

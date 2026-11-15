@@ -187,76 +187,50 @@ void main() {
     },
   );
   test(
-    'Article 52(4) checks actual winders, with the correct evacuation scope',
+    'curved winders report informative going ratios without blocking saves',
     () {
       final small = design.copyWith(
         manualWinderSteps: 5,
         manualWinderRadius: .05,
       );
-      for (final evacuation in [
-        StairEvacuation.from16To50,
-        StairEvacuation.upTo15,
-        StairEvacuation.over50,
-      ]) {
-        final checks = ArchitectStairRules.check(
-          stair(small.copyWith(evacuation: evacuation)),
-        );
-        final check = checks.singleWhere(
-          (c) => c.kind == StairCheckKind.innerGoing30,
-        );
-        expect(check.actual, lessThan(.23));
-        expect(
-          check.state,
-          evacuation == StairEvacuation.from16To50
-              ? StairCheckState.error
-              : StairCheckState.advice,
-        );
-        if (evacuation == StairEvacuation.from16To50) {
-          expect(check.article, '52(4)1');
-        }
-        if (evacuation == StairEvacuation.over50) {
-          expect(
-            checks.any(
-              (c) =>
-                  c.kind == StairCheckKind.scope &&
-                  c.state == StairCheckState.review,
-            ),
-            isTrue,
-          );
-        }
-      }
+      final checks = ArchitectStairRules.check(stair(small));
+      final check = checks.singleWhere(
+        (c) => c.kind == StairCheckKind.innerGoing30,
+      );
+      expect(check.actual, lessThan(.23));
+      expect(check.state, StairCheckState.advice);
+      expect(check.article, isNull);
       final s = stair(small),
           p = project(
             s,
           ).copyWith(storeys: [project(s).activeStorey.copyWith(stairs: [])]);
-      expect(
-        () => PutArchitectStair(
-          storeyId: 'floor',
-          stair: s,
-          create: true,
-        ).apply(p),
-        throwsArgumentError,
-      );
+      final saved = PutArchitectStair(
+        storeyId: 'floor',
+        stair: s,
+        create: true,
+      ).apply(p);
+      expect(saved.activeStorey.stairs, hasLength(1));
+      expect(saved.activeStorey.stairs.single.design!.isDraft, isFalse);
     },
   );
   test('manual winders check their own walking-line going and slope', () {
     final s = stair(
       design.copyWith(manualWinderRadius: .05, manualWinderSteps: 5),
     );
-    final errors = ArchitectStairRules.check(
+    final advices = ArchitectStairRules.check(
       s,
-    ).where((c) => c.state == StairCheckState.error);
+    ).where((c) => c.state == StairCheckState.advice);
     expect(
-      errors.any((c) => c.kind == StairCheckKind.going && c.actual! < .25),
+      advices.any((c) => c.kind == StairCheckKind.going && c.actual! < .25),
       isTrue,
     );
     expect(
-      errors.any((c) => c.kind == StairCheckKind.slope && c.actual! > 1 / 1.5),
+      advices.any((c) => c.kind == StairCheckKind.slope && c.actual! > 1 / 1.5),
       isTrue,
     );
   });
   test(
-    'overlap headroom keeps indoor, private and outdoor code scopes distinct',
+    'overlap headroom informs clearance below 2.10 m without statutory errors',
     () {
       final d = design.copyWith(
         shape: StairShape.spiralOverlap,
@@ -264,27 +238,16 @@ void main() {
         rise: 2.5,
         manualRisers: 20,
       );
-      for (final use in [
-        StairUse.private,
-        StairUse.common,
-        StairUse.outdoorRoute,
-      ]) {
-        final checks = ArchitectStairRules.check(stair(d.copyWith(use: use)));
-        final measured = checks.singleWhere(
-          (c) => c.kind == StairCheckKind.headroom && c.actual != null,
-        );
-        expect(measured.actual, lessThan(2.1));
-        expect(
-          measured.state,
-          use == StairUse.common
-              ? StairCheckState.error
-              : StairCheckState.advice,
-        );
-        expect(measured.article, use == StairUse.common ? '55(1)5' : '2.10 m');
-      }
+      final checks = ArchitectStairRules.check(stair(d));
+      final measured = checks.singleWhere(
+        (c) => c.kind == StairCheckKind.headroom && c.actual != null,
+      );
+      expect(measured.actual, lessThan(2.1));
+      expect(measured.state, StairCheckState.advice);
+      expect(measured.article, '2.10 m');
     },
   );
-  test('winders cannot replace the landing required by flight rise', () {
+  test('winder flight rise exceeds 2.5 m as an informative ratio advice', () {
     for (final shape in [StairShape.quarterTurn, StairShape.halfTurn]) {
       final s = stair(
         design.copyWith(shape: shape, use: StairUse.common, rise: 2.8),
@@ -293,7 +256,7 @@ void main() {
         ArchitectStairRules.check(s).any(
           (c) =>
               c.kind == StairCheckKind.flightRise &&
-              c.state == StairCheckState.error,
+              c.state == StairCheckState.advice,
         ),
         isTrue,
       );

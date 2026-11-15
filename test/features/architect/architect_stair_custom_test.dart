@@ -718,12 +718,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('stair-tool-freeform')));
       await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('stair-setup-confirm')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('stair-setup-confirm')));
+      await tester.pumpAndSettle();
       final draft = tester
           .widget<ArchitectStairPerimeterOverlay>(
             find.byType(ArchitectStairPerimeterOverlay),
           )
           .draft;
-      draft.replaceDesign(draft.design.copyWith(code: StairCode.geometryOnly));
       await tester.pumpAndSettle();
       await tester.tapAt(workspace.screen(tester, Offset.zero));
       await tester.pump();

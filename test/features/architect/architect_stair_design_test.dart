@@ -94,13 +94,19 @@ void main() {
       );
     }
   });
-  test('mixed element properties cannot bypass stair checks', () {
+  test('element properties allow adjusted widths while rejecting invalid values', () {
     final p = project(stairs: [stair()]);
+    final narrow = const SetArchitectElementProperties(
+      storeyId: 's',
+      elementIds: {'st'},
+      values: {'width': .7},
+    ).apply(p);
+    expect(narrow.activeStorey.stairs.single.width, .7);
     expect(
       () => const SetArchitectElementProperties(
         storeyId: 's',
         elementIds: {'st'},
-        values: {'width': .7},
+        values: {'width': 0},
       ).apply(p),
       throwsArgumentError,
     );
@@ -140,20 +146,28 @@ void main() {
       expect(d.risers, 30);
       expect(errors(stair(design: d)), isEmpty);
       expect(
-        errors(
+        ArchitectStairRules.check(
           stair(design: d.copyWith(manualRisers: 29)),
-        ).any((c) => c.kind == StairCheckKind.flightRise),
+        ).any(
+          (c) =>
+              c.kind == StairCheckKind.flightRise &&
+              c.state == StairCheckState.advice,
+        ),
         isTrue,
       );
     },
   );
   test(
-    'spiral cannot bypass a mandatory landing by choosing a curved shape',
+    'spiral flags tall single-flight rise as informative ratio advice',
     () {
       expect(
-        errors(
+        ArchitectStairRules.check(
           stair(design: const ArchitectStairDesign(shape: StairShape.spiral)),
-        ).any((c) => c.kind == StairCheckKind.flightRise),
+        ).any(
+          (c) =>
+              c.kind == StairCheckKind.flightRise &&
+              c.state == StairCheckState.advice,
+        ),
         isTrue,
       );
     },
@@ -199,48 +213,22 @@ void main() {
       expect(plan.nosings.length, 10);
     },
   );
-  test('23 cm at 30 cm applies to the 16-50 band, not up to 15', () {
+  test('spiral inner goings are reported informatively without regulatory errors', () {
     const d = ArchitectStairDesign(
       shape: StairShape.spiral,
-      use: StairUse.private,
       rise: 2.88,
       manualRisers: 18,
       innerRadius: .05,
-      evacuation: StairEvacuation.from16To50,
     );
     final checks = ArchitectStairRules.check(stair(design: d));
+    expect(errors(stair(design: d)), isEmpty);
     expect(
       checks.singleWhere((c) => c.kind == StairCheckKind.innerGoing30).state,
-      StairCheckState.error,
+      StairCheckState.advice,
     );
-    expect(
-      ArchitectStairRules.check(
-        stair(design: d.copyWith(evacuation: StairEvacuation.upTo15)),
-      ).where((c) => c.kind == StairCheckKind.innerGoing30),
-      isEmpty,
-    );
-  });
-  test('over 50 uses the narrow edge, 90 cm diameter and 150 cm width', () {
-    const d = ArchitectStairDesign(
-      shape: StairShape.spiral,
-      use: StairUse.private,
-      evacuation: StairEvacuation.over50,
-      manualRisers: 18,
-      innerRadius: .45,
-    );
-    final checks = ArchitectStairRules.check(stair(design: d));
-    expect(checks.where((c) => c.kind == StairCheckKind.innerGoing30), isEmpty);
     expect(
       checks.singleWhere((c) => c.kind == StairCheckKind.innerGoing).state,
-      StairCheckState.error,
-    );
-    expect(
-      checks.singleWhere((c) => c.kind == StairCheckKind.innerDiameter).state,
-      StairCheckState.pass,
-    );
-    expect(
-      checks.singleWhere((c) => c.kind == StairCheckKind.width).minimum,
-      1.5,
+      StairCheckState.advice,
     );
   });
   test('spiral chord is conservative and accounts for inner clear radius', () {
@@ -248,60 +236,34 @@ void main() {
     expect(d.goingAt30, closeTo(2 * .9 * math.sin(d.anglePerGoing / 2), 1e-12));
     expect(d.goingAt30, lessThan(.9 * d.anglePerGoing));
   });
-  test('assembly and urban profiles use their own width and step limits', () {
-    expect(
-      errors(
-        stair(design: const ArchitectStairDesign(use: StairUse.assembly)),
-      ).any((c) => c.kind == StairCheckKind.width && c.minimum == 1.6),
-      isTrue,
-    );
-    const d = ArchitectStairDesign(
-      use: StairUse.outdoorRoute,
-      shape: StairShape.straight,
-      landingDepth: 1.5,
-    );
-    expect(d.riser, lessThanOrEqualTo(.15));
-    expect(d.going, greaterThanOrEqualTo(.32));
-    expect(d.flightRisers.reduce(math.max) * d.riser, lessThanOrEqualTo(1.2));
-    expect(errors(stair(design: d)), isEmpty);
-  });
-  test(
-    'comfort is advice; unknown evacuation and headroom never pass silently',
-    () {
-      final checks = ArchitectStairRules.check(
-        stair(design: const ArchitectStairDesign(manualGoing: .35)),
-      );
-      expect(
-        checks.singleWhere((c) => c.kind == StairCheckKind.comfort).state,
-        StairCheckState.advice,
-      );
-      expect(
-        checks.singleWhere((c) => c.kind == StairCheckKind.evacuation).state,
-        StairCheckState.review,
-      );
-      expect(
-        checks.singleWhere((c) => c.kind == StairCheckKind.headroom).state,
-        StairCheckState.review,
-      );
-      expect(
-        checks.singleWhere((c) => c.kind == StairCheckKind.handrails).state,
-        StairCheckState.review,
-      );
-    },
-  );
-  test('unknown rules edition cannot produce a regulatory pass', () {
+  test('checks report informative comfort, riser, going and slope ratios', () {
     final checks = ArchitectStairRules.check(
-      stair(design: const ArchitectStairDesign(rulesVersion: 'future')),
+      stair(design: const ArchitectStairDesign(manualGoing: .35)),
     );
     expect(
-      checks.any(
-        (c) =>
-            c.kind == StairCheckKind.version &&
-            c.state == StairCheckState.review,
-      ),
+      checks.singleWhere((c) => c.kind == StairCheckKind.comfort).state,
+      StairCheckState.advice,
+    );
+    expect(
+      checks.singleWhere((c) => c.kind == StairCheckKind.comfort).article,
+      '2h + b',
+    );
+    expect(
+      checks.singleWhere((c) => c.kind == StairCheckKind.riser).state,
+      StairCheckState.pass,
+    );
+    expect(
+      checks.singleWhere((c) => c.kind == StairCheckKind.going).state,
+      StairCheckState.pass,
+    );
+    expect(
+      checks.singleWhere((c) => c.kind == StairCheckKind.slope).state,
+      StairCheckState.pass,
+    );
+    expect(
+      checks.every((c) => c.state != StairCheckState.error),
       isTrue,
     );
-    expect(checks.where((c) => c.kind == StairCheckKind.width), isEmpty);
   });
   test('legacy JSON keeps its original schematic dimensions and risers', () {
     final old = ArchitectStair(
@@ -442,31 +404,30 @@ void main() {
       expect(commands.project.activeStorey.stairs.single.design!.rise, 3);
     },
   );
-  test('known violations require a draft, and rejection is atomic', () {
+  test('custom dimensions save cleanly and invalid storey rejection is atomic', () {
     final commands = ArchitectCommandController(project());
     addTearDown(commands.dispose);
+    commands.execute(
+      PutArchitectStair(storeyId: 's', stair: stair(width: .7), create: true),
+    );
+    expect(commands.project.activeStorey.stairs.single.width, .7);
+    expect(commands.project.activeStorey.stairs.single.design!.isDraft, isFalse);
     expect(
       () => commands.execute(
-        PutArchitectStair(storeyId: 's', stair: stair(width: .7), create: true),
+        PutArchitectStair(
+          storeyId: 's',
+          stair: stair(
+            design: const ArchitectStairDesign(upperStoreyId: 'missing'),
+          ),
+          create: true,
+        ),
       ),
       throwsArgumentError,
     );
-    expect(commands.project.activeStorey.stairs, isEmpty);
-    expect(commands.canUndo, isFalse);
-    commands.execute(
-      PutArchitectStair(
-        storeyId: 's',
-        stair: stair(
-          width: .7,
-          design: const ArchitectStairDesign(isDraft: true),
-        ),
-        create: true,
-      ),
-    );
-    expect(commands.project.activeStorey.stairs.single.design!.isDraft, isTrue);
+    expect(commands.project.activeStorey.stairs, hasLength(1));
   });
   testWidgets(
-    'Bulgarian properties fit a phone and invalid width requires a draft',
+    'stair properties fit a phone, hide BG regulations and save narrow width cleanly',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -503,15 +464,9 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(
-        tester
-            .widget<FilledButton>(find.byKey(const ValueKey('stair-save')))
-            .onPressed,
-        isNull,
-      );
-      await tester.ensureVisible(find.byKey(const ValueKey('stair-draft')));
-      await tester.tap(find.byKey(const ValueKey('stair-draft')));
-      await tester.pumpAndSettle();
+      expect(find.text('България · BG-2025.1'), findsNothing);
+      expect(find.text('Нормативна база'), findsNothing);
+      expect(find.text('Нормативни източници'), findsNothing);
       expect(
         tester
             .widget<FilledButton>(find.byKey(const ValueKey('stair-save')))
@@ -520,7 +475,8 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('stair-save')));
       await tester.pumpAndSettle();
-      expect(saved!.design!.isDraft, isTrue);
+      expect(saved!.width, .7);
+      expect(saved!.design!.isDraft, isFalse);
       expect(tester.takeException(), isNull);
     },
   );

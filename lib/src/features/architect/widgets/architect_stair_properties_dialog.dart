@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'architect_properties_shell.dart';
 import 'architect_property_number_field.dart';
 import '../services/architect_properties_session.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
@@ -250,40 +249,17 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
       return;
     }
     var next = d.copyWith(
-      rulesVersion: d.code == StairCode.bulgaria
-          ? ArchitectStairDesign.currentRules
-          : d.rulesVersion,
       autoRisers: true,
       autoGoing: true,
       autoWinderSteps: true,
       autoWinderRadius: true,
       isDraft: false,
-      landingDepth: d.use == StairUse.outdoorRoute ? 1.5 : 1.2,
+      landingDepth: 1.2,
     );
-    final width = next.code == StairCode.bulgaria
-        ? math.max(
-            stair.width,
-            next.use == StairUse.assembly
-                ? 1.6
-                : next.isSpiral && next.evacuation == StairEvacuation.over50
-                ? 1.5
-                : next.accessible ||
-                      next.evacuation == StairEvacuation.from16To50
-                ? 1.2
-                : 1.0,
-          )
-        : stair.width;
+    final width = stair.width;
     if (next.isSpiral) {
       final factor = 2 * math.sin(next.anglePerGoing / 2);
-      var radius = math.max(.15, next.going / factor - width / 2);
-      if (next.code == StairCode.bulgaria) {
-        if (next.evacuation == StairEvacuation.from16To50) {
-          radius = math.max(radius, .23 / factor - .3);
-        }
-        if (next.evacuation == StairEvacuation.over50) {
-          radius = math.max(radius, math.max(.45, .23 / factor));
-        }
-      }
+      final radius = math.max(.15, next.going / factor - width / 2);
       next = next.copyWith(innerRadius: radius);
     }
     next = ArchitectStairRules.resolveDesign(
@@ -325,8 +301,8 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
       );
     }
     final errors = checks.where((c) => c.state == StairCheckState.error).length;
-    final unknown = checks
-        .where((c) => c.state == StairCheckState.review)
+    final advices = checks
+        .where((c) => c.state == StairCheckState.advice)
         .length;
     return ArchitectPropertiesDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -575,34 +551,6 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                       );
                     },
                   ),
-                dropdown(
-                  'code',
-                  l.stairCode,
-                  d.code,
-                  StairCode.values,
-                  (v) => v == StairCode.bulgaria
-                      ? l.stairCodeBulgaria
-                      : l.stairCodeGeometry,
-                  (v) => update(d.copyWith(code: v)),
-                ),
-                if (d.code == StairCode.bulgaria) ...[
-                  dropdown(
-                    'use',
-                    l.stairUse,
-                    d.use,
-                    StairUse.values,
-                    (v) => stairUseLabel(l, v),
-                    (v) => update(d.copyWith(use: v)),
-                  ),
-                  dropdown(
-                    'evacuation',
-                    l.stairEvacuation,
-                    d.evacuation,
-                    StairEvacuation.values,
-                    (v) => stairEvacuationLabel(l, v),
-                    (v) => update(d.copyWith(evacuation: v)),
-                  ),
-                ],
                 Tooltip(
                   message: l.stairFitHelp,
                   child: OutlinedButton.icon(
@@ -860,9 +808,9 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                   key: ValueKey('stair-checks-$errors'),
                   tilePadding: EdgeInsets.zero,
                   initiallyExpanded: errors > 0,
-                  title: Text('${l.stairChecks} · $errors / $unknown'),
+                  title: Text('${l.stairChecks} · $errors / $advices'),
                   subtitle: Text(
-                    '${l.stairCheckError} / ${l.stairCheckReview}',
+                    '${l.stairCheckError} / ${l.stairCheckAdvice}',
                   ),
                   children: [for (final check in checks) checkTile(check)],
                 ),
@@ -874,29 +822,6 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                     subtitle: Text(l.stairDraftHelp),
                     value: d.isDraft,
                     onChanged: (v) => update(d.copyWith(isDraft: v ?? false)),
-                  ),
-                Text(
-                  l.stairIncomplete,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (d.code == StairCode.bulgaria)
-                  ExpansionTile(
-                    tilePadding: EdgeInsets.zero,
-                    title: Text(l.stairRulesSources),
-                    children: [
-                      TextButton(
-                        onPressed: () => launchUrl(
-                          Uri.parse(ArchitectStairRules.fireSource),
-                        ),
-                        child: Text(l.stairFireSource),
-                      ),
-                      TextButton(
-                        onPressed: () => launchUrl(
-                          Uri.parse(ArchitectStairRules.accessibilitySource),
-                        ),
-                        child: Text(l.stairAccessSource),
-                      ),
-                    ],
                   ),
               ],
             ),

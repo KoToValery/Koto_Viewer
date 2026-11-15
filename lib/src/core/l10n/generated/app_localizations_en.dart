@@ -19,6 +19,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stairCustom => 'Freeform';
 
   @override
+  String get stairSetupTitle => 'Freeform stair';
+
+  @override
+  String get stairSetupConfirm => 'Confirm';
+
+  @override
   String get stairCustomLayout => 'Stair layout';
 
   @override

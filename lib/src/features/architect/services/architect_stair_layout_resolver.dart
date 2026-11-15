@@ -21,6 +21,8 @@ class StairLayoutIssue {
   final String partId;
   final double? suggestedRun;
   const StairLayoutIssue(this.problem, this.partId, {this.suggestedRun});
+  @override
+  String toString() => 'StairLayoutIssue($problem, $partId)';
 }
 
 /// Pure constraints: a failed fit never changes a dimension or a contour.

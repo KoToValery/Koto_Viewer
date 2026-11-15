@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
-import 'package:kotoview/src/features/architect/models/architect_elements.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_stair_perimeter_overlay.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_wall_drafting_panel.dart';
 import 'architect_tool_test_helper.dart' as tools;
@@ -55,14 +54,14 @@ void main() {
         );
         await tester.tap(find.byKey(const ValueKey('stair-tool-freeform')));
         await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('stair-setup-confirm')), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('stair-setup-confirm')));
+        await tester.pumpAndSettle();
         final draft = tester
             .widget<ArchitectStairPerimeterOverlay>(
               find.byType(ArchitectStairPerimeterOverlay),
             )
             .draft;
-        draft.replaceDesign(
-          draft.design.copyWith(code: StairCode.geometryOnly),
-        );
         expect(
           find.byKey(const ValueKey('stair-perimeter-part')),
           findsOneWidget,
@@ -139,4 +138,80 @@ void main() {
       },
     );
   }
+  testWidgets(
+    'freeform setup dialog configures height, width and going before tracing on phone',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final model = workspace.commands();
+      addTearDown(model.dispose);
+      final l = await AppLocalizations.delegate.load(const Locale('bg'));
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('bg'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ArchitectWorkspaceScreen(commandController: model),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tools.choose(tester, Icons.stairs_rounded);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('stair-tool-freeform')),
+      );
+      await tester.tap(find.byKey(const ValueKey('stair-tool-freeform')));
+      await tester.pumpAndSettle();
+      // Canceling leaves the workspace without entering perimeter tracing.
+      await tester.tap(find.text(l.cancel));
+      await tester.pumpAndSettle();
+      expect(find.byType(ArchitectStairPerimeterOverlay), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('stair-tool-freeform')));
+      await tester.pumpAndSettle();
+      final mode = find.byKey(const ValueKey('stair-setup-height-mode-true'));
+      await tester.ensureVisible(mode);
+      await tester.tap(mode);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l.stairHeightManual).last);
+      await tester.pumpAndSettle();
+      Future<void> enter(String field, String value) async {
+        final tile = find.byKey(ValueKey('stair-setup-$field'));
+        await tester.ensureVisible(tile);
+        await tester.enterText(
+          find.descendant(of: tile, matching: find.byType(TextFormField)),
+          value,
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await enter('rise', '3.2');
+      await enter('width', '1.4');
+      await enter('going', '0.3');
+      await tester.tap(find.byKey(const ValueKey('stair-setup-confirm')));
+      await tester.pumpAndSettle();
+      final draft = tester
+          .widget<ArchitectStairPerimeterOverlay>(
+            find.byType(ArchitectStairPerimeterOverlay),
+          )
+          .draft;
+      expect(draft.width, closeTo(1.4, 1e-6));
+      expect(draft.design.rise, closeTo(3.2, 1e-6));
+      await tester.tapAt(workspace.screen(tester, Offset.zero));
+      await tester.pump();
+      await tester.tapAt(workspace.screen(tester, const Offset(1.0, 0)));
+      await tester.pumpAndSettle();
+      final panel = tester.widget<ArchitectWallDraftingPanel>(
+        find.byKey(const ValueKey('stair-perimeter-panel')),
+      );
+      panel.onLength(.02);
+      panel.onLength(.25);
+      panel.onLength(2.40);
+      await tester.pumpAndSettle();
+      expect(draft.preview!.design!.layout!.flights.single.risers, 9);
+      expect(draft.preview!.design!.going, closeTo(.3, 1e-6));
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

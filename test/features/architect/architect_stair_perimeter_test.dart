@@ -53,6 +53,14 @@ void main() {
       expect(live.design!.layout!.flights, hasLength(2));
       expect(live.design!.layout!.landings, hasLength(1));
       expect(ArchitectStairLayoutResolver.check(live.design!), isEmpty);
+      expect(
+        live.design!.layout!.flights[0].footprint(live.design!.going).map((p) => p.dy).every((y) => y >= -1e-6),
+        isTrue,
+      );
+      expect(
+        live.design!.layout!.flights[1].footprint(live.design!.going).map((p) => p.dx).every((x) => x <= 2.6 + 1e-6),
+        isTrue,
+      );
       d.acceptPart();
       expect(d.complete, isTrue);
       d.undo();
@@ -61,6 +69,79 @@ void main() {
       expect(d.complete, isTrue);
     },
   );
+  test('keystroke edits on first flight fit whole steps without shrinking going', () {
+    final d = create();
+    addTearDown(d.dispose);
+    d.pick(Offset.zero);
+    d.pick(const Offset(1.0, 0));
+    d.setLength(.02);
+    d.setLength(.25);
+    d.setLength(2.50);
+    expect(d.acceptPart(), isTrue);
+    final flight = d.committedPreview!.design!.layout!.flights.single;
+    expect(flight.risers, 10);
+    expect(flight.run(d.design.going), closeTo(2.50, 1e-8));
+    expect(d.design.going, closeTo(2.50 / 9, 1e-8));
+  });
+  test('second flight exact non-multiple length does not break layout checks', () {
+    final d = create();
+    addTearDown(d.dispose);
+    d.pick(Offset.zero);
+    d.pick(const Offset(2.50, 0));
+    d.setLength(2.50);
+    expect(d.acceptPart(), isTrue);
+    d.pick(const Offset(3.70, 0));
+    expect(d.acceptPart(), isTrue);
+    d.pick(const Offset(3.70, 2.00));
+    d.setLength(2.00);
+    final live = d.preview!;
+    expect(ArchitectStairLayoutResolver.check(live.design!), isEmpty);
+    expect(d.acceptPart(), isTrue);
+    expect(d.complete, isTrue);
+  });
+  test('turning landing shifts clear of first flight steps in preview and layout', () {
+    for (final turnY in [2.6, -2.6]) {
+      final d = create();
+      addTearDown(d.dispose);
+      d.pick(Offset.zero);
+      d.pick(const Offset(1.4, 0));
+      expect(d.acceptPart(), isTrue);
+      d.pick(Offset(1.4, turnY));
+      final quads = d.pendingLandingQuads;
+      expect(quads, hasLength(1));
+      expect(
+        quads.single.every((p) => p.dx >= 1.4 - 1e-6),
+        isTrue,
+      );
+      expect(d.acceptPart(), isTrue);
+      d.pick(Offset(0, turnY));
+      final live = d.preview!;
+      expect(live.design!.layout!.flights, hasLength(2));
+      expect(live.design!.layout!.landings, hasLength(1));
+      expect(ArchitectStairLayoutResolver.check(live.design!), isEmpty);
+    }
+  });
+  test('outer three-edge U-turn advances second flight past the landing', () {
+    final d = create();
+    addTearDown(d.dispose);
+    d.pick(Offset.zero);
+    d.pick(const Offset(1.4, 0));
+    expect(d.acceptPart(), isTrue);
+    d.pick(const Offset(2.6, 0));
+    expect(d.acceptPart(), isTrue);
+    d.choose(StairPerimeterPart.landing);
+    d.pick(const Offset(2.6, 2.6));
+    expect(d.acceptPart(), isTrue);
+    d.pick(const Offset(1.2, 2.6));
+    final live = d.preview!;
+    expect(live.design!.layout!.flights, hasLength(2));
+    expect(live.design!.layout!.landings, hasLength(1));
+    expect(ArchitectStairLayoutResolver.check(live.design!), isEmpty);
+    expect(
+      live.design!.layout!.flights[1].origin.dx,
+      closeTo(1.4, 1e-6),
+    );
+  });
   test(
     'navigation restores the provisional endpoint without adding a segment',
     () {

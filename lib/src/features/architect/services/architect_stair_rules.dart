@@ -47,12 +47,8 @@ class StairCheck {
 }
 
 /// Explicit, scoped geometric checks, never a whole-building certificate.
-/// Sources / rule matrix: docs/architect_stairs_bulgaria.md.
+/// Informative geometric and ergonomic stair checks, never blocking edits.
 class ArchitectStairRules {
-  static const fireSource =
-      'https://mvr.bg/upload/286736/Naredba%20Iz-1971_2025_1.pdf';
-  static const accessibilitySource =
-      'https://dv.parliament.bg/DVWeb/showMaterialDV.jsp?idMat=155689';
   static List<StairCheck> check(
     ArchitectStair stair, {
     ArchitectProject? project,
@@ -84,8 +80,8 @@ class ArchitectStairRules {
       double actual, {
       double? min,
       double? max,
-      required String article,
-      bool advisory = false,
+      String? article,
+      bool advisory = true,
     }) {
       final ok =
           (min == null || actual >= min - 1e-9) &&
@@ -106,295 +102,83 @@ class ArchitectStairRules {
       );
     }
 
+    final walkGoing = d.walkingGoing(stair.width);
     range(
       StairCheckKind.comfort,
-      2 * d.riser + d.walkingGoing(stair.width),
+      2 * d.riser + walkGoing,
       min: .60,
       max: .64,
       article: '2h + b',
-      advisory: true,
     );
-    if (d.layout == null &&
-        d.shape == StairShape.spiralOverlap &&
-        d.overlapHeadroom < .001) {
-      range(
-        StairCheckKind.headroom,
-        d.overlapHeadroom,
-        min: .001,
-        article: '3D',
-      );
-    }
-    if (d.code == StairCode.geometryOnly) {
-      if (measuredHeadroom != null)
-        result.add(
-          StairCheck(
-            StairCheckKind.headroom,
-            measuredHeadroom <= 1e-6
-                ? StairCheckState.error
-                : StairCheckState.review,
-            actual: measuredHeadroom.isFinite ? measuredHeadroom : null,
-          ),
-        );
-      result.add(
-        const StairCheck(StairCheckKind.scope, StairCheckState.review),
-      );
-      return result;
-    }
-    if (d.rulesVersion != ArchitectStairDesign.currentRules) {
-      result.add(
-        const StairCheck(StairCheckKind.version, StairCheckState.review),
-      );
-      return result;
+    range(StairCheckKind.width, width, min: .90);
+    range(StairCheckKind.riser, d.riser, min: .12, max: .18);
+    if (!d.isSpiral) {
+      range(StairCheckKind.going, walkGoing, min: .25, max: .35);
+      range(StairCheckKind.slope, d.riser / walkGoing, max: 1 / 1.5);
     }
     if (d.hasWinders) {
+      final winderWalk = d.winderGoingAt(stair.width, stair.width / 2);
+      range(StairCheckKind.going, winderWalk, min: .25, max: .35);
+      range(StairCheckKind.slope, d.riser / winderWalk, max: 1 / 1.5);
       range(
         StairCheckKind.innerGoing30,
         d.winderGoingAt(stair.width, .30),
         min: .23,
-        article: d.evacuation == StairEvacuation.from16To50
-            ? '52(4)1'
-            : '30 cm',
-        advisory: d.evacuation != StairEvacuation.from16To50,
       );
       range(
         StairCheckKind.innerGoing,
         d.winderGoingAt(stair.width, 0),
         min: .05,
-        article: 'BWF 2017',
-        advisory: true,
-      );
-      if (d.evacuation == StairEvacuation.from16To50) {
-        range(StairCheckKind.width, stair.width, min: 1.2, article: '52(4)2');
-      }
-      if (d.evacuation == StairEvacuation.over50) {
-        result.add(
-          const StairCheck(
-            StairCheckKind.scope,
-            StairCheckState.review,
-            article: '52(4)',
-          ),
-        );
-      }
-      if (d.accessible) {
-        range(
-          StairCheckKind.going,
-          d.winderGoingAt(stair.width, stair.width / 2),
-          min: d.use == StairUse.outdoorRoute ? .32 : .28,
-          max: d.use == StairUse.outdoorRoute ? null : .35,
-          article: d.use == StairUse.outdoorRoute ? '18(1)' : '55(1)',
-        );
-        result.add(
-          const StairCheck(
-            StairCheckKind.accessibility,
-            StairCheckState.review,
-            article: '55',
-          ),
-        );
-      }
-    }
-    if (d.layout == null && d.shape == StairShape.spiralOverlap) {
-      final indoorAccessible = d.accessible && d.use != StairUse.outdoorRoute;
-      range(
-        StairCheckKind.headroom,
-        d.overlapHeadroom,
-        min: 2.1,
-        article: indoorAccessible ? '55(1)5' : '2.10 m',
-        advisory: !indoorAccessible,
       );
     }
-    if (d.accessible) {
-      final outdoor = d.use == StairUse.outdoorRoute;
-      final article = outdoor ? '18(1)' : '55(1)';
-      range(
-        StairCheckKind.width,
-        width,
-        min: d.use == StairUse.assembly ? 1.6 : 1.2,
-        article: article,
-      );
-      range(
-        StairCheckKind.riser,
-        d.riser,
-        max: outdoor ? .15 : .17,
-        article: article,
-      );
-      range(
-        StairCheckKind.flightRise,
-        d.flightRisers.reduce(math.max) * d.riser,
-        max: outdoor ? 1.2 : 2.5,
-        article: article,
-      );
-      if (!d.isSpiral) {
-        range(
-          StairCheckKind.going,
-          d.going,
-          min: outdoor ? .32 : .28,
-          max: outdoor ? null : .35,
-          article: article,
-        );
-        if (d.flightCount > 1) {
+    if (d.isSpiral) {
+      range(StairCheckKind.innerGoing30, d.goingAt30, min: .23);
+      range(StairCheckKind.innerGoing, d.innerGoing, min: .10);
+    }
+    if (!d.isSpiral && d.flightCount > 1) {
+      if (d.layout != null) {
+        for (var i = 0; i < d.layout!.landings.length; i++) {
           range(
             StairCheckKind.landing,
-            landingDepth,
-            min: outdoor ? 1.5 : 1.2,
-            article: article,
+            ArchitectStairLayoutResolver.landingDepth(d, landingIndex: i),
+            min: math.max(
+              d.layout!.flights[i].width,
+              d.layout!.flights[i + 1].width,
+            ),
           );
         }
       } else {
-        result.add(
-          const StairCheck(
-            StairCheckKind.accessibility,
-            StairCheckState.review,
-            article: '55',
-          ),
+        range(StairCheckKind.landing, landingDepth, min: stair.width);
+      }
+    }
+    range(
+      StairCheckKind.flightRise,
+      d.flightRisers.reduce(math.max) * d.riser,
+      max: 2.5,
+    );
+    if (d.layout == null && d.shape == StairShape.spiralOverlap) {
+      if (d.overlapHeadroom < .001) {
+        range(
+          StairCheckKind.headroom,
+          d.overlapHeadroom,
+          min: .001,
+          article: '3D',
+          advisory: false,
+        );
+      } else {
+        range(
+          StairCheckKind.headroom,
+          d.overlapHeadroom,
+          min: 2.1,
+          article: '2.10 m',
         );
       }
-      result.addAll([
-        StairCheck(
-          StairCheckKind.headroom,
-          measuredHeadroom == null || outdoor
-              ? StairCheckState.review
-              : measuredHeadroom + 1e-6 >= 2.1
-              ? StairCheckState.pass
-              : StairCheckState.error,
-          actual: measuredHeadroom?.isFinite == true ? measuredHeadroom : null,
-          minimum: outdoor ? null : 2.1,
-          article: outdoor ? '18' : '55(1)5',
-        ),
-        StairCheck(
-          StairCheckKind.handrails,
-          StairCheckState.review,
-          article: outdoor ? '18' : '55(2)',
-        ),
-        StairCheck(
-          StairCheckKind.finishes,
-          StairCheckState.review,
-          article: outdoor ? '18' : '55(3)',
-        ),
-      ]);
-    } else {
-      result.add(
-        const StairCheck(StairCheckKind.scope, StairCheckState.review),
-      );
-    }
-    if (d.evacuation == StairEvacuation.unspecified) {
-      result.add(
-        const StairCheck(StairCheckKind.evacuation, StairCheckState.review),
-      );
-    } else if (d.isEvacuation) {
+    } else if (measuredHeadroom != null && measuredHeadroom.isFinite) {
       range(
-        StairCheckKind.groupSteps,
-        d.flightRisers.reduce(math.min).toDouble(),
-        min: 3,
-        article: '54(3)',
-      );
-      // Occupant bands suffice for Art. 52, but cannot size the complete
-      // evacuation route under Art. 45 or check functional fire subclasses.
-      result.add(
-        const StairCheck(
-          StairCheckKind.capacity,
-          StairCheckState.review,
-          article: '45',
-        ),
-      );
-      if (d.use == StairUse.outdoorRoute) {
-        // Art. 18 urban routes are not the same scope as external escape
-        // stairs under Art. 51; do not silently apply one to the other.
-        result.add(
-          const StairCheck(
-            StairCheckKind.scope,
-            StairCheckState.review,
-            article: '51',
-          ),
-        );
-      } else {
-        range(StairCheckKind.riser, d.riser, max: .22, article: '47(4)');
-        if (!d.isSpiral) {
-          range(StairCheckKind.going, d.going, min: .25, article: '47(4)');
-          range(
-            StairCheckKind.slope,
-            d.riser / d.going,
-            max: 1 / 1.5,
-            article: '47(4)',
-          );
-          if (d.hasWinders) {
-            final going = d.winderGoingAt(stair.width, stair.width / 2);
-            range(StairCheckKind.going, going, min: .25, article: '47(4)');
-            range(
-              StairCheckKind.slope,
-              d.riser / going,
-              max: 1 / 1.5,
-              article: '47(4)',
-            );
-          }
-          if (d.flightCount > 1) {
-            if (d.layout != null) {
-              for (var i = 0; i < d.layout!.landings.length; i++) {
-                range(
-                  StairCheckKind.landing,
-                  ArchitectStairLayoutResolver.landingDepth(d, landingIndex: i),
-                  min: math.max(
-                    d.layout!.flights[i].width,
-                    d.layout!.flights[i + 1].width,
-                  ),
-                  article: '45(8)',
-                );
-              }
-            } else
-              range(
-                StairCheckKind.landing,
-                landingDepth,
-                min: stair.width,
-                article: '45(8)',
-              );
-          }
-        }
-      }
-      if (d.isSpiral) {
-        if (d.evacuation == StairEvacuation.from16To50) {
-          range(
-            StairCheckKind.innerGoing30,
-            d.goingAt30,
-            min: .23,
-            article: '52(1)1',
-          );
-          range(StairCheckKind.width, stair.width, min: 1.2, article: '52(1)2');
-        } else if (d.evacuation == StairEvacuation.over50) {
-          range(
-            StairCheckKind.innerDiameter,
-            2 * d.innerRadius,
-            min: .9,
-            article: '52(2)1',
-          );
-          range(
-            StairCheckKind.innerGoing,
-            d.innerGoing,
-            min: .23,
-            article: '52(2)1',
-          );
-          range(StairCheckKind.width, stair.width, min: 1.5, article: '52(2)2');
-        }
-        result.add(
-          const StairCheck(
-            StairCheckKind.handrails,
-            StairCheckState.review,
-            article: '52',
-          ),
-        );
-        result.add(
-          const StairCheck(StairCheckKind.headroom, StairCheckState.review),
-        );
-      }
-    }
-    if (d.layout != null &&
-        !result.any((c) => c.kind == StairCheckKind.headroom)) {
-      result.add(
-        StairCheck(
-          StairCheckKind.headroom,
-          measuredHeadroom != null && measuredHeadroom <= 1e-6
-              ? StairCheckState.error
-              : StairCheckState.review,
-          actual: measuredHeadroom?.isFinite == true ? measuredHeadroom : null,
-        ),
+        StairCheckKind.headroom,
+        measuredHeadroom,
+        min: 2.1,
+        article: '2.10 m',
       );
     }
     return result;

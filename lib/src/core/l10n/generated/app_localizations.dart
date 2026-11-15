@@ -116,6 +116,18 @@ abstract class AppLocalizations {
   /// **'Freeform'**
   String get stairCustom;
 
+  /// Title of initial setup dialog before drawing a freeform stair
+  ///
+  /// In en, this message translates to:
+  /// **'Freeform stair'**
+  String get stairSetupTitle;
+
+  /// Confirm button to proceed from stair setup dialog to drawing
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get stairSetupConfirm;
+
   /// No description provided for @stairCustomLayout.
   ///
   /// In en, this message translates to:
