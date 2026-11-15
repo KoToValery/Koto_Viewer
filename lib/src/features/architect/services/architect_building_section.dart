@@ -1188,12 +1188,7 @@ class ArchitectBuildingSection {
 
       for (final beam in floor.beams) {
         final beamPath = sliceMesh(
-          ArchitectStairMesh.verticalPrism(
-            beam.polygonCorners,
-            floor.elevation + beam.baseOffset,
-            floor.elevation + beam.baseOffset + beam.depth,
-            StairSolidMaterial.concrete,
-          ).triangles,
+          ArchitectStairMesh.beamSolid(beam, floor.elevation).triangles,
         );
         if (beamPath != null) {
           regions.add(

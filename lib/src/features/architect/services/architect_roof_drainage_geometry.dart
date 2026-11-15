@@ -477,8 +477,8 @@ class ArchitectRoofDrainageGeometry {
       for (final beam in storey.beams) {
         obstacle(
           beam.polygonCorners,
-          storey.elevation + beam.baseOffset,
-          storey.elevation + beam.baseOffset + beam.depth,
+          storey.elevation + beam.minBottomOffset,
+          storey.elevation + beam.maxTopOffset,
         );
       }
       for (final column in storey.columns) {

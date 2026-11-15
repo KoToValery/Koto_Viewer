@@ -289,12 +289,7 @@ class Architect3dBuilder {
       for (final beam in storey.beams) {
         final first = allTris.length;
         allTris.addAll(
-          ArchitectStairMesh.verticalPrism(
-            beam.polygonCorners,
-            storey.elevation + beam.baseOffset,
-            storey.elevation + beam.baseOffset + beam.depth,
-            StairSolidMaterial.concrete,
-          ).triangles,
+          ArchitectStairMesh.beamSolid(beam, storey.elevation).triangles,
         );
         mark(beam.id, first);
       }

@@ -40,6 +40,7 @@ class ArchitectSelection {
     'height',
     'endHeight',
     'tiltAngle',
+    'slopeDegrees',
     'thickness',
     'width',
     'depth',
@@ -142,6 +143,9 @@ class ArchitectSelection {
         project.activeStorey.columns.any((c) => c.id == id) ||
         project.activeStorey.beams.any((b) => b.id == id)) {
       fields['baseOffset'] = (e['baseOffset'] as num?)?.toDouble() ?? 0.0;
+    }
+    if (project.activeStorey.beams.any((b) => b.id == id)) {
+      fields['slopeDegrees'] = (e['slopeDegrees'] as num?)?.toDouble() ?? 0.0;
     }
     if (e.containsKey('referenceLine')) {
       final wall = ArchitectWall.fromJson(e);
@@ -596,6 +600,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
             'baseOffset',
             'normalOffset',
             'tiltAngle',
+            'slopeDegrees',
           }.contains(entry.key) &&
           value <
               (entry.key == 'sillHeight' ||
@@ -607,6 +612,9 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
       }
       if (entry.key == 'tiltAngle' && (value < -80 || value > 80)) {
         throw ArgumentError('Invalid tilt angle');
+      }
+      if (entry.key == 'slopeDegrees' && (value < -75 || value > 75)) {
+        throw ArgumentError('Invalid slope angle');
       }
       if (entry.key == 'stepCount' &&
           (value != value.roundToDouble() || value < 1 || value > 1000)) {

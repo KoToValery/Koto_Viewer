@@ -145,6 +145,8 @@ class ArchitectToolPalette extends StatefulWidget {
   final ValueChanged<double>? onBeamDepthChanged;
   final double beamBaseOffset;
   final ValueChanged<double>? onBeamBaseOffsetChanged;
+  final double beamSlopeDegrees;
+  final ValueChanged<double>? onBeamSlopeChanged;
 
   final ArchitectStairDesign stairDesign;
   final ValueChanged<StairShape>? onStairShapeChanged;
@@ -261,6 +263,8 @@ class ArchitectToolPalette extends StatefulWidget {
     this.onBeamDepthChanged,
     this.beamBaseOffset = 2.20,
     this.onBeamBaseOffsetChanged,
+    this.beamSlopeDegrees = 0.0,
+    this.onBeamSlopeChanged,
     this.stairDesign = const ArchitectStairDesign(),
     this.onStairShapeChanged,
     this.onStairProperties,
@@ -433,6 +437,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   double get beamBaseOffset => widget.beamBaseOffset;
   ValueChanged<double>? get onBeamBaseOffsetChanged =>
       widget.onBeamBaseOffsetChanged;
+  double get beamSlopeDegrees => widget.beamSlopeDegrees;
+  ValueChanged<double>? get onBeamSlopeChanged => widget.onBeamSlopeChanged;
   double get stairWidth => widget.stairWidth;
   ValueChanged<double>? get onStairWidthChanged => widget.onStairWidthChanged;
   int get stairSteps => widget.stairSteps;
@@ -926,6 +932,49 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
 
   // === SECTION: [SEC-05-OPENINGS] DOORS, WINDOWS & OPENINGS ===
   // --- SUBSECTION: [TAG:ARCH_PALETTE_FENEST_OPENINGS] Doors, Windows & Openings: `_buildWindowSubBar`, `_buildDoorSubBar` (2 methods) ---
+  Widget _buildNumericKeypadChip({
+    Key? key,
+    required String label,
+    required double displayValue,
+    required String unitLabel,
+    String? chipSuffix,
+    int decimals = 1,
+    required double min,
+    required double max,
+    bool allowNegative = false,
+    required ValueChanged<double>? onChanged,
+  }) {
+    final l10n = context.l10n;
+    final formatted = ArchitectUnit.trimZeros(
+      displayValue.toStringAsFixed(decimals),
+    );
+    final suffix = chipSuffix ?? ' $unitLabel';
+    return ActionChip(
+      key: key,
+      label: Text('$formatted$suffix'),
+      onPressed: onChanged == null
+          ? null
+          : () async {
+              final entered = await BimNumericKeypad.showInputDialog(
+                context,
+                title: label,
+                initialText: formatted,
+                unitLabel: unitLabel,
+                decimals: decimals,
+                allowNegative: allowNegative,
+                min: min,
+                max: max,
+                cancelLabel: l10n.cancel,
+                applyLabel: l10n.applyAction,
+              );
+              if (entered != null) {
+                onChanged(entered);
+              }
+            },
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
   Widget _buildOpeningDimensionChip({
     Key? key,
     required String label,
@@ -934,36 +983,18 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     required double maxCm,
     bool allowNegative = false,
     required ValueChanged<double>? onChangedMeters,
-  }) {
-    final l10n = context.l10n;
-    final formatted = ArchitectUnit.trimZeros(
-      (valueMeters * 100).toStringAsFixed(1),
-    );
-    return ActionChip(
-      key: key,
-      label: Text('$formatted cm'),
-      onPressed: onChangedMeters == null
-          ? null
-          : () async {
-              final entered = await BimNumericKeypad.showInputDialog(
-                context,
-                title: label,
-                initialText: formatted,
-                unitLabel: 'cm',
-                decimals: 1,
-                allowNegative: allowNegative,
-                min: minCm,
-                max: maxCm,
-                cancelLabel: l10n.cancel,
-                applyLabel: l10n.applyAction,
-              );
-              if (entered != null) {
-                onChangedMeters(entered / 100.0);
-              }
-            },
-      visualDensity: VisualDensity.compact,
-    );
-  }
+  }) => _buildNumericKeypadChip(
+    key: key,
+    label: label,
+    displayValue: valueMeters * 100,
+    unitLabel: 'cm',
+    min: minCm,
+    max: maxCm,
+    allowNegative: allowNegative,
+    onChanged: onChangedMeters == null
+        ? null
+        : (entered) => onChangedMeters(entered / 100.0),
+  );
 
   Widget _buildOpeningDimensionLabel(String text) => Padding(
     padding: const EdgeInsets.only(right: 6),
@@ -1497,6 +1528,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     final effectiveWidth = selected?.width ?? beamWidth;
     final effectiveDepth = selected?.depth ?? beamDepth;
     final effectiveBaseOffset = selected?.baseOffset ?? beamBaseOffset;
+    final effectiveSlopeDegrees = selected?.slopeDegrees ?? beamSlopeDegrees;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1532,6 +1564,19 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             maxCm: 1000,
             allowNegative: true,
             onChangedMeters: onBeamBaseOffsetChanged,
+          ),
+          const SizedBox(width: 10),
+          _buildOpeningDimensionLabel(l10n.propertiesSlope),
+          _buildNumericKeypadChip(
+            key: const ValueKey('beam-slope-input'),
+            label: l10n.propertiesSlope,
+            displayValue: effectiveSlopeDegrees,
+            unitLabel: '°',
+            chipSuffix: '°',
+            min: -75,
+            max: 75,
+            allowNegative: true,
+            onChanged: onBeamSlopeChanged,
           ),
         ],
       ),

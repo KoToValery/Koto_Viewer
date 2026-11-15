@@ -928,6 +928,25 @@ class ArchitectStairMesh {
     return StairSolid(material, triangles);
   }
 
+  /// Builds the 3D solid hexahedron for a horizontal or sloped beam anchored at [storeyElevation].
+  static StairSolid beamSolid(ArchitectBeam beam, double storeyElevation) {
+    final corners = beam.polygonCorners;
+    final zStart = storeyElevation + beam.baseOffset;
+    final zEnd = storeyElevation + beam.endBaseOffset;
+    final zTopDelta = beam.verticalDepth;
+    // `polygonCorners` order is [start-n, end-n, end+n, start+n].
+    final bottomZ = [zStart, zEnd, zEnd, zStart];
+    final bottom = [
+      for (var i = 0; i < corners.length; i++)
+        Vector3(corners[i].dx, corners[i].dy, bottomZ[i]),
+    ];
+    final top = [
+      for (var i = 0; i < corners.length; i++)
+        Vector3(corners[i].dx, corners[i].dy, bottomZ[i] + zTopDelta),
+    ];
+    return hexahedron(bottom, top, StairSolidMaterial.concrete);
+  }
+
   static StairSolid cylinder(Vector3 a, Vector3 b, double radius) {
     final axis = (b - a).normalized();
     final ref = axis.z.abs() < .9

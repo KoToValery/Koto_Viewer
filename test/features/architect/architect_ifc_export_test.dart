@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -685,4 +686,48 @@ void main() {
       }
     },
   );
+
+  test('sloped beam exports tilted IFC axis, extended span and slope property', () async {
+    final slopedProject = ArchitectProject(
+      id: 'sloped-beam-ifc',
+      name: 'Sloped Beam',
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+      activeStoreyId: 's0',
+      storeys: const [
+        ArchitectStorey(
+          id: 's0',
+          name: 'Ground',
+          beams: [
+            ArchitectBeam(
+              id: 'beam-sloped-1',
+              startPoint: Offset.zero,
+              endPoint: Offset(4, 0),
+              width: 0.25,
+              depth: 0.40,
+              baseOffset: 2.00,
+              slopeDegrees: 15.0,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final result = await ArchitectIfcExport.exportProject(slopedProject, l);
+    final text = utf8.decode(result.bytes);
+    expect(text, contains('IFCBEAM'));
+    expect(text, contains("'SlopeDegrees'"));
+
+    final reopened = IfcParser.parseFromText(text);
+    final tris = reopened.elements.expand((e) => e.triangles).toList();
+    expect(tris, isNotEmpty);
+    final zs = [for (final t in tris) ...[t.v0.z, t.v1.z, t.v2.z]];
+    final spanZ = zs.reduce(math.max) - zs.reduce(math.min);
+    // Flat beam would span depth (0.40 m); 15° rise over 4 m yields ~1.46 m vertical envelope.
+    final expectedSpan =
+        4.0 * math.tan(15.0 * math.pi / 180.0) +
+        0.40 * math.cos(15.0 * math.pi / 180.0);
+    expect(spanZ, greaterThan(1.2));
+    expect(spanZ, closeTo(expectedSpan, 0.05));
+  });
 }

@@ -8,6 +8,7 @@ import 'architect_drawing_color.dart';
 import 'architect_wall_arc.dart';
 export 'architect_wall_arc.dart';
 // === SECTION: ARCHITECTURAL ELEMENT MODELS ===
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'architect_stair_design.dart';
@@ -79,6 +80,8 @@ class ArchitectBeam {
   final double depth; // in meters (default 0.50 m = 50 cm)
   final double
   baseOffset; // in meters relative to storey elevation (default 2.20 m)
+  final double
+  slopeDegrees; // longitudinal slope from start to end in degrees (+ rises)
   final ArchitectCutDisplayMode cutDisplayMode;
   final String label;
 
@@ -89,27 +92,47 @@ class ArchitectBeam {
     this.width = 0.25,
     this.depth = 0.50,
     this.baseOffset = 2.20,
+    this.slopeDegrees = 0.0,
     this.cutDisplayMode = ArchitectCutDisplayMode.auto,
     this.label = 'B 25/50',
   });
+
+  double get slopeRadians => slopeDegrees * math.pi / 180.0;
+
+  double get elevationRise => length * math.tan(slopeRadians);
+
+  double get endBaseOffset => baseOffset + elevationRise;
+
+  /// Vertical plumb cut depth preserving perpendicular section thickness [depth].
+  double get verticalDepth {
+    final c = math.cos(slopeRadians).abs();
+    return c > 1e-4 ? depth / c : depth;
+  }
+
+  /// True 3D centerline length along the sloped beam axis.
+  double get slopedLength {
+    final c = math.cos(slopeRadians).abs();
+    return c > 1e-4 ? length / c : length;
+  }
+
+  double get minBottomOffset => math.min(baseOffset, endBaseOffset);
+
+  double get maxTopOffset => math.max(baseOffset, endBaseOffset) + verticalDepth;
 
   bool isCutAt(double storeyCutPlane) {
     return switch (cutDisplayMode) {
       ArchitectCutDisplayMode.cut => true,
       ArchitectCutDisplayMode.projected => false,
       ArchitectCutDisplayMode.overhead => false,
-      ArchitectCutDisplayMode.auto => () {
-        final zLow = baseOffset;
-        final zHigh = baseOffset + depth;
-        return zLow <= storeyCutPlane && storeyCutPlane <= zHigh;
-      }(),
+      ArchitectCutDisplayMode.auto =>
+        minBottomOffset <= storeyCutPlane && storeyCutPlane <= maxTopOffset,
     };
   }
 
   bool isOverheadAt(double storeyCutPlane) {
     return switch (cutDisplayMode) {
       ArchitectCutDisplayMode.overhead => true,
-      ArchitectCutDisplayMode.auto => baseOffset > storeyCutPlane,
+      ArchitectCutDisplayMode.auto => minBottomOffset > storeyCutPlane,
       _ => false,
     };
   }
@@ -139,6 +162,7 @@ class ArchitectBeam {
     double? width,
     double? depth,
     double? baseOffset,
+    double? slopeDegrees,
     ArchitectCutDisplayMode? cutDisplayMode,
     String? label,
   }) => ArchitectBeam(
@@ -148,6 +172,7 @@ class ArchitectBeam {
     width: width ?? this.width,
     depth: depth ?? this.depth,
     baseOffset: baseOffset ?? this.baseOffset,
+    slopeDegrees: slopeDegrees ?? this.slopeDegrees,
     cutDisplayMode: cutDisplayMode ?? this.cutDisplayMode,
     label: label ?? this.label,
   );
@@ -159,6 +184,7 @@ class ArchitectBeam {
     'width': width,
     'depth': depth,
     'baseOffset': baseOffset,
+    'slopeDegrees': slopeDegrees,
     'cutDisplayMode': cutDisplayMode.name,
     'label': label,
   };
@@ -176,6 +202,7 @@ class ArchitectBeam {
     width: (json['width'] as num?)?.toDouble() ?? 0.25,
     depth: (json['depth'] as num?)?.toDouble() ?? 0.50,
     baseOffset: (json['baseOffset'] as num?)?.toDouble() ?? 2.20,
+    slopeDegrees: (json['slopeDegrees'] as num?)?.toDouble() ?? 0.0,
     cutDisplayMode: ArchitectCutDisplayMode.fromName(
       json['cutDisplayMode'] as String?,
     ),

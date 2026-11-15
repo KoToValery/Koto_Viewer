@@ -94,6 +94,7 @@ class ArchitectElementTool extends ChangeNotifier {
   double beamWidth = 0.25;
   double beamDepth = 0.40;
   double beamBaseOffset = 2.20;
+  double beamSlopeDegrees = 0.0;
 
   static ({double width, double depth}) beamDefaultsForScheme(
     ArchitectStructuralScheme scheme,
@@ -211,16 +212,25 @@ class ArchitectElementTool extends ChangeNotifier {
     beamDepth = defaults.depth;
     if (resetVertical) {
       beamBaseOffset = 2.20;
+      beamSlopeDegrees = 0.0;
     }
     if (notify) {
       notifyListeners();
     }
   }
 
-  void setBeamParams({double? width, double? depth, double? baseOffset}) {
+  void setBeamParams({
+    double? width,
+    double? depth,
+    double? baseOffset,
+    double? slopeDegrees,
+  }) {
     if (width != null) beamWidth = width;
     if (depth != null) beamDepth = depth;
     if (baseOffset != null) beamBaseOffset = baseOffset;
+    if (slopeDegrees != null) {
+      beamSlopeDegrees = slopeDegrees.clamp(-75.0, 75.0);
+    }
     notifyListeners();
   }
 
@@ -377,6 +387,7 @@ class ArchitectElementTool extends ChangeNotifier {
       width: beamWidth,
       depth: beamDepth,
       baseOffset: beamBaseOffset,
+      slopeDegrees: beamSlopeDegrees,
       label: defaultBeamLabel(beamWidth, beamDepth),
     );
 

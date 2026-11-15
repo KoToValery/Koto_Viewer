@@ -304,16 +304,20 @@ class _IfcPreparation {
         // Axis + cross section along the beam is preferable to a vertical box:
         // the local longitudinal axis remains available to BIM importers.
         final u = beam.unitVector;
+        final slopeRad = beam.slopeRadians;
+        final cosSlope = math.cos(slopeRad);
+        final sinSlope = math.sin(slopeRad);
+        final span3d = beam.slopedLength;
         elements.add({
           'id': beam.id,
           'kind': 'beam',
           'name': beam.label,
           'origin': [beam.startPoint.dx, -beam.startPoint.dy, beam.baseOffset],
-          'axis': [u.dx, -u.dy, 0],
+          'axis': [u.dx * cosSlope, -u.dy * cosSlope, sinSlope],
           'ref': [u.dy, u.dx, 0],
           'curve': [
             [0, 0, 0],
-            [0, 0, beam.length],
+            [0, 0, span3d],
           ],
           'shapes': [
             _extrusion([
@@ -321,12 +325,13 @@ class _IfcPreparation {
               [beam.width / 2, 0],
               [beam.width / 2, beam.depth],
               [-beam.width / 2, beam.depth],
-            ], beam.length),
+            ], span3d),
           ],
           'properties': {
             'Width': beam.width,
             'Depth': beam.depth,
-            'Length': beam.length,
+            'Length': span3d,
+            'SlopeDegrees': beam.slopeDegrees,
           },
           'typeId': '${beam.width}:${beam.depth}',
         });

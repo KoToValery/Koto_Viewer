@@ -287,7 +287,7 @@ class _ArchitectElementPropertiesDialogState
       'coreThickness' => l.architectWallCoreThickness,
       'insulationThicknessOverride' => l.architectPropertyThickness,
       'rotationDeg' || 'angle' => l.architectPropertyAngle,
-      'slopePercent' => l.propertiesSlope,
+      'slopeDegrees' || 'slopePercent' => l.propertiesSlope,
       'hatchAngle' => l.architectPropertyAngle,
       'hatchScale' => l.architectHatchScale,
       'stepCount' => l.architectPropertySteps,
@@ -309,6 +309,7 @@ class _ArchitectElementPropertiesDialogState
     'stepCount',
     'hatchScale',
     'hatchAngle',
+    'slopeDegrees',
   }.contains(key);
   bool get isSlopedWall =>
       (values.containsKey('endHeight') ||
@@ -1804,6 +1805,7 @@ class _ArchitectElementPropertiesDialogState
               'thickness',
               'sillHeight',
               'baseOffset',
+              'slopeDegrees',
               'rotationDeg',
               'size',
               'angle',

@@ -235,6 +235,27 @@ class ArchitectElementsPainterHelper {
       // Centerline
       canvas.drawLine(beam.startPoint, beam.endPoint, paint);
 
+      // Clean upslope direction chevron when beam is inclined
+      if (beam.slopeDegrees.abs() > 1e-3 && beam.length > 0.35) {
+        final dir = beam.slopeDegrees > 0 ? beam.unitVector : -beam.unitVector;
+        final n = beam.normalVector;
+        final chevronSize = math.min(beam.width * 0.35, 0.14).clamp(0.05, 0.14);
+        final tip =
+            beam.startPoint +
+            beam.unitVector * (beam.length * 0.5) +
+            dir * math.max(beam.length * 0.38, beam.length * 0.5 - 0.18);
+        canvas.drawLine(
+          tip - dir * chevronSize + n * (chevronSize * 0.7),
+          tip,
+          paint,
+        );
+        canvas.drawLine(
+          tip - dir * chevronSize - n * (chevronSize * 0.7),
+          tip,
+          paint,
+        );
+      }
+
       if (ArchitectTextScope.current != null || zoomScale > 15.0) {
         final mid = (beam.startPoint + beam.endPoint) / 2.0;
         canvas.save();

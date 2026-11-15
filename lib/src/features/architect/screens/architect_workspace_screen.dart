@@ -3211,6 +3211,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _elementTool.beamBaseOffset,
 
+      _elementTool.beamSlopeDegrees,
+
       _elementTool.stairWidth,
 
       _elementTool.stairDesign,
@@ -3381,6 +3383,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _elementTool.beamWidth = beam.width;
           _elementTool.beamDepth = beam.depth;
           _elementTool.beamBaseOffset = beam.baseOffset;
+          _elementTool.beamSlopeDegrees = beam.slopeDegrees;
           break;
         case ArchitectTool.stair:
           final stair = ArchitectStair.fromJson(json);
@@ -28954,6 +28957,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     double? width,
     double? depth,
     double? baseOffset,
+    double? slopeDegrees,
   }) {
     final id = _selectedElementId;
     if (id == null) return;
@@ -28964,6 +28968,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (width != null) 'width': width,
       if (depth != null) 'depth': depth,
       if (baseOffset != null) 'baseOffset': baseOffset,
+      if (slopeDegrees != null) 'slopeDegrees': slopeDegrees,
     };
     final texts = <String, String>{};
     if (beam != null && (width != null || depth != null)) {
@@ -31822,6 +31827,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       _updateSelectedBeam(baseOffset: bo);
                     } else {
                       _elementTool.setBeamParams(baseOffset: bo);
+                    }
+                  },
+
+                  beamSlopeDegrees:
+                      selectedBeam?.slopeDegrees ??
+                      _elementTool.beamSlopeDegrees,
+
+                  onBeamSlopeChanged: (bs) {
+                    if (selectedBeam != null) {
+                      _updateSelectedBeam(slopeDegrees: bs);
+                    } else {
+                      _elementTool.setBeamParams(slopeDegrees: bs);
                     }
                   },
 
