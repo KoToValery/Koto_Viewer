@@ -13282,4 +13282,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectExitProjectConfirm => 'Exit';
+
+  @override
+  String get architectCategoryStairs => 'Stairs';
+
+  @override
+  String get stairQuickFlightWidth => 'Flight';
+
+  @override
+  String get stairQuickTotalWidth => 'Total';
+
+  @override
+  String get stairQuickOuterDiameter => 'Outer Ø';
+
+  @override
+  String get stairQuickLanding => 'Landing';
+
+  @override
+  String get stairQuickTread => 'Step b';
+
+  @override
+  String get stairQuickRiser => 'Step h';
+
+  @override
+  String stairQuickStepsCount(int count) {
+    return '$count steps';
+  }
 }

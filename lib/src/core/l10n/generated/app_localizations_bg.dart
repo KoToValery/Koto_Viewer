@@ -13332,4 +13332,30 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectExitProjectConfirm => 'Изход';
+
+  @override
+  String get architectCategoryStairs => 'Стълби';
+
+  @override
+  String get stairQuickFlightWidth => 'Крило';
+
+  @override
+  String get stairQuickTotalWidth => 'Общо';
+
+  @override
+  String get stairQuickOuterDiameter => 'Външ. Ø';
+
+  @override
+  String get stairQuickLanding => 'Площадка';
+
+  @override
+  String get stairQuickTread => 'Стъпало b';
+
+  @override
+  String get stairQuickRiser => 'Стъпало h';
+
+  @override
+  String stairQuickStepsCount(int count) {
+    return '$count ст.';
+  }
 }

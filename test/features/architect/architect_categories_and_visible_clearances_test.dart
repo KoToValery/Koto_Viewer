@@ -47,9 +47,12 @@ void main() {
             find.byKey(const ValueKey('architect-tool-category')),
           );
           await tester.pumpAndSettle();
-          await tester.tap(
-            find.byKey(ValueKey('architect-category-${category.name}')),
+          final categoryButton = find.byKey(
+            ValueKey('architect-category-${category.name}'),
           );
+          await tester.ensureVisible(categoryButton);
+          await tester.pumpAndSettle();
+          await tester.tap(categoryButton);
           await tester.pumpAndSettle();
           if (category == ArchitectToolCategory.furnishing) {
             expect(

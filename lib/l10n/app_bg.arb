@@ -4570,5 +4570,13 @@
   "architectExitProjectTitle": "Изход от проекта?",
   "architectExitProjectMessage": "Проектът се запазва автоматично. Сигурни ли сте, че искате да излезете?",
   "architectExitProjectUnattachedMessage": "Този временен работен екран не е обвързан със запазен проект. Искате ли да излезете?",
-  "architectExitProjectConfirm": "Изход"
+  "architectExitProjectConfirm": "Изход",
+  "architectCategoryStairs": "Стълби",
+  "stairQuickFlightWidth": "Крило",
+  "stairQuickTotalWidth": "Общо",
+  "stairQuickOuterDiameter": "Външ. Ø",
+  "stairQuickLanding": "Площадка",
+  "stairQuickTread": "Стъпало b",
+  "stairQuickRiser": "Стъпало h",
+  "stairQuickStepsCount": "{count} ст."
 }

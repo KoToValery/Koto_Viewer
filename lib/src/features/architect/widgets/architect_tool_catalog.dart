@@ -6,6 +6,7 @@ import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 enum ArchitectToolCategory {
   plan,
   build,
+  stairs,
   decorative,
   structure,
   services,
@@ -21,6 +22,7 @@ enum ArchitectToolCategory {
     selection => l.architectCategoryEdit,
     plan => l.architectCategoryPlan,
     build => l.architectCategoryBuild,
+    stairs => l.architectCategoryStairs,
     decorative => l.architectCategoryDecorative,
     structure => l.architectCategoryStructure,
     services => l.architectCategoryServices,
@@ -36,6 +38,7 @@ enum ArchitectToolCategory {
     selection => AppIconId.select,
     plan => AppIconId.zone,
     build => AppIconId.wall,
+    stairs => AppIconId.stairs,
     decorative => AppIconId.roundedCorner,
     structure => AppIconId.beam,
     services => AppIconId.component,
@@ -61,8 +64,8 @@ enum ArchitectToolCategory {
     ArchitectTool.wall ||
     ArchitectTool.door ||
     ArchitectTool.window ||
-    ArchitectTool.stair ||
     ArchitectTool.roof => build,
+    ArchitectTool.stair => stairs,
     ArchitectTool.decorativeProfile ||
     ArchitectTool.decorativeFrame ||
     ArchitectTool.decorativeArc ||

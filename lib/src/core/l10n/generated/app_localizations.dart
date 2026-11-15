@@ -24119,6 +24119,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Exit'**
   String get architectExitProjectConfirm;
+
+  /// Architectural tool category for stairs
+  ///
+  /// In en, this message translates to:
+  /// **'Stairs'**
+  String get architectCategoryStairs;
+
+  /// Compact label for stair flight width in the quick edit bar
+  ///
+  /// In en, this message translates to:
+  /// **'Flight'**
+  String get stairQuickFlightWidth;
+
+  /// Compact label for overall stair width in the quick edit bar
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get stairQuickTotalWidth;
+
+  /// Compact label for spiral stair outer diameter in the quick edit bar
+  ///
+  /// In en, this message translates to:
+  /// **'Outer Ø'**
+  String get stairQuickOuterDiameter;
+
+  /// Compact label for stair landing depth in the quick edit bar
+  ///
+  /// In en, this message translates to:
+  /// **'Landing'**
+  String get stairQuickLanding;
+
+  /// Compact label for stair tread going depth in the quick edit bar
+  ///
+  /// In en, this message translates to:
+  /// **'Step b'**
+  String get stairQuickTread;
+
+  /// Compact label for stair riser height in the quick edit bar
+  ///
+  /// In en, this message translates to:
+  /// **'Step h'**
+  String get stairQuickRiser;
+
+  /// Compact readout showing total stair step count in the quick edit bar
+  ///
+  /// In en, this message translates to:
+  /// **'{count} steps'**
+  String stairQuickStepsCount(int count);
 }
 
 class _AppLocalizationsDelegate

@@ -242,6 +242,10 @@ class ArchitectElementTool extends ChangeNotifier {
     if (width != null) stairWidth = width;
     if (steps != null) stairSteps = steps;
     if (design != null) stairDesign = design;
+    if (stairDesign.totalWidth != null &&
+        stairDesign.totalWidth! < 2 * stairWidth) {
+      stairDesign = stairDesign.copyWith(totalWidth: 2 * stairWidth + 0.1);
+    }
     notifyListeners();
   }
 

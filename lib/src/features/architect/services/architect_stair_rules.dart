@@ -273,6 +273,27 @@ class ArchitectStairRules {
     ];
     return changed ? project.copyWith(storeys: floors) : project;
   }
+
+  /// Returns the closest valid integer riser count for a desired riser height.
+  static int risersForTargetHeight(
+    ArchitectStairDesign design,
+    double targetRiser,
+  ) {
+    var minRisers = 2;
+    if (design.hasWinders) {
+      minRisers = math.max(
+        minRisers,
+        design.turnQuarters * (design.cornerRiser ? 2 : 3) + 3,
+      );
+    } else if (!design.isSpiral && design.shape != StairShape.straight) {
+      minRisers = math.max(minRisers, 4);
+    }
+    if (design.isSpiral) {
+      minRisers = math.max(minRisers, (design.sweepDegrees / 180.0).floor() + 2);
+    }
+    final safeTarget = targetRiser > 0.001 ? targetRiser : design.riser;
+    return (design.rise / safeTarget).round().clamp(minRisers, 500);
+  }
 }
 
 class PutArchitectStair extends ArchitectModelCommand {

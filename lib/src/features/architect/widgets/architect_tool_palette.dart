@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../services/architect_interaction_mode.dart';
@@ -148,16 +149,22 @@ class ArchitectToolPalette extends StatefulWidget {
   final double beamSlopeDegrees;
   final ValueChanged<double>? onBeamSlopeChanged;
 
+  // Stair options
+  final ArchitectStair? selectedStair;
   final ArchitectStairDesign stairDesign;
   final ValueChanged<StairShape>? onStairShapeChanged;
   final VoidCallback? onStairProperties;
   final VoidCallback? onFreeStair;
-
-  // Stair options
   final double stairWidth;
   final ValueChanged<double>? onStairWidthChanged;
   final int stairSteps;
   final ValueChanged<int>? onStairStepsChanged;
+  final ValueChanged<double>? onStairTotalWidthChanged;
+  final ValueChanged<double>? onStairOuterDiameterChanged;
+  final ValueChanged<double>? onStairLandingDepthChanged;
+  final ValueChanged<double>? onStairGoingChanged;
+  final ValueChanged<double>? onStairRiserChanged;
+  final ValueChanged<bool>? onStairTurnChanged;
 
   // Opening options
   final OpeningType openingType;
@@ -265,6 +272,7 @@ class ArchitectToolPalette extends StatefulWidget {
     this.onBeamBaseOffsetChanged,
     this.beamSlopeDegrees = 0.0,
     this.onBeamSlopeChanged,
+    this.selectedStair,
     this.stairDesign = const ArchitectStairDesign(),
     this.onStairShapeChanged,
     this.onStairProperties,
@@ -273,6 +281,12 @@ class ArchitectToolPalette extends StatefulWidget {
     this.onStairWidthChanged,
     this.stairSteps = 16,
     this.onStairStepsChanged,
+    this.onStairTotalWidthChanged,
+    this.onStairOuterDiameterChanged,
+    this.onStairLandingDepthChanged,
+    this.onStairGoingChanged,
+    this.onStairRiserChanged,
+    this.onStairTurnChanged,
     this.openingType = OpeningType.shaft,
     this.onOpeningTypeChanged,
     this.decorativeDepth = 0.05,
@@ -483,7 +497,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   widget.selectedDoor != null ||
                   widget.selectedWindow != null ||
                   widget.selectedColumn != null ||
-                  widget.selectedBeam != null) ...[
+                  widget.selectedBeam != null ||
+                  widget.selectedStair != null) ...[
                 // Contextual Sub-bar for Active Tool parameters or Selection
                 if (widget.selectedDoor != null ||
                     activeTool == ArchitectTool.door)
@@ -495,6 +510,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   _buildColumnSubBar(context)
                 else if (widget.selectedBeam != null)
                   _buildBeamSubBar(context)
+                else if (widget.selectedStair != null)
+                  _buildStairSubBar(context)
                 else if (activeTool == ArchitectTool.zone)
                   _buildZoneSubBar(context)
                 else if (activeTool == ArchitectTool.wall)
@@ -643,7 +660,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                                       widget.selectionTool!,
                                     ),
                                 ],
-                                if (category != ArchitectToolCategory.selection)
+                                if (category == ArchitectToolCategory.stairs)
+                                  ..._buildStairShapeButtons(context)
+                                else if (category !=
+                                    ArchitectToolCategory.selection)
                                   for (final tool in category.tools)
                                     _buildToolButton(
                                       tool: tool,
@@ -1527,37 +1547,218 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     );
   }
 
-  Widget _buildStairSubBar(BuildContext context) {
+  List<Widget> _buildStairShapeButtons(BuildContext context) {
     final l = context.l10n;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          TextButton.icon(
-            key: const ValueKey('stair-tool-freeform'),
-            icon: const Icon(Icons.polyline_outlined, size: 18),
-            label: Text(l.stairCustom), onPressed: widget.onFreeStair),
-          DropdownButton<StairShape>(
-            key: const ValueKey('stair-tool-shape'),
-            value: widget.stairDesign.shape,
-            dropdownColor: colors.surfaceContainerHigh,
-            style: TextStyle(color: colors.onSurface, fontSize: 13),
-            items: [
-              for (final shape in StairShape.values)
-                DropdownMenuItem(
-                  value: shape,
-                  child: Text(stairShapeLabel(l, shape)),
-                ),
-            ],
-            onChanged: (shape) {
-              if (shape != null) widget.onStairShapeChanged?.call(shape);
+    final effectiveDesign = widget.selectedStair?.design ?? widget.stairDesign;
+    final effectiveShape = effectiveDesign.layout == null
+        ? effectiveDesign.shape
+        : null;
+    AppIconId iconForShape(StairShape shape) => switch (shape) {
+      StairShape.straight => AppIconId.stairs,
+      StairShape.quarterTurn => AppIconId.turnRight,
+      StairShape.halfTurn => AppIconId.swapHorizontal,
+      StairShape.spiral => AppIconId.rotate,
+      StairShape.spiralOverlap => AppIconId.rotateLeft,
+    };
+    return [
+      for (final shape in StairShape.values)
+        KeyedSubtree(
+          key: ValueKey('stair-shape-${shape.name}'),
+          child: _buildToolButton(
+            tool: ArchitectTool.stair,
+            buttonKey: shape == effectiveDesign.shape
+                ? 'architect-tool-stair'
+                : 'stair-shape-btn-${shape.name}',
+            icon: iconForShape(shape),
+            label: stairShapeLabel(l, shape),
+            selected:
+                (widget.selectedStair != null ||
+                    activeTool == ArchitectTool.stair) &&
+                effectiveShape == shape,
+            onPressed: () {
+              final isCurrentlySelected =
+                  widget.selectedStair != null && effectiveShape == shape;
+              final isCurrentlyDrawingThis =
+                  widget.selectedStair == null &&
+                  activeTool == ArchitectTool.stair &&
+                  effectiveShape == shape;
+              if (isCurrentlyDrawingThis &&
+                  mode != ArchitectInteractionMode.contextEdit) {
+                onToolChanged(ArchitectTool.pan);
+                return;
+              }
+              if (isCurrentlySelected) return;
+              widget.onStairShapeChanged?.call(shape);
+              if (widget.selectedStair == null &&
+                  activeTool != ArchitectTool.stair) {
+                onToolChanged(ArchitectTool.stair);
+              }
             },
           ),
-          const SizedBox(width: 8),
-          Text(
-            '${(stairWidth * 100).round()} cm',
-            style: TextStyle(color: colors.onSurfaceVariant),
-          ),
+        ),
+      if (widget.onFreeStair != null)
+        _buildToolButton(
+          tool: ArchitectTool.stair,
+          buttonKey: 'stair-tool-freeform',
+          icon: AppIconId.polyline,
+          label: l.stairCustom,
+          selected:
+              widget.selectedStair != null && effectiveDesign.layout != null,
+          onPressed: widget.onFreeStair,
+        ),
+    ];
+  }
+
+  Widget _buildStairSubBar(BuildContext context) {
+    final l = context.l10n;
+    final selected = widget.selectedStair;
+    final effectiveWidth = selected?.width ?? stairWidth;
+    final effectiveDesign = selected?.design ?? widget.stairDesign;
+    final hasCustomLayout = effectiveDesign.layout != null;
+    final showTotalWidth =
+        !hasCustomLayout &&
+        effectiveDesign.shape == StairShape.halfTurn &&
+        !effectiveDesign.hasWinders;
+    final showOuterDiameter = !hasCustomLayout && effectiveDesign.isSpiral;
+    final showLandingDepth =
+        !hasCustomLayout &&
+        !effectiveDesign.isSpiral &&
+        !effectiveDesign.hasWinders &&
+        effectiveDesign.flightCount > 1;
+    final showGoing = !effectiveDesign.isSpiral;
+    final showRiser = !hasCustomLayout;
+
+    ({double length, double width})? overallPlanSize() {
+      try {
+        final plan = ArchitectStairPlan.build(
+          start: Offset.zero,
+          direction: const Offset(1, 0),
+          width: effectiveWidth,
+          design: effectiveDesign,
+        );
+        final size = plan.bounds.size;
+        return (length: size.width, width: size.height);
+      } on ArgumentError {
+        return null;
+      }
+    }
+
+    final overall = (!hasCustomLayout && !showTotalWidth && !showOuterDiameter)
+        ? overallPlanSize()
+        : null;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          if (!hasCustomLayout) ...[
+            _buildOpeningDimensionLabel(l.stairQuickFlightWidth),
+            _buildOpeningDimensionChip(
+              key: const ValueKey('stair-width-input'),
+              label: l.stairClearWidth,
+              valueMeters: effectiveWidth,
+              minCm: 40,
+              maxCm: 1000,
+              onChangedMeters: widget.onStairWidthChanged,
+            ),
+          ],
+          if (showTotalWidth) ...[
+            const SizedBox(width: 10),
+            _buildOpeningDimensionLabel(l.stairQuickTotalWidth),
+            _buildOpeningDimensionChip(
+              key: const ValueKey('stair-total-width-input'),
+              label: l.stairTotalWidth,
+              valueMeters: effectiveDesign.effectiveTotalWidth(effectiveWidth),
+              minCm: (2 * effectiveWidth * 100).ceilToDouble(),
+              maxCm: 2000,
+              onChangedMeters: widget.onStairTotalWidthChanged,
+            ),
+          ],
+          if (showOuterDiameter) ...[
+            const SizedBox(width: 10),
+            _buildOpeningDimensionLabel(l.stairQuickOuterDiameter),
+            _buildOpeningDimensionChip(
+              key: const ValueKey('stair-outer-diameter-input'),
+              label: l.stairQuickOuterDiameter,
+              valueMeters: 2 * (effectiveDesign.innerRadius + effectiveWidth),
+              minCm: ((2 * effectiveWidth + 0.10) * 100).ceilToDouble(),
+              maxCm: 3000,
+              onChangedMeters: widget.onStairOuterDiameterChanged,
+            ),
+          ],
+          if (showLandingDepth) ...[
+            const SizedBox(width: 10),
+            _buildOpeningDimensionLabel(l.stairQuickLanding),
+            _buildOpeningDimensionChip(
+              key: const ValueKey('stair-landing-depth-input'),
+              label: l.stairLanding,
+              valueMeters: math.max(effectiveWidth, effectiveDesign.landingDepth),
+              minCm: (effectiveWidth * 100).ceilToDouble(),
+              maxCm: 1000,
+              onChangedMeters: widget.onStairLandingDepthChanged,
+            ),
+          ],
+          if (showGoing) ...[
+            if (!hasCustomLayout) const SizedBox(width: 10),
+            _buildOpeningDimensionLabel(l.stairQuickTread),
+            _buildOpeningDimensionChip(
+              key: const ValueKey('stair-going-input'),
+              label: l.stairGoing,
+              valueMeters: effectiveDesign.going,
+              minCm: 15,
+              maxCm: 100,
+              onChangedMeters: widget.onStairGoingChanged,
+            ),
+          ],
+          if (showRiser) ...[
+            const SizedBox(width: 10),
+            _buildOpeningDimensionLabel(l.stairQuickRiser),
+            _buildOpeningDimensionChip(
+              key: const ValueKey('stair-riser-input'),
+              label: l.stairRiser,
+              valueMeters: effectiveDesign.riser,
+              minCm: 8,
+              maxCm: 30,
+              onChangedMeters: widget.onStairRiserChanged,
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: Text(
+                l.stairQuickStepsCount(effectiveDesign.risers),
+                key: const ValueKey('stair-risers-count'),
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+              ),
+            ),
+          ],
+          if (overall != null) ...[
+            const SizedBox(width: 10),
+            Text(
+              '${l.stairQuickTotalWidth}: '
+              '${(overall.length * 100).round()}×${(overall.width * 100).round()} cm',
+              key: const ValueKey('stair-overall-size'),
+              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+            ),
+          ],
+          if (!hasCustomLayout &&
+              effectiveDesign.shape != StairShape.straight &&
+              widget.onStairTurnChanged != null) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              key: const ValueKey('stair-tool-turn'),
+              tooltip: effectiveDesign.turnLeft
+                  ? l.stairTurnRight
+                  : l.stairTurnLeft,
+              icon: AppIcon(
+                effectiveDesign.turnLeft
+                    ? AppIconId.turnLeft
+                    : AppIconId.turnRight,
+                color: colors.onSurfaceVariant,
+              ),
+              onPressed: () =>
+                  widget.onStairTurnChanged?.call(!effectiveDesign.turnLeft),
+            ),
+          ],
           IconButton(
             key: const ValueKey('stair-tool-properties'),
             tooltip: l.architectProperties,

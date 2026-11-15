@@ -1,9 +1,13 @@
 # Architect Tool Palette — Reference & Navigation Map
 
-Freeform stair entry: `_buildStairSubBar` exposes `onFreeStair` alongside the
-existing preset picker and properties. It starts the workspace session under
-`[TAG:STAIR_FREEFORM]`; the palette is hidden while that session owns the canvas.
-Both supported ARB locales provide the entry label and its drafting messages.
+Stairs category & quick bar: `ArchitectToolCategory.stairs` exposes stair shapes
+(`StairShape.values` plus `stair-tool-freeform`) directly as buttons via
+`_buildStairShapeButtons`. `_buildStairSubBar` renders direct numeric keypad
+chips (`stair-width-input`, `stair-total-width-input`,
+`stair-outer-diameter-input`, `stair-landing-depth-input`, `stair-going-input`,
+`stair-riser-input`) for both placement defaults and `selectedStair` editing,
+alongside the `onStairProperties` button. Freeform opens the workspace session
+under `[TAG:STAIR_FREEFORM]`. Both supported ARB locales provide all labels.
 > **Path**: `lib/src/features/architect/widgets/architect_tool_palette.dart`  
 > **Primary class**: `_ArchitectToolPaletteState` (+1 more)  
 > **Important**: Treat this map as a discovery aid, not a specification. Verify concrete symbols, anchors, and behavior in the current source with `rg -n`.
@@ -42,7 +46,7 @@ tool-reset path.
 | `[SEC-03-BUILD]` | `[TAG:ARCH_PALETTE_BUILD_LAYOUT]` | Widget Build & HUD Layout: `build`, `_buildToolButton` (2 methods) |
 | `[SEC-04-WALLS]` | `[TAG:ARCH_PALETTE_WALL_OPS]` | Wall Drafting, Splitting & Joints: `_buildWallSubBar`, `_chooseWallType`, `_buildDrawingShortcut` (3 methods) |
 | `[SEC-05-OPENINGS]` | `[TAG:ARCH_PALETTE_FENEST_OPENINGS]` | Doors, Windows & Openings: `_buildWindowSubBar`, `_buildDoorSubBar` (2 methods) |
-| `[SEC-06-BUILD]` | `[TAG:ARCH_PALETTE_COMPONENT_SUB]` | Widget Build & HUD Layout: `_buildComponentSubBar`, `_buildColumnSubBar`, `_buildStairSubBar`, `_buildBeamSubBar` (4 methods) |
+| `[SEC-06-BUILD]` | `[TAG:ARCH_PALETTE_COMPONENT_SUB]` | Widget Build & HUD Layout: `_buildComponentSubBar`, `_buildColumnSubBar`, `_buildStairShapeButtons`, `_buildStairSubBar`, `_buildBeamSubBar` (5 methods) |
 | `[SEC-07-OPENINGS]` | `[TAG:ARCH_PALETTE_OPENING_SUB]` | Doors, Windows & Openings: `_buildOpeningSubBar`, `_buildZoneSubBar` (2 methods) |
 | `[SEC-08-HITS]` | `[TAG:ARCH_PALETTE_HIT_TESTING]` | Hit Testing & Candidate Picking: `_showStylePicker`, `_buildViewsSubBar`, `_buildDecorativeSubBar` (3 methods) |
 

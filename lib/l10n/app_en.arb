@@ -7323,5 +7323,40 @@
   "architectExitProjectConfirm": "Exit",
   "@architectExitProjectConfirm": {
     "description": "Confirmation button label to exit the architectural workspace"
+  },
+  "architectCategoryStairs": "Stairs",
+  "@architectCategoryStairs": {
+    "description": "Architectural tool category for stairs"
+  },
+  "stairQuickFlightWidth": "Flight",
+  "@stairQuickFlightWidth": {
+    "description": "Compact label for stair flight width in the quick edit bar"
+  },
+  "stairQuickTotalWidth": "Total",
+  "@stairQuickTotalWidth": {
+    "description": "Compact label for overall stair width in the quick edit bar"
+  },
+  "stairQuickOuterDiameter": "Outer Ø",
+  "@stairQuickOuterDiameter": {
+    "description": "Compact label for spiral stair outer diameter in the quick edit bar"
+  },
+  "stairQuickLanding": "Landing",
+  "@stairQuickLanding": {
+    "description": "Compact label for stair landing depth in the quick edit bar"
+  },
+  "stairQuickTread": "Step b",
+  "@stairQuickTread": {
+    "description": "Compact label for stair tread going depth in the quick edit bar"
+  },
+  "stairQuickRiser": "Step h",
+  "@stairQuickRiser": {
+    "description": "Compact label for stair riser height in the quick edit bar"
+  },
+  "stairQuickStepsCount": "{count} steps",
+  "@stairQuickStepsCount": {
+    "description": "Compact readout showing total stair step count in the quick edit bar",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
   }
 }

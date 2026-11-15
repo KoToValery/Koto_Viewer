@@ -29013,6 +29013,59 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  void _updateSelectedStair({
+    double? width,
+    ArchitectStairDesign? design,
+  }) {
+    final id = _selectedElementId;
+    if (id == null) return;
+    final stair = _project.activeStorey.stairs
+        .where((s) => s.id == id)
+        .firstOrNull;
+    if (stair == null) return;
+    final nextWidth = width ?? stair.width;
+    var nextDesign = ArchitectStairRules.resolveDesign(
+      _project,
+      _project.activeStorey,
+      design ?? stair.design ?? _elementTool.stairDesign,
+    );
+    if (nextDesign.totalWidth != null &&
+        nextDesign.totalWidth! < 2 * nextWidth) {
+      nextDesign = nextDesign.copyWith(totalWidth: 2 * nextWidth + 0.1);
+    }
+    try {
+      nextDesign.validate();
+      final updated = stair.copyWith(width: nextWidth, design: nextDesign);
+      _commands.execute(
+        PutArchitectStair(
+          storeyId: _project.activeStoreyId,
+          stair: updated,
+        ),
+      );
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      setState(() {});
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
+  void _applyQuickStairDesign(
+    ArchitectStair? selectedStair,
+    ArchitectStairDesign design,
+  ) {
+    if (selectedStair != null) {
+      _updateSelectedStair(design: design);
+    } else {
+      try {
+        design.validate();
+        _elementTool.setStairParams(design: design);
+      } on ArgumentError {
+        _operationError();
+      }
+    }
+  }
+
   void _performLinearSelectionAction(String action, Set<String> segmentIds) {
     if (action == 'cut') {
       _startCutSession(Set.of(segmentIds));
@@ -30856,6 +30909,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             .where((b) => b.id == _selectedElementId)
             .firstOrNull
         : null;
+    final selectedStair =
+        _selectedElementId != null && _effectiveSelection.length <= 1
+        ? _project.activeStorey.stairs
+            .where((s) => s.id == _selectedElementId)
+            .firstOrNull
+        : null;
+    final activeSelectedStair = _touchHoldSelecting ? null : selectedStair;
+    final activeStairDesign = ArchitectStairRules.resolveDesign(
+      _project,
+      _project.activeStorey,
+      activeSelectedStair?.design ?? _elementTool.stairDesign,
+    );
 
 
 
@@ -31855,34 +31920,91 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     }
                   },
 
-                  stairDesign: _elementTool.stairDesign,
-
-                  onStairShapeChanged: (shape) => _elementTool.setStairParams(
-
-                    design: _elementTool.stairDesign.copyWith(
-
-                      shape: shape,
-
-                      autoRisers: true,
-
-                    ),
-
-                  ),
-
-                  onStairProperties: () => _showStairProperties(),
+                  selectedStair: activeSelectedStair,
+                  stairDesign: activeStairDesign,
+                  onStairShapeChanged: (shape) {
+                    if (activeSelectedStair != null &&
+                        activeSelectedStair.design?.layout != null) {
+                      _clearSelection();
+                      _elementTool.setStairParams(
+                        design: _elementTool.stairDesign.copyWith(
+                          shape: shape,
+                          autoRisers: true,
+                          clearLayout: true,
+                        ),
+                      );
+                      _changeTool(ArchitectTool.stair, toggle: false);
+                      return;
+                    }
+                    _applyQuickStairDesign(
+                      activeSelectedStair,
+                      activeStairDesign.copyWith(
+                        shape: shape,
+                        autoRisers: true,
+                      ),
+                    );
+                  },
+                  onStairProperties: () =>
+                      _showStairProperties(stair: activeSelectedStair),
                   onFreeStair: () => _startFreeStair(),
-
-                  stairWidth: _elementTool.stairWidth,
-
-                  onStairWidthChanged: (sw) =>
-
-                      _elementTool.setStairParams(width: sw),
-
-                  stairSteps: _elementTool.stairSteps,
-
+                  stairWidth: activeSelectedStair?.width ?? _elementTool.stairWidth,
+                  onStairWidthChanged: (sw) {
+                    if (activeSelectedStair != null) {
+                      _updateSelectedStair(width: sw);
+                    } else {
+                      _elementTool.setStairParams(width: sw);
+                    }
+                  },
+                  stairSteps:
+                      activeSelectedStair?.stepCount ?? _elementTool.stairSteps,
                   onStairStepsChanged: (st) =>
-
                       _elementTool.setStairParams(steps: st),
+                  onStairTotalWidthChanged: (tw) {
+                    final w =
+                        activeSelectedStair?.width ?? _elementTool.stairWidth;
+                    _applyQuickStairDesign(
+                      activeSelectedStair,
+                      activeStairDesign.copyWith(
+                        totalWidth: math.max(2 * w, tw),
+                      ),
+                    );
+                  },
+                  onStairOuterDiameterChanged: (diam) {
+                    final w =
+                        activeSelectedStair?.width ?? _elementTool.stairWidth;
+                    _applyQuickStairDesign(
+                      activeSelectedStair,
+                      activeStairDesign.copyWith(
+                        innerRadius: math.max(0.05, diam / 2.0 - w),
+                      ),
+                    );
+                  },
+                  onStairLandingDepthChanged: (ld) => _applyQuickStairDesign(
+                    activeSelectedStair,
+                    activeStairDesign.copyWith(landingDepth: ld),
+                  ),
+                  onStairGoingChanged: (g) => _applyQuickStairDesign(
+                    activeSelectedStair,
+                    activeStairDesign.copyWith(
+                      manualGoing: g,
+                      layout: activeStairDesign.layout?.copyWith(
+                        goingLocked: true,
+                      ),
+                    ),
+                  ),
+                  onStairRiserChanged: (targetRiser) => _applyQuickStairDesign(
+                    activeSelectedStair,
+                    activeStairDesign.copyWith(
+                      manualRisers: ArchitectStairRules.risersForTargetHeight(
+                        activeStairDesign,
+                        targetRiser,
+                      ),
+                    ),
+                  ),
+                  onStairTurnChanged: (turnLeft) => _applyQuickStairDesign(
+                    activeSelectedStair,
+                    activeStairDesign.copyWith(turnLeft: turnLeft),
+                  ),
 
                   openingType: _elementTool.openingType,
 
