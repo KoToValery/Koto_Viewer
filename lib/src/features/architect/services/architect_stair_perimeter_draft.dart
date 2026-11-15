@@ -47,6 +47,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
   void setWidth(double value) {
     if (value > .01 && value.isFinite) {
       width = value;
+      _going = _effectiveGoing(visibleSegments);
       notifyListeners();
     }
   }
@@ -69,6 +70,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
       reviewing = old.$2;
     }
     _pointerBefore = null;
+    _going = _effectiveGoing(visibleSegments);
     notifyListeners();
   }
 
@@ -81,35 +83,60 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
   void flip() {
     side = -side;
     sideLocked = true;
+    _going = _effectiveGoing(visibleSegments);
     notifyListeners();
   }
 
-  double _effectiveGoing(List<StairPerimeterSegment> source) {
-    final firstFlight = source
-        .where((s) => s.part == StairPerimeterPart.flight)
-        .firstOrNull;
-    if (firstFlight == null) return _baseGoing;
-    final run = (firstFlight.end - firstFlight.start).distance;
+  double _goingForRun(double run) {
     if (run <= .001) return _baseGoing;
     final treads = math.max(1, (run / _baseGoing).round());
     return run / treads;
   }
 
+  double _effectiveGoing(List<StairPerimeterSegment> source) =>
+      _buildGeometry(source).going;
+
+  Offset _flightEndAnchor(ArchitectStairFlightSpec flight, double sideSign) =>
+      flight.end(_going) - flight.normal * (sideSign * flight.width / 2);
+
   @override
-  void aim(Offset p) {
+  void aim(Offset world) {
     if (reviewing) return;
+    var p = world;
     if (anchor != null && part == StairPerimeterPart.flight) {
       final v = p - anchor!;
-      final hasFirstFlight = segments.any(
-        (s) => s.part == StairPerimeterPart.flight,
-      );
-      final step = hasFirstFlight ? _effectiveGoing(segments) : _baseGoing;
       if (!snapExact && v.distance > .001) {
-        p =
-            anchor! +
-            v /
-                v.distance *
-                math.max(step, (v.distance / step).round() * step);
+        final axis = v / v.distance;
+        final provisionalSide = _sideFor([
+          ...segments,
+          StairPerimeterSegment(part, anchor!, p, width),
+        ]);
+        final committed = _buildGeometry(
+          segments,
+          overrideSide: provisionalSide,
+        );
+        var advance = 0.0;
+        if (committed.pendingHull.length >= 3) {
+          final normal = Offset(-axis.dy, axis.dx) * provisionalSide;
+          advance = _corridorAdvance(
+            anchor! + normal * (width / 2),
+            axis,
+            normal,
+            width,
+            committed.pendingHull,
+          );
+        }
+        final step = segments.any((s) => s.part == StairPerimeterPart.flight)
+            ? committed.going
+            : _baseGoing;
+        final flightDist = v.distance - advance;
+        if (flightDist > .001) {
+          final snappedFlight = math.max(
+            step,
+            (flightDist / step).round() * step,
+          );
+          p = anchor! + axis * (advance + snappedFlight);
+        }
       }
     }
     target = p;
@@ -156,15 +183,19 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     }
     final segment = StairPerimeterSegment(part, anchor!, target!, width);
     final nextSegments = [...segments, segment];
+    final expectedFlights = nextSegments
+        .where((s) => s.part == StairPerimeterPart.flight)
+        .length;
+    final geom = _buildGeometry(nextSegments);
+    if (geom.layout.flights.length != expectedFlights) return false;
     if (!sideLocked && segments.isNotEmpty) {
-      side = _sideFor(nextSegments);
+      side = geom.side;
     }
     segments.add(segment);
     _future.clear();
-    _going = _effectiveGoing(segments);
+    _going = geom.going;
     if (segment.part == StairPerimeterPart.flight) {
-      final built = _buildGeometry(segments).layout.flights.last;
-      anchor = built.end(_going) - built.normal * (built.width / 2);
+      anchor = _flightEndAnchor(geom.layout.flights.last, geom.side);
     } else {
       anchor = target;
     }
@@ -187,6 +218,71 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
 
   static double _dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
 
+  static List<Offset> _clipToCorridorStrip(
+    List<Offset> polygon,
+    Offset origin,
+    Offset axis,
+    Offset normal,
+    double half,
+  ) {
+    var pts = [
+      for (final p in polygon)
+        Offset(_dot(p - origin, axis), _dot(p - origin, normal)),
+    ];
+    List<Offset> clipHalfPlane(List<Offset> input, bool lower) {
+      if (input.isEmpty) return const [];
+      final bound = lower ? -half : half;
+      bool inside(Offset v) => lower ? v.dy >= -half : v.dy <= half;
+      Offset intersect(Offset a, Offset b) {
+        final den = b.dy - a.dy;
+        if (den.abs() < 1e-12) return a;
+        final t = ((bound - a.dy) / den).clamp(0.0, 1.0);
+        return Offset(a.dx + (b.dx - a.dx) * t, bound);
+      }
+
+      final out = <Offset>[];
+      for (var i = 0; i < input.length; i++) {
+        final cur = input[i];
+        final prev = input[(i - 1 + input.length) % input.length];
+        final curIn = inside(cur);
+        final prevIn = inside(prev);
+        if (curIn) {
+          if (!prevIn) out.add(intersect(prev, cur));
+          out.add(cur);
+        } else if (prevIn) {
+          out.add(intersect(prev, cur));
+        }
+      }
+      return out;
+    }
+
+    pts = clipHalfPlane(pts, true);
+    pts = clipHalfPlane(pts, false);
+    return pts;
+  }
+
+  static double _corridorTrimEnd(
+    Offset origin,
+    Offset axis,
+    Offset normal,
+    double width,
+    double rawEnd,
+    List<Offset> obstacle,
+  ) {
+    final half = width / 2 - 1e-4;
+    if (half <= 0 || obstacle.length < 3) return rawEnd;
+    final clipped = _clipToCorridorStrip(obstacle, origin, axis, normal, half);
+    if (clipped.length < 3) return rawEnd;
+    var minT = double.infinity;
+    var maxT = double.negativeInfinity;
+    for (final pt in clipped) {
+      if (pt.dx < minT) minT = pt.dx;
+      if (pt.dx > maxT) maxT = pt.dx;
+    }
+    if (maxT <= 1e-4 || minT >= rawEnd - 1e-4) return rawEnd;
+    return math.max(0.0, math.min(rawEnd, minT));
+  }
+
   static double _corridorAdvance(
     Offset rawOrigin,
     Offset axis,
@@ -194,31 +290,18 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     double width,
     List<Offset> obstacle,
   ) {
-    if (obstacle.length < 3) return 0;
     final half = width / 2 - 1e-4;
-    if (half <= 0) return 0;
+    if (half <= 0 || obstacle.length < 3) return 0;
+    final clipped = _clipToCorridorStrip(
+      obstacle,
+      rawOrigin,
+      axis,
+      normal,
+      half,
+    );
     var advance = 0.0;
-    for (final v in obstacle) {
-      final tSide = _dot(v - rawOrigin, normal);
-      if (tSide.abs() <= half) {
-        final tAlong = _dot(v - rawOrigin, axis);
-        if (tAlong > advance) advance = tAlong;
-      }
-    }
-    for (var i = 0; i < obstacle.length; i++) {
-      final e0 = obstacle[i];
-      final e1 = obstacle[(i + 1) % obstacle.length];
-      final s0 = _dot(e0 - rawOrigin, normal);
-      final s1 = _dot(e1 - rawOrigin, normal);
-      if ((s1 - s0).abs() <= 1e-9) continue;
-      for (final bound in [-half, half]) {
-        if ((s0 - bound) * (s1 - bound) <= 0) {
-          final u = (bound - s0) / (s1 - s0);
-          final hit = e0 + (e1 - e0) * u;
-          final tAlong = _dot(hit - rawOrigin, axis);
-          if (tAlong > advance) advance = tAlong;
-        }
-      }
+    for (final pt in clipped) {
+      if (pt.dx > advance) advance = pt.dx;
     }
     return advance;
   }
@@ -226,46 +309,63 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
   ({
     ArchitectStairLayout layout,
     List<List<Offset>> pendingQuads,
-  }) _buildGeometry(List<StairPerimeterSegment> source) {
-    final g = _effectiveGoing(source);
-    final sSide = _sideFor(source);
-    final flights = <ArchitectStairFlightSpec>[];
-    final landings = <ArchitectStairLandingSpec>[];
+    List<Offset> pendingHull,
+    double going,
+    double side,
+  }) _buildGeometry(List<StairPerimeterSegment> source, {double? overrideSide}) {
+    final sSide = overrideSide ?? _sideFor(source);
+    // Pass 1: derive each flight's clear corridor after inward turning landings
+    // trim the preceding flight end and advance the following flight start.
+    final drafts = <({
+      Offset origin,
+      Offset axis,
+      Offset normal,
+      double width,
+      double run,
+      List<List<Offset>> precedingPending,
+    })>[];
     final pending = <List<Offset>>[];
+    var truncated = false;
     for (final s in source) {
       if (s.part == StairPerimeterPart.landing) {
         final n = Offset(-s.axis.dy, s.axis.dx) * sSide * s.width;
-        var corners = <Offset>[s.start, s.end, s.end + n, s.start + n];
-        if (flights.isNotEmpty) {
-          final prev = flights.last;
-          final prevEnd = prev.end(g);
-          var maxBack = 0.0;
-          for (final c in corners) {
-            final back = _dot(prevEnd - c, prev.axis);
-            if (back > maxBack) maxBack = back;
+        final corners = <Offset>[s.start, s.end, s.end + n, s.start + n];
+        if (drafts.isNotEmpty) {
+          final last = drafts.last;
+          final trimmed = _corridorTrimEnd(
+            last.origin,
+            last.axis,
+            last.normal,
+            last.width,
+            last.run,
+            corners,
+          );
+          if (trimmed <= 1e-4) {
+            truncated = true;
           }
-          final startsAtOrAhead =
-              _dot(s.start - prevEnd, prev.axis) >= -1e-4 &&
-              _dot(s.end - prevEnd, prev.axis) >= -1e-4;
-          if (maxBack > 1e-4 &&
-              _dot(n, prev.axis) < -1e-4 &&
-              (pending.isEmpty || startsAtOrAhead)) {
-            final shift = prev.axis * maxBack;
-            corners = [for (final c in corners) c + shift];
-          }
+          drafts[drafts.length - 1] = (
+            origin: last.origin,
+            axis: last.axis,
+            normal: last.normal,
+            width: last.width,
+            run: trimmed,
+            precedingPending: last.precedingPending,
+          );
         }
         pending.add(corners);
         continue;
       }
+      if (truncated) break;
       final normal = Offset(-s.axis.dy, s.axis.dx) * sSide;
       var origin = s.start + normal * s.width / 2;
-      if (flights.isNotEmpty && pending.isNotEmpty) {
-        final previous = flights.last;
-        final a = previous.end(g);
+      var run = (s.end - s.start).distance;
+      if (drafts.isNotEmpty && pending.isNotEmpty) {
+        final prev = drafts.last;
+        final prevEnd = prev.origin + prev.axis * prev.run;
         final pendingHull = _hull([
           for (final quad in pending) ...quad,
-          a - previous.normal * previous.width / 2,
-          a + previous.normal * previous.width / 2,
+          prevEnd - prev.normal * prev.width / 2,
+          prevEnd + prev.normal * prev.width / 2,
         ]);
         final advance = _corridorAdvance(
           origin,
@@ -276,27 +376,55 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
         );
         if (advance > 1e-4) {
           origin = origin + s.axis * advance;
+          run = math.max(0.0, run - advance);
         }
       }
-      final rawRun = (s.end - s.start).distance;
-      final treads = math.max(1, (rawRun / g).round());
-      final isFirst = flights.isEmpty;
-      final f = ArchitectStairFlightSpec(
-        id: 'flight_${flights.length}',
+      if (run <= 1e-4) {
+        break;
+      }
+      drafts.add((
         origin: origin,
         axis: s.axis,
+        normal: normal,
         width: s.width,
-        risers: treads + 1,
-        fixedRun: isFirst || (rawRun - treads * g).abs() <= 1e-6
-            ? rawRun
-            : null,
+        run: run,
+        precedingPending: List<List<Offset>>.unmodifiable(pending),
+      ));
+      pending.clear();
+    }
+
+    if (truncated || drafts.isEmpty) {
+      return (
+        layout: ArchitectStairLayout(flights: const []),
+        pendingQuads: pending,
+        pendingHull: const <Offset>[],
+        going: _baseGoing,
+        side: sSide,
       );
-      if (flights.isNotEmpty && pending.isNotEmpty) {
+    }
+
+    // Pass 2: fit whole steps to the trimmed clear corridors.
+    final g = _goingForRun(drafts.first.run);
+    final flights = <ArchitectStairFlightSpec>[];
+    final landings = <ArchitectStairLandingSpec>[];
+    for (var i = 0; i < drafts.length; i++) {
+      final d = drafts[i];
+      final treads = math.max(1, (d.run / g).round());
+      final isFirst = i == 0;
+      final f = ArchitectStairFlightSpec(
+        id: 'flight_$i',
+        origin: d.origin,
+        axis: d.axis,
+        width: d.width,
+        risers: treads + 1,
+        fixedRun: isFirst || (d.run - treads * g).abs() <= 1e-6 ? d.run : null,
+      );
+      if (i > 0 && d.precedingPending.isNotEmpty) {
         final previous = flights.last;
         final a = previous.end(g);
         final b = f.origin;
         final cloud = <Offset>[
-          for (final quad in pending) ...quad,
+          for (final quad in d.precedingPending) ...quad,
           a - previous.normal * previous.width / 2,
           a + previous.normal * previous.width / 2,
           b - f.normal * f.width / 2,
@@ -310,11 +438,22 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
         );
       }
       flights.add(f);
-      pending.clear();
     }
+    final pendingHull = pending.isNotEmpty && flights.isNotEmpty
+        ? _hull([
+            for (final quad in pending) ...quad,
+            flights.last.end(g) -
+                flights.last.normal * flights.last.width / 2,
+            flights.last.end(g) +
+                flights.last.normal * flights.last.width / 2,
+          ])
+        : const <Offset>[];
     return (
       layout: ArchitectStairLayout(flights: flights, landings: landings),
       pendingQuads: pending,
+      pendingHull: pendingHull,
+      going: g,
+      side: sSide,
     );
   }
 
@@ -427,8 +566,9 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     );
     if (_previewKey == key) return _previewValue;
     _previewKey = key;
-    final g = _effectiveGoing(visibleSegments);
-    final l = _build(visibleSegments);
+    final geom = _buildGeometry(visibleSegments);
+    final g = geom.going;
+    final l = geom.layout;
     if (l.flights.isEmpty ||
         l.landings.length != l.flights.length - 1 ||
         l.risers > 500)
@@ -453,7 +593,8 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
 
   ArchitectStair? get snappingPreview {
     if (segments.isEmpty) return null;
-    final g = _effectiveGoing(segments);
+    final geom = _buildGeometry(segments);
+    final g = geom.going;
     final key = (
       design,
       segments.length,
@@ -464,7 +605,8 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     );
     if (_snapKey == key) return _snapValue;
     _snapKey = key;
-    final l = _build(segments);
+    final l = geom.layout;
+    if (l.flights.isEmpty) return _snapValue = null;
     return _snapValue = seed.copyWith(
       startPoint: Offset.zero,
       endPoint: const Offset(1, 0),
@@ -506,10 +648,14 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     if (_future.isEmpty) return;
     final next = _future.removeLast();
     segments.add(next);
-    _going = _effectiveGoing(segments);
-    if (next.part == StairPerimeterPart.flight) {
-      final built = _buildGeometry(segments).layout.flights.last;
-      anchor = built.end(_going) - built.normal * (built.width / 2);
+    final geom = _buildGeometry(segments);
+    _going = geom.going;
+    if (!sideLocked && geom.side != side) {
+      side = geom.side;
+    }
+    if (next.part == StairPerimeterPart.flight &&
+        geom.layout.flights.isNotEmpty) {
+      anchor = _flightEndAnchor(geom.layout.flights.last, geom.side);
     } else {
       anchor = next.end;
     }

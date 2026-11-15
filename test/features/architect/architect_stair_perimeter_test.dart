@@ -99,27 +99,107 @@ void main() {
     expect(d.acceptPart(), isTrue);
     expect(d.complete, isTrue);
   });
-  test('turning landing shifts clear of first flight steps in preview and layout', () {
-    for (final turnY in [2.6, -2.6]) {
-      final d = create();
+  test(
+    'turning landing stays inside perimeter and trims adjoining flights dynamically',
+    () {
+      for (final turnY in [2.6, -2.6]) {
+        final d = create();
+        addTearDown(d.dispose);
+        d.pick(Offset.zero);
+        d.pick(const Offset(2.6, 0));
+        d.setLength(2.6);
+        expect(d.committedPreview, isNull);
+        expect(d.preview!.design!.layout!.flights.single.risers, 10);
+        expect(d.acceptPart(), isTrue);
+
+        d.pick(Offset(2.6, turnY));
+        final quads = d.pendingLandingQuads;
+        expect(quads, hasLength(1));
+        expect(
+          quads.single.every((p) => p.dx <= 2.6 + 1e-6 && p.dx >= 1.4 - 1e-6),
+          isTrue,
+        );
+        final trimmedFirst = d.preview!.design!.layout!.flights.single;
+        expect(trimmedFirst.risers, 6);
+        expect(trimmedFirst.run(d.design.going), closeTo(1.4, 1e-6));
+        expect(trimmedFirst.end(d.design.going).dx, closeTo(1.4, 1e-6));
+        expect(d.acceptPart(), isTrue);
+
+        d.pick(Offset(0, turnY));
+        d.setLength(2.6);
+        final live = d.preview!;
+        final flights = live.design!.layout!.flights;
+        expect(flights, hasLength(2));
+        expect(live.design!.layout!.landings, hasLength(1));
+        expect(flights[0].end(live.design!.going).dx, closeTo(1.4, 1e-6));
+        expect(flights[1].origin.dx, closeTo(1.4, 1e-6));
+        expect(flights[1].end(live.design!.going).dx, closeTo(0.0, 1e-6));
+        expect(ArchitectStairLayoutResolver.check(live.design!), isEmpty);
+      }
+    },
+  );
+  test(
+    'asymmetric U-turn fits trimmed first flight going and advances second flight',
+    () {
+      final d = ArchitectStairPerimeterDraft(
+        const ArchitectStair(
+          id: 'stair',
+          startPoint: Offset.zero,
+          endPoint: Offset(1, 0),
+          width: 1.1,
+          design: ArchitectStairDesign(
+            shape: StairShape.straight,
+            code: StairCode.geometryOnly,
+            manualGoing: .28,
+            rise: 2.8,
+            followStoreys: false,
+          ),
+        ),
+      );
       addTearDown(d.dispose);
       d.pick(Offset.zero);
-      d.pick(const Offset(1.4, 0));
+      d.pick(const Offset(0, 3.8));
+      d.setLength(3.8);
       expect(d.acceptPart(), isTrue);
-      d.pick(Offset(1.4, turnY));
-      final quads = d.pendingLandingQuads;
-      expect(quads, hasLength(1));
-      expect(
-        quads.single.every((p) => p.dx >= 1.4 - 1e-6),
-        isTrue,
-      );
+      d.pick(const Offset(2.5, 3.8));
       expect(d.acceptPart(), isTrue);
-      d.pick(Offset(0, turnY));
+      // After turning inward by width 1.1, flight 0 is cut back to y = 2.70 m.
+      expect(d.design.going, closeTo(2.7 / 10, 1e-8));
+
+      d.pick(const Offset(2.5, 0));
+      d.setLength(3.576);
       final live = d.preview!;
-      expect(live.design!.layout!.flights, hasLength(2));
-      expect(live.design!.layout!.landings, hasLength(1));
+      final flights = live.design!.layout!.flights;
+      expect(flights, hasLength(2));
+      expect(flights[0].end(live.design!.going).dy, closeTo(2.7, 1e-6));
+      expect(flights[1].origin.dy, closeTo(2.7, 1e-6));
+      expect(live.design!.layout!.landings.single.polygon.every((p) => p.dy <= 3.8 + 1e-6), isTrue);
       expect(ArchitectStairLayoutResolver.check(live.design!), isEmpty);
-    }
+
+      // Undoing the turn restores the full untrimmed first flight.
+      d.undo();
+      d.undo();
+      expect(d.design.going, closeTo(3.8 / 14, 1e-8));
+    },
+  );
+  test('turning L-stair landing trims first flight cleanly at corner', () {
+    final d = create();
+    addTearDown(d.dispose);
+    d.pick(Offset.zero);
+    d.pick(const Offset(0, 3.8));
+    d.setLength(3.8);
+    expect(d.acceptPart(), isTrue);
+    d.pick(const Offset(1.2, 3.8));
+    expect(d.acceptPart(), isTrue);
+    d.pick(const Offset(3.8, 3.8));
+    d.setLength(2.6);
+    final live = d.preview!;
+    final flights = live.design!.layout!.flights;
+    expect(flights, hasLength(2));
+    expect(flights[0].run(live.design!.going), closeTo(2.6, 1e-6));
+    expect(flights[1].origin.dx, closeTo(1.2, 1e-6));
+    expect(flights[1].run(live.design!.going), closeTo(2.6, 1e-6));
+    expect(ArchitectStairLayoutResolver.check(live.design!), isEmpty);
   });
   test('outer three-edge U-turn advances second flight past the landing', () {
     final d = create();
