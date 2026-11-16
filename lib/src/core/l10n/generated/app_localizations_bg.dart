@@ -13358,4 +13358,16 @@ class AppLocalizationsBg extends AppLocalizations {
   String stairQuickStepsCount(int count) {
     return '$count ст.';
   }
+
+  @override
+  String get stairLandingOffset => 'Разминаване при площадката';
+
+  @override
+  String get stairLandingOffsetHelp =>
+      'Отмества първото чело на следващото рамо от ръба на площадката за по-плавен парапет и чиста долна плоча.';
+
+  @override
+  String stairTargetRisersProgress(int drawn, int target) {
+    return '$drawn/$target ст.';
+  }
 }

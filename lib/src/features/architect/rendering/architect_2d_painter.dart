@@ -45,6 +45,7 @@ import 'architect_overhang_painter_helper.dart';
 import '../services/architect_roof_tool.dart';
 import '../services/architect_landscape_tool.dart';
 import '../services/architect_drag_controller.dart';
+import '../services/architect_stair_handles.dart';
 import 'architect_drag_painter_helper.dart';
 import 'architect_landscape_painter_helper.dart';
 import 'architect_service_plan_painter.dart';
@@ -973,6 +974,45 @@ class Architect2dPainter extends CustomPainter {
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
+      return;
+    }
+    if (selected.stairs.isNotEmpty) {
+      ArchitectElementsPainterHelper.drawStairs(
+        palette: palette,
+        canvas: canvas,
+        storey: selected,
+        zoomScale: zoomScale,
+        selectedElementId: selectedElementId,
+        project: _project,
+        l10n: l10n,
+        dimensionScale: _project.dimensionScale,
+      );
+      if (marqueePoints.isEmpty && newPointCandidate == null) {
+        final stair = selected.stairs.first;
+        final draftingScale = math.max(zoomScale, 80.0);
+        const vertexColor = Color(0xFF00BCD4);
+        final clearance = handleOffsetLength > 0
+            ? handleOffsetLength / zoomScale
+            : 0.0;
+        final handles = ArchitectStairHandles.handles(stair, clearance);
+        final dotPaint = Paint()..color = vertexColor;
+        final bgLeaderPaint = Paint()
+          ..color = const Color(0x66000000)
+          ..strokeWidth = 2.6 / draftingScale
+          ..style = PaintingStyle.stroke;
+        final leaderPaint = Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..strokeWidth = 1.6 / draftingScale
+          ..style = PaintingStyle.stroke;
+        for (final h in handles) {
+          canvas.drawCircle(h.anchor, 3.5 / draftingScale, dotPaint);
+          if (handleOffsetLength > 0) {
+            canvas.drawLine(h.anchor, h.handle, bgLeaderPaint);
+            canvas.drawLine(h.anchor, h.handle, leaderPaint);
+            _drawTouchGrip(canvas, h.handle, draftingScale, vertexColor);
+          }
+        }
+      }
       return;
     }
     if (selected.roofs.isNotEmpty) {

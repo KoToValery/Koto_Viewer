@@ -18,11 +18,13 @@ class ArchitectPropertyDescriptor {
   final String id;
   final ArchitectPropertyMeasure measure;
   final double minimum, maximum;
+  final int? maxDecimals;
   const ArchitectPropertyDescriptor(
     this.id, {
     this.measure = ArchitectPropertyMeasure.length,
     this.minimum = .001,
     this.maximum = double.infinity,
+    this.maxDecimals,
   });
   double scale(ArchitectProject p) => switch (measure) {
     ArchitectPropertyMeasure.radians => math.pi / 180,

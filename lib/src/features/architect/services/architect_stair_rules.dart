@@ -72,7 +72,7 @@ class ArchitectStairRules {
       );
     }
     final measuredHeadroom =
-        project != null && storey != null && d.layout != null
+        project != null && storey != null && !d.isSpiral
         ? ArchitectStairHeadroom.minimum(project, storey, stair)
         : null;
     void range(
@@ -113,13 +113,28 @@ class ArchitectStairRules {
     range(StairCheckKind.width, width, min: .90);
     range(StairCheckKind.riser, d.riser, min: .12, max: .18);
     if (!d.isSpiral) {
-      range(StairCheckKind.going, walkGoing, min: .25, max: .35);
-      range(StairCheckKind.slope, d.riser / walkGoing, max: 1 / 1.5);
+      final hasStraightTreads = !d.hasWinders ||
+          d.risers - 1 - d.winderLayout(stair.width).perQuarter * d.turnQuarters > 0;
+      if (hasStraightTreads) {
+        range(StairCheckKind.going, walkGoing, min: .25, max: .35);
+        range(StairCheckKind.slope, d.riser / walkGoing, max: 1 / 1.5);
+      }
     }
     if (d.hasWinders) {
       final winderWalk = d.winderGoingAt(stair.width, stair.width / 2);
-      range(StairCheckKind.going, winderWalk, min: .25, max: .35);
-      range(StairCheckKind.slope, d.riser / winderWalk, max: 1 / 1.5);
+      range(
+        StairCheckKind.going,
+        winderWalk,
+        min: .25,
+        max: .35,
+        article: 'winder',
+      );
+      range(
+        StairCheckKind.slope,
+        d.riser / winderWalk,
+        max: 1 / 1.5,
+        article: 'winder',
+      );
       range(
         StairCheckKind.innerGoing30,
         d.winderGoingAt(stair.width, .30),
@@ -157,10 +172,16 @@ class ArchitectStairRules {
       max: 2.5,
     );
     if (d.layout == null && d.shape == StairShape.spiralOverlap) {
-      if (d.overlapHeadroom < .001) {
+      final slabClearance = project != null && storey != null
+          ? ArchitectStairHeadroom.minimum(project, storey, stair)
+          : null;
+      final effective = slabClearance != null && slabClearance.isFinite
+          ? math.min(d.overlapHeadroom, slabClearance)
+          : d.overlapHeadroom;
+      if (effective < .001) {
         range(
           StairCheckKind.headroom,
-          d.overlapHeadroom,
+          effective,
           min: .001,
           article: '3D',
           advisory: false,
@@ -168,7 +189,7 @@ class ArchitectStairRules {
       } else {
         range(
           StairCheckKind.headroom,
-          d.overlapHeadroom,
+          effective,
           min: 2.1,
           article: '2.10 m',
         );
@@ -293,6 +314,91 @@ class ArchitectStairRules {
     }
     final safeTarget = targetRiser > 0.001 ? targetRiser : design.riser;
     return (design.rise / safeTarget).round().clamp(minRisers, 500);
+  }
+
+  /// Applies a rounded going (`0.1 cm` = `0.001 m`) and recalculates riser
+  /// counts inversely so existing flight/stair runs are preserved.
+  static ArchitectStairDesign applyGoingInverse(
+    ArchitectStairDesign design,
+    double targetGoing, {
+    double width = 1.2,
+  }) {
+    final nextGoing = ArchitectStairDesign.roundGoing(
+      targetGoing,
+    ).clamp(.10, 2.0);
+    if (design.isSpiral) {
+      return design.copyWith(manualGoing: nextGoing);
+    }
+    if (design.layout case final l?) {
+      ArchitectStairDesign buildCandidate({required bool floor}) {
+        final flights = [
+          for (final f in l.flights)
+            () {
+              if (f.countLocked) return f;
+              final targetRun = f.fixedRun ?? f.run(design.going);
+              final rawTreads = targetRun / nextGoing;
+              final treads = math.max(
+                1,
+                floor ? rawTreads.floor() : rawTreads.round(),
+              );
+              return f.copyWith(
+                risers: treads + 1,
+                fixedRun: f.fixedRun != null ? treads * nextGoing : null,
+              );
+            }(),
+        ];
+        final nextLayout = ArchitectStairLayoutResolver.reconnect(
+          l,
+          l.copyWith(flights: flights, goingLocked: true),
+          design.going,
+          nextGoing,
+        );
+        return design.copyWith(
+          manualGoing: nextGoing,
+          manualRisers: design.manualRisers == null ? null : nextLayout.risers,
+          layout: nextLayout,
+        );
+      }
+
+      final rounded = buildCandidate(floor: false);
+      if (ArchitectStairLayoutResolver.check(rounded).isEmpty) {
+        return rounded;
+      }
+      final floored = buildCandidate(floor: true);
+      if (ArchitectStairLayoutResolver.check(floored).isEmpty) {
+        return floored;
+      }
+      return rounded;
+    }
+    if (design.hasWinders) {
+      final turnCount = design.winderLayout(width).perQuarter * design.turnQuarters;
+      final minRisers = turnCount + 3;
+      final currentStraightRun = math.max(
+        0.0,
+        (design.risers - 1 - turnCount) * design.going,
+      );
+      final nextStraightTreads = (currentStraightRun / nextGoing).round();
+      final nextRisers = (turnCount + 1 + nextStraightTreads).clamp(
+        minRisers,
+        500,
+      );
+      return design.copyWith(
+        manualGoing: nextGoing,
+        manualRisers: nextRisers,
+      );
+    }
+    final flights = design.flightCount;
+    final currentRun = math.max(
+      flights * design.going,
+      (design.risers - flights) * design.going,
+    );
+    final targetTreads = math.max(flights, (currentRun / nextGoing).round());
+    final minRisers = design.shape == StairShape.straight ? 2 : 4;
+    final nextRisers = (targetTreads + flights).clamp(minRisers, 500);
+    return design.copyWith(
+      manualGoing: nextGoing,
+      manualRisers: nextRisers,
+    );
   }
 }
 

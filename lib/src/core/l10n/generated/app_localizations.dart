@@ -24167,6 +24167,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} steps'**
   String stairQuickStepsCount(int count);
+
+  /// Offset of the next flight's first riser past the landing edge
+  ///
+  /// In en, this message translates to:
+  /// **'Landing stagger'**
+  String get stairLandingOffset;
+
+  /// Help text explaining landing stagger offset
+  ///
+  /// In en, this message translates to:
+  /// **'Offsets the next flight past the landing edge so inner handrails and concrete soffits meet cleanly.'**
+  String get stairLandingOffsetHelp;
+
+  /// Progress indicator showing drawn risers vs target risers from stair setup
+  ///
+  /// In en, this message translates to:
+  /// **'{drawn}/{target} steps'**
+  String stairTargetRisersProgress(int drawn, int target);
 }
 
 class _AppLocalizationsDelegate

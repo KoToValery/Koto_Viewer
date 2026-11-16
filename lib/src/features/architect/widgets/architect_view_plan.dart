@@ -334,6 +334,7 @@ class ArchitectViewPlanPainter extends CustomPainter {
           canvas: canvas,
           stair: stair,
           scale: scale,
+          cutHeight: floor.cutPlaneHeight,
           color: colors.onSurface.withValues(
             alpha: floor.id == project.activeStoreyId ? .9 : .3,
           ),

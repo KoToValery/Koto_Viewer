@@ -77,6 +77,7 @@ class _ArchitectStairSetupDialogState extends State<ArchitectStairSetupDialog> {
     bool enabled = true,
     double minimum = .001,
     double maximum = 100,
+    int? maxDecimals,
     String? helper,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
@@ -90,6 +91,7 @@ class _ArchitectStairSetupDialogState extends State<ArchitectStairSetupDialog> {
         key,
         minimum: minimum,
         maximum: maximum,
+        maxDecimals: maxDecimals,
         measure: metric
             ? ArchitectPropertyMeasure.length
             : ArchitectPropertyMeasure.count,
@@ -266,9 +268,16 @@ class _ArchitectStairSetupDialogState extends State<ArchitectStairSetupDialog> {
                 'going',
                 l.stairGoing,
                 d.going,
-                (v) => _update(d.copyWith(manualGoing: v)),
+                (v) => _update(
+                  d.copyWith(manualGoing: ArchitectStairDesign.roundGoing(v)),
+                ),
                 minimum: .1,
                 maximum: 2,
+                maxDecimals: widget.project.units == ArchitectUnit.centimeters
+                    ? 1
+                    : widget.project.units == ArchitectUnit.meters
+                    ? 3
+                    : 2,
               ),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,

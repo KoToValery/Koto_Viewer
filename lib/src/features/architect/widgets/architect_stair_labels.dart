@@ -6,7 +6,7 @@ import '../services/architect_stair_rules.dart';
 String stairPlanLabel(AppLocalizations l, ArchitectStair stair) {
   final d = stair.design;
   if (d == null) return '';
-  final cm = NumberFormat('0.##', l.localeName);
+  final cm = NumberFormat('0.#', l.localeName);
   var going = cm.format(d.walkingGoing(stair.width) * 100);
   if (d.hasWinders) {
     final winderGoing = d.winderGoingAt(stair.width, stair.width / 2);

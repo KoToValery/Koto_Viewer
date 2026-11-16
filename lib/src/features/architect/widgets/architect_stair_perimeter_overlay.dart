@@ -90,6 +90,8 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
                           .firstWhere((c) => c.state == StairCheckState.error)
                           .kind,
                     )
+                  : preview != null && draft.targetRisers != null
+                  ? '${l.stairTargetRisersProgress(preview.design!.risers, draft.targetRisers!)} · ${l.stairPerimeterHint}'
                   : l.stairPerimeterHint,
             ),
           ),

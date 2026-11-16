@@ -31,10 +31,12 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
   bool reviewing = false, sideLocked = false;
   double side = 1, width;
   double _baseGoing, _going;
+  final int? targetRisers;
   ArchitectStairPerimeterDraft(this.seed)
     : width = seed.width,
-      _baseGoing = seed.design!.going,
-      _going = seed.design!.going,
+      _baseGoing = ArchitectStairDesign.roundGoing(seed.design!.going),
+      _going = ArchitectStairDesign.roundGoing(seed.design!.going),
+      targetRisers = seed.design!.manualRisers,
       super(
         seed.copyWith(
           design: seed.design!.copyWith(
@@ -87,10 +89,15 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     notifyListeners();
   }
 
-  double _goingForRun(double run) {
+  double _goingForRun(double run, {bool mustNotExceed = false}) {
     if (run <= .001) return _baseGoing;
     final treads = math.max(1, (run / _baseGoing).round());
-    return run / treads;
+    final raw = run / treads;
+    var rounded = ArchitectStairDesign.roundGoing(raw).clamp(.10, 2.0);
+    if (mustNotExceed && treads * rounded > run + 1e-6) {
+      rounded = ((raw * 1000 + 1e-9).floorToDouble() / 1000.0).clamp(.10, 2.0);
+    }
+    return rounded;
   }
 
   double _effectiveGoing(List<StairPerimeterSegment> source) =>
@@ -322,6 +329,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
       Offset normal,
       double width,
       double run,
+      bool trimmedByTurn,
       List<List<Offset>> precedingPending,
     })>[];
     final pending = <List<Offset>>[];
@@ -349,6 +357,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
             normal: last.normal,
             width: last.width,
             run: trimmed,
+            trimmedByTurn: last.trimmedByTurn || trimmed < last.run - 1e-6,
             precedingPending: last.precedingPending,
           );
         }
@@ -388,6 +397,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
         normal: normal,
         width: s.width,
         run: run,
+        trimmedByTurn: false,
         precedingPending: List<List<Offset>>.unmodifiable(pending),
       ));
       pending.clear();
@@ -404,36 +414,31 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     }
 
     // Pass 2: fit whole steps to the trimmed clear corridors.
-    final g = _goingForRun(drafts.first.run);
+    final g = _goingForRun(
+      drafts.first.run,
+      mustNotExceed: drafts.first.trimmedByTurn,
+    );
     final flights = <ArchitectStairFlightSpec>[];
     final landings = <ArchitectStairLandingSpec>[];
     for (var i = 0; i < drafts.length; i++) {
       final d = drafts[i];
       final treads = math.max(1, (d.run / g).round());
       final isFirst = i == 0;
+      final fittedRun = treads * g;
       final f = ArchitectStairFlightSpec(
         id: 'flight_$i',
         origin: d.origin,
         axis: d.axis,
         width: d.width,
         risers: treads + 1,
-        fixedRun: isFirst || (d.run - treads * g).abs() <= 1e-6 ? d.run : null,
+        fixedRun: isFirst || (d.run - fittedRun).abs() <= 1e-6 ? fittedRun : null,
       );
       if (i > 0 && d.precedingPending.isNotEmpty) {
         final previous = flights.last;
-        final a = previous.end(g);
-        final b = f.origin;
-        final cloud = <Offset>[
-          for (final quad in d.precedingPending) ...quad,
-          a - previous.normal * previous.width / 2,
-          a + previous.normal * previous.width / 2,
-          b - f.normal * f.width / 2,
-          b + f.normal * f.width / 2,
-        ];
         landings.add(
           ArchitectStairLandingSpec(
             id: 'landing_${landings.length}',
-            polygon: _hull(cloud),
+            polygon: _landingPolygon(d.precedingPending, previous, f, g),
           ),
         );
       }
@@ -462,6 +467,82 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
 
   List<List<Offset>> get pendingLandingQuads =>
       _buildGeometry(visibleSegments).pendingQuads;
+
+  static List<Offset> _landingPolygon(
+    List<List<Offset>> quads,
+    ArchitectStairFlightSpec previous,
+    ArchitectStairFlightSpec next,
+    double going,
+  ) {
+    final a = previous.end(going);
+    final b = next.origin;
+    if (_dot(previous.axis, next.axis) < 1 - 1e-6) {
+      final base = _hull([for (final q in quads) ...q]);
+      final spliced = _spliceFlightThroat(
+        base,
+        a,
+        previous.axis,
+        previous.width,
+      );
+      if (spliced != null && ArchitectPolygonGeometry.valid(spliced)) {
+        return spliced;
+      }
+    }
+    return _hull([
+      for (final quad in quads) ...quad,
+      a - previous.normal * previous.width / 2,
+      a + previous.normal * previous.width / 2,
+      b - next.normal * next.width / 2,
+      b + next.normal * next.width / 2,
+    ]);
+  }
+
+  static List<Offset>? _spliceFlightThroat(
+    List<Offset> poly,
+    Offset center,
+    Offset intoLandingAxis,
+    double width,
+  ) {
+    if (poly.length < 3) return null;
+    final across = Offset(-intoLandingAxis.dy, intoLandingAxis.dx);
+    final e1 = center - across * (width / 2);
+    final e2 = center + across * (width / 2);
+    for (var i = 0; i < poly.length; i++) {
+      final p0 = poly[i];
+      final p1 = poly[(i + 1) % poly.length];
+      final edge = p1 - p0;
+      final len = edge.distance;
+      if (len < 1e-8) continue;
+      final dir = edge / len;
+      if (_dot(dir, intoLandingAxis).abs() > 1e-4) continue;
+      final gap = _dot(p0 - center, intoLandingAxis);
+      if (gap < -1e-6 || gap > math.max(0.3, width * 0.4)) continue;
+      final t1 = _dot(e1 - p0, dir) / len;
+      final t2 = _dot(e2 - p0, dir) / len;
+      final tMin = math.min(t1, t2);
+      final tMax = math.max(t1, t2);
+      if (tMin < -1e-4 || tMax > 1 + 1e-4) continue;
+      if (gap <= 1e-6) return poly;
+      final firstPt = t1 <= t2 ? e1 : e2;
+      final secondPt = t1 <= t2 ? e2 : e1;
+      final qStart = p0 + edge * tMin.clamp(0.0, 1.0);
+      final qEnd = p0 + edge * tMax.clamp(0.0, 1.0);
+      final out = <Offset>[];
+      for (var k = 0; k < poly.length; k++) {
+        final v = poly[k];
+        if (out.isEmpty || (out.last - v).distance > 1e-7) out.add(v);
+        if (k != i) continue;
+        for (final pt in [qStart, firstPt, secondPt, qEnd]) {
+          if ((out.last - pt).distance > 1e-7) out.add(pt);
+        }
+      }
+      if (out.length > 2 && (out.last - out.first).distance <= 1e-7) {
+        out.removeLast();
+      }
+      return out;
+    }
+    return null;
+  }
 
   static List<Offset> _hull(List<Offset> input) {
     final p = <Offset>[];
@@ -543,7 +624,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
   }
   @override
   void replaceDesign(ArchitectStairDesign next) {
-    _baseGoing = next.going;
+    _baseGoing = ArchitectStairDesign.roundGoing(next.going);
     _going = _effectiveGoing(visibleSegments);
     super.replaceDesign(next);
   }
@@ -576,6 +657,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     return _previewValue = seed.copyWith(
       startPoint: Offset.zero,
       endPoint: const Offset(1, 0),
+      width: l.flights.first.width,
       design: design.copyWith(
         layout: l,
         manualGoing: g,

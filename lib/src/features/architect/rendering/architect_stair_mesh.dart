@@ -351,6 +351,44 @@ class ArchitectStairMesh {
         for (final i in front) {
           polygon[i] -= inward * d.nosingProjection;
         }
+      } else if (d.nosingProjection > 0 &&
+          geometry.landings.any((l) => (l.elevation - surface.elevation).abs() < 1e-6)) {
+        final edge = b - a;
+        if (edge.distance > 1e-8) {
+          var inward = Offset(-edge.dy, edge.dx) / edge.distance;
+          final mid = (a + b) / 2;
+          if (!ArchitectStairGeometry.inside(
+            mid + inward * .01,
+            polygon,
+            tolerance: 1e-6,
+          )) {
+            inward = -inward;
+          }
+          if (ArchitectStairGeometry.inside(
+                a,
+                polygon,
+                tolerance: 1e-6,
+              ) &&
+              ArchitectStairGeometry.inside(
+                b,
+                polygon,
+                tolerance: 1e-6,
+              )) {
+            result.add(
+              verticalPrism(
+                [
+                  a - inward * d.nosingProjection,
+                  b - inward * d.nosingProjection,
+                  b,
+                  a,
+                ],
+                surface.elevation + d.startOffset - d.treadThickness,
+                surface.elevation + d.startOffset,
+                material,
+              ),
+            );
+          }
+        }
       }
       result.add(
         verticalPrism(

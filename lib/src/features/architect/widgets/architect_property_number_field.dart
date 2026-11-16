@@ -39,7 +39,7 @@ class _NumberState extends State<ArchitectPropertyNumberField> {
       ? ''
       : ArchitectUnit.trimZeros(
           (widget.value! / widget.descriptor.scale(widget.project))
-              .toStringAsFixed(9),
+              .toStringAsFixed(widget.descriptor.maxDecimals ?? 9),
         );
   @override
   void didUpdateWidget(covariant ArchitectPropertyNumberField old) {
@@ -70,7 +70,9 @@ class _NumberState extends State<ArchitectPropertyNumberField> {
     ArchitectPropertiesShell.of(context)?.expand();
     if (widget.readOnly) return;
     final decimals =
-        widget.descriptor.measure == ArchitectPropertyMeasure.count ? 0 : 3;
+        widget.descriptor.measure == ArchitectPropertyMeasure.count
+            ? 0
+            : (widget.descriptor.maxDecimals ?? 3);
     final scale = widget.descriptor.scale(widget.project);
     final result = await BimNumericKeypad.showInputDialog(
       context,

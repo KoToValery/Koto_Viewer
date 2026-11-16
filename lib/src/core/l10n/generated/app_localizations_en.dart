@@ -13308,4 +13308,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String stairQuickStepsCount(int count) {
     return '$count steps';
   }
+
+  @override
+  String get stairLandingOffset => 'Landing stagger';
+
+  @override
+  String get stairLandingOffsetHelp =>
+      'Offsets the next flight past the landing edge so inner handrails and concrete soffits meet cleanly.';
+
+  @override
+  String stairTargetRisersProgress(int drawn, int target) {
+    return '$drawn/$target steps';
+  }
 }

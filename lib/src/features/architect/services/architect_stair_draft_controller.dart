@@ -409,42 +409,11 @@ class ArchitectStairDraftController extends ChangeNotifier {
   void updateFlight(ArchitectStairFlightSpec next, {bool remember = true}) {
     final old = _layout.flights.firstWhere((f) => f.id == next.id);
     if (remember) _remember();
-    final index = _layout.flights.indexOf(old);
-    List<Offset> portChange(
-      List<Offset> polygon,
-      Offset a,
-      Offset b,
-      Offset c,
-      Offset e,
-    ) => [
-      for (final p in polygon)
-        ArchitectStairGeometry.pointSegmentDistance(p, a, b) < 1e-6
-            ? c +
-                  (e - c) *
-                      (ArchitectStairGeometry.dot(p - a, b - a) /
-                          (b - a).distanceSquared)
-            : p,
-    ];
-    final landings = List<ArchitectStairLandingSpec>.of(_layout.landings);
-    for (final pair in [
-      (index - 1, old.origin, next.origin),
-      (index, old.end(design.going), next.end(design.going)),
-    ]) {
-      if (pair.$1 < 0 || pair.$1 >= landings.length) continue;
-      final l = landings[pair.$1];
-      landings[pair.$1] = l.copyWith(
-        polygon: portChange(
-          l.polygon,
-          pair.$2 - old.normal * old.width / 2,
-          pair.$2 + old.normal * old.width / 2,
-          pair.$3 - next.normal * next.width / 2,
-          pair.$3 + next.normal * next.width / 2,
-        ),
-      );
-    }
-    _layout = _layout.copyWith(
-      flights: [for (final f in _layout.flights) f.id == next.id ? next : f],
-      landings: landings,
+    _layout = ArchitectStairLayoutResolver.updateFlightWithPorts(
+      _layout,
+      design.going,
+      old,
+      next,
     );
     notifyListeners();
   }
@@ -464,39 +433,67 @@ class ArchitectStairDraftController extends ChangeNotifier {
 
   void replaceDesign(ArchitectStairDesign next) {
     _remember();
-    _layout = ArchitectStairLayoutResolver.reconnect(
-      _layout,
-      _layout.copyWith(
-        goingLocked: next.layout?.goingLocked ?? _layout.goingLocked,
-      ),
-      design.going,
-      next.going,
-    );
-    _stair = _stair.copyWith(
-      design: next.copyWith(
-        clearLayout: _layout.flights.isEmpty,
-        layout: _layout.flights.isEmpty
-            ? null
-            : _layout.copyWith(
-                landings: _layout.landings
-                    .take(_layout.flights.length - 1)
-                    .toList(),
-              ),
-      ),
-    );
+    if (_layout.flights.isNotEmpty && (next.going - design.going).abs() > 1e-6) {
+      final locked = next.layout?.goingLocked ?? _layout.goingLocked;
+      final applied = ArchitectStairRules.applyGoingInverse(
+        next.copyWith(layout: _layout.copyWith(goingLocked: locked)),
+        next.going,
+        width: _stair.width,
+      );
+      _layout = applied.layout!.copyWith(goingLocked: locked);
+      _stair = _stair.copyWith(
+        design: applied.copyWith(
+          layout: _layout.copyWith(
+            landings: _layout.landings.take(_layout.flights.length - 1).toList(),
+          ),
+        ),
+      );
+    } else {
+      _layout = ArchitectStairLayoutResolver.reconnect(
+        _layout,
+        _layout.copyWith(
+          goingLocked: next.layout?.goingLocked ?? _layout.goingLocked,
+        ),
+        design.going,
+        next.going,
+      );
+      _stair = _stair.copyWith(
+        design: next.copyWith(
+          clearLayout: _layout.flights.isEmpty,
+          layout: _layout.flights.isEmpty
+              ? null
+              : _layout.copyWith(
+                  landings: _layout.landings
+                      .take(_layout.flights.length - 1)
+                      .toList(),
+                ),
+        ),
+      );
+    }
     notifyListeners();
   }
 
   void setGoing(double value, {required bool locked}) {
     if (!value.isFinite || value <= 0) return;
     _remember();
-    _layout = ArchitectStairLayoutResolver.reconnect(
-      _layout,
-      _layout.copyWith(goingLocked: locked),
-      design.going,
+    final updated = ArchitectStairRules.applyGoingInverse(
+      design.copyWith(
+        layout: _layout.flights.isEmpty
+            ? null
+            : _layout.copyWith(goingLocked: locked),
+      ),
       value,
+      width: _stair.width,
     );
-    _stair = _stair.copyWith(design: design.copyWith(manualGoing: value));
+    if (updated.layout != null) {
+      _layout = updated.layout!.copyWith(goingLocked: locked);
+    }
+    _stair = _stair.copyWith(
+      design: updated.copyWith(
+        clearLayout: _layout.flights.isEmpty,
+        layout: _layout.flights.isEmpty ? null : _layout,
+      ),
+    );
     notifyListeners();
   }
 

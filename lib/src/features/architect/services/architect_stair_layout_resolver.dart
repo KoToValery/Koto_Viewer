@@ -213,7 +213,7 @@ class ArchitectStairLayoutResolver {
     if (l == null) return null;
     final candidates = <double>{d.going};
     if (!l.goingLocked) {
-      candidates.add((.63 - 2 * d.riser).clamp(.28, .35));
+      candidates.add(ArchitectStairDesign.roundGoing((.63 - 2 * d.riser).clamp(.28, .35)));
       for (final f in l.flights.where((f) => f.fixedRun != null)) {
         for (var n = 2; n <= 500; n++) {
           if (f.countLocked && n != f.risers) continue;
@@ -311,6 +311,55 @@ class ArchitectStairLayoutResolver {
       landings[i] = landings[i].copyWith(polygon: points);
     }
     return next.copyWith(landings: landings);
+  }
+
+  /// Updates one flight and shifts its adjoining landing port edges cleanly.
+  static ArchitectStairLayout updateFlightWithPorts(
+    ArchitectStairLayout layout,
+    double going,
+    ArchitectStairFlightSpec oldFlight,
+    ArchitectStairFlightSpec nextFlight,
+  ) {
+    final index = layout.flights.indexWhere((f) => f.id == oldFlight.id);
+    if (index < 0) return layout;
+    List<Offset> portChange(
+      List<Offset> polygon,
+      Offset a,
+      Offset b,
+      Offset c,
+      Offset e,
+    ) => [
+      for (final p in polygon)
+        ArchitectStairGeometry.pointSegmentDistance(p, a, b) < 1e-6
+            ? c +
+                  (e - c) *
+                      (ArchitectStairGeometry.dot(p - a, b - a) /
+                          (b - a).distanceSquared)
+            : p,
+    ];
+    final landings = List<ArchitectStairLandingSpec>.of(layout.landings);
+    for (final pair in [
+      (index - 1, oldFlight.origin, nextFlight.origin),
+      (index, oldFlight.end(going), nextFlight.end(going)),
+    ]) {
+      if (pair.$1 < 0 || pair.$1 >= landings.length) continue;
+      final l = landings[pair.$1];
+      landings[pair.$1] = l.copyWith(
+        polygon: portChange(
+          l.polygon,
+          pair.$2 - oldFlight.normal * oldFlight.width / 2,
+          pair.$2 + oldFlight.normal * oldFlight.width / 2,
+          pair.$3 - nextFlight.normal * nextFlight.width / 2,
+          pair.$3 + nextFlight.normal * nextFlight.width / 2,
+        ),
+      );
+    }
+    return layout.copyWith(
+      flights: [
+        for (final f in layout.flights) f.id == nextFlight.id ? nextFlight : f,
+      ],
+      landings: landings,
+    );
   }
 
   static ArchitectStair normalizePlacement(ArchitectStair stair) {

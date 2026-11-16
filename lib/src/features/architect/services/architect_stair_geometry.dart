@@ -187,11 +187,12 @@ class ArchitectStairGeometry {
       _guardSegments();
   List<({Offset a, Offset b, double za, double zb})> _guardSegments() {
     final d = stair.design!;
-    if (d.layout == null)
+    if (d.layout == null && (d.isSpiral || d.hasWinders)) {
       return [
         for (final (a, b) in guardEdges)
           (a: a, b: b, za: elevationAt(a), zb: elevationAt(b)),
       ];
+    }
     final result = <({Offset a, Offset b, double za, double zb})>[];
     for (var i = 0; i < flights.length; i++) {
       final f = flights[i];

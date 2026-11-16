@@ -251,6 +251,7 @@ import '../services/architect_command_controller.dart';
 import '../services/architect_element_tool.dart';
 
 import '../services/architect_stair_rules.dart';
+import '../services/architect_stair_handles.dart';
 import '../services/architect_stair_draft_controller.dart';
 import '../services/architect_stair_perimeter_draft.dart';
 import '../widgets/architect_stair_perimeter_overlay.dart';
@@ -4128,6 +4129,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         if (_wallEndpointOriginal != null) _wallEndpointOriginal!.id,
 
+        if (_stairHandleOriginal != null) _stairHandleOriginal!.id,
+
       },
 
     );
@@ -7671,6 +7674,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Offset _drainGrabOffset = Offset.zero;
 
+  ArchitectStair? _stairHandleOriginal;
+
+  StairEndpointHandle? _stairHandleHit;
+
+  Offset _stairHandleGrabOffset = Offset.zero;
+
+  Offset _stairHandleDisplacement = Offset.zero;
+
 
 
   ArchitectFloorDrain? get _selectedFloorDrain {
@@ -8900,6 +8911,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _drainDragOriginal != null ||
 
+      _stairHandleOriginal != null ||
+
       _isDraggingZoneTable ||
 
       _draggingRasterId != null ||
@@ -10024,6 +10037,45 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       }
 
+    }
+
+
+
+    final selectedStair = _stairDraft == null &&
+            _effectiveSelection.length <= 1 &&
+            _selectedElementId != null
+        ? _project.activeStorey.stairs
+              .where((s) => s.id == _selectedElementId)
+              .firstOrNull
+        : null;
+    if (selectedStair != null &&
+        !_moveSelection &&
+        !_mirrorActive &&
+        _offsetOptions == null &&
+        _chamferFilletSourceId == null &&
+        !_splitActive &&
+        _newPointTargetId == null) {
+      final hit = ArchitectStairHandles.hitTest(
+        selectedStair,
+        rawModel,
+        _currentScale,
+        _handleOffsetLength,
+      );
+      if (hit != null) {
+        final grabPoint = hit.isOffset ? hit.handle : hit.anchor;
+        _stairHandleOriginal = selectedStair;
+        _stairHandleHit = hit;
+        _stairHandleGrabOffset = grabPoint - rawModel;
+        _stairHandleDisplacement =
+            hit.isOffset ? (hit.handle - hit.anchor) : Offset.zero;
+        _wallEndpointLeaderLine =
+            hit.isOffset ? (hit.anchor, hit.handle) : null;
+        _elementMoveOriginal = _project;
+        _elementMovePreview = _project;
+        _isHandleEngaged = true;
+        HapticFeedback.selectionClick();
+        return;
+      }
     }
 
 
@@ -12298,6 +12350,50 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    if (_stairHandleOriginal != null &&
+        _stairHandleHit != null &&
+        _elementMoveOriginal != null) {
+      final original = _stairHandleOriginal!;
+      final hit = _stairHandleHit!;
+      final base = _elementMoveOriginal!;
+      final snapProject = _wallSnapProject ??= base.updateActiveStorey(
+        base.activeStorey.copyWith(
+          stairs: base.activeStorey.stairs
+              .where((s) => s.id != original.id)
+              .toList(),
+        ),
+      );
+      final rawTarget =
+          rawModel + _stairHandleGrabOffset - _stairHandleDisplacement;
+      _updateMidpointReferences(rawTarget);
+      final snap = _snapElement(
+        rawTarget,
+        anchor: hit.opposite,
+        source: snapProject,
+      );
+      try {
+        final updated = ArchitectStairHandles.applyDrag(
+          original,
+          hit,
+          snap.point,
+        );
+        final anchor = ArchitectStairHandles.anchorFor(updated, hit);
+        _wallEndpointLeaderLine = hit.isOffset
+            ? (anchor, rawModel + _stairHandleGrabOffset)
+            : null;
+        _elementMovePreview = PutArchitectStair(
+          storeyId: _project.activeStoreyId,
+          stair: updated,
+        ).apply(base);
+        _activeSnapLabel = snap.snapLabel;
+        _activeMagneticGuides = snap.magneticGuides;
+      } on ArgumentError {
+        /* Keep the last valid preview. */
+      }
+      _repaintPreview();
+      return;
+    }
+
 
 
     if (_activeTool == ArchitectTool.column && !_isActivelyDraggingHandle) {
@@ -13720,6 +13816,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _drainGrabOffset = Offset.zero;
 
+    _stairHandleOriginal = null;
+
+    _stairHandleHit = null;
+
+    _stairHandleGrabOffset = Offset.zero;
+
+    _stairHandleDisplacement = Offset.zero;
+
     _handleMoved = false;
 
     _handlePointerDown = null;
@@ -14030,6 +14134,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _drainDragOriginal != null ||
 
+        _stairHandleOriginal != null ||
+
         _draggingElementId != null) {
 
       final preview = _finishElementMove(
@@ -14039,6 +14145,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _wallEndpointOriginal != null ||
 
             _drainDragOriginal != null ||
+
+            _stairHandleOriginal != null ||
 
             (_elementMoveDelta?.distance ?? 0) > 1e-9,
 
@@ -22027,6 +22135,39 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       );
 
+    } else if (storey.stairs.any((s) => s.id == elementId)) {
+      final stair = storey.stairs.firstWhere((s) => s.id == elementId);
+      final d = stair.design;
+      if (d != null &&
+          ((d.layout != null &&
+                  (d.layout!.flights.length > 1 ||
+                      d.layout!.landings.isNotEmpty)) ||
+              d.shape != StairShape.straight)) {
+        items.add(
+          _radialItem(
+            action: ArchitectRadialAction.flip,
+            color: const Color(0xFF40C4FF),
+          ),
+        );
+      }
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.move,
+          color: const Color(0xFFFFB300),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.duplicate,
+          color: const Color(0xFF64FFDA),
+        ),
+      );
+      items.add(
+        _radialItem(
+          action: ArchitectRadialAction.properties,
+          color: const Color(0xFFB388FF),
+        ),
+      );
     } else {
 
       items.add(
@@ -31946,7 +32087,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   },
                   onStairProperties: () =>
                       _showStairProperties(stair: activeSelectedStair),
-                  onFreeStair: () => _startFreeStair(),
+                  onFreeStair: () => activeSelectedStair != null &&
+                          activeSelectedStair.design != null &&
+                          !activeSelectedStair.design!.isSpiral &&
+                          !activeSelectedStair.design!.hasWinders
+                      ? _startFreeStair(
+                          stair: activeSelectedStair,
+                          create: false,
+                        )
+                      : _startFreeStair(),
                   stairWidth: activeSelectedStair?.width ?? _elementTool.stairWidth,
                   onStairWidthChanged: (sw) {
                     if (activeSelectedStair != null) {
@@ -31985,11 +32134,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   ),
                   onStairGoingChanged: (g) => _applyQuickStairDesign(
                     activeSelectedStair,
-                    activeStairDesign.copyWith(
-                      manualGoing: g,
-                      layout: activeStairDesign.layout?.copyWith(
-                        goingLocked: true,
-                      ),
+                    ArchitectStairRules.applyGoingInverse(
+                      activeStairDesign,
+                      g,
+                      width:
+                          activeSelectedStair?.width ?? _elementTool.stairWidth,
                     ),
                   ),
                   onStairRiserChanged: (targetRiser) => _applyQuickStairDesign(
@@ -34832,6 +34981,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ArchitectStairDraftOverlay(draft: draft,
             project: _commands.documentProject, toScreen: _viewport.toScreen,
             toModel: _screenToModel, scale: _viewport.scale,
+            snapPoint: (raw) {
+              final doc = _commands.documentProject;
+              return _snapElement(
+                raw,
+                source: doc.updateActiveStorey(
+                  doc.activeStorey.copyWith(
+                    stairs: doc.activeStorey.stairs
+                        .where((s) => s.id != draft.baseStair.id)
+                        .toList(),
+                  ),
+                ),
+              ).point;
+            },
             darkCanvas: _canvasPalette.isDark, onApply: _applyFreeStair,
             onCancel: _cancelFreeStair, onProperties: _freeStairProperties))),
 

@@ -111,7 +111,10 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
         next,
       );
       next.validate();
-      setState(() => stair = stair.copyWith(design: next));
+      setState(() {
+        legacy = false;
+        stair = stair.copyWith(design: next);
+      });
     } on ArgumentError {
       invalid();
     }
@@ -188,6 +191,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
     bool enabled = true,
     double minimum = .001,
     double maximum = 100,
+    int? maxDecimals,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: ArchitectPropertyNumberField(
@@ -200,6 +204,7 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
         key,
         minimum: minimum,
         maximum: maximum,
+        maxDecimals: maxDecimals,
         measure: metric
             ? ArchitectPropertyMeasure.length
             : integer
@@ -457,14 +462,16 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                     'width',
                     l.stairClearWidth,
                     stair.width,
-                    (v) => setState(
-                      () => stair = stair.copyWith(
+                    (v) => setState(() {
+                      legacy = false;
+                      stair = stair.copyWith(
                         width: v,
                         design: d.totalWidth != null && d.totalWidth! < 2 * v
                             ? d.copyWith(totalWidth: 2 * v + .1)
                             : d,
-                      ),
-                    ),
+                      );
+                    }),
+                    minimum: .4,
                     maximum: 10,
                   ),
                 if (d.layout == null &&
@@ -598,12 +605,19 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                         l.stairGoing,
                         d.going,
                         (v) => update(
-                          d.copyWith(
-                            manualGoing: v,
-                            layout: d.layout?.copyWith(goingLocked: true),
+                          ArchitectStairRules.applyGoingInverse(
+                            d,
+                            v,
+                            width: stair.width,
                           ),
                         ),
+                        minimum: .1,
                         maximum: 2,
+                        maxDecimals: unit == ArchitectUnit.centimeters
+                            ? 1
+                            : unit == ArchitectUnit.meters
+                            ? 3
+                            : 2,
                       ),
                       SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
@@ -696,6 +710,24 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                           math.max(stair.width, d.landingDepth),
                           (v) => update(d.copyWith(landingDepth: v)),
                           maximum: 10,
+                        ),
+                      if (d.layout == null &&
+                          (d.shape == StairShape.quarterTurn ||
+                              d.shape == StairShape.halfTurn) &&
+                          !d.hasWinders)
+                        Tooltip(
+                          message: l.stairLandingOffsetHelp,
+                          child: number(
+                            'landing-offset',
+                            l.stairLandingOffset,
+                            d.landingStepOffset,
+                            (v) => update(d.copyWith(landingStepOffset: v)),
+                            minimum: 0,
+                            maximum: 1,
+                            maxDecimals: unit == ArchitectUnit.centimeters
+                                ? 1
+                                : 3,
+                          ),
                         ),
                     ] else ...[
                       number(
@@ -880,7 +912,8 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
           stairStateLabel(l, check.state),
           if (check.actual != null) value(check.actual!),
           if (range.isNotEmpty) range,
-          if (check.article != null) check.article!,
+          if (check.article != null)
+            check.article == 'winder' ? l.stairWinders : check.article!,
         ].join(' · '),
       ),
     );

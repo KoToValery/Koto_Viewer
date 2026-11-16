@@ -4578,5 +4578,8 @@
   "stairQuickLanding": "Площадка",
   "stairQuickTread": "Стъпало b",
   "stairQuickRiser": "Стъпало h",
-  "stairQuickStepsCount": "{count} ст."
+  "stairQuickStepsCount": "{count} ст.",
+  "stairLandingOffset": "Разминаване при площадката",
+  "stairLandingOffsetHelp": "Отмества първото чело на следващото рамо от ръба на площадката за по-плавен парапет и чиста долна плоча.",
+  "stairTargetRisersProgress": "{drawn}/{target} ст."
 }

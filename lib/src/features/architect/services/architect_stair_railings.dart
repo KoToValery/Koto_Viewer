@@ -137,9 +137,10 @@ class ArchitectStairRailings {
         ));
       }
     }
-    bool wallAt(Offset point, Offset tangent, double base) {
+    bool wallAt(Offset point, Offset? tangent, double base) {
       for (final (wall, bottom) in candidates) {
-        if (ArchitectStairGeometry.dot(tangent, wall.unitVector).abs() < .96) {
+        if (tangent != null &&
+            ArchitectStairGeometry.dot(tangent, wall.unitVector).abs() < .96) {
           continue;
         }
         final along = ArchitectStairGeometry.dot(
@@ -221,7 +222,7 @@ class ArchitectStairRailings {
         pieces.add((
           a: Vector3(a.dx, a.dy, edge.za),
           b: Vector3(b.dx, b.dy, edge.zb),
-          wall: false,
+          wall: wallAt(a, null, (edge.za + edge.zb) / 2),
         ));
         continue;
       }

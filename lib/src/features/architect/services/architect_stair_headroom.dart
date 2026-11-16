@@ -78,6 +78,7 @@ class ArchitectStairHeadroom {
 
       for (final p in candidates.where(onArea)) {
         if (top(p) <= level + 1e-7) continue;
+        hasSlabs = true;
         final gap = math.max(0.0, bottom(p) - level);
         minimum = minimum == null ? gap : math.min(minimum!, gap);
       }
@@ -87,9 +88,17 @@ class ArchitectStairHeadroom {
       final z = storey.elevation + d.startOffset + surface.elevation;
       for (final floor in project.storeys) {
         for (final slab in floor.slabs) {
-          hasSlabs = true;
           final layers = ArchitectSlabGeometry.surfaces(project, floor, slab);
           if (layers.isEmpty) continue;
+          if (slab.polygon.any((p) => layers.first.topAt(p) > z + 1e-7) &&
+              Path.combine(
+                    PathOperation.intersect,
+                    Path()..addPolygon(surface.polygon, true),
+                    Path()..addPolygon(slab.polygon, true),
+                  ).getBounds().isEmpty ==
+                  false) {
+            hasSlabs = true;
+          }
           obstacle(
             surface.polygon,
             z,

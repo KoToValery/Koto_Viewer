@@ -1517,6 +1517,19 @@ class ArchitectElementTool extends ChangeNotifier {
       return storey.copyWith(walls: newWalls);
     }
 
+    // 3. Stair (flip turn direction)
+    final stairIndex = storey.stairs.indexWhere((s) => s.id == elementId);
+    if (stairIndex != -1) {
+      final stair = storey.stairs[stairIndex];
+      final d = stair.design;
+      if (d == null) return storey;
+      final newStairs = List<ArchitectStair>.from(storey.stairs);
+      newStairs[stairIndex] = stair.copyWith(
+        design: d.copyWith(turnLeft: !d.turnLeft),
+      );
+      return storey.copyWith(stairs: newStairs);
+    }
+
     return storey;
   }
 

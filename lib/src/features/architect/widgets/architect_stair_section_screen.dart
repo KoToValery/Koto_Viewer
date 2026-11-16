@@ -8,6 +8,7 @@ import '../rendering/architect_elements_painter_helper.dart';
 import '../rendering/architect_canvas_palette.dart';
 import '../rendering/architect_stair_mesh.dart';
 import '../rendering/architect_stair_section_painter.dart';
+import '../services/architect_stair_floor_contact.dart';
 import '../services/architect_stair_section.dart';
 import 'architect_stair_labels.dart';
 
@@ -33,7 +34,14 @@ class _StairSectionState extends State<ArchitectStairSectionScreen> {
   void initState() {
     super.initState();
     solids = [
-      ...ArchitectStairMesh.body(widget.stair),
+      ...ArchitectStairMesh.body(
+        widget.stair,
+        firstRiserBottom: ArchitectStairFloorContact.firstRiserBottom(
+          widget.project,
+          floor,
+          widget.stair,
+        ),
+      ),
       ...ArchitectStairMesh.railings(
         widget.stair,
         storey: floor,

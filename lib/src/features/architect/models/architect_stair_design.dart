@@ -53,6 +53,7 @@ class ArchitectStairDesign {
   final double concreteThickness;
   final double finishThickness;
   final double nosingProjection;
+  final double landingStepOffset;
 
   const ArchitectStairDesign({
     this.rulesVersion = currentRules,
@@ -88,6 +89,7 @@ class ArchitectStairDesign {
     this.concreteThickness = .15,
     this.finishThickness = .02,
     this.nosingProjection = .03,
+    this.landingStepOffset = 0,
   }) : sweepDegrees =
            sweepDegrees ?? (shape == StairShape.spiralOverlap ? 375 : 270);
 
@@ -200,12 +202,17 @@ class ArchitectStairDesign {
     return count;
   }
 
+  static double roundGoing(double value) =>
+      (value * 1000).roundToDouble() / 1000.0;
+
   double get riser => rise / risers;
   double get going =>
       manualGoing ??
-      (.63 - 2 * riser).clamp(
-        accessible && use == StairUse.outdoorRoute ? .32 : .28,
-        .35,
+      roundGoing(
+        (.63 - 2 * riser).clamp(
+          accessible && use == StairUse.outdoorRoute ? .32 : .28,
+          .35,
+        ),
       );
   double get maximumFlightRise =>
       use == StairUse.outdoorRoute && accessible ? 1.2 : 2.5;
@@ -264,10 +271,13 @@ class ArchitectStairDesign {
     }
     if (!finishThickness.isFinite ||
         !nosingProjection.isFinite ||
+        !landingStepOffset.isFinite ||
         finishThickness < 0 ||
         finishThickness > .15 ||
         nosingProjection < 0 ||
         nosingProjection > .1 ||
+        landingStepOffset < 0 ||
+        landingStepOffset > 1 ||
         treadThickness > .2 ||
         stringerWidth > .3 ||
         stringerDepth > 1 ||
@@ -338,6 +348,7 @@ class ArchitectStairDesign {
     double? concreteThickness,
     double? finishThickness,
     double? nosingProjection,
+    double? landingStepOffset,
   }) => ArchitectStairDesign(
     layout: clearLayout ? null : layout ?? this.layout,
     rulesVersion: rulesVersion ?? this.rulesVersion,
@@ -386,6 +397,7 @@ class ArchitectStairDesign {
     concreteThickness: concreteThickness ?? this.concreteThickness,
     finishThickness: finishThickness ?? this.finishThickness,
     nosingProjection: nosingProjection ?? this.nosingProjection,
+    landingStepOffset: landingStepOffset ?? this.landingStepOffset,
   );
 
   Map<String, dynamic> toJson() => {
@@ -422,6 +434,7 @@ class ArchitectStairDesign {
     'concreteThickness': concreteThickness,
     'finishThickness': finishThickness,
     'nosingProjection': nosingProjection,
+    if (landingStepOffset != 0) 'landingStepOffset': landingStepOffset,
   };
   factory ArchitectStairDesign.fromJson(Map<String, dynamic> json) {
     T readEnum<T extends Enum>(List<T> values, String key, T fallback) =>
@@ -472,6 +485,8 @@ class ArchitectStairDesign {
       concreteThickness: (json['concreteThickness'] as num?)?.toDouble() ?? .15,
       finishThickness: (json['finishThickness'] as num?)?.toDouble() ?? .02,
       nosingProjection: (json['nosingProjection'] as num?)?.toDouble() ?? .03,
+      landingStepOffset:
+          (json['landingStepOffset'] as num?)?.toDouble() ?? 0,
     );
     result.validate();
     return result;
@@ -702,29 +717,54 @@ class ArchitectStairPlan {
           ]);
           origin = end + axis * d;
         } else if (design.shape == StairShape.quarterTurn) {
-          landing([
-            end - normal * width / 2,
-            end + axis * d - normal * width / 2,
-            end + axis * d + normal * (d - width / 2),
-            end + normal * (d - width / 2),
-          ]);
-          origin = end + axis * (d - width / 2) + normal * (d - width / 2);
+          final s = design.landingStepOffset;
+          if (s <= 1e-6) {
+            landing([
+              end - normal * width / 2,
+              end + axis * d - normal * width / 2,
+              end + axis * d + normal * (d - width / 2),
+              end + normal * (d - width / 2),
+            ]);
+          } else {
+            landing([
+              end - normal * width / 2,
+              end + axis * d - normal * width / 2,
+              end + axis * d + normal * (d - width / 2 + s),
+              end + axis * (d - width) + normal * (d - width / 2 + s),
+              if (d > width + 1e-6)
+                end + axis * (d - width) + normal * (d - width / 2),
+              end + normal * (d - width / 2),
+            ]);
+          }
+          origin = end + axis * (d - width / 2) + normal * (d - width / 2 + s);
           walk.add(world(end + axis * (d - width / 2)));
           axis = normal;
         } else {
           // A 10 cm clear well separates the two return flights unless a custom total width is set.
           final well = design.wellGap(width);
           final side = f.isEven ? normal : -normal;
-          landing([
-            end - side * width / 2,
-            end + axis * d - side * width / 2,
-            end + axis * d + side * (1.5 * width + well),
-            end + side * (1.5 * width + well),
-          ]);
-          origin = end + side * (width + well);
+          final s = design.landingStepOffset;
+          if (s <= 1e-6) {
+            landing([
+              end - side * width / 2,
+              end + axis * d - side * width / 2,
+              end + axis * d + side * (1.5 * width + well),
+              end + side * (1.5 * width + well),
+            ]);
+          } else {
+            landing([
+              end - side * width / 2,
+              end + axis * d - side * width / 2,
+              end + axis * d + side * (1.5 * width + well),
+              end - axis * s + side * (1.5 * width + well),
+              end - axis * s + side * (width / 2 + well),
+              end + side * (width / 2 + well),
+            ]);
+          }
+          origin = end + side * (width + well) - axis * s;
           walk.addAll([
             world(end + axis * d / 2),
-            world(origin + axis * d / 2),
+            world(origin + axis * (d / 2 + s)),
           ]);
           axis = -axis;
         }

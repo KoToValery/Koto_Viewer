@@ -980,6 +980,8 @@ class _IfcPreparation {
     );
     final type = d == null
         ? 'STRAIGHT_RUN_STAIR'
+        : d.layout != null
+        ? _customStairIfcType(d.layout!)
         : switch (d.shape) {
             StairShape.straight => 'STRAIGHT_RUN_STAIR',
             StairShape.quarterTurn => 'QUARTER_TURN_STAIR',
@@ -1158,6 +1160,25 @@ class _IfcPreparation {
         'shapes': [for (final r in railings) _mesh(r.triangles, 0)],
       });
     }
+  }
+
+  static String _customStairIfcType(ArchitectStairLayout layout) {
+    if (layout.flights.length <= 1) return 'STRAIGHT_RUN_STAIR';
+    final turns = <double>[];
+    for (var i = 1; i < layout.flights.length; i++) {
+      final a = layout.flights[i - 1].axis, b = layout.flights[i].axis;
+      final dot = (a.dx * b.dx + a.dy * b.dy).clamp(-1.0, 1.0);
+      turns.add(math.acos(dot));
+    }
+    if (turns.length == 1) {
+      if ((turns.single - math.pi / 2).abs() < .25) return 'QUARTER_TURN_STAIR';
+      if ((turns.single - math.pi).abs() < .25) return 'HALF_TURN_STAIR';
+    }
+    if (turns.length == 2 &&
+        turns.every((t) => (t - math.pi / 2).abs() < .25)) {
+      return 'TWO_QUARTER_TURN_STAIR';
+    }
+    return 'USERDEFINED';
   }
 }
 

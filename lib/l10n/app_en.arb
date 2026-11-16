@@ -7358,5 +7358,21 @@
     "placeholders": {
       "count": { "type": "int" }
     }
+  },
+  "stairLandingOffset": "Landing stagger",
+  "@stairLandingOffset": {
+    "description": "Offset of the next flight's first riser past the landing edge"
+  },
+  "stairLandingOffsetHelp": "Offsets the next flight past the landing edge so inner handrails and concrete soffits meet cleanly.",
+  "@stairLandingOffsetHelp": {
+    "description": "Help text explaining landing stagger offset"
+  },
+  "stairTargetRisersProgress": "{drawn}/{target} steps",
+  "@stairTargetRisersProgress": {
+    "description": "Progress indicator showing drawn risers vs target risers from stair setup",
+    "placeholders": {
+      "drawn": { "type": "int" },
+      "target": { "type": "int" }
+    }
   }
 }

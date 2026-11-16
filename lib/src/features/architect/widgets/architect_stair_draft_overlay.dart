@@ -29,6 +29,7 @@ class ArchitectStairDraftOverlay extends StatelessWidget {
   final ArchitectStairDraftController draft;
   final ArchitectProject project;
   final Offset Function(Offset) toScreen, toModel;
+  final Offset Function(Offset rawModel)? snapPoint;
   final double scale;
   final bool darkCanvas;
   final VoidCallback onApply, onCancel, onProperties;
@@ -43,6 +44,7 @@ class ArchitectStairDraftOverlay extends StatelessWidget {
     required this.onApply,
     required this.onCancel,
     required this.onProperties,
+    this.snapPoint,
     this.darkCanvas = false,
   });
 
@@ -236,7 +238,7 @@ class ArchitectStairDraftOverlay extends StatelessWidget {
                   child: ArchitectCanvasHint(
                     message:
                         '${l.stairCheckHeadroom}: '
-                        '${headroom.actual == null ? stairStateLabel(l, headroom.state) : project.formatLength(headroom.actual!)}',
+                        '${headroom.actual == null || !headroom.actual!.isFinite ? stairStateLabel(l, headroom.state) : project.formatLength(headroom.actual!)}',
                   ),
                 ),
             ],
@@ -344,8 +346,10 @@ class ArchitectStairDraftOverlay extends StatelessWidget {
           onTap: tap,
           onLongPress: hold,
           onPanStart: (_) => draft.beginGesture(),
-          onPanUpdate: (d) =>
-              move(toModel(toScreen(draft.toWorld(local)) + d.delta)),
+          onPanUpdate: (d) {
+            final raw = toModel(toScreen(draft.toWorld(local)) + d.delta);
+            move(snapPoint != null ? snapPoint!(raw) : raw);
+          },
           onPanEnd: (_) => draft.endGesture(),
           onPanCancel: draft.endGesture,
           child: Center(
@@ -402,15 +406,14 @@ class ArchitectStairDraftOverlay extends StatelessWidget {
       result.add(
         grip('stair-grip-end', f.end(draft.design.going), (p) {
           final delta = draft.toLocal(p) - f.origin;
-          if (delta.distance < .01 || f.fixedRun != null || f.countLocked)
-            return;
+          if (delta.distance < .01 || f.countLocked) return;
+          final going = draft.design.going;
+          final treads = math.max(1, (delta.distance / going).round());
           draft.updateFlight(
             f.copyWith(
               axis: delta / delta.distance,
-              risers: math.max(
-                2,
-                (delta.distance / draft.design.going).round() + 1,
-              ),
+              risers: treads + 1,
+              fixedRun: f.fixedRun != null ? treads * going : null,
             ),
             remember: false,
           );
@@ -558,6 +561,7 @@ class ArchitectStairDraftOverlay extends StatelessWidget {
                     ArchitectPropertyMeasure.length,
                 double minimum = .001,
                 double maximum = 100,
+                int? maxDecimals,
               }) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: ArchitectPropertyNumberField(
@@ -570,6 +574,7 @@ class ArchitectStairDraftOverlay extends StatelessWidget {
                     measure: measure,
                     minimum: minimum,
                     maximum: maximum,
+                    maxDecimals: maxDecimals,
                   ),
                   onChanged: change,
                 ),
@@ -676,7 +681,13 @@ class ArchitectStairDraftOverlay extends StatelessWidget {
                       l.stairGoing,
                       draft.design.going,
                       (v) => draft.setGoing(v, locked: true),
+                      minimum: .1,
                       maximum: 2,
+                      maxDecimals: project.units == ArchitectUnit.centimeters
+                          ? 1
+                          : project.units == ArchitectUnit.meters
+                          ? 3
+                          : 2,
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
