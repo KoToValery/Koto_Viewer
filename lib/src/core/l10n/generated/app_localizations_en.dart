@@ -13320,4 +13320,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String stairTargetRisersProgress(int drawn, int target) {
     return '$drawn/$target steps';
   }
+
+  @override
+  String stairRiserRangeWarning(int min, int max) {
+    return 'Riser height outside $min–$max cm';
+  }
+
+  @override
+  String get stairQuickHeight => 'Height H';
+
+  @override
+  String stairQuickWellGap(String gap) {
+    return 'Well: $gap';
+  }
+
+  @override
+  String get stairQuickLandingOffset => 'Offset';
 }

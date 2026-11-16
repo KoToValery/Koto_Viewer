@@ -128,6 +128,13 @@ void main() {
       expect(palette.stairDesign.going, closeTo(0.30, 1e-6));
       expect(palette.stairDesign.risers, 20);
       expect(palette.stairDesign.riser, closeTo(0.14, 1e-6));
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('stair-riser-input')),
+          matching: find.byIcon(Icons.warning_amber_rounded),
+        ),
+        findsOneWidget,
+      );
 
       // Switch to spiral and edit outer diameter -> updates innerRadius cleanly.
       final spiralBtn = find.byKey(const ValueKey('stair-shape-spiral'));
@@ -223,6 +230,13 @@ void main() {
       expect(edited.design!.totalWidth, closeTo(2.60, 1e-6));
       expect(edited.design!.going, closeTo(0.31, 1e-6));
       expect(edited.design!.risers, 20);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('stair-riser-input')),
+          matching: find.byIcon(Icons.warning_amber_rounded),
+        ),
+        findsNothing,
+      );
       expect(commands.undoCount, 4);
 
       final persisted = _persisted(commands).activeStorey.stairs.single;

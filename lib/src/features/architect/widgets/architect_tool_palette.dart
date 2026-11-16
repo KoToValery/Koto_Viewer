@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'architect_wall_type_label.dart';
 import 'architect_wall_type_picker.dart';
 import '../models/architect_project.dart' show ArchitectUnit;
+import '../services/architect_stair_rules.dart';
 import 'architect_stair_labels.dart';
 import 'architect_component_labels.dart';
 import '../components/definitions/service_components.dart';
@@ -162,6 +163,8 @@ class ArchitectToolPalette extends StatefulWidget {
   final ValueChanged<double>? onStairTotalWidthChanged;
   final ValueChanged<double>? onStairOuterDiameterChanged;
   final ValueChanged<double>? onStairLandingDepthChanged;
+  final ValueChanged<double>? onStairLandingOffsetChanged;
+  final ValueChanged<double>? onStairRiseChanged;
   final ValueChanged<double>? onStairGoingChanged;
   final ValueChanged<double>? onStairRiserChanged;
   final ValueChanged<bool>? onStairTurnChanged;
@@ -277,13 +280,15 @@ class ArchitectToolPalette extends StatefulWidget {
     this.onStairShapeChanged,
     this.onStairProperties,
     this.onFreeStair,
-    this.stairWidth = 1.10,
+    this.stairWidth = 1.00,
     this.onStairWidthChanged,
     this.stairSteps = 16,
     this.onStairStepsChanged,
     this.onStairTotalWidthChanged,
     this.onStairOuterDiameterChanged,
     this.onStairLandingDepthChanged,
+    this.onStairLandingOffsetChanged,
+    this.onStairRiseChanged,
     this.onStairGoingChanged,
     this.onStairRiserChanged,
     this.onStairTurnChanged,
@@ -962,6 +967,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     required double min,
     required double max,
     bool allowNegative = false,
+    bool warning = false,
+    String? warningTooltip,
     required ValueChanged<double>? onChanged,
   }) {
     final l10n = context.l10n;
@@ -969,9 +976,32 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
       displayValue.toStringAsFixed(decimals),
     );
     final suffix = chipSuffix ?? ' $unitLabel';
-    return ActionChip(
+    final chip = ActionChip(
       key: key,
-      label: Text('$formatted$suffix'),
+      side: warning ? BorderSide(color: colors.error, width: 1.3) : null,
+      backgroundColor: warning
+          ? colors.errorContainer.withValues(alpha: 0.72)
+          : null,
+      label: warning
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 15,
+                  color: colors.error,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$formatted$suffix',
+                  style: TextStyle(
+                    color: colors.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            )
+          : Text('$formatted$suffix'),
       onPressed: onChanged == null
           ? null
           : () async {
@@ -993,6 +1023,10 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             },
       visualDensity: VisualDensity.compact,
     );
+    if (warning && warningTooltip != null) {
+      return Tooltip(message: warningTooltip, child: chip);
+    }
+    return chip;
   }
 
   Widget _buildOpeningDimensionChip({
@@ -1002,6 +1036,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     required double minCm,
     required double maxCm,
     bool allowNegative = false,
+    bool warning = false,
+    String? warningTooltip,
     required ValueChanged<double>? onChangedMeters,
   }) => _buildNumericKeypadChip(
     key: key,
@@ -1011,6 +1047,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     min: minCm,
     max: maxCm,
     allowNegative: allowNegative,
+    warning: warning,
+    warningTooltip: warningTooltip,
     onChanged: onChangedMeters == null
         ? null
         : (entered) => onChangedMeters(entered / 100.0),
@@ -1615,6 +1653,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     final effectiveWidth = selected?.width ?? stairWidth;
     final effectiveDesign = selected?.design ?? widget.stairDesign;
     final hasCustomLayout = effectiveDesign.layout != null;
+    final showFlightWidth =
+        !hasCustomLayout || effectiveDesign.layout!.flights.isNotEmpty;
     final showTotalWidth =
         !hasCustomLayout &&
         effectiveDesign.shape == StairShape.halfTurn &&
@@ -1625,8 +1665,12 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
         !effectiveDesign.isSpiral &&
         !effectiveDesign.hasWinders &&
         effectiveDesign.flightCount > 1;
+    final showLandingOffset =
+        !hasCustomLayout &&
+        (effectiveDesign.shape == StairShape.quarterTurn ||
+            effectiveDesign.shape == StairShape.halfTurn) &&
+        !effectiveDesign.hasWinders;
     final showGoing = !effectiveDesign.isSpiral;
-    final showRiser = !hasCustomLayout;
 
     ({double length, double width})? overallPlanSize() {
       try {
@@ -1646,13 +1690,19 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
     final overall = (!hasCustomLayout && !showTotalWidth && !showOuterDiameter)
         ? overallPlanSize()
         : null;
+    final riserWarning = ArchitectStairRules.isRiserOutOfRange(
+      effectiveDesign.riser,
+    );
+    final riserWarnText = riserWarning ? stairRiserRangeWarningText(l) : null;
+    final wellGapText =
+        '${ArchitectUnit.trimZeros((effectiveDesign.wellGap(effectiveWidth) * 100).toStringAsFixed(1))} cm';
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          if (!hasCustomLayout) ...[
+          if (showFlightWidth) ...[
             _buildOpeningDimensionLabel(l.stairQuickFlightWidth),
             _buildOpeningDimensionChip(
               key: const ValueKey('stair-width-input'),
@@ -1673,6 +1723,14 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               minCm: (2 * effectiveWidth * 100).ceilToDouble(),
               maxCm: 2000,
               onChangedMeters: widget.onStairTotalWidthChanged,
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: Text(
+                l.stairQuickWellGap(wellGapText),
+                key: const ValueKey('stair-well-gap'),
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+              ),
             ),
           ],
           if (showOuterDiameter) ...[
@@ -1699,8 +1757,39 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               onChangedMeters: widget.onStairLandingDepthChanged,
             ),
           ],
+          if (showLandingOffset) ...[
+            const SizedBox(width: 10),
+            Tooltip(
+              message: l.stairLandingOffsetHelp,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildOpeningDimensionLabel(l.stairQuickLandingOffset),
+                  _buildOpeningDimensionChip(
+                    key: const ValueKey('stair-landing-offset-input'),
+                    label: l.stairLandingOffset,
+                    valueMeters: effectiveDesign.landingStepOffset,
+                    minCm: 0,
+                    maxCm: 100,
+                    onChangedMeters: widget.onStairLandingOffsetChanged,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (showFlightWidth || showTotalWidth || showOuterDiameter)
+            const SizedBox(width: 10),
+          _buildOpeningDimensionLabel(l.stairQuickHeight),
+          _buildOpeningDimensionChip(
+            key: const ValueKey('stair-rise-input'),
+            label: l.stairRise,
+            valueMeters: effectiveDesign.rise,
+            minCm: 30,
+            maxCm: 3000,
+            onChangedMeters: widget.onStairRiseChanged,
+          ),
           if (showGoing) ...[
-            if (!hasCustomLayout) const SizedBox(width: 10),
+            const SizedBox(width: 10),
             _buildOpeningDimensionLabel(l.stairQuickTread),
             _buildOpeningDimensionChip(
               key: const ValueKey('stair-going-input'),
@@ -1711,26 +1800,26 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
               onChangedMeters: widget.onStairGoingChanged,
             ),
           ],
-          if (showRiser) ...[
-            const SizedBox(width: 10),
-            _buildOpeningDimensionLabel(l.stairQuickRiser),
-            _buildOpeningDimensionChip(
-              key: const ValueKey('stair-riser-input'),
-              label: l.stairRiser,
-              valueMeters: effectiveDesign.riser,
-              minCm: 8,
-              maxCm: 30,
-              onChangedMeters: widget.onStairRiserChanged,
+          const SizedBox(width: 10),
+          _buildOpeningDimensionLabel(l.stairQuickRiser),
+          _buildOpeningDimensionChip(
+            key: const ValueKey('stair-riser-input'),
+            label: l.stairRiser,
+            valueMeters: effectiveDesign.riser,
+            minCm: 8,
+            maxCm: 30,
+            warning: riserWarning,
+            warningTooltip: riserWarnText,
+            onChangedMeters: hasCustomLayout ? null : widget.onStairRiserChanged,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: Text(
+              l.stairQuickStepsCount(effectiveDesign.risers),
+              key: const ValueKey('stair-risers-count'),
+              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
             ),
-            Padding(
-              padding: const EdgeInsets.only(left: 6),
-              child: Text(
-                l.stairQuickStepsCount(effectiveDesign.risers),
-                key: const ValueKey('stair-risers-count'),
-                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-              ),
-            ),
-          ],
+          ),
           if (overall != null) ...[
             const SizedBox(width: 10),
             Text(

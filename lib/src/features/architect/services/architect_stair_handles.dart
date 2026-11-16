@@ -9,6 +9,7 @@ import 'architect_stair_layout_resolver.dart';
 class StairEndpointHandle {
   final int flightIndex;
   final bool atStart;
+  final int? landingIndex;
   final Offset anchor;
   final Offset handle;
   final Offset opposite;
@@ -17,6 +18,7 @@ class StairEndpointHandle {
   const StairEndpointHandle({
     required this.flightIndex,
     required this.atStart,
+    this.landingIndex,
     required this.anchor,
     required this.handle,
     required this.opposite,
@@ -26,6 +28,7 @@ class StairEndpointHandle {
   StairEndpointHandle withOffset(bool offset) => StairEndpointHandle(
     flightIndex: flightIndex,
     atStart: atStart,
+    landingIndex: landingIndex,
     anchor: anchor,
     handle: handle,
     opposite: opposite,
@@ -87,7 +90,9 @@ class ArchitectStairHandles {
         ),
       ];
     }
-    final flights = ArchitectStairGeometry.of(stair).flights;
+    final geom = ArchitectStairGeometry.of(stair);
+    final flights = geom.flights;
+    final landings = geom.landings;
     return [
       for (var i = 0; i < flights.length; i++) ...[
         () {
@@ -115,7 +120,51 @@ class ArchitectStairHandles {
           );
         }(),
       ],
+      for (var i = 0; i < landings.length && i < flights.length; i++)
+        if (_landingBackHandle(
+          landings[i],
+          flights[i],
+          i,
+          clearance,
+        )
+            case final landingHandle?)
+          landingHandle,
     ];
+  }
+
+  static StairEndpointHandle? _landingBackHandle(
+    StairLandingGeometry landing,
+    StairFlightGeometry incoming,
+    int landingIndex,
+    double clearance,
+  ) {
+    final poly = landing.polygon;
+    if (poly.length < 3) return null;
+    Offset? bestMid;
+    var bestProj = double.negativeInfinity;
+    for (var k = 0; k < poly.length; k++) {
+      final p0 = poly[k], p1 = poly[(k + 1) % poly.length];
+      final seg = p1 - p0;
+      if (seg.distance < 1e-4) continue;
+      final dir = seg / seg.distance;
+      if (ArchitectStairGeometry.dot(dir, incoming.axis).abs() > 0.35) continue;
+      final mid = (p0 + p1) / 2;
+      final proj = ArchitectStairGeometry.dot(mid, incoming.axis);
+      if (proj > bestProj) {
+        bestProj = proj;
+        bestMid = mid;
+      }
+    }
+    if (bestMid == null) return null;
+    final incomingEnd = incoming.origin + incoming.axis * incoming.run;
+    return StairEndpointHandle(
+      flightIndex: landingIndex,
+      atStart: false,
+      landingIndex: landingIndex,
+      anchor: bestMid,
+      handle: bestMid + incoming.axis * clearance,
+      opposite: incomingEnd,
+    );
   }
 
   static StairEndpointHandle? hitTest(
@@ -159,7 +208,9 @@ class ArchitectStairHandles {
   ) {
     final items = handles(stair, 0);
     for (final h in items) {
-      if (h.flightIndex == hit.flightIndex && h.atStart == hit.atStart) {
+      if (h.landingIndex == hit.landingIndex &&
+          h.flightIndex == hit.flightIndex &&
+          h.atStart == hit.atStart) {
         return h.anchor;
       }
     }
@@ -267,8 +318,67 @@ class ArchitectStairHandles {
       );
     }
 
-    // Multi-flight straight/turn presets or custom layouts: edit the targeted
-    // flight along its axis and reconnect its landing port cleanly.
+    // Multi-flight straight/turn presets or custom layouts:
+    if (hit.landingIndex != null) {
+      final li = hit.landingIndex!;
+      if (d.layout == null) {
+        final flights = ArchitectStairGeometry.of(original).flights;
+        if (li < 0 || li >= flights.length) return original;
+        final incoming = flights[li];
+        final rawDepth = ArchitectStairGeometry.dot(
+          snappedPoint - hit.opposite,
+          incoming.axis,
+        );
+        final nextDepth =
+            (rawDepth.clamp(original.width, 10.0) * 100.0).round() / 100.0;
+        return original.copyWith(design: d.copyWith(landingDepth: nextDepth));
+      }
+      final baseLayout = d.layout!;
+      if (li < 0 || li >= baseLayout.landings.length) return original;
+      final u = original.unitVector;
+      final v = original.normalVector * (d.turnLeft ? -1 : 1);
+      final q = snappedPoint - original.startPoint;
+      final localTarget = Offset(
+        ArchitectStairGeometry.dot(q, u),
+        ArchitectStairGeometry.dot(q, v),
+      );
+      final going = ArchitectStairDesign.roundGoing(d.going);
+      final incoming = baseLayout.flights[li];
+      final incomingEndProj = ArchitectStairGeometry.dot(
+        incoming.end(going),
+        incoming.axis,
+      );
+      final minProj = incomingEndProj + incoming.width;
+      final targetProj = math.max(
+        minProj,
+        (ArchitectStairGeometry.dot(localTarget, incoming.axis) * 100.0)
+                .round() /
+            100.0,
+      );
+      final nextLayout = ArchitectStairLayoutResolver.updateLandingDepth(
+        baseLayout,
+        going,
+        li,
+        incoming.axis,
+        targetProj,
+      );
+      final nextDesign = d.copyWith(
+        shape: StairShape.straight,
+        winderSteps: false,
+        manualGoing: going,
+        manualRisers: d.manualRisers == null ? null : nextLayout.risers,
+        autoRisers: d.manualRisers == null,
+        layout: nextLayout,
+      );
+      if (ArchitectStairLayoutResolver.check(nextDesign).isNotEmpty) {
+        throw ArgumentError('Invalid landing handle drag');
+      }
+      return ArchitectStairLayoutResolver.normalizePlacement(
+        original.copyWith(design: nextDesign),
+      );
+    }
+
+    // Edit the targeted flight along its axis and reconnect its landing port cleanly.
     final baseLayout =
         d.layout ?? ArchitectStairLayoutResolver.fromStair(original);
     if (hit.flightIndex < 0 || hit.flightIndex >= baseLayout.flights.length) {

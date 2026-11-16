@@ -570,7 +570,40 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                 Text(
                   '${d.risers} × ${length(d.riser)} / ${length(d.walkingGoing(stair.width))}',
                   textAlign: TextAlign.center,
+                  style: ArchitectStairRules.isRiserOutOfRange(d.riser)
+                      ? TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.w600,
+                        )
+                      : null,
                 ),
+                if (ArchitectStairRules.isRiserOutOfRange(d.riser))
+                  Padding(
+                    key: const ValueKey('stair-riser-warning'),
+                    padding: const EdgeInsets.only(top: 4, bottom: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            stairRiserRangeWarningText(l),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ExpansionTile(
                   key: const ValueKey('stair-dimensions'),
                   tilePadding: EdgeInsets.zero,
@@ -888,23 +921,33 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
       if (check.minimum != null) '≥ ${value(check.minimum!)}',
       if (check.maximum != null) '≤ ${value(check.maximum!)}',
     ].join(' · ');
-    final color = switch (check.state) {
-      StairCheckState.pass => Colors.green,
-      StairCheckState.error => Colors.red,
-      StairCheckState.advice => Colors.orange,
-      StairCheckState.review => Colors.blueGrey,
-    };
+    final isRiserOut =
+        check.kind == StairCheckKind.riser &&
+        check.state != StairCheckState.pass;
+    final color = isRiserOut
+        ? Colors.red.shade700
+        : switch (check.state) {
+            StairCheckState.pass => Colors.green,
+            StairCheckState.error => Colors.red,
+            StairCheckState.advice => Colors.orange,
+            StairCheckState.review => Colors.blueGrey,
+          };
     return ListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
       leading: Tooltip(
         message: stairStateLabel(l, check.state),
-        child: AppIcon.fromMaterial(switch (check.state) {
-          StairCheckState.pass => Icons.check_circle_outline,
-          StairCheckState.error => Icons.error_outline,
-          StairCheckState.advice => Icons.info_outline,
-          StairCheckState.review => Icons.help_outline,
-        }, color: color),
+        child: AppIcon.fromMaterial(
+          isRiserOut
+              ? Icons.warning_amber_rounded
+              : switch (check.state) {
+                  StairCheckState.pass => Icons.check_circle_outline,
+                  StairCheckState.error => Icons.error_outline,
+                  StairCheckState.advice => Icons.info_outline,
+                  StairCheckState.review => Icons.help_outline,
+                },
+          color: color,
+        ),
       ),
       title: Text(stairCheckLabel(l, check.kind)),
       subtitle: Text(

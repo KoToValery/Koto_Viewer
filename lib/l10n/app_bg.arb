@@ -4581,5 +4581,9 @@
   "stairQuickStepsCount": "{count} ст.",
   "stairLandingOffset": "Разминаване при площадката",
   "stairLandingOffsetHelp": "Отмества първото чело на следващото рамо от ръба на площадката за по-плавен парапет и чиста долна плоча.",
-  "stairTargetRisersProgress": "{drawn}/{target} ст."
+  "stairTargetRisersProgress": "{drawn}/{target} ст.",
+  "stairRiserRangeWarning": "Височината на стъпалото е извън {min}–{max} cm",
+  "stairQuickHeight": "Височина H",
+  "stairQuickWellGap": "Око: {gap}",
+  "stairQuickLandingOffset": "Отстояние"
 }

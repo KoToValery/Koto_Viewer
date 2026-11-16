@@ -313,7 +313,8 @@ class ArchitectStairLayoutResolver {
     return next.copyWith(landings: landings);
   }
 
-  /// Updates one flight and shifts its adjoining landing port edges cleanly.
+  /// Updates one flight and shifts/steps its adjoining landing port edges cleanly,
+  /// preserving orthogonal corners and minimum landing clear depth.
   static ArchitectStairLayout updateFlightWithPorts(
     ArchitectStairLayout layout,
     double going,
@@ -322,35 +323,288 @@ class ArchitectStairLayoutResolver {
   ) {
     final index = layout.flights.indexWhere((f) => f.id == oldFlight.id);
     if (index < 0) return layout;
-    List<Offset> portChange(
-      List<Offset> polygon,
-      Offset a,
-      Offset b,
-      Offset c,
-      Offset e,
-    ) => [
-      for (final p in polygon)
-        ArchitectStairGeometry.pointSegmentDistance(p, a, b) < 1e-6
-            ? c +
-                  (e - c) *
-                      (ArchitectStairGeometry.dot(p - a, b - a) /
-                          (b - a).distanceSquared)
-            : p,
-    ];
+
+    List<Offset> shiftPortOnPolygon(
+      List<Offset> polygon, {
+      required Offset a,
+      required Offset b,
+      required Offset c,
+      required Offset e,
+      required Offset intoLanding,
+      required double minClearDepth,
+      required bool allowPushBackWall,
+      (Offset, Offset)? otherPort,
+    }) {
+      if ((a - c).distance < 1e-7 && (b - e).distance < 1e-7) return polygon;
+      final split = <Offset>[];
+      for (var k = 0; k < polygon.length; k++) {
+        final p0 = polygon[k], p1 = polygon[(k + 1) % polygon.length];
+        split.add(p0);
+        final seg = p1 - p0;
+        final segLen = seg.distance;
+        if (segLen < 1e-7) continue;
+        final inserts = <(double t, Offset pt)>[];
+        for (final target in [a, b]) {
+          if (ArchitectStairGeometry.pointSegmentDistance(target, p0, p1) <
+                  1e-5 &&
+              (target - p0).distance > 1e-5 &&
+              (target - p1).distance > 1e-5) {
+            final t = ArchitectStairGeometry.dot(target - p0, seg) /
+                seg.distanceSquared;
+            inserts.add((t, target));
+          }
+        }
+        inserts.sort((x, y) => x.$1.compareTo(y.$1));
+        for (final item in inserts) {
+          if ((item.$2 - split.last).distance > 1e-5) {
+            split.add(item.$2);
+          }
+        }
+      }
+      final pts = <Offset>[];
+      for (final p in split) {
+        if (pts.isEmpty || (p - pts.last).distance > 1e-5) pts.add(p);
+      }
+      if (pts.length > 1 && (pts.first - pts.last).distance <= 1e-5) {
+        pts.removeLast();
+      }
+      if (pts.length < 3) return polygon;
+
+      final n = pts.length;
+      final idxA = pts.indexWhere((p) => (p - a).distance < 1e-4);
+      final idxB = pts.indexWhere((p) => (p - b).distance < 1e-4);
+      if (idxA < 0 || idxB < 0 || idxA == idxB) {
+        return [
+          for (final p in pts)
+            ArchitectStairGeometry.pointSegmentDistance(p, a, b) < 1e-5
+                ? c +
+                    (e - c) *
+                        (ArchitectStairGeometry.dot(p - a, b - a) /
+                            (b - a).distanceSquared)
+                : p,
+        ];
+      }
+
+      bool allOnPort(int start, int end, int step) {
+        var cur = start;
+        while (true) {
+          if (ArchitectStairGeometry.pointSegmentDistance(pts[cur], a, b) >
+              1e-4) {
+            return false;
+          }
+          if (cur == end) return true;
+          cur = (cur + step + n) % n;
+        }
+      }
+
+      int startIdx = idxA, endIdx = idxB;
+      Offset oldStart = a, oldEnd = b, newStart = c, newEnd = e;
+      if (!allOnPort(idxA, idxB, 1)) {
+        if (allOnPort(idxB, idxA, 1)) {
+          startIdx = idxB;
+          endIdx = idxA;
+          oldStart = b;
+          oldEnd = a;
+          newStart = e;
+          newEnd = c;
+        } else {
+          return polygon;
+        }
+      }
+
+      bool isParallelMove(Offset from, Offset to, Offset neighbor) {
+        final move = to - from;
+        final edge = from - neighbor;
+        if (move.distance < 1e-6 || edge.distance < 1e-6) return true;
+        return ArchitectStairGeometry.cross(edge, move).abs() <
+            1e-4 * edge.distance * move.distance;
+      }
+
+      final prevIdx = (startIdx - 1 + n) % n;
+      final nextIdx = (endIdx + 1) % n;
+      final keepOldStart = !isParallelMove(oldStart, newStart, pts[prevIdx]);
+      final keepOldEnd = !isParallelMove(oldEnd, newEnd, pts[nextIdx]);
+
+      // When a port corner moves laterally (e.g. flight width edit) along a
+      // landing edge that runs along the flight axis, translate that outer/inner
+      // side corner so the edge remains perpendicular to the port.
+      final latStart = newStart - oldStart;
+      final latEnd = newEnd - oldEnd;
+      final portSpan = oldEnd - oldStart;
+      final portDir = portSpan.distance > 1e-8
+          ? portSpan / portSpan.distance
+          : Offset.zero;
+      bool isAxisAlignedEdge(Offset edge, Offset move) {
+        if (edge.distance < 1e-6 ||
+            move.distance < 1e-6 ||
+            portDir.distance < 1e-6) {
+          return false;
+        }
+        return ArchitectStairGeometry.dot(edge, portDir).abs() <
+                1e-4 * edge.distance &&
+            ArchitectStairGeometry.dot(edge, move).abs() <
+                1e-4 * edge.distance * move.distance;
+      }
+      bool touchesOther(Offset p) =>
+          otherPort != null &&
+          ArchitectStairGeometry.pointSegmentDistance(
+                p,
+                otherPort.$1,
+                otherPort.$2,
+              ) <=
+              1e-4;
+
+      final shiftPrevSide =
+          keepOldStart &&
+          isAxisAlignedEdge(oldStart - pts[prevIdx], latStart) &&
+          !touchesOther(pts[prevIdx]);
+      final shiftNextSide =
+          keepOldEnd &&
+          isAxisAlignedEdge(pts[nextIdx] - oldEnd, latEnd) &&
+          !touchesOther(pts[nextIdx]);
+
+      final rebuilt = <Offset>[];
+      var i = (endIdx + 1) % n;
+      while (i != startIdx) {
+        var p = pts[i];
+        if (i == nextIdx && shiftNextSide) p = p + latEnd;
+        if (i == prevIdx && shiftPrevSide) p = p + latStart;
+        rebuilt.add(p);
+        i = (i + 1) % n;
+      }
+      if (keepOldStart && !shiftPrevSide) rebuilt.add(oldStart);
+      rebuilt.add(newStart);
+      rebuilt.add(newEnd);
+      if (keepOldEnd && !shiftNextSide) rebuilt.add(oldEnd);
+
+      var cleaned = <Offset>[];
+      for (final p in rebuilt) {
+        if (cleaned.isEmpty || (p - cleaned.last).distance > 1e-5) {
+          cleaned.add(p);
+        }
+      }
+      if (cleaned.length > 1 && (cleaned.first - cleaned.last).distance <= 1e-5) {
+        cleaned.removeLast();
+      }
+      var removedColinear = true;
+      while (removedColinear && cleaned.length > 3) {
+        removedColinear = false;
+        for (var idx = 0; idx < cleaned.length; idx++) {
+          final prev = cleaned[(idx - 1 + cleaned.length) % cleaned.length];
+          final curr = cleaned[idx];
+          final next = cleaned[(idx + 1) % cleaned.length];
+          final v1 = curr - prev, v2 = next - curr;
+          final len = v1.distance * v2.distance;
+          if (len > 1e-12 &&
+              ArchitectStairGeometry.cross(v1, v2).abs() <= 1e-6 * len &&
+              ArchitectStairGeometry.dot(v1, v2) >= 0) {
+            cleaned.removeAt(idx);
+            removedColinear = true;
+            break;
+          }
+        }
+      }
+
+      final shift = newStart - oldStart;
+      if (allowPushBackWall &&
+          intoLanding.distance > 1e-6 &&
+          ArchitectStairGeometry.dot(shift, intoLanding) > 1e-6) {
+        var maxProj = double.negativeInfinity;
+        for (final p in cleaned) {
+          maxProj = math.max(maxProj, ArchitectStairGeometry.dot(p, intoLanding));
+        }
+        final reqProj =
+            ArchitectStairGeometry.dot(c, intoLanding) + minClearDepth;
+        if (maxProj < reqProj - 1e-5) {
+          final push = reqProj - maxProj;
+          bool isBack(Offset p) =>
+              (ArchitectStairGeometry.dot(p, intoLanding) - maxProj).abs() <
+              1e-4;
+          bool pinned(Offset p) =>
+              otherPort != null &&
+              ArchitectStairGeometry.pointSegmentDistance(
+                    p,
+                    otherPort.$1,
+                    otherPort.$2,
+                  ) <=
+                  1e-4;
+          final pushed = <Offset>[];
+          for (var k = 0; k < cleaned.length; k++) {
+            final p = cleaned[k];
+            if (!isBack(p)) {
+              pushed.add(p);
+              continue;
+            }
+            if (!pinned(p)) {
+              pushed.add(p + intoLanding * push);
+              continue;
+            }
+            final prev = cleaned[(k - 1 + cleaned.length) % cleaned.length];
+            final next = cleaned[(k + 1) % cleaned.length];
+            final prevShifted = isBack(prev) && !pinned(prev);
+            final nextShifted = isBack(next) && !pinned(next);
+            if (prevShifted) pushed.add(p + intoLanding * push);
+            pushed.add(p);
+            if (nextShifted) pushed.add(p + intoLanding * push);
+          }
+          cleaned = pushed;
+        }
+      }
+      return cleaned;
+    }
+
     final landings = List<ArchitectStairLandingSpec>.of(layout.landings);
-    for (final pair in [
-      (index - 1, oldFlight.origin, nextFlight.origin),
-      (index, oldFlight.end(going), nextFlight.end(going)),
+    for (final entry in [
+      (
+        landingIdx: index - 1,
+        oldCenter: oldFlight.origin,
+        newCenter: nextFlight.origin,
+        intoLanding: -oldFlight.axis,
+      ),
+      (
+        landingIdx: index,
+        oldCenter: oldFlight.end(going),
+        newCenter: nextFlight.end(going),
+        intoLanding: oldFlight.axis,
+      ),
     ]) {
-      if (pair.$1 < 0 || pair.$1 >= landings.length) continue;
-      final l = landings[pair.$1];
-      landings[pair.$1] = l.copyWith(
-        polygon: portChange(
+      if (entry.landingIdx < 0 || entry.landingIdx >= landings.length) {
+        continue;
+      }
+      final l = landings[entry.landingIdx];
+      final oldDepth = ArchitectStairLayoutResolver.landingDepth(
+        ArchitectStairDesign(
+          shape: StairShape.straight,
+          manualGoing: going,
+          layout: layout,
+        ),
+        landingIndex: entry.landingIdx,
+      );
+      final incoming = layout.flights[entry.landingIdx];
+      final outgoing = layout.flights[entry.landingIdx + 1];
+      final otherFlight = entry.landingIdx == index - 1 ? incoming : outgoing;
+      final otherCenter = entry.landingIdx == index - 1
+          ? incoming.end(going)
+          : outgoing.origin;
+      final otherPort = (
+        otherCenter - otherFlight.normal * otherFlight.width / 2,
+        otherCenter + otherFlight.normal * otherFlight.width / 2,
+      );
+      final minClear = math.max(
+        oldDepth.isFinite ? oldDepth : 0.0,
+        math.max(incoming.width, outgoing.width),
+      );
+      landings[entry.landingIdx] = l.copyWith(
+        polygon: shiftPortOnPolygon(
           l.polygon,
-          pair.$2 - oldFlight.normal * oldFlight.width / 2,
-          pair.$2 + oldFlight.normal * oldFlight.width / 2,
-          pair.$3 - nextFlight.normal * nextFlight.width / 2,
-          pair.$3 + nextFlight.normal * nextFlight.width / 2,
+          a: entry.oldCenter - oldFlight.normal * oldFlight.width / 2,
+          b: entry.oldCenter + oldFlight.normal * oldFlight.width / 2,
+          c: entry.newCenter - nextFlight.normal * nextFlight.width / 2,
+          e: entry.newCenter + nextFlight.normal * nextFlight.width / 2,
+          intoLanding: entry.intoLanding,
+          minClearDepth: minClear,
+          allowPushBackWall: layout.cell.isEmpty,
+          otherPort: otherPort,
         ),
       );
     }
@@ -360,6 +614,95 @@ class ArchitectStairLayoutResolver {
       ],
       landings: landings,
     );
+  }
+
+  /// Updates all flight widths in [layout] uniformly and keeps landing ports &
+  /// side edges orthogonal.
+  static ArchitectStairLayout resizeFlightWidths(
+    ArchitectStairLayout layout,
+    double going,
+    double newWidth,
+  ) {
+    var current = layout;
+    for (var i = 0; i < current.flights.length; i++) {
+      final f = current.flights[i];
+      if ((f.width - newWidth).abs() < 1e-7) continue;
+      current = updateFlightWithPorts(
+        current,
+        going,
+        f,
+        f.copyWith(width: newWidth),
+      );
+    }
+    return current;
+  }
+
+  /// Shifts the outer back edge of landing [landingIndex] along [axis] to set
+  /// its clear projection depth relative to the incoming flight port.
+  static ArchitectStairLayout updateLandingDepth(
+    ArchitectStairLayout layout,
+    double going,
+    int landingIndex,
+    Offset axis,
+    double targetProj,
+  ) {
+    if (landingIndex < 0 || landingIndex >= layout.landings.length) {
+      return layout;
+    }
+    final l = layout.landings[landingIndex];
+    final poly = l.polygon;
+    if (poly.length < 3) return layout;
+    final incoming = layout.flights[landingIndex];
+    final outgoing = layout.flights[landingIndex + 1];
+    final inPort = (
+      incoming.end(going) - incoming.normal * incoming.width / 2,
+      incoming.end(going) + incoming.normal * incoming.width / 2,
+    );
+    final outPort = (
+      outgoing.origin - outgoing.normal * outgoing.width / 2,
+      outgoing.origin + outgoing.normal * outgoing.width / 2,
+    );
+
+    var maxProj = double.negativeInfinity;
+    for (final p in poly) {
+      maxProj = math.max(maxProj, ArchitectStairGeometry.dot(p, axis));
+    }
+    final delta = targetProj - maxProj;
+    if (delta.abs() < 1e-6) return layout;
+
+    bool isBack(Offset p) =>
+        (ArchitectStairGeometry.dot(p, axis) - maxProj).abs() < 1e-4;
+    bool pinned(Offset p) =>
+        ArchitectStairGeometry.pointSegmentDistance(p, inPort.$1, inPort.$2) <=
+            1e-4 ||
+        ArchitectStairGeometry.pointSegmentDistance(
+              p,
+              outPort.$1,
+              outPort.$2,
+            ) <=
+            1e-4;
+
+    final nextPoly = <Offset>[];
+    for (var k = 0; k < poly.length; k++) {
+      final p = poly[k];
+      if (!isBack(p)) {
+        nextPoly.add(p);
+        continue;
+      }
+      if (!pinned(p)) {
+        nextPoly.add(p + axis * delta);
+        continue;
+      }
+      final prev = poly[(k - 1 + poly.length) % poly.length];
+      final next = poly[(k + 1) % poly.length];
+      if (isBack(prev) && !pinned(prev)) nextPoly.add(p + axis * delta);
+      nextPoly.add(p);
+      if (isBack(next) && !pinned(next)) nextPoly.add(p + axis * delta);
+    }
+
+    final landings = List<ArchitectStairLandingSpec>.of(layout.landings);
+    landings[landingIndex] = l.copyWith(polygon: nextPoly);
+    return layout.copyWith(landings: landings);
   }
 
   static ArchitectStair normalizePlacement(ArchitectStair stair) {

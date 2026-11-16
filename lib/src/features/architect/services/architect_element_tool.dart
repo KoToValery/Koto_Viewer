@@ -110,9 +110,11 @@ class ArchitectElementTool extends ChangeNotifier {
       'B ${(width * 100).round()}/${(depth * 100).round()}';
 
   // Stair options
-  double stairWidth = 1.20;
+  double stairWidth = 1.00;
   int stairSteps = 16;
-  ArchitectStairDesign stairDesign = const ArchitectStairDesign();
+  ArchitectStairDesign stairDesign = const ArchitectStairDesign(
+    totalWidth: 2.40,
+  );
 
   // Opening options
   OpeningType openingType = OpeningType.shaft;

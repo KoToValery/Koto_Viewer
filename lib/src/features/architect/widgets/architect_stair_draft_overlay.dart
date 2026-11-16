@@ -214,11 +214,24 @@ class ArchitectStairDraftOverlay extends StatelessWidget {
                 ),
               ),
               if (preview != null)
-                ArchitectCanvasHint(
-                  message:
-                      '${preview.design!.risers} × ${project.formatLength(preview.design!.riser)} / '
-                      '${project.formatLength(preview.design!.going)}',
-                ),
+                () {
+                  final d = preview.design!;
+                  final riserWarn = ArchitectStairRules.isRiserOutOfRange(
+                    d.riser,
+                  );
+                  final summary =
+                      '${d.risers} × ${project.formatLength(d.riser)} / '
+                      '${project.formatLength(d.going)}';
+                  return ArchitectCanvasHint(
+                    key: riserWarn
+                        ? const ValueKey('stair-draft-riser-warning')
+                        : null,
+                    warning: riserWarn,
+                    message: riserWarn
+                        ? '$summary · ${stairRiserRangeWarningText(l)}'
+                        : summary,
+                  );
+                }(),
               if (problem != null)
                 ArchitectCanvasHint(
                   message:
@@ -647,6 +660,34 @@ class ArchitectStairDraftOverlay extends StatelessWidget {
                         minimum: 2,
                         maximum: 500,
                       ),
+                      if (ArchitectStairRules.isRiserOutOfRange(
+                        draft.design.riser,
+                      ))
+                        Padding(
+                          key: const ValueKey('stair-part-riser-warning'),
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                size: 17,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '${l.stairRiser}: ${project.formatLength(draft.design.riser)} · '
+                                  '${stairRiserRangeWarningText(l)}',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(l.stairLockCount),

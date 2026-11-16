@@ -5,6 +5,7 @@ import '../models/architect_project.dart';
 import '../services/architect_properties_session.dart';
 import '../services/architect_stair_rules.dart';
 import 'architect_property_number_field.dart';
+import 'architect_stair_labels.dart';
 
 /// Initial height and step-parameter prompt before tracing a freeform stair.
 class ArchitectStairSetupDialog extends StatefulWidget {
@@ -252,6 +253,31 @@ class _ArchitectStairSetupDialogState extends State<ArchitectStairSetupDialog> {
                 maximum: 500,
                 helper: '${l.stairRiser}: ${length(d.riser)}',
               ),
+              if (ArchitectStairRules.isRiserOutOfRange(d.riser))
+                Padding(
+                  key: const ValueKey('stair-setup-riser-warning'),
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${l.stairRiser}: ${length(d.riser)} · ${stairRiserRangeWarningText(l)}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
                 dense: true,

@@ -257,6 +257,7 @@ import '../services/architect_stair_perimeter_draft.dart';
 import '../widgets/architect_stair_perimeter_overlay.dart';
 import '../services/architect_stair_layout_resolver.dart';
 import '../widgets/architect_stair_draft_overlay.dart';
+import '../widgets/architect_stair_labels.dart';
 
 import '../widgets/architect_stair_properties_dialog.dart';
 import '../widgets/architect_stair_setup_dialog.dart';
@@ -29170,13 +29171,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _project.activeStorey,
       design ?? stair.design ?? _elementTool.stairDesign,
     );
+    if (nextDesign.layout != null && width != null) {
+      final resized = ArchitectStairLayoutResolver.resizeFlightWidths(
+        nextDesign.layout!,
+        nextDesign.going,
+        nextWidth,
+      );
+      nextDesign = nextDesign.copyWith(layout: resized);
+    }
     if (nextDesign.totalWidth != null &&
         nextDesign.totalWidth! < 2 * nextWidth) {
       nextDesign = nextDesign.copyWith(totalWidth: 2 * nextWidth + 0.1);
     }
     try {
       nextDesign.validate();
-      final updated = stair.copyWith(width: nextWidth, design: nextDesign);
+      var updated = stair.copyWith(width: nextWidth, design: nextDesign);
+      if (nextDesign.layout != null) {
+        updated = ArchitectStairLayoutResolver.normalizePlacement(updated);
+      }
       _commands.execute(
         PutArchitectStair(
           storeyId: _project.activeStoreyId,
@@ -32132,6 +32144,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     activeSelectedStair,
                     activeStairDesign.copyWith(landingDepth: ld),
                   ),
+                  onStairLandingOffsetChanged: (offset) =>
+                      _applyQuickStairDesign(
+                        activeSelectedStair,
+                        activeStairDesign.copyWith(landingStepOffset: offset),
+                      ),
+                  onStairRiseChanged: (targetRise) => _applyQuickStairDesign(
+                    activeSelectedStair,
+                    activeStairDesign.copyWith(
+                      followStoreys: false,
+                      rise: targetRise,
+                    ),
+                  ),
                   onStairGoingChanged: (g) => _applyQuickStairDesign(
                     activeSelectedStair,
                     ArchitectStairRules.applyGoingInverse(
@@ -34996,6 +35020,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             },
             darkCanvas: _canvasPalette.isDark, onApply: _applyFreeStair,
             onCancel: _cancelFreeStair, onProperties: _freeStairProperties))),
+
+      Positioned(
+        top: 8,
+        left: 8,
+        right: 8,
+        child: IgnorePointer(
+          child: AnimatedBuilder(
+            animation: _previewRevision,
+            builder: (_, _) {
+              final handleStair = _stairHandleOriginal;
+              if (handleStair == null) return const SizedBox.shrink();
+              final live = (_elementMovePreview ?? _project)
+                      .activeStorey
+                      .stairs
+                      .where((s) => s.id == handleStair.id)
+                      .firstOrNull ??
+                  handleStair;
+              final d = live.design;
+              if (d == null) return const SizedBox.shrink();
+              final warn = ArchitectStairRules.isRiserOutOfRange(d.riser);
+              final text =
+                  '${d.risers} × ${_project.formatLength(d.riser)} / '
+                  '${_project.formatLength(d.going)}';
+              return ArchitectCanvasHint(
+                key: const ValueKey('stair-handle-riser-hud'),
+                warning: warn,
+                message: warn
+                    ? '$text · ${stairRiserRangeWarningText(context.l10n)}'
+                    : text,
+              );
+            },
+          ),
+        ),
+      ),
 
       if (_activeTool == ArchitectTool.cadEllipse && _effectiveSelection.isEmpty)
         Positioned.fill(child: AnimatedBuilder(

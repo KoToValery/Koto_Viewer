@@ -13,11 +13,13 @@ import 'package:kotoview/src/features/architect/rendering/architect_stair_mesh.d
 import 'package:kotoview/src/features/architect/services/architect_element_tool.dart';
 import 'package:kotoview/src/features/architect/services/architect_slab_geometry.dart';
 import 'package:kotoview/src/features/architect/services/architect_stair_geometry.dart';
+import 'package:kotoview/src/features/architect/services/architect_stair_draft_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_stair_handles.dart';
 import 'package:kotoview/src/features/architect/services/architect_stair_headroom.dart';
 import 'package:kotoview/src/features/architect/services/architect_stair_layout_resolver.dart';
 import 'package:kotoview/src/features/architect/services/architect_stair_railings.dart';
 import 'package:kotoview/src/features/architect/services/architect_stair_rules.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_stair_draft_overlay.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_stair_labels.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_stair_properties_dialog.dart';
 
@@ -449,5 +451,162 @@ void main() {
       expect(saved!.design!.going, closeTo(.324, 1e-6));
       expect(tester.takeException(), isNull);
     });
+
+    test('riser out-of-range check uses 15-18 cm bounds non-blockingly', () {
+      expect(ArchitectStairRules.minRiser, closeTo(.15, 1e-9));
+      expect(ArchitectStairRules.maxRiser, closeTo(.18, 1e-9));
+      expect(ArchitectStairRules.isRiserOutOfRange(.149), isTrue);
+      expect(ArchitectStairRules.isRiserOutOfRange(.15), isFalse);
+      expect(ArchitectStairRules.isRiserOutOfRange(.168), isFalse);
+      expect(ArchitectStairRules.isRiserOutOfRange(.18), isFalse);
+      expect(ArchitectStairRules.isRiserOutOfRange(.181), isTrue);
+
+      for (final risers in [16, 22]) {
+        final stair = ArchitectStair(
+          id: 'r_$risers',
+          startPoint: Offset.zero,
+          endPoint: const Offset(3, 0),
+          width: 1.2,
+          design: ArchitectStairDesign(
+            shape: StairShape.straight,
+            rise: 3.0,
+            followStoreys: false,
+            manualRisers: risers,
+          ),
+        );
+        final checks = ArchitectStairRules.check(stair);
+        final riserCheck = checks.singleWhere(
+          (c) => c.kind == StairCheckKind.riser,
+        );
+        expect(riserCheck.state, StairCheckState.advice);
+        expect(checks.any((c) => c.state == StairCheckState.error), isFalse);
+      }
+    });
+
+    testWidgets(
+      'properties dialog and freeform draft overlay show non-blocking red riser warning outside 15-18 cm',
+      (tester) async {
+        const steepStair = ArchitectStair(
+          id: 'steep_1',
+          startPoint: Offset.zero,
+          endPoint: Offset(3.2, 0),
+          width: 1.2,
+          design: ArchitectStairDesign(
+            shape: StairShape.straight,
+            rise: 3.0,
+            followStoreys: false,
+            manualRisers: 16,
+            manualGoing: .28,
+          ),
+        );
+        final project = wrapStorey(
+          const ArchitectStorey(
+            id: 's0',
+            name: '0.00',
+            height: 3.0,
+            stairs: [steepStair],
+          ),
+        );
+        ArchitectStair? saved;
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('bg'),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => ArchitectStairPropertiesDialog(
+                      project: project,
+                      stair: steepStair,
+                      onApply: (s) {
+                        saved = s;
+                        return true;
+                      },
+                    ),
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('stair-riser-warning')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('stair-save')));
+        await tester.pumpAndSettle();
+        expect(saved, isNotNull);
+
+        // Verify red warning cue in custom draft overlay when riser < 15 cm.
+        final shallowCustom = ArchitectStair(
+          id: 'shallow_custom',
+          startPoint: Offset.zero,
+          endPoint: Offset(1, 0),
+          width: 1.2,
+          design: ArchitectStairDesign(
+            shape: StairShape.straight,
+            rise: 2.8,
+            followStoreys: false,
+            manualGoing: .28,
+            layout: ArchitectStairLayout(
+              flights: [
+                ArchitectStairFlightSpec(
+                  id: 'f1',
+                  origin: Offset.zero,
+                  axis: Offset(1, 0),
+                  width: 1.2,
+                  risers: 20,
+                ),
+              ],
+            ),
+          ),
+        );
+        final draft = ArchitectStairDraftController(shallowCustom, create: false);
+        addTearDown(draft.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('bg'),
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 600,
+                child: ArchitectStairDraftOverlay(
+                  draft: draft,
+                  project: project,
+                  toScreen: (p) => Offset(p.dx * 100 + 50, p.dy * 100 + 300),
+                  toModel: (s) => Offset((s.dx - 50) / 100, (s.dy - 300) / 100),
+                  scale: 100,
+                  onApply: () {},
+                  onCancel: () {},
+                  onProperties: () {},
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('stair-draft-riser-warning')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('stair-draft-riser-warning')),
+            matching: find.byIcon(Icons.warning_amber_rounded),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

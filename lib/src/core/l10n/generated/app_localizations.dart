@@ -24185,6 +24185,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{drawn}/{target} steps'**
   String stairTargetRisersProgress(int drawn, int target);
+
+  /// Non-blocking warning shown when manual stair editing produces a riser height outside the recommended range
+  ///
+  /// In en, this message translates to:
+  /// **'Riser height outside {min}–{max} cm'**
+  String stairRiserRangeWarning(int min, int max);
+
+  /// Compact label for total stair rise height in the quick edit bar
+  ///
+  /// In en, this message translates to:
+  /// **'Height H'**
+  String get stairQuickHeight;
+
+  /// Compact readout showing the remaining stairwell well gap next to total width
+  ///
+  /// In en, this message translates to:
+  /// **'Well: {gap}'**
+  String stairQuickWellGap(String gap);
+
+  /// Compact label for flight stagger offset relative to the landing in the quick edit bar
+  ///
+  /// In en, this message translates to:
+  /// **'Offset'**
+  String get stairQuickLandingOffset;
 }
 
 class _AppLocalizationsDelegate

@@ -79,20 +79,38 @@ class ArchitectStairRailings {
   }
 
   /// Joined offsets avoid gaps and overlapping corners in the plan rail.
+  /// Vertical steps that coincide in XY keep adjacent 2D segment normals so
+  /// transitions onto flights never trigger the miter divisor fallback.
   static List<Offset> planOffset(List<Vector3> points, double distance) {
-    Offset normal(int a, int b) {
-      final v = Offset(points[b].x - points[a].x, points[b].y - points[a].y);
-      return v.distance < 1e-8 ? Offset.zero : Offset(-v.dy, v.dx) / v.distance;
+    Offset distinctNormalBefore(int index) {
+      final curr = Offset(points[index].x, points[index].y);
+      for (var p = index - 1; p >= 0; p--) {
+        final delta = curr - Offset(points[p].x, points[p].y);
+        if (delta.distance >= 1e-6) {
+          return Offset(-delta.dy, delta.dx) / delta.distance;
+        }
+      }
+      return Offset.zero;
+    }
+
+    Offset distinctNormalAfter(int index) {
+      final curr = Offset(points[index].x, points[index].y);
+      for (var q = index + 1; q < points.length; q++) {
+        final delta = Offset(points[q].x, points[q].y) - curr;
+        if (delta.distance >= 1e-6) {
+          return Offset(-delta.dy, delta.dx) / delta.distance;
+        }
+      }
+      return Offset.zero;
     }
 
     return [
       for (var i = 0; i < points.length; i++)
         () {
-          final before = normal(i == 0 ? i : i - 1, i == 0 ? i + 1 : i);
-          final after = normal(
-            i == points.length - 1 ? i - 1 : i,
-            i == points.length - 1 ? i : i + 1,
-          );
+          var before = distinctNormalBefore(i);
+          var after = distinctNormalAfter(i);
+          if (before == Offset.zero) before = after;
+          if (after == Offset.zero) after = before;
           final sum = before + after;
           final bisector = sum.distance < 1e-8 ? before : sum / sum.distance;
           final divisor = math.max(

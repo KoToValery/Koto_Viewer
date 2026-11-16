@@ -49,6 +49,12 @@ class StairCheck {
 /// Explicit, scoped geometric checks, never a whole-building certificate.
 /// Informative geometric and ergonomic stair checks, never blocking edits.
 class ArchitectStairRules {
+  static const double minRiser = .15;
+  static const double maxRiser = .18;
+
+  static bool isRiserOutOfRange(double riser) =>
+      riser < minRiser - 1e-6 || riser > maxRiser + 1e-6;
+
   static List<StairCheck> check(
     ArchitectStair stair, {
     ArchitectProject? project,
@@ -111,7 +117,7 @@ class ArchitectStairRules {
       article: '2h + b',
     );
     range(StairCheckKind.width, width, min: .90);
-    range(StairCheckKind.riser, d.riser, min: .12, max: .18);
+    range(StairCheckKind.riser, d.riser, min: minRiser, max: maxRiser);
     if (!d.isSpiral) {
       final hasStraightTreads = !d.hasWinders ||
           d.risers - 1 - d.winderLayout(stair.width).perQuarter * d.turnQuarters > 0;

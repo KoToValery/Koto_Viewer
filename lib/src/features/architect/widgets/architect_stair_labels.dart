@@ -73,3 +73,8 @@ String stairStateLabel(AppLocalizations l, StairCheckState state) =>
       StairCheckState.advice => l.stairCheckAdvice,
       StairCheckState.review => l.stairCheckReview,
     };
+
+String stairRiserRangeWarningText(AppLocalizations l) => l.stairRiserRangeWarning(
+  (ArchitectStairRules.minRiser * 100).round(),
+  (ArchitectStairRules.maxRiser * 100).round(),
+);

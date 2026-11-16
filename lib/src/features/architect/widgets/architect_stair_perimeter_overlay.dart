@@ -78,21 +78,41 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
           top: 8,
           left: 8,
           right: 8,
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: ArchitectCanvasHint(
-              message: issues.isNotEmpty
-                  ? stairLayoutProblemLabel(l, issues.first.problem)
-                  : checks.any((c) => c.state == StairCheckState.error)
-                  ? stairCheckLabel(
-                      l,
-                      checks
-                          .firstWhere((c) => c.state == StairCheckState.error)
-                          .kind,
-                    )
-                  : preview != null && draft.targetRisers != null
-                  ? '${l.stairTargetRisersProgress(preview.design!.risers, draft.targetRisers!)} · ${l.stairPerimeterHint}'
-                  : l.stairPerimeterHint,
+          child: IgnorePointer(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ArchitectCanvasHint(
+                  message: issues.isNotEmpty
+                      ? stairLayoutProblemLabel(l, issues.first.problem)
+                      : checks.any((c) => c.state == StairCheckState.error)
+                      ? stairCheckLabel(
+                          l,
+                          checks
+                              .firstWhere(
+                                (c) => c.state == StairCheckState.error,
+                              )
+                              .kind,
+                        )
+                      : preview != null && draft.targetRisers != null
+                      ? '${l.stairTargetRisersProgress(preview.design!.risers, draft.targetRisers!)} · ${l.stairPerimeterHint}'
+                      : l.stairPerimeterHint,
+                ),
+                if (preview != null &&
+                    ArchitectStairRules.isRiserOutOfRange(
+                      preview.design!.riser,
+                    )) ...[
+                  const SizedBox(height: 4),
+                  ArchitectCanvasHint(
+                    key: const ValueKey('stair-perimeter-riser-warning'),
+                    warning: true,
+                    message:
+                        '${project.formatLength(preview.design!.riser)} · '
+                        '${stairRiserRangeWarningText(l)}',
+                  ),
+                ],
+              ],
             ),
           ),
         ),

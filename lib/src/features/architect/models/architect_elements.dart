@@ -415,7 +415,7 @@ class ArchitectStair {
   final String id;
   final Offset startPoint;
   final Offset endPoint;
-  final double width; // flight width in meters (default 1.10 m)
+  final double width; // flight width in meters (default 1.00 m)
   final int _stepCount;
   final bool _hasLanding;
   final ArchitectStairDesign? design;
@@ -426,7 +426,7 @@ class ArchitectStair {
     required this.id,
     required this.startPoint,
     required this.endPoint,
-    this.width = 1.10,
+    this.width = 1.00,
     int stepCount = 16,
     bool hasLanding = false,
     this.design,
@@ -439,7 +439,7 @@ class ArchitectStair {
     required String id,
     required Offset corner,
     required Offset directionPoint,
-    double width = 1.10,
+    double width = 1.00,
     int stepCount = 16,
     ArchitectStairDesign? design,
   }) {
