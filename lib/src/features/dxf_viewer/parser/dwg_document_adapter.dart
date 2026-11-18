@@ -365,25 +365,35 @@ class DwgDocumentAdapter {
         final width = _number(size['x'], 1), height = _number(size['y'], 1);
         final raw = _list(e['clip_boundary_vertices']).map(_point).toList();
         final clipped = e['clipping_enabled'] != false && raw.length >= 2;
-        var boundary = clipped ? raw : [
-          Offset(-width / 2, -height / 2), Offset(width / 2, -height / 2),
-          Offset(width / 2, height / 2), Offset(-width / 2, height / 2),
-        ];
+        var boundary = clipped
+            ? raw
+            : [
+                Offset(-width / 2, -height / 2),
+                Offset(width / 2, -height / 2),
+                Offset(width / 2, height / 2),
+                Offset(-width / 2, height / 2),
+              ];
         if (boundary.length == 2) {
           final a = boundary.first, b = boundary.last;
           boundary = [a, Offset(b.dx, a.dy), b, Offset(a.dx, b.dy)];
         }
-        Offset world(Offset p) => insertion + u * (p.dx + width / 2) +
-            v * (height / 2 - p.dy);
+        Offset world(Offset p) =>
+            insertion + u * (p.dx + width / 2) + v * (height / 2 - p.dy);
         final loops = <List<Offset>>[boundary.map(world).toList()];
         if (clipped && e['clip_mode'] == 'Inside') {
-          loops.insert(0, [insertion, insertion + u * width,
-            insertion + u * width + v * height, insertion + v * height]);
+          loops.insert(0, [
+            insertion,
+            insertion + u * width,
+            insertion + u * width + v * height,
+            insertion + v * height,
+          ]);
         }
         // Native WIPEOUT uses image pixel coordinates, with the V axis down.
         // The renderer shares polygon storage with hatches but keeps mask semantics.
         return make(DxfHatch.new, {
-          #boundaryPaths: common['invisible'] == true ? <List<Offset>>[] : loops,
+          #boundaryPaths: common['invisible'] == true
+              ? <List<Offset>>[]
+              : loops,
           #isWipeout: true,
           #isSolid: true,
         });

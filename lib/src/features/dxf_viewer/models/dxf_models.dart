@@ -16,6 +16,7 @@ import '../rendering/dxf_quadtree.dart';
 // [SEC-05-CURVES] [TAG:DXF_M_CURVES] DxfLine, Circle, Arc, Ellipse, Polyline, Spline
 // [SEC-06-TEXT] [TAG:DXF_M_TEXT] DxfText & DxfMText models
 // [SEC-07-HATCHES] [TAG:DXF_M_HATCHES] DxfSolid, DxfHatch & boundary loops
+//   [TAG:DWG_WIPEOUT_MASK] Opaque polygon mask semantics
 // [SEC-08-BLOCKREFS] [TAG:DXF_M_BLOCKREFS] DxfAttribute, DxfAttdef, DxfInsert
 // [SEC-09-DIMS] [TAG:DXF_M_DIMS] DxfDimension, DxfLeader, DxfMLeader, Viewport
 // [SEC-10-DOC] [TAG:DXF_M_DOC] DxfDocument master model & spatial indexing
@@ -1046,6 +1047,7 @@ class DxfHatchPatternLine {
 
 /// HATCH Entity.
 class DxfHatch extends DxfEntity {
+  // --- SUBSECTION: [TAG:DWG_WIPEOUT_MASK] Opaque native drawing masks ---
   /// Opaque background mask (WIPEOUT), retaining polygon/hole geometry.
   final bool isWipeout;
   final List<List<Offset>> boundaryPaths;

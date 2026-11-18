@@ -28,3 +28,10 @@ family. Raster parity, holes, transformed blocks, paper views and bounded
 recording work are covered by `test/dxf_hatch_viewport_test.dart`.
 Pan hysteresis uses `_paintedVisibleCadRect` to accumulate movement from the
 last recorded layer, including when several small pans skip repainting.
+
+`DxfHatch.isWipeout` renders an opaque canvas-background polygon with no hatch
+opacity or boundary stroke. Drawings with masks retain source entity order after
+spatial queries, disable geometry/text reordering, and use `orderedCompiled`
+blocks. Paper sheets and model-space viewports retain their own background.
+`test/dwg_wipeout_test.dart` checks occlusion, front/back geometry, themes and
+explicit persistence. Source DWGs still open without persistence/conversion.

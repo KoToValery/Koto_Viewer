@@ -22,6 +22,7 @@ import 'dxf_snap_helper.dart';
 // [SEC-05-TEXT] [TAG:PAINTER_TEXT] Single-line TEXT & multiline MTEXT rendering
 // [SEC-06-HATCH] [TAG:PAINTER_HATCH] Solids, hatches & pattern fills
 //   [TAG:HATCH_VIEWPORT_WORK] Buffered scene bounds limit hatch pattern work
+//   [TAG:PAINTER_WIPEOUT] Background masks retain source draw order
 // [SEC-07-BLOCKS] [TAG:PAINTER_BLOCKS] Blocks & INSERT entities expansion
 // [SEC-08-DIMS] [TAG:PAINTER_DIMS] Dimensions, leaders & arrowheads
 // [SEC-09-SNAPS] [TAG:PAINTER_SNAPS] Snapping, magnetic highlights & annotations
@@ -1898,6 +1899,7 @@ class DxfPainter extends CustomPainter {
       return;
     }
 
+    // --- SUBSECTION: [TAG:PAINTER_WIPEOUT] Mask previous geometry with the drawing background ---
     if (hatch.isWipeout) {
       canvas.drawPath(path, Paint()..color = _drawingBackground);
       return;

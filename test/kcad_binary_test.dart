@@ -309,18 +309,18 @@ void main() {
     expect(sw.elapsedMilliseconds, lessThan(1200));
   });
 
-  test('Stable Cache Key: DWG and intermediate DXF resolve to exact same companion KCAD path', () async {
-    final dwgFile = File(r'C:\Users\Creator\Downloads\+9.30 (OVK).dwg');
-    final dxfFile = File(r'C:\Users\Creator\AppData\Local\Temp\dwg_cache\+9.30 (OVK)_7275639_1790145006000_v6.dxf');
-
-    final cachePathFromDxf = await KcadService.getCachePath(dxfFile);
-    final expectedSuffix = '+9.30 (OVK)_7275639_1790145006000_v${KcadWriter.currentVersion}.kcad';
-    expect(cachePathFromDxf.endsWith(expectedSuffix), isTrue);
-
-    if (dwgFile.existsSync()) {
-      final cachePathFromDwg = await KcadService.getCachePath(dwgFile);
-      print('KCAD Cache Path from original DWG:     $cachePathFromDwg');
-      expect(cachePathFromDwg, equals(cachePathFromDxf));
+  test('Explicit export cache keys retain the original source fingerprint', () async {
+    final temp = await Directory.systemTemp.createTemp('kcad_keys_');
+    try {
+      final source = await File('${temp.path}/drawing.dwg').writeAsString('original CAD bytes');
+      final exported = await File('${temp.path}/drawing_v7.dxf').writeAsString('explicit DXF export');
+      final originalKey = await KcadService.getCachePath(source);
+      final exportKey = await KcadService.getCachePath(exported, originalFile: source);
+      expect(exportKey, originalKey);
+      expect(exportKey, endsWith('_v${KcadWriter.currentVersion}.kcad'));
+      expect(await KcadService.getCachePath(exported), isNot(originalKey));
+    } finally {
+      await temp.delete(recursive: true);
     }
   });
 
@@ -424,31 +424,8 @@ void main() {
     }
   });
 
-  test('End-to-End Repeated Load: Instant DWG open via KCAD cache without converter', () async {
-    final dwgFile = File(r'C:\Users\Creator\Downloads\+9.30 (OVK).dwg');
-    if (!dwgFile.existsSync()) return;
-
-    final kcadPath = await KcadService.getCachePath(dwgFile);
-    final kcadFile = File(kcadPath);
-    expect(kcadFile.existsSync(), isTrue, reason: 'KCAD cache must exist from previous run');
-
-    // Measure instant second load exactly as FileOpenerService does:
-    final sw = Stopwatch()..start();
-    final doc = await KcadService.loadKcadFile(kcadFile);
-    sw.stop();
-
-    print('\n================ SECOND OPEN (END-TO-END WIN) ================');
-    print('Target DWG:       ${dwgFile.path} (${(dwgFile.lengthSync() / (1024 * 1024)).toStringAsFixed(2)} MB)');
-    print('KCAD Cache File:  $kcadPath (${(kcadFile.lengthSync() / (1024 * 1024)).toStringAsFixed(2)} MB)');
-    print('Converted Exe:    SKIPPED (0.0 ms - dwg2dxf.exe was NOT run!)');
-    print('Entities Loaded:  ${doc.entities.length} direct entities + ${doc.blocks.length} blocks');
-    print('Spatial Index:    Built in isolate with ${doc.spatialIndex != null ? "active QuadTree" : "none"}');
-    print('TOTAL LOAD TIME:  ${sw.elapsedMilliseconds} ms!');
-    print('===============================================================\n');
-
-    expect(doc.entities.length, equals(69417));
-    expect(sw.elapsedMilliseconds, lessThan(750));
-  });
+  // Original DWGs now bypass KCAD caches. Direct-reader regression tests cover
+  // repeated DWG opening; explicit binary round trips are tested above.
 
   test('KCAD v3 TLV: Gracefully skips unknown entity type without crashing (Forward Compatibility)', () {
     final layer0 = DxfLayer(name: '0', colorIndex: 7);

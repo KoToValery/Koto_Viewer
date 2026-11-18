@@ -42,9 +42,16 @@ path, with competing default deep-link route handling disabled following
 
 ## Build
 
-The native library is pinned to acadrust **0.6.8**. Windows needs Rust MSVC and
-Visual Studio C++ tools. Android needs Rust targets `aarch64-linux-android`,
-`armv7-linux-androideabi`, `x86_64-linux-android`, and the NDK. This project uses
+The native library is pinned to acadrust **0.6.8**. Normal Android builds package
+the checked-in JNI libraries in `src/acadrust_converter/prebuilt/android` for
+ARM64, ARMv7 and x86_64. **Rust is not required on a second development computer.**
+Commit/sync that directory, its checksum manifest, the native sources and Gradle
+configuration together. CMake checks binary hashes and normalized source hashes
+so missing/stale bundles fail the build instead of silently dropping DWG support.
+
+Rebuilding native code requires Rust targets `aarch64-linux-android`,
+`armv7-linux-androideabi`, `x86_64-linux-android`, and the NDK. Windows native
+builds need Rust MSVC and Visual Studio C++ tools. This project uses
 NDK 28.2/API 24; Gradle 8.14 uses JDK 21. Local toolchains under `build/` do not
 change the system PATH or Java installation.
 
@@ -52,14 +59,16 @@ change the system PATH or Java installation.
 ./tools/build_acadrust.ps1
 ./tools/build_acadrust.ps1 -Test
 ./tools/build_acadrust_android.ps1
+./tools/bundle_acadrust_android.ps1
 python tools/collect_acadrust_licenses.py --cargo-home <cargo-home>
 ```
 
-CMake packages the Windows executable or Android JNI library automatically,
-including dependency notices. Android ELF segments use 16 KB alignment.
-Cargo.lock is committed. Android builds with native DWG enabled fail if Cargo
-is missing, so an ordinary build cannot silently drop the reader. Explicit
-`KOTO_BUILD_ACADRUST=OFF` builds have no direct DWG support. LibreDWG and
+CMake packages the Windows executable; Gradle packages the bundled Android JNI
+libraries with dependency notices. Android ELF segments use 16 KB alignment.
+Cargo.lock is committed. Native developers can use the Gradle property
+`-PkotoRebuildAcadrust=true` to compile from Rust instead of using the bundle;
+this explicit mode fails if Cargo is unavailable. Run the bundle script and
+commit updated binaries after changing Rust/JNI source. LibreDWG and
 `KOTO_USE_ACADRUST` apply only to legacy
 explicit DXF export, never to a hidden opening step.
 
@@ -94,6 +103,13 @@ incomplete-read statistics). These failures never start a conversion fallback.
 The JNI harness accepts `-FixtureDirectory` for local reproduction inputs.
 `DWG_PHONE_REPRO=true` on the headless smoke entry tests the two reported local
 drawings from the app's private cache, plus a control drawing and a corrupt input.
+
+Native WIPEOUT records retain mask polygons, inverted clip holes and opaque
+canvas-background semantics. Drawings with masks retain entity/block order
+through spatial queries and compiled rendering; ordinary drawings keep batching.
+Explicit KCAD output uses version 6 to preserve the mask flag, while the reader
+still accepts versions 1–5. This does not introduce a KCAD intermediate when
+opening a source DWG.
 
 ## Zoom rendering
 

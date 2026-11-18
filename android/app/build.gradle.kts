@@ -9,6 +9,10 @@ plugins {
 }
 
 val keystoreProperties = Properties()
+// Normal builds use checked-in JNI binaries and need no local Rust toolchain.
+// Native developers can explicitly rebuild with -PkotoRebuildAcadrust=true.
+val rebuildAcadrust = providers.gradleProperty("kotoRebuildAcadrust")
+    .map { it.toBoolean() }.orElse(false).get()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
@@ -36,6 +40,11 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        externalNativeBuild {
+            cmake {
+                arguments += "-DKOTO_REBUILD_ACADRUST=${if (rebuildAcadrust) "ON" else "OFF"}"
+            }
+        }
     }
 
     signingConfigs {
@@ -77,6 +86,9 @@ android {
 
     // Include notices for the unmodified native Rust dependencies.
     sourceSets.getByName("main").assets.srcDir("../../src/acadrust_converter/licenses")
+    if (!rebuildAcadrust) {
+        sourceSets.getByName("main").jniLibs.srcDir("../../src/acadrust_converter/prebuilt/android")
+    }
 }
 
 flutter {

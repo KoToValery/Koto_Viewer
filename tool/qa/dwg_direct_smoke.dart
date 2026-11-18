@@ -30,8 +30,9 @@ Future<void> main() async {
           !document.blocks.containsKey('квадратура_3_1')) {
         throw StateError('Cyrillic block name was lost');
       }
-      if (!await File(input).exists())
+      if (!await File(input).exists()) {
         throw StateError('Source DWG disappeared');
+      }
       print(
         'DWG_DIRECT_SMOKE_PASS file=${fixture.key} entities=${document.entities.length} blocks=${document.blocks.length}',
       );
@@ -48,8 +49,9 @@ Future<void> main() async {
       } finally {
         await invalid.delete();
       }
-      if (!rejected)
+      if (!rejected) {
         throw StateError('Native diagnostic did not reach Flutter');
+      }
       final outputs = Directory(directory).listSync().whereType<File>();
       if (outputs.length != fixtures.length ||
           outputs.any((f) => !f.path.endsWith('.dwg'))) {

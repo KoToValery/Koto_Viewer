@@ -22,3 +22,9 @@
 | Attributes & inserts | `DxfAttribute`, `DxfAttdef`, `DxfInsert` | Block references (`INSERT`) and attributes |
 | Dimensions & viewports | `DxfDimension`, `DxfLeader`, `DxfMLeader`, `DxfViewport` | Dimensions, leaders, and paper-space viewports |
 | Document & measure tools | `DxfDocument`, `DxfUnit`, `DxfMeasureTool`, `DxfAnnotation`, `DxfMeasurement` | Master document model, unit conversion, and measurements |
+
+`DxfHatch.isWipeout` keeps opaque background-mask semantics on polygon geometry
+from native DWG. `DxfBlock.orderedCompiled` retains source entity order when masks
+are present, including nested inserts and constant attribute templates. Both
+compiled caches are cleared by `clearCompiled` before isolate transfer.
+Explicit KCAD v6 output and `DxfDocumentTransformer` preserve the mask flag.

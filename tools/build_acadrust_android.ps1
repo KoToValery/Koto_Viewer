@@ -20,7 +20,7 @@ foreach ($abi in $Abis) {
     & "$cmakeBin/cmake.exe" -S "$repoRoot/android/app/src/main/cpp" -B $buildDir -G Ninja `
         "-DCMAKE_MAKE_PROGRAM=$cmakeBin/ninja.exe" `
         "-DCMAKE_TOOLCHAIN_FILE=$ndkRoot/build/cmake/android.toolchain.cmake" `
-        "-DANDROID_ABI=$abi" "-DANDROID_PLATFORM=android-$Api" -DCMAKE_BUILD_TYPE=Release
+        "-DANDROID_ABI=$abi" "-DANDROID_PLATFORM=android-$Api" -DCMAKE_BUILD_TYPE=Release -DKOTO_REBUILD_ACADRUST=ON
     if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed for $abi" }
     & "$cmakeBin/cmake.exe" --build $buildDir --target koto_acadrust
     if ($LASTEXITCODE -ne 0) { throw "JNI build failed for $abi" }
