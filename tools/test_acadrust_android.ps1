@@ -1,10 +1,12 @@
 param(
     [string]$Serial = 'emulator-5554',
     [string]$SdkRoot,
-    [string]$JdkRoot
+    [string]$JdkRoot,
+    [string]$FixtureDirectory
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $FixtureDirectory) { $FixtureDirectory = "$repoRoot/test_files" }
 if (-not $SdkRoot) {
     $line = Get-Content "$repoRoot/android/local.properties" | Where-Object { $_ -like 'sdk.dir=*' } | Select-Object -First 1
     if (-not $line) { throw 'Pass -SdkRoot or configure android/local.properties.' }
@@ -41,12 +43,12 @@ if ($LASTEXITCODE -ne 0) { throw 'Cannot create device test directory.' }
 if ($LASTEXITCODE -ne 0) { throw 'Cannot push JNI library.' }
 & $adb -s $Serial push "$testDir/dex/classes.dex" "$remote/classes.dex"
 if ($LASTEXITCODE -ne 0) { throw 'Cannot push DEX harness.' }
-foreach ($fixture in Get-ChildItem "$repoRoot/test_files/*.dwg") {
+foreach ($fixture in Get-ChildItem -LiteralPath $FixtureDirectory -Filter '*.dwg') {
     & $adb -s $Serial push $fixture.FullName "$remote/fixtures/$($fixture.Name)"
     if ($LASTEXITCODE -ne 0) { throw 'Cannot push DWG fixture.' }
 }
 & $adb -s $Serial shell "CLASSPATH=$remote/classes.dex app_process /system/bin com.koto.kotoviewer.DwgConverterService $remote/libkoto_acadrust.so $remote/fixtures"
 if ($LASTEXITCODE -ne 0) { throw 'Android JNI smoke test failed.' }
 & $adb -s $Serial pull "$remote/fixtures/output" "$testDir/device-output"
-if ($LASTEXITCODE -ne 0) { throw 'Cannot retrieve converted test drawings.' }
+if ($LASTEXITCODE -ne 0) { throw 'Cannot retrieve native reader test artifacts.' }
 Write-Output "Android test artifacts: $remote and $testDir/device-output"

@@ -155,8 +155,8 @@ class KcadEntityType {
 /// Serializes a [DxfDocument] into ultra-compact, high-performance KCAD binary format.
 class KcadWriter {
   static const List<int> magicBytes = [0x4B, 0x43, 0x41, 0x44]; // 'K', 'C', 'A', 'D'
-  /// Version 5: Adds Block Attributes on DxfInsert and DxfAttdef entity support.
-  static const int currentVersion = 5;
+  /// Version 6: Preserves opaque WIPEOUT mask semantics on polygon fills.
+  static const int currentVersion = 6;
 
   /// Flags: bit 0: isCompressed
   static const int flagCompressed = 1;
@@ -563,6 +563,7 @@ class KcadWriter {
     } else if (e is DxfHatch) {
       buf.writeUint32(st.getId(e.patternName));
       buf.writeUint8(e.isSolid ? 1 : 0);
+      buf.writeUint8(e.isWipeout ? 1 : 0);
       buf.writeFloat32(e.patternAngle);
       buf.writeFloat32(e.patternScale);
       buf.writeUint8(e.transparency != null ? 1 : 0);

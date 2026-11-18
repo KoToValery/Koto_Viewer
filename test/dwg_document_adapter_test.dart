@@ -19,6 +19,27 @@ Map<String, dynamic> _document(List<dynamic> entities) => {
 };
 
 void main() {
+  test('native linetype gaps and dots use the viewer LTYPE convention', () {
+    final data = _document([]);
+    data['line_types'] = [
+      {
+        'name': 'DASHDOT',
+        'elements': [
+          {'length': 1270},
+          {'length': -635},
+          {'length': 0},
+          {'length': -635},
+        ],
+      },
+    ];
+    expect(DwgDocumentAdapter.decode(data).lineTypes['DASHDOT'], [
+      1270,
+      635,
+      1.8,
+      635,
+    ]);
+  });
+
   test(
     'constructs every existing viewer entity family from native objects',
     () {

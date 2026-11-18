@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.*
+import android.util.Log
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
@@ -21,6 +22,7 @@ class AndroidDwgReaderClient(private val context: Context) {
         var bound = false
         var bytes: ByteArray? = null
         var status: Int? = null
+        var diagnostic: String? = null
         lateinit var connection: ServiceConnection
         lateinit var timeout: Runnable
 
@@ -43,15 +45,28 @@ class AndroidDwgReaderClient(private val context: Context) {
                 try { context.unbindService(connection) } catch (_: Exception) {}
             }
             executor.shutdownNow()
-            if (code != null) result.error(code, "Native DWG reader failed", null)
-            else if (status != 0 || bytes!!.isEmpty()) result.error("DWG_READ_FAILED", "Native DWG reader rejected the drawing", null)
-            else result.success(bytes)
+            val details = mapOf("nativeStatus" to status, "nativeMessage" to diagnostic,
+                "payloadBytes" to (bytes?.size ?: 0), "abis" to Build.SUPPORTED_ABIS.toList())
+            if (code != null) result.error(code, "Native DWG reader failed", details)
+            else if (status != 0 || bytes!!.isEmpty()) {
+                val errorCode = when (status) {
+                    -97 -> "DWG_READER_UNAVAILABLE"
+                    -99 -> "DWG_JNI_FAILED"
+                    -3 -> "DWG_DECODE_FAILED"
+                    -4 -> "DWG_READER_PANIC"
+                    -5 -> "DWG_WORKER_START_FAILED"
+                    else -> "DWG_READ_FAILED"
+                }
+                Log.e("AndroidDwgReaderClient", "$errorCode $details")
+                result.error(errorCode, "Native DWG reader rejected the drawing", details)
+            } else result.success(bytes)
         }
         timeout = Runnable { finish("CONVERSION_TIMEOUT") }
         val reply = Messenger(object : Handler(Looper.getMainLooper()) {
             override fun handleMessage(message: Message) {
                 if (message.what == DwgConverterService.MSG_RESULT) {
                     status = message.data.getInt(DwgConverterService.KEY_RESULT_CODE, -1)
+                    diagnostic = message.data.getString(DwgConverterService.KEY_ERROR_MESSAGE)
                     finish()
                 }
             }

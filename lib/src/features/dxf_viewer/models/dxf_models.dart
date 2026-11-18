@@ -249,7 +249,7 @@ class DxfCompiledBlock {
     this.linePath,
   });
 
-  factory DxfCompiledBlock.fromBlock(DxfBlock block) {
+  factory DxfCompiledBlock.fromBlock(DxfBlock block, {bool preserveDrawOrder = false}) {
     final lines = <DxfCompiledLine>[];
     final other = <DxfEntity>[];
     final baseX = block.basePoint.dx;
@@ -291,6 +291,11 @@ class DxfCompiledBlock {
         commonLayer = e.layer;
       } else if (commonLayer != e.layer) {
         hasSingleLayer = false;
+      }
+
+      if (preserveDrawOrder) {
+        other.add(e);
+        continue;
       }
 
       if (e is DxfLine) {
@@ -424,6 +429,9 @@ class DxfBlock {
   final List<DxfEntity> entities;
   DxfCompiledBlock? _compiled;
   DxfCompiledBlock get compiled => _compiled ??= DxfCompiledBlock.fromBlock(this);
+  DxfCompiledBlock? _orderedCompiled;
+  DxfCompiledBlock get orderedCompiled => _orderedCompiled ??=
+      DxfCompiledBlock.fromBlock(this, preserveDrawOrder: true);
   Rect? _cachedBounds;
   bool _boundsComputed = false;
 
@@ -437,6 +445,7 @@ class DxfBlock {
   /// can safely be sent across Dart Isolates via SendPort.
   void clearCompiled() {
     _compiled = null;
+    _orderedCompiled = null;
   }
 
   /// Lazily computes and caches CAD bounding box of all block entities.
@@ -1037,6 +1046,8 @@ class DxfHatchPatternLine {
 
 /// HATCH Entity.
 class DxfHatch extends DxfEntity {
+  /// Opaque background mask (WIPEOUT), retaining polygon/hole geometry.
+  final bool isWipeout;
   final List<List<Offset>> boundaryPaths;
   final String patternName;
   final bool isSolid;
@@ -1047,6 +1058,7 @@ class DxfHatch extends DxfEntity {
 
   const DxfHatch({
     required this.boundaryPaths,
+    this.isWipeout = false,
     this.patternName = 'SOLID',
     this.isSolid = true,
     this.patternAngle = 0.0,
@@ -1064,7 +1076,7 @@ class DxfHatch extends DxfEntity {
   });
 
   @override
-  String get typeName => 'HATCH';
+  String get typeName => isWipeout ? 'WIPEOUT' : 'HATCH';
 
   @override
   Rect? getBoundingBox(Map<String, DxfBlock> blocks) {

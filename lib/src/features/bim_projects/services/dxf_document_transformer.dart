@@ -306,6 +306,7 @@ class DxfDocumentTransformer {
       );
     } else if (entity is DxfHatch) {
       return DxfHatch(
+        isWipeout: entity.isWipeout,
         boundaryPaths: entity.boundaryPaths
             .map((loop) => loop.map(tr).toList())
             .toList(),

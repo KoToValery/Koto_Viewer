@@ -57,8 +57,10 @@ python tools/collect_acadrust_licenses.py --cargo-home <cargo-home>
 
 CMake packages the Windows executable or Android JNI library automatically,
 including dependency notices. Android ELF segments use 16 KB alignment.
-Cargo.lock is committed. Missing Cargo or `KOTO_BUILD_ACADRUST=OFF` makes direct
-DWG opening unavailable. LibreDWG and `KOTO_USE_ACADRUST` apply only to legacy
+Cargo.lock is committed. Android builds with native DWG enabled fail if Cargo
+is missing, so an ordinary build cannot silently drop the reader. Explicit
+`KOTO_BUILD_ACADRUST=OFF` builds have no direct DWG support. LibreDWG and
+`KOTO_USE_ACADRUST` apply only to legacy
 explicit DXF export, never to a hidden opening step.
 
 ## Verification
@@ -81,3 +83,31 @@ ART/JNI test snapshots are stored solely as test artifacts under
 pipes. `tool/qa/dwg_direct_smoke.dart` is a dedicated headless Android test entry
 point for the complete Flutter → service → JNI → Rust → model path. Product APKs
 use `lib/main.dart`; the smoke entry point is never used for distribution.
+
+Android native failures retain the numeric status and bounded UTF-8 diagnostic
+in the worker log, the method-channel reply and AppErrorHandler's exception log.
+`DWG_READER_UNAVAILABLE` identifies library loading failures;
+`DWG_JNI_FAILED` identifies binding/runtime exceptions;
+`DWG_DECODE_FAILED` identifies a native read error (including the OS error or
+incomplete-read statistics). These failures never start a conversion fallback.
+`test/android_dwg_reader_test.dart` checks transport and diagnostic preservation.
+The JNI harness accepts `-FixtureDirectory` for local reproduction inputs.
+`DWG_PHONE_REPRO=true` on the headless smoke entry tests the two reported local
+drawings from the app's private cache, plus a control drawing and a corrupt input.
+
+## Zoom rendering
+
+`DxfPainter` limits hatch pattern enumeration to the buffered scene viewport,
+including block and paper viewport transforms, and batches each line family.
+Pattern origins, dash phases, boundary holes and full-drawing exports remain
+intact. Native LTYPE gaps/dots are adapted to the same positive-length convention
+as the existing DXF parser. No new conversion or drawing mutation is involved.
+
+`test/dxf_hatch_viewport_test.dart` checks raster parity and bounded work.
+For an opt-in local drawing benchmark (not a device FPS measurement):
+
+```powershell
+flutter test --no-pub --dart-define="DWG_ZOOM_INPUT=<original.dwg>" tool/qa/dwg_zoom_benchmark_test.dart
+```
+
+`DWG_ZOOM_OUTPUT=<directory>` optionally saves the rendered zoom levels as PNGs.

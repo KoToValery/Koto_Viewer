@@ -4,6 +4,29 @@
 #include <unistd.h>
 
 extern int32_t koto_acadrust_read_utf16(const uint16_t *input, size_t input_len, int32_t fd);
+extern int32_t koto_acadrust_read_utf16_detailed(const uint16_t *input, size_t input_len,
+                                               int32_t fd, uint8_t *error, size_t capacity);
+
+JNIEXPORT jint JNICALL
+Java_com_koto_kotoviewer_DwgConverterService_readDwgWithAcadrustDetailed(
+    JNIEnv *env, jclass clazz, jstring input, jint output_fd, jbyteArray diagnostic) {
+    (void)clazz;
+    if (!input || output_fd < 0 || !diagnostic) return -1;
+    const jchar *chars = (*env)->GetStringChars(env, input, NULL);
+    if (!chars) return -1;
+    jbyte *error = (*env)->GetByteArrayElements(env, diagnostic, NULL);
+    if (!error) {
+        (*env)->ReleaseStringChars(env, input, chars);
+        return -1;
+    }
+    const int cloned_fd = dup(output_fd);
+    const jint result = cloned_fd < 0 ? -1 : koto_acadrust_read_utf16_detailed(
+        chars, (size_t)(*env)->GetStringLength(env, input), cloned_fd,
+        (uint8_t *)error, (size_t)(*env)->GetArrayLength(env, diagnostic));
+    (*env)->ReleaseByteArrayElements(env, diagnostic, error, 0);
+    (*env)->ReleaseStringChars(env, input, chars);
+    return result;
+}
 
 JNIEXPORT jint JNICALL
 Java_com_koto_kotoviewer_DwgConverterService_readDwgWithAcadrust(

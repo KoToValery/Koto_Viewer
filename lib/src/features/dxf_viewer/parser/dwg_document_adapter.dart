@@ -59,9 +59,14 @@ class DwgDocumentAdapter {
     final lineTypes = <String, List<double>>{};
     for (final value in _list(source['line_types'])) {
       final line = _map(value);
-      lineTypes[line['name'] as String] = _list(
-        line['elements'],
-      ).map((element) => _number(_map(element)['length'])).toList();
+      lineTypes[line['name'] as String] = _list(line['elements']).map((
+        element,
+      ) {
+        // The viewer stores alternating positive dash/gap lengths, like the
+        // DXF LTYPE reader. Native CAD gaps are negative and zero means a dot.
+        final length = _number(_map(element)['length']);
+        return length == 0 ? 1.8 : length.abs();
+      }).toList();
     }
     final layoutNames = <String, String>{};
     for (final value in _list(source['layouts'])) {
@@ -158,7 +163,12 @@ class DwgDocumentAdapter {
     }
     final type = wrapper.keys.single;
     var e = _map(wrapper.values.single);
-    if (const {'Block', 'BlockEnd', 'Seqend', 'AttributeEntity'}.contains(type)) {
+    if (const {
+      'Block',
+      'BlockEnd',
+      'Seqend',
+      'AttributeEntity',
+    }.contains(type)) {
       return null;
     }
     var dimensionType = '';
@@ -347,6 +357,35 @@ class DwgDocumentAdapter {
               dashes: _list(line['dash_lengths']).map(_number).toList(),
             );
           }).toList(),
+        });
+      case 'Wipeout':
+        final insertion = _point(e['insertion_point']);
+        final u = _point(e['u_vector']), v = _point(e['v_vector']);
+        final size = _map(e['size']);
+        final width = _number(size['x'], 1), height = _number(size['y'], 1);
+        final raw = _list(e['clip_boundary_vertices']).map(_point).toList();
+        final clipped = e['clipping_enabled'] != false && raw.length >= 2;
+        var boundary = clipped ? raw : [
+          Offset(-width / 2, -height / 2), Offset(width / 2, -height / 2),
+          Offset(width / 2, height / 2), Offset(-width / 2, height / 2),
+        ];
+        if (boundary.length == 2) {
+          final a = boundary.first, b = boundary.last;
+          boundary = [a, Offset(b.dx, a.dy), b, Offset(a.dx, b.dy)];
+        }
+        Offset world(Offset p) => insertion + u * (p.dx + width / 2) +
+            v * (height / 2 - p.dy);
+        final loops = <List<Offset>>[boundary.map(world).toList()];
+        if (clipped && e['clip_mode'] == 'Inside') {
+          loops.insert(0, [insertion, insertion + u * width,
+            insertion + u * width + v * height, insertion + v * height]);
+        }
+        // Native WIPEOUT uses image pixel coordinates, with the V axis down.
+        // The renderer shares polygon storage with hatches but keeps mask semantics.
+        return make(DxfHatch.new, {
+          #boundaryPaths: common['invisible'] == true ? <List<Offset>>[] : loops,
+          #isWipeout: true,
+          #isSolid: true,
         });
       case 'Dimension':
         final kinds = {
@@ -646,9 +685,9 @@ class DwgDocumentAdapter {
         : (
             null,
             0xff000000 |
-                    (rgb['r'] as int) << 16 |
-                    (rgb['g'] as int) << 8 |
-                    (rgb['b'] as int),
+                (rgb['r'] as int) << 16 |
+                (rgb['g'] as int) << 8 |
+                (rgb['b'] as int),
           );
   }
 

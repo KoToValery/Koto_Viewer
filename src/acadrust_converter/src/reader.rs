@@ -15,7 +15,9 @@ struct NativeBlock<'a> {
 pub fn read_to_writer(input: &Path, output: impl Write) -> Result<(), Box<dyn std::error::Error>> {
     let outcome = DwgReader::from_file(input)?.read_with_stats()?;
     if !outcome.stats.stream_completed || outcome.stats.skipped_source_records > 0 || outcome.stats.recovered_errors > 0 {
-        return Err("DWG reader could not decode the complete drawing".into());
+        return Err(format!("DWG decode incomplete: completed={}, skipped={}, recovered={}",
+            outcome.stats.stream_completed, outcome.stats.skipped_source_records,
+            outcome.stats.recovered_errors).into());
     }
     write_objects(&outcome.document, output)
 }

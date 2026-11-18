@@ -22,19 +22,7 @@ class DwgReaderService {
     }
     final Uint8List data;
     if (Platform.isAndroid) {
-      try {
-        final result = await AcadrustConverterService.androidChannel
-            .invokeMethod<Uint8List>('readDwg', {
-              'inputPath': File(path).absolute.path,
-            });
-        if (result == null || result.isEmpty) {
-          throw const FormatException('DWG reader returned no objects');
-        }
-        data = result;
-      } on PlatformException catch (error) {
-        if (error.code == 'OOM_KILLED') throw const DwgMemoryLimitException();
-        throw FormatException('DWG reader: ${error.code}');
-      }
+      data = await readAndroidObjectStream(File(path).absolute.path);
     } else if (Platform.isWindows) {
       final executable = AcadrustConverterService.findExecutable();
       if (executable == null) {
@@ -78,6 +66,33 @@ class DwgReaderService {
     return compute(_decodeObjects, data);
   }
 
+  /// Android transport seam; preserves native diagnostics without converting
+  /// the source or loading native libraries in the Flutter process.
+  @visibleForTesting
+  static Future<Uint8List> readAndroidObjectStream(
+    String absolutePath, {
+    MethodChannel channel = AcadrustConverterService.androidChannel,
+  }) async {
+    try {
+      final result = await channel.invokeMethod<Uint8List>('readDwg', {
+        'inputPath': absolutePath,
+      });
+      if (result == null || result.isEmpty) {
+        throw const FormatException('DWG reader returned no objects');
+      }
+      return result;
+    } on PlatformException catch (error) {
+      debugPrint(
+        'DwgReaderService Android: ${error.code}; ${error.message}; ${error.details}',
+      );
+      if (error.code == 'OOM_KILLED') throw const DwgMemoryLimitException();
+      throw _AndroidDwgReadException(error.code, {
+        'platformMessage': error.message,
+        'details': error.details,
+      });
+    }
+  }
+
   static Future<Uint8List> _collect(
     Stream<List<int>> stream,
     Process process,
@@ -92,6 +107,17 @@ class DwgReaderService {
     }
     return bytes.takeBytes();
   }
+}
+
+class _AndroidDwgReadException extends FormatException {
+  _AndroidDwgReadException(String code, this.nativeDetails)
+    : super('DWG reader: $code');
+  final dynamic nativeDetails;
+
+  // The viewer uses the existing localized loading error and `message`.
+  // AppErrorHandler's logs also retain the actual native status and reason.
+  @override
+  String toString() => '${super.toString()}; native=$nativeDetails';
 }
 
 DxfDocument _decodeObjects(Uint8List bytes) {

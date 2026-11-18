@@ -30,11 +30,13 @@ class DwgConverterService : Service() {
         const val KEY_INPUT_PATH = "input_path"
         const val KEY_OUTPUT_PATH = "output_path"
         const val KEY_RESULT_CODE = "result_code"
+        const val KEY_ERROR_MESSAGE = "error_message"
         const val KEY_BACKEND = "backend"
         const val KEY_REQUEST_ID = "request_id"
 
         // Lazy loading is essential: MainActivity also references this class's
         // protocol constants. Native libraries belong only in the worker.
+        private var acadrustLoadError: String? = null
         private val acadrustLoaded by lazy { loadLibrary("koto_acadrust") }
         private val libreDwgLoaded by lazy {
             loadLibrary("redwg") && loadLibrary("koto_dwg")
@@ -45,8 +47,10 @@ class DwgConverterService : Service() {
                 System.loadLibrary(name)
                 return true
             } catch (error: LinkageError) {
+                if (name == "koto_acadrust") acadrustLoadError = error.toString()
                 Log.w(TAG, "Native backend unavailable: $name", error)
             } catch (error: SecurityException) {
+                if (name == "koto_acadrust") acadrustLoadError = error.toString()
                 Log.w(TAG, "Native backend load denied: $name", error)
             }
             return false
@@ -60,6 +64,9 @@ class DwgConverterService : Service() {
 
         @JvmStatic
         external fun readDwgWithAcadrust(inDwgPath: String, outputFd: Int): Int
+
+        @JvmStatic
+        external fun readDwgWithAcadrustDetailed(inDwgPath: String, outputFd: Int, diagnostic: ByteArray): Int
 
         private fun convert(backend: String, input: String, output: String): Int = when (backend) {
             "acadrust" -> if (acadrustLoaded) convertDwgWithAcadrust(input, output) else -97
@@ -85,20 +92,33 @@ class DwgConverterService : Service() {
                     service.executor.execute {
                         service.activeRequestId = requestId
                         var result = -97
+                        var diagnostic = "Native DWG library unavailable"
                         try {
                             if (!service.cancelledRequests.remove(requestId) && acadrustLoaded) {
-                                result = readDwgWithAcadrust(input, pipe.fd)
+                                val buffer = ByteArray(4096)
+                                result = readDwgWithAcadrustDetailed(input, pipe.fd, buffer)
+                                val end = buffer.indexOf(0.toByte()).let { if (it < 0) buffer.size else it }
+                                diagnostic = String(buffer, 0, end, Charsets.UTF_8)
+                            } else {
+                                diagnostic = acadrustLoadError ?: diagnostic
                             }
                         } catch (error: Throwable) {
                             Log.e(TAG, "Direct DWG read failed", error)
+                            diagnostic = error.toString()
                             result = -99
                         } finally {
                             pipe.close()
                             service.activeRequestId = null
                         }
+                        val abi = if (android.os.Process.is64Bit()) "64-bit" else "32-bit"
+                        if (result == 0) Log.i(TAG, "Direct DWG read completed request=$requestId process=$abi")
+                        else Log.e(TAG, "Direct DWG read failed request=$requestId status=$result process=$abi: $diagnostic")
                         try {
                             reply.send(Message.obtain(null, MSG_RESULT).apply {
-                                data = Bundle().apply { putInt(KEY_RESULT_CODE, result) }
+                                data = Bundle().apply {
+                                    putInt(KEY_RESULT_CODE, result)
+                                    putString(KEY_ERROR_MESSAGE, diagnostic)
+                                }
                             })
                         } catch (_: Exception) {}
                     }

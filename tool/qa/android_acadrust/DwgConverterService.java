@@ -10,6 +10,7 @@ import android.os.ParcelFileDescriptor;
 public final class DwgConverterService {
     private static native int convertDwgWithAcadrust(String input, String output);
     private static native int readDwgWithAcadrust(String input, int outputFd);
+    private static native int readDwgWithAcadrustDetailed(String input, int outputFd, byte[] diagnostic);
 
     public static void main(String[] args) throws Exception {
         System.load(args[0]);
@@ -25,11 +26,13 @@ public final class DwgConverterService {
             File unicodeOutput = new File(outputs, input.getName() + " 🏠.objects.json");
             Files.copy(input.toPath(), unicodeInput.toPath(), StandardCopyOption.REPLACE_EXISTING);
             int result;
+            byte[] diagnostic = new byte[4096];
             try (ParcelFileDescriptor descriptor = ParcelFileDescriptor.open(unicodeOutput,
                     ParcelFileDescriptor.MODE_CREATE | ParcelFileDescriptor.MODE_TRUNCATE | ParcelFileDescriptor.MODE_WRITE_ONLY)) {
-                result = readDwgWithAcadrust(unicodeInput.getPath(), descriptor.getFd());
+                result = readDwgWithAcadrustDetailed(unicodeInput.getPath(), descriptor.getFd(), diagnostic);
             }
-            if (result != 0) throw new AssertionError(input.getName() + ": JNI result " + result);
+            if (result != 0) throw new AssertionError(input.getName() + ": JNI result " + result
+                    + ": " + new String(diagnostic, StandardCharsets.UTF_8).trim());
             String text = new String(Files.readAllBytes(unicodeOutput.toPath()), StandardCharsets.UTF_8);
             if (!text.contains("\"source\":\"DWG\"") || !text.contains("\"protocol\":1") || !text.trim().endsWith("}")) {
                 throw new AssertionError("Incomplete native objects: " + input.getName());
@@ -45,9 +48,15 @@ public final class DwgConverterService {
         Files.write(invalid.toPath(), "not a DWG".getBytes(StandardCharsets.UTF_8));
         try (ParcelFileDescriptor descriptor = ParcelFileDescriptor.open(new File(outputs, "bad.objects.json"),
                 ParcelFileDescriptor.MODE_CREATE | ParcelFileDescriptor.MODE_WRITE_ONLY)) {
-            if (readDwgWithAcadrust(invalid.getPath(), descriptor.getFd()) == 0) {
+            byte[] diagnostic = new byte[4096];
+            if (readDwgWithAcadrustDetailed(invalid.getPath(), descriptor.getFd(), diagnostic) == 0) {
                 throw new AssertionError("Invalid DWG accepted");
             }
+            String reason = new String(diagnostic, StandardCharsets.UTF_8).trim();
+            if (!reason.contains("Unsupported CAD version")) {
+                throw new AssertionError("Native failure reason was lost: " + reason);
+            }
+            System.out.println("PASS corrupt input diagnostic: " + reason);
         }
         System.out.println("JNI checks passed: " + passed + " drawings, corrupt input, Unicode paths, overwrite protection");
     }

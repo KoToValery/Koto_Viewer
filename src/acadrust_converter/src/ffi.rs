@@ -3,25 +3,47 @@ use std::{panic, path::Path, slice, thread};
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub unsafe extern "C" fn koto_acadrust_read_utf16(input: *const u16, len: usize, fd: i32) -> i32 {
+    unsafe { koto_acadrust_read_utf16_detailed(input, len, fd, std::ptr::null_mut(), 0) }
+}
+
+/// Owns the duplicated output descriptor, and writes a bounded UTF-8 diagnostic
+/// back to JNI. No drawing or diagnostic file is created.
+///
+/// # Safety
+/// Input contains `len` readable UTF-16 units; a non-null diagnostic buffer has
+/// `capacity` writable bytes. `fd` is transferred to this function exactly once.
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn koto_acadrust_read_utf16_detailed(
+    input: *const u16, len: usize, fd: i32, diagnostic: *mut u8, capacity: usize,
+) -> i32 {
     use std::{fs::File, io::BufWriter, os::fd::FromRawFd};
     if fd < 0 { return -1; }
     let output = unsafe { File::from_raw_fd(fd) };
     if input.is_null() || len == 0 || len > 32768 { return -1; }
-    panic::catch_unwind(|| {
+    let (code, message) = panic::catch_unwind(|| {
         let path = match String::from_utf16(unsafe { slice::from_raw_parts(input, len) }) {
             Ok(value) if !value.contains('\0') => value,
-            _ => return -2,
+            _ => return (-2, "Invalid UTF-16 source path".into()),
         };
         match thread::Builder::new().name("acadrust-read".into()).stack_size(8 * 1024 * 1024).spawn(move || {
             match crate::read_to_writer(Path::new(&path), BufWriter::new(output)) {
-                Ok(()) => 0,
-                Err(error) => { eprintln!("DWG read failed: {error}"); -3 }
+                Ok(()) => (0, String::new()),
+                Err(error) => { eprintln!("DWG read failed: {error}"); (-3, error.to_string()) }
             }
         }) {
-            Ok(worker) => worker.join().unwrap_or(-4),
-            Err(_) => -5,
+            Ok(worker) => worker.join().unwrap_or((-4, "Native DWG worker panicked".into())),
+            Err(error) => (-5, format!("Cannot start native DWG worker: {error}")),
         }
-    }).unwrap_or(-4)
+    }).unwrap_or((-4, "Native DWG reader panicked".into()));
+    if !diagnostic.is_null() && capacity > 0 {
+        let count = message.len().min(capacity - 1);
+        unsafe {
+            std::ptr::copy_nonoverlapping(message.as_ptr(), diagnostic, count);
+            *diagnostic.add(count) = 0;
+        }
+    }
+    code
 }
 
 /// Android JNI supplies real UTF-16, avoiding JNI Modified UTF-8 for filenames

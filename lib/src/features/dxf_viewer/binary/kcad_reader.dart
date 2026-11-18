@@ -124,7 +124,7 @@ class KcadReader {
 
     // 2. Read Header
     final version = headerReader.readUint16();
-    if (version < 1 || version > 5) {
+    if (version < 1 || version > KcadWriter.currentVersion) {
       throw FormatException('Unsupported KCAD version: $version');
     }
 
@@ -776,6 +776,7 @@ class KcadReader {
       case KcadEntityType.hatch:
         final patternName = stringTable[reader.readUint32()];
         final isSolid = reader.readUint8() != 0;
+        final isWipeout = version >= 6 && reader.readUint8() != 0;
         final patternAngle = isV2 ? reader.readFloat32() : reader.readFloat64();
         final patternScale = isV2 ? reader.readFloat32() : reader.readFloat64();
         final hasTransparency = reader.readUint8() != 0;
@@ -819,6 +820,7 @@ class KcadReader {
         }
         return DxfHatch(
           boundaryPaths: boundaryPaths,
+          isWipeout: isWipeout,
           patternName: patternName,
           isSolid: isSolid,
           patternAngle: patternAngle,

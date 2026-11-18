@@ -21,6 +21,7 @@ import 'dxf_snap_helper.dart';
 // [SEC-04-GEOMETRY] [TAG:PAINTER_GEOM] Lines, arcs, circles, polylines, splines
 // [SEC-05-TEXT] [TAG:PAINTER_TEXT] Single-line TEXT & multiline MTEXT rendering
 // [SEC-06-HATCH] [TAG:PAINTER_HATCH] Solids, hatches & pattern fills
+//   [TAG:HATCH_VIEWPORT_WORK] Buffered scene bounds limit hatch pattern work
 // [SEC-07-BLOCKS] [TAG:PAINTER_BLOCKS] Blocks & INSERT entities expansion
 // [SEC-08-DIMS] [TAG:PAINTER_DIMS] Dimensions, leaders & arrowheads
 // [SEC-09-SNAPS] [TAG:PAINTER_SNAPS] Snapping, magnetic highlights & annotations
@@ -171,6 +172,14 @@ class DxfPainter extends CustomPainter {
   /// Stroke width in screen pixels, independent of CAD lineweights and zoom.
   final double? drawingStrokeWidthOverride;
 
+  // Scene-space counterpart of the same buffered CAD query used below. Block
+  // and paper-viewport mappers also produce scene coordinates, so hatch clipping
+  // must use this rectangle rather than compare local block points to WCS.
+  Rect? _hatchPatternVisibleRect;
+  Rect? _paintedVisibleCadRect;
+  bool _preserveCadDrawOrder = false;
+  Color _drawingBackground = const Color(0xFFFFFFFF);
+
   DxfPainter({
     required this.document,
     required this.theme,
@@ -193,6 +202,10 @@ class DxfPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty || size.width <= 0 || size.height <= 0) return;
+    _paintedVisibleCadRect = visibleCadRect;
+    _preserveCadDrawOrder = document.entities.any((e) => e is DxfHatch && e.isWipeout) ||
+        document.blocks.values.any((b) => b.entities.any((e) => e is DxfHatch && e.isWipeout));
+    _drawingBackground = activeLayout == 'Model' ? theme.bgColor : Colors.white;
 
     _paintCallCount++;
     final paintStopwatch = Stopwatch()..start();
@@ -249,6 +262,19 @@ class DxfPainter extends CustomPainter {
         tx + (cadPoint.dx - minX) * fitScale,
         ty + (maxY - cadPoint.dy) * fitScale,
       );
+    }
+
+    // --- SUBSECTION: [TAG:HATCH_VIEWPORT_WORK] Bound pattern generation to the cached viewport ---
+    final visible = visibleCadRect;
+    if (visible != null && visible.isFinite) {
+      final buffered = visible.inflate(visible.longestSide * 0.20);
+      _hatchPatternVisibleRect = Rect.fromPoints(
+        toCanvas(buffered.topLeft),
+        toCanvas(buffered.bottomRight),
+      );
+    } else {
+      // Full drawing exports and callers without a viewport retain all detail.
+      _hatchPatternVisibleRect = null;
     }
 
     // 1. Draw Background & Presentation
@@ -316,6 +342,7 @@ class DxfPainter extends CustomPainter {
           final double modelFitScale = fitScale * vp.modelToPaperScale;
 
           // Render Model Space entities inside this viewport
+          _drawingBackground = theme.bgColor;
           final modelEntities = document.layoutEntities['Model'] ?? [];
           for (final mEntity in modelEntities) {
             final layer = document.layers[mEntity.layer];
@@ -364,6 +391,7 @@ class DxfPainter extends CustomPainter {
           }
 
           canvas.restore();
+          _drawingBackground = Colors.white;
 
           // Viewport border
           canvas.drawRect(
@@ -383,11 +411,18 @@ class DxfPainter extends CustomPainter {
     }
 
     // 3. Draw Entities
-    final Iterable<DxfEntity> entitiesToDraw = isPaperSpaceMode
+    Iterable<DxfEntity> entitiesToDraw = isPaperSpaceMode
         ? (document.layoutEntities[activeLayout] ?? []).where((e) => e is! DxfViewport)
         : ((visibleCadRect != null && document.spatialIndex != null)
             ? document.spatialIndex!.query(visibleCadRect!.inflate(visibleCadRect!.longestSide * 0.20))
             : (document.layoutEntities['Model'] ?? document.entities.where((e) => !e.isPaperSpace)));
+    if (_preserveCadDrawOrder && !isPaperSpaceMode) {
+      // A spatial query returns tree traversal order. Masks require the original
+      // entity order, including geometry before/after masked INSERT contents.
+      final visible = entitiesToDraw.toSet();
+      entitiesToDraw = (document.layoutEntities['Model'] ?? document.entities)
+          .where(visible.contains);
+    }
 
     final Map<int, Path> continuousLineBatches = {};
     final Map<int, Paint> lineBatchPaints = {};
@@ -434,7 +469,7 @@ class DxfPainter extends CustomPainter {
         final strokeWidth = _calcStrokeWidth(entity.lineWeight, layer: layer);
 
         // FAST PATH: Batch continuous top-level lines and polylines into a single Path per style
-        if (entity is DxfLine && _isContinuousLineType(entity.lineType, layer?.lineType)) {
+        if (!_preserveCadDrawOrder && entity is DxfLine && _isContinuousLineType(entity.lineType, layer?.lineType)) {
           final p1 = toCanvas(entity.p1);
           final p2 = toCanvas(entity.p2);
           final int styleKey = (color.toARGB32() & 0xFFFFFFFF) | (((strokeWidth * 100).round() & 0x7FFFFFFF) << 32);
@@ -457,7 +492,7 @@ class DxfPainter extends CustomPainter {
           continue;
         }
 
-        if (entity is DxfLwPolyline && _isContinuousLineType(entity.lineType, layer?.lineType)) {
+        if (!_preserveCadDrawOrder && entity is DxfLwPolyline && _isContinuousLineType(entity.lineType, layer?.lineType)) {
           final vertices = entity.vertices;
           if (vertices.isNotEmpty) {
             final int styleKey = (color.toARGB32() & 0xFFFFFFFF) | (((strokeWidth * 100).round() & 0x7FFFFFFF) << 32);
@@ -514,7 +549,7 @@ class DxfPainter extends CustomPainter {
           ..isAntiAlias = true;
 
         // Defer Texts, Dimensions, Leaders to render on top of lines for pristine legibility
-        if (entity is DxfText || entity is DxfMText || entity is DxfDimension || entity is DxfLeader) {
+        if (!_preserveCadDrawOrder && (entity is DxfText || entity is DxfMText || entity is DxfDimension || entity is DxfLeader)) {
           deferredOverlays.add((entity: entity, strokePaint: strokePaint, fillPaint: fillPaint));
           continue;
         }
@@ -1845,14 +1880,6 @@ class DxfPainter extends CustomPainter {
   ) {
     if (hatch.boundaryPaths.isEmpty) return;
 
-    // Fast viewport bounds check: If hatch is outside visible CAD rectangle, skip entirely
-    if (visibleCadRect != null) {
-      final box = hatch.getBoundingBox(const {});
-      if (box != null && !visibleCadRect!.inflate(visibleCadRect!.longestSide * 0.05).overlaps(box)) {
-        return;
-      }
-    }
-
     final path = Path()..fillType = PathFillType.evenOdd;
     for (final loop in hatch.boundaryPaths) {
       if (loop.isEmpty) continue;
@@ -1863,6 +1890,17 @@ class DxfPainter extends CustomPainter {
         path.lineTo(p.dx, p.dy);
       }
       path.close();
+    }
+
+    final visible = _hatchPatternVisibleRect;
+    if (visible != null &&
+        !visible.inflate(strokePaint.strokeWidth).overlaps(path.getBounds())) {
+      return;
+    }
+
+    if (hatch.isWipeout) {
+      canvas.drawPath(path, Paint()..color = _drawingBackground);
+      return;
     }
 
     final bool hasExplicitPatternLines =
@@ -1896,7 +1934,11 @@ class DxfPainter extends CustomPainter {
     Offset Function(Offset) toCanvas,
     double fitScale,
   ) {
-    final bounds = clipPath.getBounds();
+    var bounds = clipPath.getBounds();
+    final visible = _hatchPatternVisibleRect;
+    if (visible != null) {
+      bounds = bounds.intersect(visible.inflate(strokePaint.strokeWidth));
+    }
     if (bounds.isEmpty || bounds.width <= 0 || bounds.height <= 0) return;
 
     final double scale = currentScale.clamp(0.001, 10000.0);
@@ -2074,6 +2116,22 @@ class DxfPainter extends CustomPainter {
     // Do NOT scale with strokeWidth; use currentScale so dots stay visually consistent at any zoom.
     final double dotRadius = (1.0 * settings.lineThicknessScale) / scale;
 
+    // One stroke per family instead of thousands of individual canvas calls.
+    // Separate contours preserve dash caps and the phase of every CAD segment.
+    final segments = Path();
+    var linePaint = paint;
+    if (!useDashes && hasDrawnDashes) {
+      final positive = line.dashes.fold<double>(0, (sum, d) => sum + math.max(0, d));
+      final period = line.dashes.fold<double>(0, (sum, d) => sum + d.abs());
+      final ratio = period > 0 ? (positive / period).clamp(0.1, 0.8) : 0.5;
+      linePaint = Paint()
+        ..color = paint.color.withValues(alpha: (paint.color.a * ratio).clamp(0.05, 1.0))
+        ..strokeWidth = paint.strokeWidth
+        ..strokeCap = StrokeCap.butt
+        ..style = PaintingStyle.stroke
+        ..isAntiAlias = true;
+    }
+
     // 6. Draw lines
     for (int k = kMin; k <= kMax; k += stride) {
       final lineBase = Offset(
@@ -2099,24 +2157,8 @@ class DxfPainter extends CustomPainter {
             lineBase.dx + dirCanvas.dx * tEnd,
             lineBase.dy + dirCanvas.dy * tEnd,
           );
-          if (hasDrawnDashes) {
-            // Draw with opacity proportional to dash fill ratio so dashes at distance look lighter, not solid
-            double posSum = 0.0;
-            double totSum = 0.0;
-            for (final d in line.dashes) {
-              if (d > 0) posSum += d;
-              totSum += d.abs();
-            }
-            final double fillRatio = totSum > 0 ? (posSum / totSum).clamp(0.1, 0.8) : 0.5;
-            final dashLinePaint = Paint()
-              ..color = paint.color.withValues(alpha: (paint.color.a * fillRatio).clamp(0.05, 1.0))
-              ..strokeWidth = paint.strokeWidth
-              ..strokeCap = StrokeCap.butt
-              ..isAntiAlias = true;
-            canvas.drawLine(pStart, pEnd, dashLinePaint);
-          } else {
-            canvas.drawLine(pStart, pEnd, paint);
-          }
+          segments.moveTo(pStart.dx, pStart.dy);
+          segments.lineTo(pEnd.dx, pEnd.dy);
         }
       } else {
         // Dashed / dotted line
@@ -2139,7 +2181,8 @@ class DxfPainter extends CustomPainter {
                   lineBase.dx + dirCanvas.dx * segEnd,
                   lineBase.dy + dirCanvas.dy * segEnd,
                 );
-                canvas.drawLine(pStart, pEnd, paint);
+                segments.moveTo(pStart.dx, pStart.dy);
+                segments.lineTo(pEnd.dx, pEnd.dy);
               }
             } else if (d == 0) {
               // Dot (rendered as crisp filled circle)
@@ -2157,6 +2200,7 @@ class DxfPainter extends CustomPainter {
         }
       }
     }
+    canvas.drawPath(segments, linePaint);
   }
 
   // === SECTION: BLOCKS & INSERT ENTITIES ===
@@ -2203,7 +2247,7 @@ class DxfPainter extends CustomPainter {
     final double insertAvgScale = (insert.scaleX.abs() + insert.scaleY.abs()) / 2.0;
     final double childFitScale = insertAvgScale > 0.0001 ? fitScale * insertAvgScale : fitScale;
     final double totalBlockRot = parentRotationDeg + insert.rotationDeg;
-    final compiled = block.compiled;
+    final compiled = _preserveCadDrawOrder ? block.orderedCompiled : block.compiled;
 
     for (int r = 0; r < insert.rowCount; r++) {
       for (int c = 0; c < insert.colCount; c++) {
@@ -3844,7 +3888,10 @@ class DxfPainter extends CustomPainter {
       return true;
     }
 
-    final oldRect = oldDelegate.visibleCadRect;
+    // Several small settled pans can reuse the same layer. Measure the total
+    // movement from that painted layer, not just from the previous delegate.
+    final oldRect = oldDelegate._paintedVisibleCadRect ?? oldDelegate.visibleCadRect;
+    _paintedVisibleCadRect = oldRect;
     final newRect = visibleCadRect;
     if (oldRect != newRect) {
       if (oldRect == null || newRect == null) {

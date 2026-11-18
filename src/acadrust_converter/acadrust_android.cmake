@@ -9,8 +9,7 @@ find_program(KOTO_CARGO_EXECUTABLE cargo HINTS
   "$ENV{HOME}/.cargo/bin" "$ENV{USERPROFILE}/.cargo/bin"
   "${KOTO_LOCAL_RUST}/cargo/bin")
 if(NOT KOTO_CARGO_EXECUTABLE)
-  message(WARNING "Rust/Cargo not found: direct Android DWG opening unavailable.")
-  return()
+  message(FATAL_ERROR "Rust/Cargo not found. Direct Android DWG opening requires acadrust. Install Rust or explicitly set KOTO_BUILD_ACADRUST=OFF to build without DWG support.")
 endif()
 if(ANDROID_ABI STREQUAL "arm64-v8a")
   set(KOTO_RUST_TARGET "aarch64-linux-android")
