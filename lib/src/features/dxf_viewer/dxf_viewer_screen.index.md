@@ -13,8 +13,13 @@
 
 | Area | Concrete symbols | Responsibility |
 | --- | --- | --- |
-| Widget & loading | `DxfViewerScreen`, `_DxfViewerScreenState`, `_loadDxfFile`, `_importDxfFile`, `_loadStructuralProject`, `_saveToRecentFiles` | Async DXF/DWG loading and linked project state |
+| Widget & loading | `DxfViewerScreen`, `_DxfViewerScreenState`, `_loadDxfFile`, `_importDxfFile`, `_loadStructuralProject`, `_saveToRecentFiles` | Original DWG paths dispatch through `DxfParser.parseFromFile` to the direct native reader; DXF imports and linked project state retain their existing paths |
 | Viewport & layouts | `_fitToScreen`, `_switchLayout`, `_onTransformChanged`, `_syncCanvasAfterTransform`, `_updateHudCadCoord`, `_buildLayoutTabsWidget`, `_buildProjectSwitchBar` | Camera transforms, Model/Paper layout switching, HUD bars |
 | Pointer & keyboard input | `_handleGeneralPointerDown`, `_handleGeneralPointerMove`, `_handleGeneralPointerUp`, `_handleGeneralPointerCancel`, `_handlePointerSignal`, `_handlePointerHover`, `_handleCanvasTap`, `_handleCanvasContextTap`, `_handleKeyEvent` | Pan/zoom/wheel/keyboard input and entity context actions |
 | Measurement & annotations | `_handleMeasurePointerDown`, `_handleMeasurePointerMove`, `_handleMeasurePointerUp`, `_handleMeasurePointerCancel`, `_updateMeasurePointer`, `_applyMeasurementPoint`, `_handleUndoAreaPoint`, `_handleCloseAreaPolygon`, `_openAnnotationDialog`, `_saveAnnotationsToPrefs`, `_loadSavedAnnotations` | Interactive distance/area measurement, snapping, and saved annotations |
 | Sheets & export | `_showLayersSheet`, `_showInfoSheet`, `_showCoordinateSettings`, `_saveAsAnnotatedDxf`, `_exportKcad`, `_shareDxf`, `_printDxf` | Layer management, DXF/KCAD export, sharing, and printing |
+
+`[TAG:DWG_DIRECT_IMPORT]` reuses the existing import action, model merge and
+selection workflow with native DWG objects. DXF conversion remains only for
+explicit DXF export/share operations in `_filesForDxfExport`
+(`[TAG:DWG_EXPORT_BOUNDARY]`), outside opening or importing DWGs.

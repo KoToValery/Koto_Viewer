@@ -151,7 +151,7 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         item.internalPath,
       );
       if (item.fileType == KotoFileType.dwg) {
-        readyDwgPath = await ProjectBundlePreloadService.prioritizeAndConvert(
+        readyDwgPath = await ProjectBundlePreloadService.prioritizeAndExtract(
           _bundle!.archivePath,
           item,
         );

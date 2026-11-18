@@ -68,11 +68,18 @@ class MainActivity : FlutterActivity() {
         dwgConverterChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DWG_CONVERTER_CHANNEL)
         dwgConverterChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
+                "readDwg" -> {
+                    val input = call.argument<String>("inputPath")
+                    if (input == null) result.error("INVALID_ARGUMENT", "inputPath required", null)
+                    else try { AndroidDwgReaderClient(this).read(input, result) }
+                    catch (error: Exception) { result.error("DWG_READ_FAILED", error.message, null) }
+                }
                 "convertDwg" -> {
                     val inputPath = call.argument<String>("inputPath")
                     val outputPath = call.argument<String>("outputPath")
-                    if (inputPath != null && outputPath != null) {
-                        convertDwgInIsolatedService(inputPath, outputPath, result)
+                    val backend = call.argument<String>("backend") ?: "libredwg"
+                    if (inputPath != null && outputPath != null && backend in setOf("acadrust", "libredwg")) {
+                        convertDwgInIsolatedService(inputPath, outputPath, backend, result)
                     } else {
                         result.error("INVALID_ARGUMENT", "inputPath and outputPath required", null)
                     }
@@ -252,13 +259,45 @@ class MainActivity : FlutterActivity() {
     private fun convertDwgInIsolatedService(
         inputPath: String,
         outputPath: String,
+        backend: String,
         result: MethodChannel.Result
     ) {
         val intent = Intent(this, DwgConverterService::class.java)
         var isUnbound = false
         var hasResponded = false
+        var workerMessenger: Messenger? = null
+        val requestId = android.os.SystemClock.elapsedRealtimeNanos()
+        val mainHandler = Handler(Looper.getMainLooper())
 
         lateinit var serviceConnection: ServiceConnection
+        lateinit var timeout: Runnable
+
+        fun unbind() {
+            if (!isUnbound) {
+                isUnbound = true
+                try { unbindService(serviceConnection) } catch (_: Exception) {}
+            }
+        }
+
+        fun fail(code: String, message: String?) {
+            if (hasResponded) return
+            hasResponded = true
+            mainHandler.removeCallbacks(timeout)
+            result.error(code, message, null)
+            unbind()
+        }
+
+        timeout = Runnable {
+            if (!hasResponded) {
+                // Cancellation terminates a hung native worker, never Flutter.
+                try {
+                    workerMessenger?.send(Message.obtain(null, DwgConverterService.MSG_CANCEL).apply {
+                        data = Bundle().apply { putLong(DwgConverterService.KEY_REQUEST_ID, requestId) }
+                    })
+                } catch (_: Exception) {}
+                fail("CONVERSION_TIMEOUT", "DWG conversion exceeded the service deadline")
+            }
+        }
 
         val responseHandler = object : Handler(Looper.getMainLooper()) {
             override fun handleMessage(msg: Message) {
@@ -266,14 +305,10 @@ class MainActivity : FlutterActivity() {
                     val resultCode = msg.data.getInt(DwgConverterService.KEY_RESULT_CODE, -1)
                     if (!hasResponded) {
                         hasResponded = true
+                        mainHandler.removeCallbacks(timeout)
                         result.success(resultCode)
                     }
-                    if (!isUnbound) {
-                        try {
-                            unbindService(serviceConnection)
-                            isUnbound = true
-                        } catch (_: Exception) {}
-                    }
+                    unbind()
                 }
             }
         }
@@ -281,61 +316,47 @@ class MainActivity : FlutterActivity() {
 
         serviceConnection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                if (hasResponded) { unbind(); return }
                 try {
                     val serviceMessenger = Messenger(service)
+                    workerMessenger = serviceMessenger
                     val msg = Message.obtain(null, DwgConverterService.MSG_CONVERT)
                     val data = Bundle().apply {
                         putString(DwgConverterService.KEY_INPUT_PATH, inputPath)
                         putString(DwgConverterService.KEY_OUTPUT_PATH, outputPath)
+                        putString(DwgConverterService.KEY_BACKEND, backend)
+                        putLong(DwgConverterService.KEY_REQUEST_ID, requestId)
                     }
                     msg.data = data
                     msg.replyTo = clientMessenger
                     serviceMessenger.send(msg)
                 } catch (e: Exception) {
-                    if (!hasResponded) {
-                        hasResponded = true
-                        result.error("CONVERT_SEND_FAILED", e.message, null)
-                    }
-                    if (!isUnbound) {
-                        try {
-                            unbindService(this)
-                            isUnbound = true
-                        } catch (_: Exception) {}
-                    }
+                    fail("CONVERT_SEND_FAILED", e.message)
                 }
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
                 android.util.Log.e("MainActivity", "DwgConverterService process was killed unexpectedly by OS (OOM / SIGKILL)")
-                if (!hasResponded) {
-                    hasResponded = true
-                    result.error("OOM_KILLED", "Process was killed by Android due to memory limits", null)
-                }
-                isUnbound = true
+                fail("OOM_KILLED", "DWG worker process terminated unexpectedly")
             }
 
             override fun onBindingDied(name: ComponentName?) {
                 android.util.Log.e("MainActivity", "DwgConverterService binding died")
-                if (!hasResponded) {
-                    hasResponded = true
-                    result.error("OOM_KILLED", "Binding died: Process was killed by Android", null)
-                }
-                if (!isUnbound) {
-                    try {
-                        unbindService(this)
-                        isUnbound = true
-                    } catch (_: Exception) {}
-                }
+                fail("OOM_KILLED", "DWG worker binding died")
+            }
+
+            override fun onNullBinding(name: ComponentName?) {
+                fail("BIND_FAILED", "DWG worker returned no binder")
             }
         }
 
         try {
             val bound = bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
             if (!bound) {
-                result.error("BIND_FAILED", "Failed to bind to DwgConverterService", null)
-            }
+                fail("BIND_FAILED", "Failed to bind to DwgConverterService")
+            } else mainHandler.postDelayed(timeout, 120_000L)
         } catch (e: Exception) {
-            result.error("BIND_EXCEPTION", e.message, null)
+            fail("BIND_EXCEPTION", e.message)
         }
     }
 

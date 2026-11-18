@@ -1,8 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'dart:convert';
-import 'dart:io';
-import '../../../core/services/dwg_converter_service.dart';
 import '../../dxf_viewer/binary/kcad_service.dart';
 import '../../dxf_viewer/parser/dxf_parser.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
@@ -75,15 +73,7 @@ class BimUnderlayLoader {
             final ext = file.path.split('.').last.toLowerCase();
             final doc = ext == 'kcad'
                 ? await KcadService.loadKcadFile(file)
-                : await DxfParser.parseFromFile(
-                    ext == 'dwg'
-                        ? File(
-                            await DwgConverterService.convertDwgToDxf(
-                              file.path,
-                            ),
-                          )
-                        : file,
-                  );
+                : await DxfParser.parseFromFile(file);
             rawDocs[storey.storeyId] = StructuralUnderlaySource.original(doc);
             break;
           } catch (_) {

@@ -1,0 +1,59 @@
+option(KOTO_BUILD_ACADRUST "Build the Android acadrust JNI backend" ON)
+if(NOT KOTO_BUILD_ACADRUST)
+  return()
+endif()
+set(KOTO_ACADRUST_SOURCE "${CMAKE_CURRENT_LIST_DIR}")
+get_filename_component(KOTO_REPO_ROOT "${KOTO_ACADRUST_SOURCE}/../.." ABSOLUTE)
+set(KOTO_LOCAL_RUST "${KOTO_REPO_ROOT}/build/acadrust-toolchain")
+find_program(KOTO_CARGO_EXECUTABLE cargo HINTS
+  "$ENV{HOME}/.cargo/bin" "$ENV{USERPROFILE}/.cargo/bin"
+  "${KOTO_LOCAL_RUST}/cargo/bin")
+if(NOT KOTO_CARGO_EXECUTABLE)
+  message(WARNING "Rust/Cargo not found: direct Android DWG opening unavailable.")
+  return()
+endif()
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+  set(KOTO_RUST_TARGET "aarch64-linux-android")
+elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+  set(KOTO_RUST_TARGET "armv7-linux-androideabi")
+elseif(ANDROID_ABI STREQUAL "x86_64")
+  set(KOTO_RUST_TARGET "x86_64-linux-android")
+else()
+  message(WARNING "acadrust is not configured for Android ABI ${ANDROID_ABI}")
+  return()
+endif()
+set(KOTO_RUST_ENV)
+if(KOTO_CARGO_EXECUTABLE STREQUAL "${KOTO_LOCAL_RUST}/cargo/bin/cargo.exe")
+  list(APPEND KOTO_RUST_ENV
+    "CARGO_HOME=${KOTO_LOCAL_RUST}/cargo"
+    "RUSTUP_HOME=${KOTO_LOCAL_RUST}/rustup"
+    "RUSTC=${KOTO_LOCAL_RUST}/cargo/bin/rustc.exe")
+endif()
+
+# Cargo produces a static archive. NDK links the final JNI library for the
+# selected ABI/API, including the alignment required by 16 KB page devices.
+string(TOUPPER "${KOTO_RUST_TARGET}" KOTO_TARGET_ENV)
+string(REPLACE "-" "_" KOTO_TARGET_ENV "${KOTO_TARGET_ENV}")
+list(APPEND KOTO_RUST_ENV
+  "CARGO_TARGET_${KOTO_TARGET_ENV}_LINKER=${CMAKE_C_COMPILER}")
+set(KOTO_TARGET_DIR "${KOTO_REPO_ROOT}/build/acadrust/android/${ANDROID_ABI}")
+set(KOTO_RUST_ARCHIVE "${KOTO_TARGET_DIR}/${KOTO_RUST_TARGET}/release/libkoto_acadrust.a")
+add_custom_command(OUTPUT "${KOTO_RUST_ARCHIVE}"
+  COMMAND "${CMAKE_COMMAND}" -E env ${KOTO_RUST_ENV}
+    "${KOTO_CARGO_EXECUTABLE}" build --lib --release --locked
+    --manifest-path "${KOTO_ACADRUST_SOURCE}/Cargo.toml"
+    --target-dir "${KOTO_TARGET_DIR}" --target "${KOTO_RUST_TARGET}"
+  DEPENDS
+    "${KOTO_ACADRUST_SOURCE}/Cargo.toml" "${KOTO_ACADRUST_SOURCE}/Cargo.lock"
+    "${KOTO_ACADRUST_SOURCE}/src/lib.rs" "${KOTO_ACADRUST_SOURCE}/src/ffi.rs"
+    "${KOTO_ACADRUST_SOURCE}/src/reader.rs"
+  WORKING_DIRECTORY "${KOTO_ACADRUST_SOURCE}"
+  COMMENT "Building acadrust for ${ANDROID_ABI}"
+  VERBATIM)
+add_custom_target(acadrust_android_build DEPENDS "${KOTO_RUST_ARCHIVE}")
+add_library(acadrust_android_static STATIC IMPORTED)
+set_target_properties(acadrust_android_static PROPERTIES IMPORTED_LOCATION "${KOTO_RUST_ARCHIVE}")
+add_library(koto_acadrust SHARED "${KOTO_REPO_ROOT}/android/app/src/main/cpp/acadrust_jni.c")
+add_dependencies(koto_acadrust acadrust_android_build)
+target_link_libraries(koto_acadrust PRIVATE acadrust_android_static log m dl)
+target_link_options(koto_acadrust PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,--exclude-libs,ALL")

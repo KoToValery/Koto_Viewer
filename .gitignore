@@ -72,3 +72,6 @@ key.properties
 *.keystore
 **/*.jks
 **/*.keystore
+
+# Rust DWG converter artifacts (Cargo.lock is committed for reproducible builds).
+/src/acadrust_converter/target/

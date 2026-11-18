@@ -296,7 +296,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loadingCad => 'Loading CAD drawing...';
 
   @override
-  String get convertingDwg => 'Converting & loading DWG...';
+  String get convertingDwg => 'Opening DWG...';
 
   @override
   String get loadingWordDoc => 'Loading Word document...';
@@ -648,6 +648,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String errorLoadingDxf(String error) {
     return 'Error opening DXF file: $error';
+  }
+
+  @override
+  String errorLoadingCad(String error) {
+    return 'Error opening drawing: $error';
   }
 
   @override

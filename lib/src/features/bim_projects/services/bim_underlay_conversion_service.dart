@@ -4,7 +4,7 @@ import '../../structural_designer/analysis/drawing_frame_detector.dart';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import '../../../core/services/dwg_converter_service.dart';
+import '../../../core/services/dwg_reader_service.dart';
 import '../../../core/services/universal_encoding_service.dart';
 import '../../dxf_viewer/binary/kcad_service.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
@@ -209,22 +209,13 @@ class BimUnderlayConversionService {
       final fingerprint = (await sha256.bind(original.openRead()).first)
           .toString();
       File? dxf;
-      if (ext == 'dwg') {
-        // The converter cache keys include the basename, size and mtime.
-        // A content-derived name avoids collisions between unrelated inputs.
-        final converterInput = await original.copy(
-          '${dir.path}/$fingerprint.dwg',
-        );
-        final converted = await DwgConverterService.convertDwgToDxf(
-          converterInput.uri.toFilePath(),
-        );
-        dxf = await File(converted).copy('${dir.path}/source.dxf');
-        await converterInput.delete();
-      } else if (ext == 'dxf') {
+      if (ext == 'dxf') {
         dxf = original;
       }
       final document = ext == 'kcad'
           ? await KcadService.loadKcadFile(original)
+          : ext == 'dwg'
+          ? await DwgReaderService.read(original.path)
           : await compute(_parseSourceDxf, dxf!.path);
       // KCAD input may itself be a previously baked underlay. Strip only owned
       // generated objects and restore original visibility before reprocessing.

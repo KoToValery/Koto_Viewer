@@ -5,13 +5,11 @@ import '../models/pdf_item.dart';
 import '../errors/app_error_handler.dart';
 import '../l10n/l10n_extensions.dart';
 import 'android_saf_service.dart';
-import 'dwg_converter_service.dart';
 import 'ppt_to_pdf_converter_service.dart';
 import 'recent_files_service.dart';
 
 import '../../features/pdf_viewer/pdf_viewer_screen.dart';
 import '../../features/dxf_viewer/dxf_viewer_screen.dart';
-import '../../features/dxf_viewer/binary/kcad_service.dart';
 import '../../features/svg_viewer/svg_viewer_screen.dart';
 import '../../features/dxf_3d_viewer/dxf_3d_viewer_screen.dart';
 import '../../features/xlsx_viewer/xlsx_viewer_screen.dart';
@@ -75,7 +73,9 @@ class FileOpenerService {
         if (context.mounted && scaffoldMessenger != null) {
           scaffoldMessenger.showSnackBar(
             const SnackBar(
-              content: Text('Could not open file. It may have been moved or deleted.'),
+              content: Text(
+                'Could not open file. It may have been moved or deleted.',
+              ),
             ),
           );
         }
@@ -116,14 +116,12 @@ class FileOpenerService {
           nav,
           item,
           filePath,
-          PdfViewerScreen(
-            filePath: resolvedPath,
-            addToRecent: addToRecent,
-          ),
+          PdfViewerScreen(filePath: resolvedPath, addToRecent: addToRecent),
           addToRecent: addToRecent,
         );
 
       case KotoFileType.dxf:
+      case KotoFileType.dwg:
         return await _pushViewer(
           nav,
           item,
@@ -136,90 +134,12 @@ class FileOpenerService {
           addToRecent: addToRecent,
         );
 
-      case KotoFileType.dwg:
-        final dwgFile = File(resolvedPath);
-        final kcadPath = await KcadService.getCachePath(dwgFile);
-        if (await File(kcadPath).exists() && await File(kcadPath).length() > 16) {
-          debugPrint('FileOpenerService: Instant DWG open via KCAD cache! -> $kcadPath');
-          return await _pushViewer(
-            nav,
-            item,
-            filePath,
-            DxfViewerScreen(
-              filePath: kcadPath,
-              title: name,
-              originalFilePath: filePath,
-              addToRecent: addToRecent,
-            ),
-            addToRecent: addToRecent,
-          );
-        }
-
-        String? convertedDxfPath;
-        dynamic conversionException;
-        try {
-          convertedDxfPath = await _showConversionProgressDialog(
-            context: context,
-            title: l10n?.convertingDwgTitle ?? 'Converting DWG...',
-            message: l10n?.convertingDwgMessage ?? 'Converting DWG to DXF for viewing',
-            action: () => DwgConverterService.convertDwgToDxf(resolvedPath),
-          );
-        } catch (e, stack) {
-          AppErrorHandler.recordError(e, stack, context: 'FileOpenerService.convertDwg');
-          conversionException = e;
-        }
-
-        if (convertedDxfPath != null &&
-            convertedDxfPath.isNotEmpty &&
-            context.mounted) {
-          return await _pushViewer(
-            nav,
-            item,
-            filePath,
-            DxfViewerScreen(
-              filePath: convertedDxfPath,
-              title: name,
-              originalFilePath: filePath,
-              addToRecent: addToRecent,
-            ),
-            addToRecent: addToRecent,
-          );
-        } else {
-          await RecentFilesService.removeRecentFile(filePath);
-          await DwgConverterService.clearCacheForFile(filePath);
-          if (context.mounted && scaffoldMessenger != null) {
-            final String errorMessage;
-            if (conversionException is DwgMemoryLimitException) {
-              errorMessage = l10n?.dwgMemoryLimitError ?? conversionException.toString();
-            } else if (conversionException != null) {
-              final errStr = conversionException is DwgConversionException
-                  ? conversionException.message
-                  : conversionException.toString();
-              errorMessage = l10n?.dwgConversionFailed(errStr) ?? errStr;
-            } else {
-              errorMessage = l10n?.dwgConversionFailed('') ?? '';
-            }
-
-            scaffoldMessenger.showSnackBar(
-              SnackBar(
-                content: Text(errorMessage),
-                backgroundColor: Colors.red.shade700,
-                duration: const Duration(seconds: 6),
-              ),
-            );
-          }
-          return false;
-        }
-
       case KotoFileType.svg:
         return await _pushViewer(
           nav,
           item,
           filePath,
-          SvgViewerScreen(
-            filePath: resolvedPath,
-            addToRecent: addToRecent,
-          ),
+          SvgViewerScreen(filePath: resolvedPath, addToRecent: addToRecent),
           addToRecent: addToRecent,
         );
 
@@ -236,10 +156,7 @@ class FileOpenerService {
           nav,
           item,
           filePath,
-          Dxf3DViewerScreen(
-            filePath: resolvedPath,
-            addToRecent: addToRecent,
-          ),
+          Dxf3DViewerScreen(filePath: resolvedPath, addToRecent: addToRecent),
           addToRecent: addToRecent,
         );
 
@@ -304,12 +221,20 @@ class FileOpenerService {
         try {
           convertedPdfPath = await _showConversionProgressDialog(
             context: context,
-            title: l10n?.convertingPresentationTitle ?? 'Converting Presentation...',
-            message: l10n?.convertingPresentationMessage ?? 'Converting presentation to PDF for viewing',
+            title:
+                l10n?.convertingPresentationTitle ??
+                'Converting Presentation...',
+            message:
+                l10n?.convertingPresentationMessage ??
+                'Converting presentation to PDF for viewing',
             action: () => PptToPdfConverterService.convertToPdf(resolvedPath),
           );
         } on Exception catch (e, stack) {
-          AppErrorHandler.recordError(e, stack, context: 'FileOpenerService.convertPptx');
+          AppErrorHandler.recordError(
+            e,
+            stack,
+            context: 'FileOpenerService.convertPptx',
+          );
           conversionError = e.toString();
         }
 
@@ -389,10 +314,7 @@ class FileOpenerService {
           nav,
           item,
           filePath,
-          ProjectViewerScreen(
-            filePath: resolvedPath,
-            addToRecent: addToRecent,
-          ),
+          ProjectViewerScreen(filePath: resolvedPath, addToRecent: addToRecent),
           addToRecent: addToRecent,
         );
 
@@ -423,10 +345,7 @@ class FileOpenerService {
           nav,
           item,
           filePath,
-          ProjectViewerScreen(
-            filePath: resolvedPath,
-            addToRecent: addToRecent,
-          ),
+          ProjectViewerScreen(filePath: resolvedPath, addToRecent: addToRecent),
           addToRecent: addToRecent,
         );
 
@@ -529,16 +448,25 @@ class FileOpenerService {
                 bytes[0] == 0x25 && // '%'
                 bytes[1] == 0x50 && // 'P'
                 bytes[2] == 0x44 && // 'D'
-                bytes[3] == 0x46) { // 'F'
+                bytes[3] == 0x46) {
+              // 'F'
               isRealPdf = true;
             }
           } finally {
             raf.closeSync();
           }
         } on FileSystemException catch (e, stack) {
-          AppErrorHandler.recordError(e, stack, context: 'FileOpenerService.probePdf.fs');
+          AppErrorHandler.recordError(
+            e,
+            stack,
+            context: 'FileOpenerService.probePdf.fs',
+          );
         } on Exception catch (e, stack) {
-          AppErrorHandler.recordError(e, stack, context: 'FileOpenerService.probePdf');
+          AppErrorHandler.recordError(
+            e,
+            stack,
+            context: 'FileOpenerService.probePdf',
+          );
         }
 
         if (isRealPdf) {
@@ -546,16 +474,15 @@ class FileOpenerService {
             nav,
             item,
             filePath,
-            PdfViewerScreen(
-              filePath: resolvedPath,
-              addToRecent: addToRecent,
-            ),
+            PdfViewerScreen(filePath: resolvedPath, addToRecent: addToRecent),
             addToRecent: addToRecent,
           );
         } else {
           await RecentFilesService.removeRecentFile(filePath);
           if (context.mounted && scaffoldMessenger != null) {
-            final warningMsg = l10n?.unsupportedFileFormat(name) ?? 'Unsupported file format: $name';
+            final warningMsg =
+                l10n?.unsupportedFileFormat(name) ??
+                'Unsupported file format: $name';
             scaffoldMessenger.showSnackBar(
               SnackBar(
                 content: Text(warningMsg),

@@ -1,0 +1,30 @@
+use std::{env, path::Path, process::ExitCode};
+
+fn main() -> ExitCode {
+    let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 2 && args[0] == "--read" {
+        return match koto_acadrust::read_to_writer(Path::new(&args[1]), std::io::stdout().lock()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => { eprintln!("DWG read failed: {error}"); ExitCode::FAILURE }
+        };
+    }
+    if args.len() == 1 && args[0] == "--version" {
+        println!(
+            "koto-acadrust {} (acadrust {})",
+            env!("CARGO_PKG_VERSION"),
+            acadrust::VERSION
+        );
+        return ExitCode::SUCCESS;
+    }
+    if args.len() != 2 {
+        eprintln!("Usage: koto-acadrust <input.dwg> <output.dxf>");
+        return ExitCode::from(2);
+    }
+    match koto_acadrust::convert(Path::new(&args[0]), Path::new(&args[1])) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("DWG conversion failed: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}

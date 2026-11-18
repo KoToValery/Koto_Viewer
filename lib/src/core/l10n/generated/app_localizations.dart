@@ -629,7 +629,7 @@ abstract class AppLocalizations {
   /// Converting and loading DWG title
   ///
   /// In en, this message translates to:
-  /// **'Converting & loading DWG...'**
+  /// **'Opening DWG...'**
   String get convertingDwg;
 
   /// Loading DOC/DOCX document title
@@ -1261,6 +1261,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Error opening DXF file: {error}'**
   String errorLoadingDxf(String error);
+
+  /// No description provided for @errorLoadingCad.
+  ///
+  /// In en, this message translates to:
+  /// **'Error opening drawing: {error}'**
+  String errorLoadingCad(String error);
 
   /// Error message when saving DXF file fails
   ///

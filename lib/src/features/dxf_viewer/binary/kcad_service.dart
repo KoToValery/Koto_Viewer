@@ -39,7 +39,7 @@ class KcadService {
     final fingerprint = (await sha256.bind(effectiveSource.openRead()).first)
         .toString();
     final converterVersion = effectiveSource.path.toLowerCase().endsWith('.dwg')
-        ? '_c${DwgConverterService.cacheVersion}'
+        ? '_c${DwgConverterService.cacheVersionForSource(sourceFile.path)}'
         : '';
     Directory tempDir;
     try {

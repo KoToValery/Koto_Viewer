@@ -9,24 +9,16 @@ import '../rendering/dxf_math.dart';
 import '../rendering/dxf_quadtree.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 import '../binary/kcad_service.dart';
+import '../../../core/services/dwg_reader_service.dart';
+import '../../../core/services/cad_text_decoder.dart';
 
 // ============================================================================
 // MASTER DXF PARSER LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
-// COMPANION MAP: See 'dxf_parser.index.md' for full entity parsing directory.
-// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
+// COMPANION MAP: See 'dxf_parser.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
 //
-// [SEC-01-PAIRS] [TAG:DXF_P_PAIRS] _DxfPair group code & value tokenizer
-// [SEC-02-API] [TAG:DXF_P_API] DxfParser API & KCAD binary cache fast-path
-// [SEC-03-HEADER] [TAG:DXF_P_HEADER] HEADER section ($EXTMIN, $EXTMAX, $INSUNITS)
-// [SEC-04-TABLES] [TAG:DXF_P_TABLES] TABLES (LAYER, LTYPE, STYLE, DIMSTYLE, VPORT)
-// [SEC-05-BLOCKS] [TAG:DXF_P_BLOCKS] BLOCKS section (definition headers & entities)
-// [SEC-06-ENTITIES] [TAG:DXF_P_ENTITIES] ENTITIES section main dispatch loop
-// [SEC-07-PRIMITIVES] [TAG:DXF_P_GEOM] LINE, CIRCLE, ARC, LWPOLYLINE, POLYLINE, SPLINE
-// [SEC-08-TEXT] [TAG:DXF_P_TEXT] TEXT, MTEXT, font formatting & Cyrillic fix
-// [SEC-09-HATCH-INS] [TAG:DXF_P_HATCH] HATCH boundary loops, INSERT block references
-// [SEC-10-DIMS-MISC] [TAG:DXF_P_DIMS] DIMENSION, LEADER, SOLID, TRACE, ELLIPSE
-// [SEC-11-HELPERS] [TAG:DXF_P_HELPERS] Text decoders, MText code stripper, colors
+// [SEC-01-PAIRS]    Dxf Group Code Tokenizer
 // ============================================================================
 
 // === SECTION: [SEC-01-PAIRS] DXF GROUP CODE TOKENIZER ===
@@ -50,6 +42,10 @@ class DxfParser {
   /// For files >64KB without cache, file I/O, Cyrillic decoding, entity parsing, and QuadTree spatial indexing
   /// run completely in a background Isolate worker thread without blocking the UI.
   static Future<DxfDocument> parseFromFile(File file, {File? originalFile}) async {
+    // [TAG:DWG_DIRECT_READ] The DWG path never enters DXF/KCAD parsing or caching.
+    if (file.path.toLowerCase().endsWith('.dwg')) {
+      return DwgReaderService.read(file.path);
+    }
     // 0. Direct KCAD binary loading:
     if (file.path.toLowerCase().endsWith('.kcad')) {
       return KcadService.loadKcadFile(file);
@@ -2230,87 +2226,8 @@ class DxfParser {
   }
 
   /// Cleans CAD TEXT string, decoding unicode escape sequences, international codepages (Greek, Cyrillic, CJK, Central European), and CAD special codes.
-  static String _cleanCadText(String text) {
-    var result = UniversalEncodingService.decodeCadString(text);
-
-    // Clean any embedded MTEXT codes/leftovers if present
-    if (result.contains('\\') || result.contains(';') || result.contains('ql;') || result.contains('t0;')) {
-      result = _stripMTextFormattingCodes(result);
-    }
-
-    return result;
-  }
-
-  /// Cleans MTEXT formatted string, stripping formatting codes, service tags (-ql;, t0;, etc.), and resolving newlines.
-  static String _cleanMText(String text) {
-    var result = text;
-
-    // First decode unicode and Cyrillic
-    result = _cleanCadText(result);
-
-    // Strip all MTEXT formatting codes and service tags
-    result = _stripMTextFormattingCodes(result);
-
-    return result.trim();
-  }
-
-  /// Thoroughly strips AutoCAD MTEXT formatting sequences and residual service tokens.
-  /// (e.g. \fArial...;, \C7;, \H0.25x;, \pxql,t0;, \pi-0.5,l0.5,t0;, -ql;, t0;, \S1/2;)
-  static String _stripMTextFormattingCodes(String text) {
-    var result = text;
-
-    // 1. Replace paragraph breaks \P (or \p followed by non-letter), \N, ^J with real newlines FIRST.
-    // Notice: \px, \pi, \pt, \ps are paragraph style definitions, not paragraph breaks.
-    result = result.replaceAll(RegExp(r'\\P|\\p(?![a-zA-Z])'), '\n');
-    result = result.replaceAll(RegExp(r'\\N|\\n(?![a-zA-Z])'), '\n');
-    result = result.replaceAll(RegExp(r'\^J', caseSensitive: false), '\n');
-    result = result.replaceAll(RegExp(r'\\~'), ' ');
-
-    // 2. Simplify stacked fractions: \S1/2; or \S1^2; or \S1#2; -> 1/2 or 1^2
-    result = result.replaceAllMapped(
-      RegExp(r'\\[Ss]([^;]+);'),
-      (match) => match.group(1)?.replaceAll('^', '') ?? '',
-    );
-
-    // 3. Repeatedly strip all standard AutoCAD backslash formatting sequences ending with semicolon:
-    // e.g. \f...;, \F...;, \C...;, \c...;, \H...;, \W...;, \Q...;, \T...;, \A...;, \px...;, \pi...;, \pt...;, \ps...;
-    // Repeat until fixed point to handle nested formatting blocks
-    String prev;
-    int iterations = 0;
-    do {
-      prev = result;
-      // Strip backslash formatting codes ending in semicolon
-      result = result.replaceAll(RegExp(r'\\[a-zA-Z0-9_\-]+[^;]*;', caseSensitive: false), '');
-      // Strip formatting toggles without semicolon: \L, \l, \O, \o, \K, \k, \X, \x
-      result = result.replaceAll(RegExp(r'\\[LlOoKkXx]'), '');
-      // Strip residual braces
-      result = result.replaceAll('{', '').replaceAll('}', '');
-      iterations++;
-    } while (result != prev && iterations < 10);
-
-    // 4. Strip leftover paragraph formatting tags from DWG/DXF converters
-    // such as: -ql;, ql;, qc;, qr;, qj;, qd;, t0;, ,t0;, \pt0;, i0;, l0;, c0;, b0;, etc.
-    // e.g. "-ql;,t0;Text" or ",t0;Text" or "Text -ql;,t0;"
-    result = result.replaceAll(
-      RegExp(
-        r'(?:^|[\s,;\\])-?(?:ql|qc|qr|qj|qd|t\d+(?:\.\d+)?|i-?\d+(?:\.\d+)?|l\d+(?:\.\d+)?|c\d+|x\d+|b\d+|p\d+);',
-        caseSensitive: false,
-      ),
-      '',
-    );
-
-    // Clean up any remaining leading/trailing commas or semicolons from stripped tags on individual lines,
-    // and strip excessive trailing whitespace (e.g. 48-space padding in CAD blocks)
-    result = result
-        .split('\n')
-        .map((line) => line.replaceAll(RegExp(r'^[,\s;]+'), '').replaceAll(RegExp(r'[ \t]{2,}$'), ''))
-        .join('\n');
-
-    // Remove remaining escaped backslashes
-    result = result.replaceAll(r'\\', r'\');
-
-    return result.trim();
-  }
+  static String _cleanCadText(String text) => CadTextDecoder.single(text);
+  static String _cleanMText(String text) => CadTextDecoder.multiline(text);
 
   /// Parses HATCH boundary path loops from entity pairs.
   static List<List<Offset>> _parseHatchBoundaryPaths(List<_DxfPair> pairs, [OcsTransform ocs = OcsTransform.identity]) {

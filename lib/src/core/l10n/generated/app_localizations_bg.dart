@@ -295,7 +295,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get loadingCad => 'Зареждане на CAD чертеж...';
 
   @override
-  String get convertingDwg => 'Конвертиране и зареждане на DWG...';
+  String get convertingDwg => 'Отваряне на DWG...';
 
   @override
   String get loadingWordDoc => 'Зареждане на Word документ...';
@@ -650,6 +650,11 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String errorLoadingDxf(String error) {
     return 'Грешка при отваряне на DXF файл: $error';
+  }
+
+  @override
+  String errorLoadingCad(String error) {
+    return 'Грешка при отваряне на чертеж: $error';
   }
 
   @override

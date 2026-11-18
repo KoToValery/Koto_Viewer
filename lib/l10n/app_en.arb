@@ -141,7 +141,7 @@
   "@loadingPresentation": { "description": "Loading PPTX presentation title" },
   "loadingCad": "Loading CAD drawing...",
   "@loadingCad": { "description": "Loading CAD DXF/DWG title" },
-  "convertingDwg": "Converting & loading DWG...",
+  "convertingDwg": "Opening DWG...",
   "@convertingDwg": { "description": "Converting and loading DWG title" },
   "loadingWordDoc": "Loading Word document...",
   "@loadingWordDoc": { "description": "Loading DOC/DOCX document title" },
@@ -424,6 +424,8 @@
   "flyModeActive": "Walk / Fly Mode (BIMx)",
   "@flyModeActive": { "description": "Badge indicator when walkthrough fly mode is active" },
   "errorLoadingDxf": "Error opening DXF file: {error}",
+  "errorLoadingCad": "Error opening drawing: {error}",
+  "@errorLoadingCad": {"placeholders": {"error": {"type": "String"}}},
   "@errorLoadingDxf": {
     "description": "Error message when opening DXF file fails",
     "placeholders": {

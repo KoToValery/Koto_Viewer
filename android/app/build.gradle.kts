@@ -74,6 +74,9 @@ android {
             path = file("src/main/cpp/CMakeLists.txt")
         }
     }
+
+    // Include notices for the unmodified native Rust dependencies.
+    sourceSets.getByName("main").assets.srcDir("../../src/acadrust_converter/licenses")
 }
 
 flutter {

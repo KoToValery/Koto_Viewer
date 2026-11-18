@@ -48,17 +48,10 @@ import '../structural_designer/structural_designer_screen.dart';
 // ============================================================================
 // MASTER DXF VIEWER SCREEN LLM SEARCH INDEX & TABLE OF CONTENTS
 // ============================================================================
-// COMPANION MAP: See 'dxf_viewer_screen.index.md' for full operations matrix.
-// QUICK NAV: TOC tags are topic labels here; search a concrete class or method from the companion map with rg -n.
+// COMPANION MAP: See 'dxf_viewer_screen.index.md' for reference patterns and symbols.
+// QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
 //
-// [SEC-01-WIDGET] [TAG:DXF_WIDGET] DxfViewerScreen StatefulWidget & parameters
-// [SEC-02-STATE] [TAG:DXF_STATE] State variables, async DXF parsing & transforms
-// [SEC-03-MEASURE] [TAG:DXF_MEASURE] Distance measurement controller & snapping
-// [SEC-04-ACTIONS] [TAG:DXF_ACTIONS] Area calculations, PDF export & screenshot
-// [SEC-05-GESTURES] [TAG:DXF_GESTURES] Pan/zoom, mouse wheel scaling & hotkeys
-// [SEC-06-DIALOGS] [TAG:DXF_DIALOGS] Layer manager sheet, entity context dialogs
-// [SEC-07-HUD] [TAG:DXF_HUD] Top bar, Layout/Model tabs & zoom extents HUD
-// [SEC-08-BUILD] [TAG:DXF_BUILD] Main build method & interactive canvas viewport
+// [SEC-01-WIDGET]   Widget Declaration & Public Api
 // ============================================================================
 
 // === SECTION: [SEC-01-WIDGET] WIDGET DECLARATION & PUBLIC API ===
@@ -337,6 +330,15 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _fitToScreen();
       });
+    } on DwgMemoryLimitException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._loadDxfFile.memory');
+      final l10n = mounted ? AppLocalizations.of(context) : null;
+      if (mounted) {
+        setState(() {
+          _errorMessage = l10n?.dwgMemoryLimitError ?? e.message;
+          _isLoading = false;
+        });
+      }
     } on FileSystemException catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'DxfViewer._loadDxfFile.fs',
       );
@@ -359,7 +361,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       final l10n = mounted ? AppLocalizations.of(context) : null;
       if (mounted) {
         setState(() {
-          _errorMessage = l10n?.errorLoadingDxf(e.message) ?? 'Failed to open DXF file: ${e.message}';
+          _errorMessage = l10n?.errorLoadingCad(e.message) ?? e.message;
           _isLoading = false;
         });
       }
@@ -374,7 +376,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       final l10n = mounted ? AppLocalizations.of(context) : null;
       if (mounted) {
         setState(() {
-          _errorMessage = l10n?.errorLoadingDxf(e.toString()) ?? 'Failed to open DXF file: $e';
+          _errorMessage = l10n?.errorLoadingCad(e.toString()) ?? e.toString();
           _isLoading = false;
         });
       }
@@ -903,7 +905,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       try {
         await DxfExporterService.exportMergedDxf(
           baseFile: effectiveBase,
-          importedFiles: _importedDxfFiles,
+          importedFiles: await _filesForDxfExport(),
           annotations: _annotations,
           outputFile: outputFile,
         );
@@ -912,7 +914,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         outputFile = File('${docsDir.path}/$outputFileName');
         await DxfExporterService.exportMergedDxf(
           baseFile: effectiveBase,
-          importedFiles: _importedDxfFiles,
+          importedFiles: await _filesForDxfExport(),
           annotations: _annotations,
           outputFile: outputFile,
         );
@@ -1481,35 +1483,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         return;
       }
 
-      File effectiveDxfFile;
-      File? originalSourceFile;
-      if (lower.endsWith('.dwg')) {
-        originalSourceFile = File(filePath);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Converting DWG to DXF for import...'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-        final convertedDxfPath = await DwgConverterService.convertDwgToDxf(filePath,
-        );
-        effectiveDxfFile = File(convertedDxfPath);
-      } else {
-        effectiveDxfFile = File(filePath);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Parsing DXF for import...'),
-              duration: Duration(seconds: 1),
-            ),
-          );
-        }
-      }
-
-      final importedDoc = await DxfParser.parseFromFile(effectiveDxfFile, originalFile: originalSourceFile,
-      );
+      // [TAG:DWG_DIRECT_IMPORT] DWG objects come from the native reader.
+      final importedFile = File(filePath);
+      final importedDoc = await DxfParser.parseFromFile(importedFile);
       final activeCrs = CoordinateSystemService.activeSystemNotifier.value;
 
       if (!mounted) return;
@@ -1565,7 +1541,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       }
 
       setState(() {
-        _importedDxfFiles.add(effectiveDxfFile);
+        _importedDxfFiles.add(importedFile);
         _document = DxfDocument(
           layers: mergedLayers,
           blocks: mergedBlocks,
@@ -1659,6 +1635,17 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     }
   }
 
+  // [TAG:DWG_EXPORT_BOUNDARY] CAD conversion belongs only to explicit DXF export.
+  Future<List<File>> _filesForDxfExport() async {
+    final files = <File>[];
+    for (final file in _importedDxfFiles) {
+      files.add(file.path.toLowerCase().endsWith('.dwg')
+          ? File(await DwgConverterService.convertDwgToDxf(file.path))
+          : file);
+    }
+    return files;
+  }
+
   Future<void> _shareDxf() async {
     String fileToShare = widget.filePath;
 
@@ -1686,7 +1673,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
         await DxfExporterService.exportMergedDxf(
           baseFile: effectiveBase,
-          importedFiles: _importedDxfFiles,
+          importedFiles: await _filesForDxfExport(),
           annotations: _annotations,
           outputFile: tempOutputFile,
         );
@@ -2079,7 +2066,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
         icon: isDwg ? null : Icons.architecture_rounded,
         accentColor: const Color(0xFFFF9800),
-        loadingTitle: isDwg ? l10n.convertingDwg : l10n.loadingCad,
+        loadingTitle: l10n.loadingCad,
         statusMessage: l10n.statusAnalyzingCad,
         onCancel: () => Navigator.of(context).pop(false),
       );

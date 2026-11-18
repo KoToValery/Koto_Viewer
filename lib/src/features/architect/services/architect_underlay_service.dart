@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:pdfrx/pdfrx.dart';
 
-import '../../../core/services/dwg_converter_service.dart';
+import '../../../core/services/dwg_reader_service.dart';
 import '../../../core/services/universal_encoding_service.dart';
 import '../../bim_projects/services/bim_project_library_service.dart';
 import '../../bim_projects/services/bim_project_asset_service.dart';
@@ -234,11 +234,8 @@ class ArchitectUnderlayService {
 
   Future<DxfDocument> _parseCadFile(File file, String ext) async {
     if (ext == 'kcad') return KcadService.loadKcadFile(file);
-    final dxfPath = ext == 'dwg'
-        ? await DwgConverterService.convertDwgToDxf(file.uri.toFilePath())
-        : file.path;
-    // Converted DXFs belong to the shared content cache and may have readers.
-    return compute(_parseDxfIsolate, dxfPath);
+    if (ext == 'dwg') return DwgReaderService.read(file.path);
+    return compute(_parseDxfIsolate, file.path);
   }
 
   /// Imports a raster image file (PNG, JPG, WEBP, BMP) into the project's

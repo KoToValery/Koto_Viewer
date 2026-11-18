@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../errors/app_error_handler.dart';
+import 'acadrust_converter_service.dart';
 import 'libredwg_ffi.dart';
 import 'universal_encoding_service.dart';
 
@@ -28,11 +29,25 @@ class DwgMemoryLimitException extends DwgConversionException {
   ]) : super(message, errorCode: -999);
 }
 
+enum DwgConversionBackend { automatic, acadrust, libreDwg }
+
 /// Service to handle DWG -> DXF conversion and cache management.
 class DwgConverterService {
   static const String _cacheFolder = 'dwg_cache';
-  static const int cacheVersion = 6;
-  static const String _cacheVersion = '_v$cacheVersion';
+  static const int _libreDwgCacheVersion = 6;
+  static const String _cacheVersion = '_v$_libreDwgCacheVersion';
+
+  /// Also used by the instant-open KCAD path before conversion is attempted.
+  static int get cacheVersion => AcadrustConverterService.isAvailable
+      ? AcadrustConverterService.cacheVersion
+      : _libreDwgCacheVersion;
+
+  /// A fallback result must retain the legacy KCAD key, so it cannot mask a
+  /// subsequent attempt with the preferred backend on the same original DWG.
+  static int cacheVersionForSource(String sourcePath) {
+    final match = RegExp(r'[a-f0-9]{64}_v(6|7)\.dxf$').firstMatch(sourcePath);
+    return match == null ? cacheVersion : int.parse(match.group(1)!);
+  }
 
   /// Locates the bundled or installed dwg2dxf executable on Windows.
   static String? _findWindowsDwg2DxfExe() {
@@ -177,14 +192,15 @@ class DwgConverterService {
     return Directory.systemTemp;
   }
 
-  static const MethodChannel _androidChannel = MethodChannel(
-    'com.koto.kotoviewer/dwg_converter',
-  );
+  static const MethodChannel _androidChannel =
+      AcadrustConverterService.androidChannel;
 
   /// Returns true if native LibreDWG converter library or CLI tool is loaded and ready.
   static bool get isNativeSupported {
     if (Platform.isWindows) {
-      return _findWindowsDwg2DxfExe() != null || LibreDwgFfi.isAvailable;
+      return AcadrustConverterService.isAvailable ||
+          _findWindowsDwg2DxfExe() != null ||
+          LibreDwgFfi.isAvailable;
     }
     if (Platform.isAndroid) {
       return true;
@@ -198,6 +214,8 @@ class DwgConverterService {
   static Future<String> convertDwgToDxf(
     String dwgPath, {
     bool forceReconvert = false,
+    DwgConversionBackend backend = DwgConversionBackend.automatic,
+    @visibleForTesting AcadrustProcessRunner? acadrustProcessRunner,
   }) async {
     final dwgFile = File(dwgPath);
     if (!await dwgFile.exists()) {
@@ -212,6 +230,53 @@ class DwgConverterService {
     );
     if (!await cacheDir.exists()) {
       await cacheDir.create(recursive: true);
+    }
+
+    final useAcadrust =
+        backend == DwgConversionBackend.acadrust ||
+        (backend == DwgConversionBackend.automatic &&
+            AcadrustConverterService.isAvailable);
+    if (useAcadrust) {
+      final output = File(
+        '${cacheDir.path}/${fingerprint}_v${AcadrustConverterService.cacheVersion}.dxf',
+      );
+      if (!forceReconvert &&
+          await AcadrustConverterService.isCompleteDxf(output)) {
+        return output.path;
+      }
+      try {
+        final bool converted;
+        if (Platform.isAndroid) {
+          converted = await AcadrustConverterService.convertAndroid(
+            input: dwgFile,
+            output: output,
+          );
+        } else {
+          final executable = AcadrustConverterService.findExecutable();
+          converted =
+              executable != null &&
+              await AcadrustConverterService.convert(
+                executable: executable,
+                input: dwgFile,
+                output: output,
+                processRunner: acadrustProcessRunner,
+              );
+        }
+        if (converted) {
+          debugPrint('DwgConverterService: acadrust converted $dwgPath');
+          unawaited(pruneCache());
+          return output.path;
+        }
+      } on PlatformException catch (error) {
+        if (error.code == 'OOM_KILLED') throw const DwgMemoryLimitException();
+        debugPrint(
+          'DwgConverterService: acadrust service error: ${error.code}',
+        );
+      }
+      if (backend == DwgConversionBackend.acadrust) {
+        throw const DwgConversionException('acadrust DWG conversion failed.');
+      }
+      debugPrint('DwgConverterService: falling back to LibreDWG');
     }
 
     // Content identity keeps unrelated same-name project snapshots separate.
@@ -402,6 +467,7 @@ class DwgConverterService {
         final res = await _androidChannel.invokeMethod<int>('convertDwg', {
           'inputPath': dwgPath,
           'outputPath': targetDxfPath,
+          'backend': 'libredwg',
         });
         result = res ?? -1;
       } on PlatformException catch (e) {
@@ -419,7 +485,7 @@ class DwgConverterService {
     }
 
     // 3. Fallback to Isolate FFI conversion (Linux, or if service not available)
-    if (result != 0 && LibreDwgFfi.isAvailable) {
+    if (result != 0 && !Platform.isAndroid && LibreDwgFfi.isAvailable) {
       final params = _ConversionParams(
         inputDwgPath: dwgPath,
         outputDxfPath: targetDxfPath,
@@ -511,16 +577,22 @@ class DwgConverterService {
       );
       if (!await cacheDir.exists()) return;
 
-      final fileName = dwgPath.split(Platform.pathSeparator).last;
+      final fileName = File(dwgPath).uri.pathSegments.last;
       final baseName = fileName.contains('.')
           ? fileName.substring(0, fileName.lastIndexOf('.'))
           : fileName;
+      final source = File(dwgPath);
+      final fingerprint = await source.exists()
+          ? (await sha256.bind(source.openRead()).first).toString()
+          : null;
 
-      // Delete all cache entries whose name starts with this base name
-      // (they encode size + timestamp in the filename, so there may be stale versions).
+      // Clear both converter revisions and companion KCAD files, including
+      // name-based entries created by older application versions.
       await for (final entity in cacheDir.list()) {
+        final name = entity.uri.pathSegments.last;
         if (entity is File &&
-            entity.uri.pathSegments.last.startsWith('${baseName}_')) {
+            (name.startsWith('${baseName}_') ||
+                (fingerprint != null && name.startsWith('${fingerprint}_')))) {
           try {
             await entity.delete();
             debugPrint('DwgConverterService: Deleted cache for $baseName');
