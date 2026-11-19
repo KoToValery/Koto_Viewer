@@ -5253,6 +5253,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectEdgeDistance => 'Distance';
 
   @override
+  String get architectRoofEdgeSizeInvalid =>
+      'This size would make the roof outline invalid.';
+
+  @override
   String get architectPolygonExactOffset => 'Exact offset';
 
   @override
@@ -6732,7 +6736,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reverse the roof slope direction by 180°';
 
   @override
-  String get architectRoofRotateSlope => 'Slope dir';
+  String get architectRoofDirection => 'Direction';
+
+  @override
+  String get architectRoofDirectionTooltip =>
+      'Drainage direction and eaves edge';
+
+  @override
+  String get architectRoofRotateSlope => 'Next edge';
+
+  @override
+  String get architectRoofRotateSlopeTooltip =>
+      'Set the next roof edge as the eaves';
 
   @override
   String get architectRoofAttachToWalls => 'Attach to wall top';

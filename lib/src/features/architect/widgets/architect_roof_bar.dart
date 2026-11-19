@@ -1,9 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../services/architect_roof_tool.dart';
 import 'architect_roof_number_field.dart';
+
+enum _RoofDirectionAction { nextEdge, flip }
 
 class ArchitectRoofBar extends StatelessWidget {
   final ArchitectRoofTool tool;
@@ -58,10 +62,68 @@ class ArchitectRoofBar extends StatelessWidget {
     RoofDrawMode.multiPitch => l.architectRoofDrawMultiPitch,
     RoofDrawMode.mansard => l.architectRoofDrawMansard,
   };
+
+  Widget _directionMenu(BuildContext context, ArchitectRoofPlane roof) {
+    final l = context.l10n;
+    final direction = roof.drainageDirection;
+    return PopupMenuButton<_RoofDirectionAction>(
+      key: const ValueKey('roof-direction-menu'),
+      tooltip: l.architectRoofDirectionTooltip,
+      onSelected: (action) => switch (action) {
+        _RoofDirectionAction.nextEdge => onSwitchEavesEdge?.call(),
+        _RoofDirectionAction.flip => onFlipSlopeDirection?.call(),
+      },
+      itemBuilder: (_) => [
+        if (onSwitchEavesEdge != null)
+          PopupMenuItem(
+            key: const ValueKey('roof-rotate-slope'),
+            value: _RoofDirectionAction.nextEdge,
+            child: AppMenuLabel(
+              icon: AppIconId.rotate,
+              child: Text(l.architectRoofRotateSlope),
+            ),
+          ),
+        if (onFlipSlopeDirection != null)
+          PopupMenuItem(
+            key: const ValueKey('roof-flip-slope'),
+            value: _RoofDirectionAction.flip,
+            child: AppMenuLabel(
+              icon: AppIconId.flipHorizontal,
+              child: Text(l.architectRoofFlipSlope),
+            ),
+          ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              l.architectRoofDirection,
+              style: Theme.of(context).textTheme.bodySmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Transform.rotate(
+              angle: math.atan2(direction.dy, direction.dx) - math.pi / 2,
+              child: const AppIcon(AppIconId.down, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n, roof = selectedRoof;
     final drafting = roof == null && tool.isDrafting;
+    final hasRoofDetails =
+        roof != null &&
+        (onToggleMansard != null ||
+            onToggleParapet != null ||
+            (roof.roofGroupId != null && onToggleSlopeLocked != null) ||
+            (groupCount > 1 && onMatchRidgeHeight != null));
     final canFinish =
         drafting &&
         tool.draftPoints.length >= 3 &&
@@ -241,6 +303,8 @@ class ArchitectRoofBar extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (onSwitchEavesEdge != null || onFlipSlopeDirection != null)
+                    Expanded(child: _directionMenu(context, roof)),
                   Expanded(
                     child: TextButton.icon(
                       key: const ValueKey('roof-open-assembly'),
@@ -270,14 +334,11 @@ class ArchitectRoofBar extends StatelessWidget {
                   onPressed: onOpenLayersDialog,
                   icon: const AppIcon(AppIconId.properties),
                 ),
-                if (roof != null)
+                if (roof != null && hasRoofDetails)
                   PopupMenuButton<String>(
                     key: const ValueKey('roof-actions'),
                     tooltip: l.roofUiDetails,
                     onSelected: (v) => switch (v) {
-                      'eaves' => onSetSelectedEdgeAsEaves?.call(),
-                      'rotate' => onSwitchEavesEdge?.call(),
-                      'flip' => onFlipSlopeDirection?.call(),
                       'mansard' => onToggleMansard?.call(),
                       'parapet' => onToggleParapet?.call(),
                       'lock' => onToggleSlopeLocked?.call(),
@@ -285,24 +346,6 @@ class ArchitectRoofBar extends StatelessWidget {
                       _ => null,
                     },
                     itemBuilder: (_) => [
-                      if (onSwitchEavesEdge != null)
-                        PopupMenuItem(
-                          key: const ValueKey('roof-rotate-slope'),
-                          value: 'rotate',
-                          child: AppMenuLabel(
-                            icon: AppIconId.rotate,
-                            child: Text(l.architectRoofRotateSlope),
-                          ),
-                        ),
-                      if (onFlipSlopeDirection != null)
-                        PopupMenuItem(
-                          key: const ValueKey('roof-flip-slope'),
-                          value: 'flip',
-                          child: AppMenuLabel(
-                            icon: AppIconId.flipHorizontal,
-                            child: Text(l.architectRoofFlipSlope),
-                          ),
-                        ),
                       if (onToggleMansard != null)
                         CheckedPopupMenuItem(
                           key: const ValueKey('roof-toggle-mansard'),

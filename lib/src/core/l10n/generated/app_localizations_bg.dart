@@ -5277,6 +5277,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectEdgeDistance => 'Разстояние';
 
   @override
+  String get architectRoofEdgeSizeInvalid =>
+      'Този размер нарушава контура на ската.';
+
+  @override
   String get architectPolygonExactOffset => 'Точно отместване';
 
   @override
@@ -6759,7 +6763,18 @@ class AppLocalizationsBg extends AppLocalizations {
       'Обърни посоката на наклона на ската на 180°';
 
   @override
-  String get architectRoofRotateSlope => 'Посока скат';
+  String get architectRoofDirection => 'Посока';
+
+  @override
+  String get architectRoofDirectionTooltip =>
+      'Посока на оттичане и избор на стреха';
+
+  @override
+  String get architectRoofRotateSlope => 'Следващ ръб';
+
+  @override
+  String get architectRoofRotateSlopeTooltip =>
+      'Задай следващия ръб на ската за стреха';
 
   @override
   String get architectRoofAttachToWalls => 'Прикрепи към стените';

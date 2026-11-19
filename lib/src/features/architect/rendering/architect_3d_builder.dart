@@ -8,6 +8,7 @@ import 'architect_vertical_clip.dart';
 import 'architect_panel_roof_geometry.dart';
 import '../services/architect_slab_geometry.dart';
 import '../services/architect_roof_junctions.dart';
+import '../services/architect_roof_framing.dart';
 import '../services/architect_roof_ridge_beams.dart';
 import '../services/architect_roof_wall_plates.dart';
 import '../services/architect_roof_geometry.dart';
@@ -28,6 +29,9 @@ import '../services/component_library_service.dart';
 import '../services/architect_service_geometry.dart';
 import '../services/architect_decorative_geometry.dart';
 import 'architect_fence_3d_mesh.dart';
+
+// TOC: buildProjectMesh, [TAG:ROOF_DIAGONAL_TIMBER], buildRoofBody,
+// _buildRoofMesh, _appendLandscape3D
 
 /// Real-time 3D solid mesh builder for architectural projects.
 class Architect3dBuilder {
@@ -343,6 +347,9 @@ class Architect3dBuilder {
       final ridgeBeams = previewGeometry
           ? ArchitectRoofRidgeBeam.build(storey, project: project)
           : <ArchitectRoofRidgeBeam>[];
+      final framing = previewGeometry
+          ? ArchitectRoofFraming.build(storey, roofJunctions, ridgeBeams)
+          : null;
       final wallPlates = ArchitectRoofWallPlate.build(storey, project: project);
       final roofMeshes = [
         for (final roof in storey.roofs)
@@ -351,6 +358,7 @@ class Architect3dBuilder {
               storey,
               roof,
               detailed: previewGeometry,
+              framing: framing,
               ridgeSeats: ridgeBeams,
               wallPlates: wallPlates.where((p) => p.roofId == roof.id).toList(),
               footprint: roofJunctions.trimmed.contains(roof.id)
@@ -407,6 +415,28 @@ class Architect3dBuilder {
         }
       }
 
+      // --- SUBSECTION: [TAG:ROOF_DIAGONAL_TIMBER] Shared hip and valley solids ---
+      for (final (index, beam)
+          in (framing?.diagonals ?? const <ArchitectRoofDiagonalRafter>[])
+              .indexed) {
+        for (final roof in storey.roofs.where(
+          (roof) => beam.roofIds.contains(roof.id),
+        )) {
+          final first = allTris.length;
+          final mesh = beam.mesh(
+            planClip: roofJunctions.footprint(roof),
+            openSeam: true,
+          );
+          allTris.addAll(mesh);
+          mark(roof.id, first);
+          if (silhouetteGroups != null) {
+            for (final triangle in mesh) {
+              silhouetteGroups[triangle] =
+                  'construction:roof-diagonal:${beam.roofIds.first}:$index';
+            }
+          }
+        }
+      }
       for (final beam in ridgeBeams) {
         for (final roof in storey.roofs.where(
           (r) => beam.roofIds.contains(r.id),
@@ -592,12 +622,28 @@ class Architect3dBuilder {
     ArchitectStorey storey,
     ArchitectRoofPlane roof,
   ) {
-    final footprint = ArchitectRoofJunctions.of(storey, project: project).footprint(roof);
+    final junctions = ArchitectRoofJunctions.of(storey, project: project);
+    final footprint = junctions.footprint(roof);
     final ridges = ArchitectRoofRidgeBeam.build(storey, project: project);
-    final plates = ArchitectRoofWallPlate.build(storey, project: project)
-        .where((p) => p.roofId == roof.id).toList();
-    final result = _buildRoofMesh(storey, roof, detailed: true,
-        ridgeSeats: ridges, wallPlates: plates, footprint: footprint);
+    final framing = ArchitectRoofFraming.build(storey, junctions, ridges);
+    final plates = ArchitectRoofWallPlate.build(
+      storey,
+      project: project,
+    ).where((p) => p.roofId == roof.id).toList();
+    final result = _buildRoofMesh(
+      storey,
+      roof,
+      detailed: true,
+      framing: framing,
+      ridgeSeats: ridges,
+      wallPlates: plates,
+      footprint: footprint,
+    );
+    for (final beam in framing.diagonals.where(
+      (b) => b.roofIds.contains(roof.id),
+    )) {
+      result.addAll(beam.mesh(planClip: footprint));
+    }
     for (final ridge in ridges.where((r) => r.roofIds.contains(roof.id))) {
       result.addAll(ridge.mesh(planClip: footprint));
       for (final bearing in ridge.bearings(storey,
@@ -614,6 +660,7 @@ class Architect3dBuilder {
     ArchitectStorey storey,
     ArchitectRoofPlane roof, {
     bool detailed = true,
+    ArchitectRoofFraming? framing,
     List<ArchitectRoofRidgeBeam> ridgeSeats = const [],
     List<ArchitectRoofWallPlate> wallPlates = const [],
     Path? footprint,
@@ -779,83 +826,92 @@ class Architect3dBuilder {
       );
     }
 
-    // 2. Rafters (Ребра) along slope direction (prominently visible at eaves overhang)
-    final rafterW = timber.rafterWidth.clamp(0.05, 0.16);
-    final rafterStep = math.max(timber.rafterSpacing, 0.35);
+    if (framing != null && framing.joins(roof)) {
+      for (final mesh in framing.rafters(
+        roof,
+        seats: [...ridgeSeats, ...wallPlates],
+      )) {
+        tris.addAll(mesh);
+      }
+    } else {
+      // Single planes retain their original field and edge rafters.
+      final rafterW = timber.rafterWidth.clamp(0.05, 0.16);
+      final rafterStep = math.max(timber.rafterSpacing, 0.35);
 
-    final rafterPositions = <double>[];
-    for (var s = minS; s <= maxS - rafterW + 1e-4; s += rafterStep) {
-      rafterPositions.add(s);
-    }
-    if (rafterPositions.isEmpty ||
-        (maxS - rafterW - rafterPositions.last).abs() > rafterW * 0.6) {
-      rafterPositions.add(math.max(minS, maxS - rafterW));
-    }
+      final rafterPositions = <double>[];
+      for (var s = minS; s <= maxS - rafterW + 1e-4; s += rafterStep) {
+        rafterPositions.add(s);
+      }
+      if (rafterPositions.isEmpty ||
+          (maxS - rafterW - rafterPositions.last).abs() > rafterW * 0.6) {
+        rafterPositions.add(math.max(minS, maxS - rafterW));
+      }
 
-    for (final s0 in rafterPositions) {
-      final s1 = math.min(s0 + rafterW, maxS);
-      if (hasKnuckle) {
-        final lowerRafterClip = _clipPolygonToRect(
-          polySD,
-          s0,
-          s1,
-          minD,
-          dKnuckle,
-        );
-        _addExtrudedClippedPrism(
-          tris,
-          lowerRafterClip,
-          p0,
-          u,
-          v,
-          storey.elevation,
-          roof,
-          hRafterBottom,
-          hRafterTop,
-          planClip: footprint,
-          topColor: rafterTopColor,
-          sideColor: rafterSideColor,
-          seats: [...ridgeSeats, ...wallPlates],
-        );
-        final upperRafterClip = _clipPolygonToRect(
-          polySD,
-          s0,
-          s1,
-          dKnuckle,
-          maxD,
-        );
-        _addExtrudedClippedPrism(
-          tris,
-          upperRafterClip,
-          p0,
-          u,
-          v,
-          storey.elevation,
-          roof,
-          hRafterBottom,
-          hRafterTop,
-          planClip: footprint,
-          topColor: rafterTopColor,
-          sideColor: rafterSideColor,
-          seats: [...ridgeSeats, ...wallPlates],
-        );
-      } else {
-        final rafterClip = _clipPolygonToRect(polySD, s0, s1, minD, maxD);
-        _addExtrudedClippedPrism(
-          tris,
-          rafterClip,
-          p0,
-          u,
-          v,
-          storey.elevation,
-          roof,
-          hRafterBottom,
-          hRafterTop,
-          planClip: footprint,
-          topColor: rafterTopColor,
-          sideColor: rafterSideColor,
-          seats: [...ridgeSeats, ...wallPlates],
-        );
+      for (final s0 in rafterPositions) {
+        final s1 = math.min(s0 + rafterW, maxS);
+        if (hasKnuckle) {
+          final lowerRafterClip = _clipPolygonToRect(
+            polySD,
+            s0,
+            s1,
+            minD,
+            dKnuckle,
+          );
+          _addExtrudedClippedPrism(
+            tris,
+            lowerRafterClip,
+            p0,
+            u,
+            v,
+            storey.elevation,
+            roof,
+            hRafterBottom,
+            hRafterTop,
+            planClip: footprint,
+            topColor: rafterTopColor,
+            sideColor: rafterSideColor,
+            seats: [...ridgeSeats, ...wallPlates],
+          );
+          final upperRafterClip = _clipPolygonToRect(
+            polySD,
+            s0,
+            s1,
+            dKnuckle,
+            maxD,
+          );
+          _addExtrudedClippedPrism(
+            tris,
+            upperRafterClip,
+            p0,
+            u,
+            v,
+            storey.elevation,
+            roof,
+            hRafterBottom,
+            hRafterTop,
+            planClip: footprint,
+            topColor: rafterTopColor,
+            sideColor: rafterSideColor,
+            seats: [...ridgeSeats, ...wallPlates],
+          );
+        } else {
+          final rafterClip = _clipPolygonToRect(polySD, s0, s1, minD, maxD);
+          _addExtrudedClippedPrism(
+            tris,
+            rafterClip,
+            p0,
+            u,
+            v,
+            storey.elevation,
+            roof,
+            hRafterBottom,
+            hRafterTop,
+            planClip: footprint,
+            topColor: rafterTopColor,
+            sideColor: rafterSideColor,
+            seats: [...ridgeSeats, ...wallPlates],
+          );
+        }
       }
     }
 

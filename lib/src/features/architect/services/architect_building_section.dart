@@ -1344,6 +1344,7 @@ class ArchitectBuildingSection {
             ArchitectRoofMemberKind.wallPlate ||
             ArchitectRoofMemberKind.ringBeam ||
             ArchitectRoofMemberKind.ridgePurlin ||
+            ArchitectRoofMemberKind.diagonalRafter ||
             ArchitectRoofMemberKind.intermediatePurlin => true,
             ArchitectRoofMemberKind.layer =>
               member.role == ArchitectRoofLayerRole.structure ||

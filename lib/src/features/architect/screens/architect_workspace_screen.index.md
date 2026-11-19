@@ -93,6 +93,7 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Drafting and placement with live preview | Wall chain: [TAG:TOUCH_DOWN], [TAG:TOUCH_MOVE], [TAG:TOUCH_UP], [TAG:WALL_DRAFT], [TAG:CANVAS_2D]; _onPointerDown, _onPointerMove, _onPointerUp, _placeDraftSegment, _finishChainedWall | Tool activation/configuration, viewport input, snapping, preview, finish/cancel behavior, commit and undo/persistence |
 | Opening placement and editing | [TAG:FENEST_RADIAL], [TAG:FENESTRATION_SELECTION_UPDATES], [TAG:TOUCH_DOWN], [TAG:TOUCH_UP]; _tryPlaceDoorAt, _commitOpeningPlacement | Candidate selection, host detection, placement preview, selection actions, property UI, confirmation, model update |
 | Selected-element context actions | [TAG:SELECTION_BAR], [TAG:FENEST_RADIAL], [TAG:GRID_AXIS]; _handleSelectionTap, _buildSelectionBar | Selection hit path, contextual actions, property controls, cancellation/closing, state updates |
+| Selected roof direction | [TAG:ROOF_DIRECTION_ACTIONS]; _buildRadialMenuItems, ArchitectRoofBar | Existing edge-cycle and flip commands update the roof plane through UpdateArchitectRoofPlane; the bar and automatic plan arrow read drainageDirection. |
 | Two-point drag of elements or underlays | [TAG:DRAG_TOOL], [TAG:UNDERLAY_DRAG], [TAG:TOUCH_DOWN], [TAG:TOUCH_MOVE], [TAG:TOUCH_UP]; _startDragSession, _startUnderlaySnapDrag, _updateDragTarget, _cancelDragGesture, _confirmDragPlacement, _cancelDragPlacement, ArchitectDragController | Dormant touch input allows pan/pinch before either pick; taps or precision holds choose points. Navigation preserves the session and placed target; Apply commits once. Both element and underlay drag use the same controller and lifecycle, with no generic geometry-command preview. |
 | Multi-step geometry modification | Wall split: [TAG:WALL_SPLIT]. Chamfer/fillet and edge-curving: [TAG:FLOATING_HUD]; _startChamferFilletSession, _buildChamferFilletFloatingOverlay | Session state, preview/rubber band, pan and gesture arbitration, confirm/cancel controls, model command and history |
 | CAD/raster underlay placement or repositioning | [TAG:CAD_UNDERLAY_IMPORT], [TAG:UNDERLAY_DRAG], [TAG:DRAG_TOOL]; _loadExternalCadFileForStorey, _startUnderlaySnapDrag, _confirmDragPlacement | CAD preview and snapshot, raster calibration, and shared drag lifecycle |
@@ -392,10 +393,15 @@ visible centres are preserved. Placement publishes one creation command.
 
 `[TAG:SLAB_DRAFT_CONTROLS]` stages slab properties in a temporary model until
 manual contour completion; it never creates a placeholder in the real project.
-`[TAG:POLYGON_ANGLE_LOCK]` uses the wall badge archetype. Edge release for Hatch
-and slabs opens `_editPolygonDisplacement` automatically; vertices retain their
+`[TAG:POLYGON_ANGLE_LOCK]` uses the wall badge archetype. Edge release for hatches,
+slabs and roof outer contours opens `_editPolygonDisplacement` automatically; vertices retain their
 separate precision option. Manual Hatch points are accepted immediately with
 snaps and never enter the wall distance checkpoint.
+
+`[TAG:ROOF_EDGE_EXACT_INPUT]` connects roof edge release and editable dimensions
+to the same live contour preview and keypad confirmation. The keypad keeps any
+staged roof edit as its starting geometry and commits it through the normal
+geometry command, history and autosave when confirmed.
 
 ### Project snapshots and editable underlay crops
 

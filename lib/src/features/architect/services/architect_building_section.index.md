@@ -16,6 +16,7 @@
 | `ArchitectSectionRegion` | Section cut region bounds and orientation data |
 | `[TAG:SECTION_DRAWING_REGIONS]` | `effectiveHatch` and `drawingRegions` share material contours only when cut weights match. See `[TAG:SECTION_PLOT_STYLE]` in `architect_building_sections_screen.dart` for the painter shared by the workspace and `ArchitectDrawingPublisher`. |
 | `ArchitectBuildingSection` | Main section and elevation builder (`build(...)`) |
+| Roof framing | `ArchitectRoofFraming` builds hip and valley timber and paired rafter layouts. `[TAG:ROOF_FRAMING_SECTIONS]` in `architect_roof_geometry.dart` slices the same solids that `[TAG:ROOF_DIAGONAL_TIMBER]` in `architect_3d_builder.dart` renders. |
 | `[TAG:SPANDREL_INFILL]` | Continuous drop beams, RC lintels, and aerated concrete infill |
 | `[TAG:TIE_BEAMS]` | Intermediate RC tie beams on tall masonry walls |
 | `_findCutOpeningsOnWall` | Cut window/door aperture detection and frame section profiles |

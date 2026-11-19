@@ -959,6 +959,9 @@ class ArchitectRoofPlane {
   Offset get slopeDirection =>
       reverseSlope ? -_rawEavesInwardNormal : _rawEavesInwardNormal;
 
+  /// Plan direction of runoff from the higher side toward the lower edge.
+  Offset get drainageDirection => -slopeDirection;
+
   double get slopeRadians => slopeDegrees * math.pi / 180.0;
 
   double get slopePercent => math.tan(slopeRadians) * 100.0;

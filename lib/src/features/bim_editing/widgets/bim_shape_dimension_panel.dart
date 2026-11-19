@@ -13,6 +13,7 @@ class BimShapeDimensionPanel extends StatefulWidget {
   final int decimals;
   final double minimum;
   final bool canSave, signed, keypadInitiallyOpen;
+  final String? invalidGeometryMessage;
   final void Function(int index, double value) onChanged;
   final VoidCallback onSave, onCancel;
   const BimShapeDimensionPanel({
@@ -25,6 +26,7 @@ class BimShapeDimensionPanel extends StatefulWidget {
     this.canSave = true,
     this.signed = false,
     this.keypadInitiallyOpen = true,
+    this.invalidGeometryMessage,
     required this.onChanged,
     required this.onSave,
     required this.onCancel,
@@ -276,7 +278,7 @@ class _BimShapeDimensionPanelState extends State<BimShapeDimensionPanel> {
               ),
               if (!widget.canSave)
                 Text(
-                  l.architectOperationRejected,
+                  widget.invalidGeometryMessage ?? l.architectOperationRejected,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: colors.error, fontSize: 11),

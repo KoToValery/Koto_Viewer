@@ -13927,7 +13927,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
       final isHatchOrSlab = source.activeStorey.slabs.any((s) => s.id == id) ||
           source.activeStorey.cadPrimitives.any((p) => p.id == id && p.type == CadPrimitiveType.hatch);
-      final exactDrag = (_polygonEditor.edge && isHatchOrSlab) ||
+      final isRoofEdge =
+          holeIndex == null &&
+          source.activeStorey.roofs.any((r) => r.id == id);
+      final exactDrag =
+          (_polygonEditor.edge && (isHatchOrSlab || isRoofEdge)) ||
           (_polygonPrecisionMode && isCadContour);
       final displacement = exactDrag && valid && changed
           ? ArchitectPolygonDisplacement.fromDrag(
@@ -19101,6 +19105,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  // --- SUBSECTION: [TAG:ROOF_EDGE_EXACT_INPUT] Exact roof edge input and single confirmation ---
+  void _applyRoofEdgeInput(ArchitectProject? candidate) {
+    if (candidate != null) _commands.commit(candidate);
+    if (_commandAction == ArchitectRadialAction.edit && _commandReady) {
+      _confirmGeometryCommand();
+    } else if (candidate != null) {
+      _saveBiMProjectIfAttached();
+    }
+  }
+
   Future<void> _editPolygonDisplacement({
     required String id,
     required int? holeIndex,
@@ -19108,6 +19122,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     required ArchitectPolygonDisplacement drag,
   }) async {
     if (_polygonDistanceOpen || !mounted) return;
+    final isRoofEdge =
+        drag.edge && holeIndex == null &&
+        source.activeStorey.roofs.any((r) => r.id == id);
     final previousEdge = _polygonSelectedEdge;
     final unit = source.units;
     // The initial preview uses exactly the value displayed by the keypad.
@@ -19169,6 +19186,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   unit: unit.symbol, decimals: source.distanceDecimals,
                   minimum: -double.infinity, signed: true,
                   canSave: candidate != null && identical(source, _project),
+                  invalidGeometryMessage: isRoofEdge && identical(source, _project)
+                      ? context.l10n.architectRoofEdgeSizeInvalid
+                      : null,
                   onChanged: (_, value) {
                     meters = unit.fromUnit(value);
                     preview();
@@ -19176,9 +19196,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   },
                   onSave: () {
                     if (candidate == null || !identical(source, _project)) return;
+                    final next = _elementMovePreview;
                     _elementMovePreview = null;
                     _polygonDisplacementLine = null;
-                    if (meters.abs() > ArchitectPolygonGeometry.epsilon) {
+                    final changed =
+                        meters.abs() > ArchitectPolygonGeometry.epsilon;
+                    if (isRoofEdge) {
+                      try {
+                        _applyRoofEdgeInput(changed ? next : null);
+                      } on ArgumentError {
+                        candidate = null;
+                        dialogSetState(() {});
+                        _repaintPreview();
+                        return;
+                      }
+                    } else if (changed) {
                       _commands.execute(UpdateArchitectPolygon(
                         storeyId: source.activeStoreyId, elementId: id,
                         polygon: candidate!, holeIndex: holeIndex,
@@ -19218,9 +19250,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _editPolygonDistance(ArchitectPolygonDistance? dimension) async {
-    _beginGeometryCommand(ArchitectRadialAction.edit);
-
     if (_polygonDistanceOpen) return;
+    final targetId = _activePolygonDistanceElementId;
+    final roof = _selectedPolygonHoleIndex == null
+        ? _project.activeStorey.roofs.where((r) => r.id == targetId).firstOrNull
+        : null;
+    final isRoofEdge = roof != null;
+    if (isRoofEdge &&
+        _commandPreview != null &&
+        _commandAction != ArchitectRadialAction.edit) {
+      return;
+    }
+    if (!isRoofEdge) _beginGeometryCommand(ArchitectRadialAction.edit);
 
     final polygon = _editablePolygon;
     final wholeRing = dimension == null && _hatchOrSlabSelected;
@@ -19250,6 +19291,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     var displacement = 0.0;
 
     var enteredMeters = dimension?.distance ?? 0.0;
+    final setsRoofOverhang =
+        isRoofEdge &&
+        dimension != null &&
+        dimension.referenceId != id &&
+        dimension.side == -1 &&
+        edge == roof.safeEavesEdgeIndex;
 
     final normal = ArchitectPolygonGeometry.normal(original, edge);
 
@@ -19311,6 +19358,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 signed: dimension == null,
 
                 canSave: candidate != null && identical(project, _project),
+                invalidGeometryMessage: isRoofEdge && identical(project, _project)
+                    ? context.l10n.architectRoofEdgeSizeInvalid
+                    : null,
 
                 onChanged: (_, value) {
 
@@ -19344,16 +19394,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   _elementMovePreview = null;
                   if (candidate != null) {
                     try {
-                      _elementMovePreview = UpdateArchitectPolygon(
-
-                      storeyId: project.activeStoreyId,
-
-                      elementId: id,
-
-                      polygon: candidate!,
-                      holeIndex: holeIndex,
-
-                    ).apply(project);
+                      final command = setsRoofOverhang
+                          ? UpdateArchitectRoofPlane(
+                              storeyId: project.activeStoreyId,
+                              roof: roof!.copyWith(
+                                points: candidate!,
+                                eavesOverhang: enteredMeters,
+                              ),
+                            )
+                          : UpdateArchitectPolygon(
+                              storeyId: project.activeStoreyId,
+                              elementId: id,
+                              polygon: candidate!,
+                              holeIndex: holeIndex,
+                            );
+                      _elementMovePreview = command.apply(project);
                     } on ArgumentError {
                       candidate = null;
                       _elementMovePreview = null;
@@ -19387,64 +19442,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   }
 
+                  final next = _elementMovePreview;
                   _elementMovePreview = null;
-
-                  if (displacement.abs() > ArchitectPolygonGeometry.epsilon) {
-
-                    final roof = _selectedRoof;
-
-                    if (roof != null &&
-                        holeIndex == null &&
-
-                        roof.id == id &&
-
-                        dimension != null &&
-
-                        dimension.side == -1 &&
-
-                        edge == roof.safeEavesEdgeIndex) {
-
-                      _roofTool.setEavesOverhang(enteredMeters);
-
-                      _commands.execute(
-
-                        UpdateArchitectRoofPlane(
-
-                          storeyId: project.activeStoreyId,
-
-                          roof: roof.copyWith(
-
-                            points: candidate!,
-
-                            eavesOverhang: enteredMeters,
-
-                          ),
-
-                        ),
-
-                      );
-
-                    } else {
-
-                      _commands.execute(
-
-                        UpdateArchitectPolygon(
-
-                          storeyId: project.activeStoreyId,
-
-                          elementId: id,
-
-                          polygon: candidate!,
-                          holeIndex: holeIndex,
-
-                        ),
-
-                      );
-
+                  final changed =
+                      displacement.abs() > ArchitectPolygonGeometry.epsilon;
+                  if (isRoofEdge) {
+                    try {
+                      _applyRoofEdgeInput(changed ? next : null);
+                    } on ArgumentError {
+                      candidate = null;
+                      dialogSetState(() {});
+                      _repaintPreview();
+                      return;
                     }
-
+                    if (changed && setsRoofOverhang) {
+                      _roofTool.setEavesOverhang(enteredMeters);
+                    }
+                  } else if (changed && next != null) {
+                    _commands.commit(next);
                     _saveBiMProjectIfAttached();
-
                   }
 
                   _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
@@ -21862,32 +21878,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         );
       }
 
+      // --- SUBSECTION: [TAG:ROOF_DIRECTION_ACTIONS] Selected roof direction actions ---
       if (isRoof) {
-
-        items.add(
-
-          _radialItem(
-
+        final l = context.l10n;
+        items.addAll([
+          ArchitectRadialMenuItem(
             action: ArchitectRadialAction.rotate,
-
+            icon: AppIconId.rotate,
+            label: l.architectRoofRotateSlope,
+            tooltip: l.architectRoofRotateSlopeTooltip,
             color: const Color(0xFF40C4FF),
-
           ),
-
-        );
-
-        items.add(
-
-          _radialItem(
-
+          ArchitectRadialMenuItem(
             action: ArchitectRadialAction.flip,
-
+            icon: AppIconId.flipHorizontal,
+            label: l.architectRoofFlipSlope,
+            tooltip: l.architectRoofFlipSlopeTooltip,
             color: const Color(0xFF80D8FF),
-
           ),
-
-        );
-
+        ]);
       }
 
       items.add(
@@ -36802,8 +36811,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ArchitectProject get _drawingProject {
 
-    var project = _commandReady ? _commandPreview!.preview
-        : _duplicateMove?.preview ?? _elementMovePreview ?? _project;
+    var project = (_polygonDistanceOpen ? _elementMovePreview : null) ??
+        (_commandReady
+            ? _commandPreview!.preview
+            : _duplicateMove?.preview ?? _elementMovePreview ?? _project);
 
     if (_dimensionEditing != null) {
 

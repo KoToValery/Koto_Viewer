@@ -3,6 +3,7 @@
 // 2. Auto-Roof Generator (Gable / Hip / Shed / Flat from building walls or slabs)
 // 3. Plan Edge Classification & Wall Support Line
 // 4. Section Cut Geometry (Mitered Layers, Discrete Battens, Rafters, Mauerlat, Ridge Purlin)
+//    [TAG:ROOF_FRAMING_SECTIONS] Shared hip, valley and rafter solids
 // 5. Wall-to-Roof Clipping & Height Adaptation
 // 6. Roof Drafting Snap Guides (Hip/Valley Intersections & Inner Corner Alignments)
 
@@ -16,6 +17,7 @@ import '../rendering/architect_panel_roof_geometry.dart';
 import '../rendering/architect_mesh_section.dart';
 import 'architect_element_id.dart';
 import 'architect_polygon_geometry.dart';
+import 'architect_roof_framing.dart';
 import 'architect_roof_junctions.dart';
 import 'architect_roof_ridge_beams.dart';
 import 'architect_roof_wall_plates.dart';
@@ -34,6 +36,7 @@ enum ArchitectRoofMemberKind {
   wallPlate,
   ringBeam,
   ridgePurlin,
+  diagonalRafter,
   intermediatePurlin,
   fascia,
   metalFlashing,
@@ -1129,6 +1132,31 @@ class ArchitectRoofGeometry {
       ..clear()
       ..addAll(ownedIntervals);
     final ridgeBeams = ArchitectRoofRidgeBeam.build(storey, project: project);
+    // --- SUBSECTION: [TAG:ROOF_FRAMING_SECTIONS] Slice the shared structural solids ---
+    final framing = ArchitectRoofFraming.build(
+      storey,
+      roofJunctions,
+      ridgeBeams,
+    );
+    final sectionBounds = Rect.fromPoints(
+      sectionLine.start,
+      sectionLine.end,
+    ).inflate(.0001);
+    final diagonalSections = [
+      for (final beam in framing.diagonals)
+        if (beam.footprint.getBounds().overlaps(sectionBounds))
+          (
+            beam,
+            ArchitectMeshSection.verticalClipped(
+              beam.mesh(),
+              sectionLine.start,
+              lineDir,
+              lineLen,
+            ),
+          ),
+    ]..removeWhere((entry) => entry.$2.getBounds().isEmpty);
+    final emittedDiagonals = <ArchitectRoofDiagonalRafter>{};
+    final rafterSections = <String, List<Path>>{};
     final ridgeSections = <(ArchitectRoofRidgeBeam, Path)>[
       for (final beam in ridgeBeams)
         (
@@ -1145,12 +1173,13 @@ class ArchitectRoofGeometry {
         ),
     ]..removeWhere((entry) => entry.$2.getBounds().isEmpty);
     final emittedRidges = <ArchitectRoofRidgeBeam>{};
+    final wallPlates = ArchitectRoofWallPlate.build(
+      storey,
+      project: project,
+      lowerStorey: lowerStorey,
+    );
     final plateSections = [
-      for (final plate in ArchitectRoofWallPlate.build(
-        storey,
-        project: project,
-        lowerStorey: lowerStorey,
-      ))
+      for (final plate in wallPlates)
         (
           plate,
           ArchitectMeshSection.vertical(
@@ -1226,6 +1255,7 @@ class ArchitectRoofGeometry {
       final wallCapIntervals =
           <({double fromS, double toS, double maxWallZ})>[];
       final timber = roof.assembly.timber;
+      final hasJoinedFraming = framing.joins(roof);
 
       // Apparent slope along the section line:
       final dzDs = (zTop1 - zTop0) / (s1 - s0);
@@ -1262,7 +1292,9 @@ class ArchitectRoofGeometry {
             timber.hasBattens &&
             slopeDirDotSection > 0.35;
 
-        if (!isDiscreteBattenGap) {
+        if (!isDiscreteBattenGap &&
+            !(hasJoinedFraming &&
+                layer.role == ArchitectRoofLayerRole.rafters)) {
           final poly = <Offset>[
             Offset(s0, zTop0 - dTopV),
             Offset(s1, zTop1 - dTopV),
@@ -1343,7 +1375,44 @@ class ArchitectRoofGeometry {
       }
 
       // 4. Discrete Rafters & Counter-Battens when cutting across the slope (parallel to eaves)
-      if (timber.hasRafters && slopeDirDotSection <= 0.35) {
+      if (hasJoinedFraming) {
+        final profiles = rafterSections.putIfAbsent(
+          roof.id,
+          () => [
+            for (final mesh in framing.rafters(
+              roof,
+              seats: [
+                ...ridgeBeams,
+                ...wallPlates.where((p) => p.roofId == roof.id),
+              ],
+              sectionBounds: sectionBounds,
+            ))
+              ArchitectMeshSection.verticalClipped(
+                mesh,
+                sectionLine.start,
+                lineDir,
+                lineLen,
+              ),
+          ]..removeWhere((path) => path.getBounds().isEmpty),
+        );
+        final span = Path()..addRect(Rect.fromLTRB(s0, -1e6, s1, 1e6));
+        for (final profile in profiles) {
+          final path = Path.combine(PathOperation.intersect, profile, span);
+          if (path.getBounds().isEmpty) continue;
+          final loops = ArchitectPathSolid.contours(path);
+          discreteMembers.add(
+            ArchitectRoofSectionMember(
+              roofId: roof.id,
+              kind: ArchitectRoofMemberKind.rafter,
+              role: ArchitectRoofLayerRole.rafters,
+              material: ArchitectRoofMaterial.timberBoarding,
+              polygon: loops.length == 1 ? loops.single : const [],
+              path: path,
+              drawTimberDiagonals: slopeDirDotSection <= .35,
+            ),
+          );
+        }
+      } else if (timber.hasRafters && slopeDirDotSection <= 0.35) {
         final hypot = math.sqrt(1.0 + dzDs * dzDs);
         final uSlope = Offset(1.0 / hypot, dzDs / hypot);
         final vNormIn = Offset(dzDs / hypot, -1.0 / hypot);
@@ -1586,6 +1655,26 @@ class ArchitectRoofGeometry {
         );
       }
 
+      for (final (beam, path) in diagonalSections) {
+        if (!beam.roofIds.contains(roof.id) || !emittedDiagonals.add(beam)) {
+          continue;
+        }
+        final loops = ArchitectPathSolid.contours(path);
+        discreteMembers.add(
+          ArchitectRoofSectionMember(
+            roofId: roof.id,
+            kind: ArchitectRoofMemberKind.diagonalRafter,
+            role: ArchitectRoofLayerRole.structure,
+            material: ArchitectRoofMaterial.timberBoarding,
+            path: path,
+            polygon: loops.length == 1 ? loops.single : const [],
+            drawTimberDiagonals:
+                (beam.axis.dx * lineDir.dx + beam.axis.dy * lineDir.dy).abs() <
+                .25,
+          ),
+        );
+      }
+
       // 6. Slice the physical ridge beam, including longitudinal/oblique cuts.
       for (final (beam, path) in ridgeSections) {
         if (beam.roofIds.contains(roof.id) && emittedRidges.add(beam)) {
@@ -1790,8 +1879,8 @@ class ArchitectRoofGeometry {
     }
 
     // 8. Collect all discrete structural cutouts across ALL slices on this storey
-    // so shared ridge purlins, Mauerlat, ring beams, rafters, fascia, and flashing
-    // cleanly boolean-subtract from every overlapping continuous roof layer!
+    // so shared timbers, bearings, fascia and flashing are cut out of every
+    // overlapping continuous roof layer.
     final allDiscreteCutouts = <Path>[];
     for (final draft in draftSlices) {
       for (final dm in draft.discreteMembers) {
@@ -1799,6 +1888,7 @@ class ArchitectRoofGeometry {
             dm.kind == ArchitectRoofMemberKind.wallPlate ||
             dm.kind == ArchitectRoofMemberKind.ringBeam ||
             dm.kind == ArchitectRoofMemberKind.ridgePurlin ||
+            dm.kind == ArchitectRoofMemberKind.diagonalRafter ||
             dm.kind == ArchitectRoofMemberKind.intermediatePurlin ||
             dm.kind == ArchitectRoofMemberKind.fascia ||
             dm.kind == ArchitectRoofMemberKind.metalFlashing) {
@@ -1807,11 +1897,21 @@ class ArchitectRoofGeometry {
       }
     }
 
-    final flashings = [
-      for (final draft in draftSlices)
-        for (final member in draft.discreteMembers)
-          if (member.kind == ArchitectRoofMemberKind.metalFlashing) member.path,
-    ];
+    final flashings = <Path>[];
+    final bearingProfiles = <Path>[];
+    for (final draft in draftSlices) {
+      for (final member in draft.discreteMembers) {
+        if (member.kind == ArchitectRoofMemberKind.metalFlashing) {
+          flashings.add(member.path);
+        } else if (member.kind == ArchitectRoofMemberKind.wallPlate ||
+            member.kind == ArchitectRoofMemberKind.ringBeam) {
+          bearingProfiles.add(member.path);
+        }
+      }
+    }
+    final joinedRoofIds = {
+      for (final beam in framing.diagonals) ...beam.roofIds,
+    };
 
     final result = <ArchitectRoofSectionSlice>[];
     for (final draft in draftSlices) {
@@ -1839,32 +1939,39 @@ class ArchitectRoofGeometry {
         );
       }
 
-      final members = [
-        ...cleanedLayers,
-        for (final member in draft.discreteMembers)
-          if (member.kind != ArchitectRoofMemberKind.fascia)
-            member
-          else
+      final members = [...cleanedLayers];
+      for (final member in draft.discreteMembers) {
+        // Some wall bearings are drawn from section wall spans. Seat the cut
+        // profiles there as well as at the physical plates already cut in 3D.
+        final cutouts = switch (member.kind) {
+          ArchitectRoofMemberKind.fascia => flashings,
+          ArchitectRoofMemberKind.rafter
+              when joinedRoofIds.contains(member.roofId) =>
+            bearingProfiles,
+          _ => const <Path>[],
+        };
+        var path = member.path;
+        for (final cutout in cutouts) {
+          if (!path.getBounds().overlaps(cutout.getBounds())) continue;
+          path = Path.combine(PathOperation.difference, path, cutout);
+        }
+        if (identical(path, member.path)) {
+          members.add(member);
+        } else if (!path.getBounds().isEmpty) {
+          final loops = ArchitectPathSolid.contours(path);
+          members.add(
             ArchitectRoofSectionMember(
               roofId: member.roofId,
               kind: member.kind,
               role: member.role,
               material: member.material,
-              polygon: member.polygon,
+              polygon: loops.length == 1 ? loops.single : const [],
               drawTimberDiagonals: member.drawTimberDiagonals,
-              path: flashings.fold<Path>(
-                member.path,
-                (path, flashing) =>
-                    path.getBounds().overlaps(flashing.getBounds())
-                    ? ArchitectMeshSection.combine(
-                        PathOperation.difference,
-                        path,
-                        flashing,
-                      )
-                    : path,
-              ),
+              path: path,
             ),
-      ];
+          );
+        }
+      }
 
       var envelope = Path()
         ..addPolygon([
@@ -1877,6 +1984,7 @@ class ArchitectRoofGeometry {
         if (m.kind == ArchitectRoofMemberKind.wallPlate ||
             m.kind == ArchitectRoofMemberKind.ringBeam ||
             m.kind == ArchitectRoofMemberKind.ridgePurlin ||
+            m.kind == ArchitectRoofMemberKind.diagonalRafter ||
             m.kind == ArchitectRoofMemberKind.intermediatePurlin ||
             m.kind == ArchitectRoofMemberKind.fascia ||
             m.kind == ArchitectRoofMemberKind.metalFlashing) {

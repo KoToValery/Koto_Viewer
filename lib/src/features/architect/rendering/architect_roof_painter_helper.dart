@@ -580,7 +580,7 @@ class ArchitectRoofPainterHelper {
     final center = arrow.position;
     final slopeDir = arrow.direction == RoofSlopeDirection.upslope
         ? roof.slopeDirection
-        : -roof.slopeDirection;
+        : roof.drainageDirection;
     final arrowHalfLen = (arrow.arrowLength * 16.0).clamp(12.0, 36.0) / scale;
     final start = center - slopeDir * arrowHalfLen;
     final end = center + slopeDir * arrowHalfLen;
@@ -706,7 +706,7 @@ class ArchitectRoofPainterHelper {
     )..layout();
 
     var center = position ?? roof.centroid;
-    final dir = roof.slopeDirection;
+    final dir = roof.drainageDirection;
     if (avoid.isNotEmpty && availableArea != null) {
       List<Rect> symbolBounds(Offset point) => [
         Rect.fromLTWH(
@@ -782,7 +782,7 @@ class ArchitectRoofPainterHelper {
 
     canvas.drawLine(start, end, arrowPaint);
 
-    // Arrowhead at high (upslope) end
+    // The automatic arrow points toward the lower edge.
     final headLen = 6.0 / scale;
     final perp = Offset(-dir.dy, dir.dx);
     final head1 = end - dir * headLen + perp * (headLen * 0.55);

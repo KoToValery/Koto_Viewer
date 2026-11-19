@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_roof_painter_helper.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_vector_scene.dart';
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_roof_settings_commands.dart';
 import 'package:kotoview/src/features/architect/services/architect_roof_tool.dart';
@@ -12,6 +14,7 @@ import 'package:kotoview/src/features/architect/widgets/architect_roof_bar.dart'
 import 'package:kotoview/src/features/architect/widgets/architect_roof_number_field.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_auto_roof_preview_dialog.dart';
 import 'architect_roof_drainage_test.dart' as fixture;
+import 'architect_workspace_interaction_test.dart' as workspace;
 
 ArchitectProject groupProject() {
   final p = fixture.drainageProject();
@@ -36,6 +39,62 @@ ArchitectProject groupProject() {
 }
 
 void main() {
+  test('automatic roof arrows point from higher to lower elevations', () {
+    final floor = groupProject().activeStorey;
+    for (final reverseSlope in [false, true]) {
+      final roof = floor.roofs.first.copyWith(reverseSlope: reverseSlope);
+      final canvas = ArchitectVectorCanvas();
+      ArchitectRoofPainterHelper.paintRoofs(
+        canvas: canvas,
+        storey: floor.copyWith(roofs: [roof]),
+        scale: 100,
+        selectedIds: const {},
+      );
+      final strokes = canvas.operations
+          .whereType<ArchitectVectorPath>()
+          .toList();
+      final shaft = strokes[strokes.length - 3].path.computeMetrics().single;
+      final tail = shaft.getTangentForOffset(0)!.position;
+      final tip = shaft.getTangentForOffset(shaft.length)!.position;
+      expect(roof.topElevationAt(tip), lessThan(roof.topElevationAt(tail)));
+      for (final stroke in strokes.skip(strokes.length - 2)) {
+        expect(
+          stroke.path.computeMetrics().single.getTangentForOffset(0)!.position,
+          tip,
+        );
+      }
+    }
+  });
+
+  testWidgets('roof direction changes through the workspace and can be undone', (
+    tester,
+  ) async {
+    final project = fixture.drainageProject();
+    final roof = project.activeStorey.roofs.single;
+    final controller = ArchitectCommandController(project);
+    addTearDown(controller.dispose);
+    await workspace.open(tester, controller);
+    await tester.tapAt(workspace.screen(tester, roof.centroid));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('roof-direction-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('roof-rotate-slope')));
+    await tester.pumpAndSettle();
+    expect(
+      controller.project.activeStorey.roofs.single.safeEavesEdgeIndex,
+      roof.nextSlopeEdge().safeEavesEdgeIndex,
+    );
+
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(
+      controller.project.activeStorey.roofs.single.safeEavesEdgeIndex,
+      roof.safeEavesEdgeIndex,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   test('Partial between-rafter insulation shares the framing depth', () {
     final assembly = ArchitectRoofAssembly.fromPreset(
       ArchitectRoofPreset.warmPitched,
@@ -431,6 +490,7 @@ void main() {
         final tool = ArchitectRoofTool();
         addTearDown(tool.dispose);
         final p = groupProject();
+        var nextEdges = 0, flips = 0;
         Future<void> show(ArchitectRoofPlane? roof, {int? edge}) =>
             tester.pumpWidget(
               MaterialApp(
@@ -446,6 +506,9 @@ void main() {
                     onAutoRoof: (_) {},
                     onOpenLayersDialog: () {},
                     onSetSelectedEdgeAsEaves: () {},
+                    onSwitchEavesEdge: () => nextEdges++,
+                    onFlipSlopeDirection: () => flips++,
+                    onToggleParapet: () {},
                   ),
                 ),
               ),
@@ -460,6 +523,18 @@ void main() {
           find.byKey(const ValueKey('roof-open-assembly')),
           findsOneWidget,
         );
+        final direction = find.byKey(const ValueKey('roof-direction-menu'));
+        expect(direction, findsOneWidget);
+        await tester.tap(direction);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('roof-rotate-slope')));
+        await tester.pumpAndSettle();
+        expect(nextEdges, 1);
+        await tester.tap(direction);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('roof-flip-slope')));
+        await tester.pumpAndSettle();
+        expect(flips, 1);
         expect(tester.takeException(), isNull);
         tool.setDrawMode(RoofDrawMode.polygon);
         for (final point in const [Offset(0, 0), Offset(4, 0), Offset(4, 4)]) {

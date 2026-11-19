@@ -9257,6 +9257,12 @@ abstract class AppLocalizations {
   /// **'Distance'**
   String get architectEdgeDistance;
 
+  /// No description provided for @architectRoofEdgeSizeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This size would make the roof outline invalid.'**
+  String get architectRoofEdgeSizeInvalid;
+
   /// No description provided for @architectPolygonExactOffset.
   ///
   /// In en, this message translates to:
@@ -11945,11 +11951,29 @@ abstract class AppLocalizations {
   /// **'Reverse the roof slope direction by 180°'**
   String get architectRoofFlipSlopeTooltip;
 
+  /// No description provided for @architectRoofDirection.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get architectRoofDirection;
+
+  /// No description provided for @architectRoofDirectionTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Drainage direction and eaves edge'**
+  String get architectRoofDirectionTooltip;
+
   /// No description provided for @architectRoofRotateSlope.
   ///
   /// In en, this message translates to:
-  /// **'Slope dir'**
+  /// **'Next edge'**
   String get architectRoofRotateSlope;
+
+  /// No description provided for @architectRoofRotateSlopeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the next roof edge as the eaves'**
+  String get architectRoofRotateSlopeTooltip;
 
   /// No description provided for @architectRoofAttachToWalls.
   ///
