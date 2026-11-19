@@ -7399,5 +7399,10 @@
   "stairQuickLandingOffset": "Offset",
   "@stairQuickLandingOffset": {
     "description": "Compact label for flight stagger offset relative to the landing in the quick edit bar"
-  }
+  },
+  "architectExportDwgViews": "DWG drawings",
+  "architectExportDwgSheets": "DWG sheets",
+  "bimProjectExportStoreyDwg": "Storey (DWG)",
+  "exportStructuralDwg": "Storey (DWG)",
+  "exportStructuralDwgHint": "Columns, walls, beams, slabs and axes"
 }

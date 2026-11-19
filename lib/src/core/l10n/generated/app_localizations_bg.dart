@@ -13391,4 +13391,19 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get stairQuickLandingOffset => 'Отстояние';
+
+  @override
+  String get architectExportDwgViews => 'DWG чертежи';
+
+  @override
+  String get architectExportDwgSheets => 'DWG листове';
+
+  @override
+  String get bimProjectExportStoreyDwg => 'Етаж (DWG)';
+
+  @override
+  String get exportStructuralDwg => 'Етаж (DWG)';
+
+  @override
+  String get exportStructuralDwgHint => 'Колони, стени, греди, плочи и оси';
 }

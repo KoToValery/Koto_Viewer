@@ -12,11 +12,20 @@ import java.util.concurrent.Executors
 
 /** Object stream from :dwg_converter through a pipe, avoiding Binder's 1 MB limit. */
 class AndroidDwgReaderClient(private val context: Context) {
-    fun read(inputPath: String, result: MethodChannel.Result) {
+    companion object {
+        private val exportCancellations = mutableMapOf<String, () -> Unit>()
+        fun cancelExport(jobId: String) { exportCancellations.remove(jobId)?.invoke() }
+    }
+
+    fun read(inputPath: String, result: MethodChannel.Result) = stream(inputPath, null, null, result)
+    fun write(input: ByteArray, jobId: String, result: MethodChannel.Result) = stream(null, input, jobId, result)
+
+    private fun stream(inputPath: String?, inputBytes: ByteArray?, jobId: String?, result: MethodChannel.Result) {
         val handler = Handler(Looper.getMainLooper())
         val requestId = SystemClock.elapsedRealtimeNanos()
         val pipe = ParcelFileDescriptor.createPipe()
-        val executor = Executors.newSingleThreadExecutor()
+        val source = if (inputBytes != null) ParcelFileDescriptor.createPipe() else null
+        val executor = Executors.newFixedThreadPool(if (source == null) 1 else 2)
         var worker: Messenger? = null
         var finished = false
         var bound = false
@@ -30,6 +39,7 @@ class AndroidDwgReaderClient(private val context: Context) {
             if (finished) return
             if (code == null && (bytes == null || status == null)) return
             finished = true
+            if (jobId != null) exportCancellations.remove(jobId)
             handler.removeCallbacks(timeout)
             if (code != null) {
                 try {
@@ -40,6 +50,7 @@ class AndroidDwgReaderClient(private val context: Context) {
             }
             try { pipe[0].close() } catch (_: Exception) {}
             try { pipe[1].close() } catch (_: Exception) {}
+            source?.forEach { try { it.close() } catch (_: Exception) {} }
             if (bound) {
                 bound = false
                 try { context.unbindService(connection) } catch (_: Exception) {}
@@ -52,7 +63,7 @@ class AndroidDwgReaderClient(private val context: Context) {
                 val errorCode = when (status) {
                     -97 -> "DWG_READER_UNAVAILABLE"
                     -99 -> "DWG_JNI_FAILED"
-                    -3 -> "DWG_DECODE_FAILED"
+                    -3 -> if (source == null) "DWG_DECODE_FAILED" else "DWG_WRITE_FAILED"
                     -4 -> "DWG_READER_PANIC"
                     -5 -> "DWG_WORKER_START_FAILED"
                     else -> "DWG_READ_FAILED"
@@ -62,6 +73,7 @@ class AndroidDwgReaderClient(private val context: Context) {
             } else result.success(bytes)
         }
         timeout = Runnable { finish("CONVERSION_TIMEOUT") }
+        if (jobId != null) exportCancellations[jobId] = { finish("DWG_EXPORT_CANCELLED") }
         val reply = Messenger(object : Handler(Looper.getMainLooper()) {
             override fun handleMessage(message: Message) {
                 if (message.what == DwgConverterService.MSG_RESULT) {
@@ -76,15 +88,17 @@ class AndroidDwgReaderClient(private val context: Context) {
                 if (finished) return
                 try {
                     worker = Messenger(binder)
-                    worker!!.send(Message.obtain(null, DwgConverterService.MSG_READ).apply {
+                    worker!!.send(Message.obtain(null, if (source == null) DwgConverterService.MSG_READ else DwgConverterService.MSG_WRITE).apply {
                         data = Bundle().apply {
                             putString(DwgConverterService.KEY_INPUT_PATH, inputPath)
                             putLong(DwgConverterService.KEY_REQUEST_ID, requestId)
                             putParcelable(DwgConverterService.KEY_OBJECT_PIPE, pipe[1])
+                            if (source != null) putParcelable(DwgConverterService.KEY_INPUT_PIPE, source[0])
                         }
                         replyTo = reply
                     })
                     pipe[1].close()
+                    source?.get(0)?.close()
                 } catch (_: Exception) { finish("CONVERT_SEND_FAILED") }
             }
             override fun onServiceDisconnected(name: ComponentName?) { finish("OOM_KILLED") }
@@ -95,6 +109,11 @@ class AndroidDwgReaderClient(private val context: Context) {
             bound = context.bindService(Intent(context, DwgConverterService::class.java), connection, Context.BIND_AUTO_CREATE)
             if (!bound) { finish("BIND_FAILED"); return }
             handler.postDelayed(timeout, 120_000L)
+            if (source != null) executor.execute {
+                try {
+                    ParcelFileDescriptor.AutoCloseOutputStream(source[1]).use { it.write(inputBytes!!) }
+                } catch (_: Exception) { handler.post { finish("DWG_INPUT_STREAM_FAILED") } }
+            }
             executor.execute {
                 try {
                     val payload = ByteArrayOutputStream()

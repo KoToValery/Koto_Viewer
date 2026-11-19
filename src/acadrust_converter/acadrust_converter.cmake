@@ -43,6 +43,7 @@ add_custom_command(OUTPUT "${KOTO_ACADRUST_EXE}"
     "${KOTO_ACADRUST_SOURCE}/src/lib.rs"
     "${KOTO_ACADRUST_SOURCE}/src/ffi.rs"
     "${KOTO_ACADRUST_SOURCE}/src/reader.rs"
+    "${KOTO_ACADRUST_SOURCE}/src/writer.rs"
   WORKING_DIRECTORY "${KOTO_ACADRUST_SOURCE}"
   COMMENT "Building acadrust DWG converter"
   VERBATIM)

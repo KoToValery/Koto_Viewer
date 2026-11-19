@@ -858,6 +858,8 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
               enabled: !busy && !editing,
               onSelected: (v) {
                 if (v == 'dxfViews') exchange(ArchitectExchangeFormat.dxfViews);
+                if (v == 'dwgViews') exchange(ArchitectExchangeFormat.dwgViews);
+                if (v == 'dwgSheets') exchange(ArchitectExchangeFormat.dwgSheets);
                 if (v == 'dxfSheets') {
                   exchange(ArchitectExchangeFormat.dxfSheets);
                 }
@@ -946,6 +948,19 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                     icon: AppIconId.building,
                     child: Text(l.architectExportIfc),
                   ),
+                ),
+                PopupMenuItem(
+                  value: 'dwgViews',
+                  key: const ValueKey('architect-sheet-export-dwg-views'),
+                  child: AppMenuLabel(icon: AppIconId.file,
+                    child: Text(l.architectExportDwgViews)),
+                ),
+                PopupMenuItem(
+                  value: 'dwgSheets',
+                  enabled: s != null,
+                  key: const ValueKey('architect-sheet-export-dwg-sheets'),
+                  child: AppMenuLabel(icon: AppIconId.layoutGrid,
+                    child: Text(l.architectExportDwgSheets)),
                 ),
               ],
             ),

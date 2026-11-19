@@ -5,12 +5,57 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/services/dwg_export_service.dart';
 import '../models/structural_element.dart';
 import '../rendering/grid_axis_presentation.dart';
 
 /// Service responsible for persisting and exporting BiM structural models
 /// associated with CAD/DXF drawings.
 class StructuralPersistenceService {
+  /// Exports the current storey as an editable DWG in its CAD coordinate frame.
+  static Future<File> exportToDwgFile({
+    required StructuralProject project,
+    required String baseName,
+    double cadUnitsPerMeter = 1.0,
+    Directory? outputDirectory,
+  }) async {
+    final dir = outputDirectory ?? await getTemporaryDirectory();
+    await dir.create(recursive: true);
+    final work = await dir.createTemp('structural_dwg_');
+    try {
+      final source = await exportStoreyToDxfFile(
+        storey: project
+            .storeyPlanFor(project.activeStorey)
+            .copyWith(gridAxes: project.effectiveGridAxes),
+        baseName: baseName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_'),
+        cadUnitsPerMeter: cadUnitsPerMeter,
+        outputDirectory: work,
+        gridAxisStoreys: project.storeys,
+      );
+      final bytes = await DwgExportService.encode(await source.readAsBytes());
+      final name = source.uri.pathSegments.last;
+      return File(
+        '${dir.path}/${name.substring(0, name.length - 4)}.dwg',
+      ).writeAsBytes(bytes, flush: true);
+    } finally {
+      await work.delete(recursive: true);
+    }
+  }
+
+  static String _cadHeader(double unitsPerMeter) {
+    if (!unitsPerMeter.isFinite || unitsPerMeter <= 0) {
+      throw ArgumentError('Invalid CAD units');
+    }
+    const scales = {6: 1.0, 5: 100.0, 4: 1000.0, 1: 1 / .0254, 2: 1 / .3048};
+    final code =
+        scales.entries
+            .where((e) => (e.value - unitsPerMeter).abs() < e.value * 1e-6)
+            .firstOrNull
+            ?.key ??
+        0;
+    return '0\nSECTION\n2\nHEADER\n9\n\$ACADVER\n1\nAC1015\n9\n\$INSUNITS\n70\n$code';
+  }
+
   static const String _prefPrefix = 'koto_bim_v1_';
 
   /// Generates a standardized document storage key from file path or title.
@@ -95,9 +140,7 @@ class StructuralPersistenceService {
     final sb = StringBuffer();
 
     // 1. DXF Header
-    sb.writeln(
-      '0\nSECTION\n2\nHEADER\n9\n\$ACADVER\n1\nAC1015',
-    ); // AutoCAD 2000
+    sb.writeln(_cadHeader(cadUnitsPerMeter));
     sb.writeln('0\nENDSEC');
 
     // 2. DXF Tables (Layers)
@@ -146,16 +189,14 @@ class StructuralPersistenceService {
     final sb = StringBuffer();
 
     // 1. DXF Header
-    sb.writeln(
-      '0\nSECTION\n2\nHEADER\n9\n\$ACADVER\n1\nAC1015',
-    ); // AutoCAD 2000
+    final localUnitsPerMeter = cpRef != null && cpLocal != null && unitScale > 0
+        ? cadUnitsPerMeter / unitScale
+        : cadUnitsPerMeter;
+    sb.writeln(_cadHeader(localUnitsPerMeter));
     sb.writeln('0\nENDSEC');
 
     // Define the axis pattern explicitly so CAD applications render it reliably.
     sb.writeln('0\nSECTION\n2\nTABLES');
-    final localUnitsPerMeter = cpRef != null && cpLocal != null && unitScale > 0
-        ? cadUnitsPerMeter / unitScale
-        : cadUnitsPerMeter;
     sb.writeln('0\nTABLE\n2\nLTYPE\n70\n2');
     sb.writeln(
       '0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n73\n0\n40\n0.0',

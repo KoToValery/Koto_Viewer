@@ -26,6 +26,8 @@ class DwgConverterService : Service() {
         const val MSG_RESULT = 2
         const val MSG_CANCEL = 3
         const val MSG_READ = 4
+        const val MSG_WRITE = 5
+        const val KEY_INPUT_PIPE = "input_pipe"
         const val KEY_OBJECT_PIPE = "object_pipe"
         const val KEY_INPUT_PATH = "input_path"
         const val KEY_OUTPUT_PATH = "output_path"
@@ -68,6 +70,9 @@ class DwgConverterService : Service() {
         @JvmStatic
         external fun readDwgWithAcadrustDetailed(inDwgPath: String, outputFd: Int, diagnostic: ByteArray): Int
 
+        @JvmStatic
+        external fun writeDwgWithAcadrust(inputFd: Int, outputFd: Int, diagnostic: ByteArray): Int
+
         private fun convert(backend: String, input: String, output: String): Int = when (backend) {
             "acadrust" -> if (acadrustLoaded) convertDwgWithAcadrust(input, output) else -97
             "libredwg" -> if (libreDwgLoaded) convertDwgToDxf(input, output) else -97
@@ -83,11 +88,19 @@ class DwgConverterService : Service() {
     private class IncomingHandler(private val service: DwgConverterService) : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
-                MSG_READ -> {
-                    val input = msg.data.getString(KEY_INPUT_PATH) ?: return
+                MSG_READ, MSG_WRITE -> {
+                    val writing = msg.what == MSG_WRITE
+                    val operation = if (writing) "write" else "read"
+                    val input = msg.data.getString(KEY_INPUT_PATH)
                     @Suppress("DEPRECATION")
-                    val pipe = msg.data.getParcelable<android.os.ParcelFileDescriptor>(KEY_OBJECT_PIPE) ?: return
-                    val reply = msg.replyTo ?: run { pipe.close(); return }
+                    val source = msg.data.getParcelable<android.os.ParcelFileDescriptor>(KEY_INPUT_PIPE)
+                    @Suppress("DEPRECATION")
+                    val pipe = msg.data.getParcelable<android.os.ParcelFileDescriptor>(KEY_OBJECT_PIPE)
+                        ?: run { source?.close(); return }
+                    if ((writing && source == null) || (!writing && input == null)) {
+                        source?.close(); pipe.close(); return
+                    }
+                    val reply = msg.replyTo ?: run { source?.close(); pipe.close(); return }
                     val requestId = msg.data.getLong(KEY_REQUEST_ID)
                     service.executor.execute {
                         service.activeRequestId = requestId
@@ -96,23 +109,25 @@ class DwgConverterService : Service() {
                         try {
                             if (!service.cancelledRequests.remove(requestId) && acadrustLoaded) {
                                 val buffer = ByteArray(4096)
-                                result = readDwgWithAcadrustDetailed(input, pipe.fd, buffer)
+                                result = if (writing) writeDwgWithAcadrust(source!!.fd, pipe.fd, buffer)
+                                    else readDwgWithAcadrustDetailed(input!!, pipe.fd, buffer)
                                 val end = buffer.indexOf(0.toByte()).let { if (it < 0) buffer.size else it }
                                 diagnostic = String(buffer, 0, end, Charsets.UTF_8)
                             } else {
                                 diagnostic = acadrustLoadError ?: diagnostic
                             }
                         } catch (error: Throwable) {
-                            Log.e(TAG, "Direct DWG read failed", error)
+                            Log.e(TAG, "Direct DWG $operation failed", error)
                             diagnostic = error.toString()
                             result = -99
                         } finally {
+                            source?.close()
                             pipe.close()
                             service.activeRequestId = null
                         }
                         val abi = if (android.os.Process.is64Bit()) "64-bit" else "32-bit"
-                        if (result == 0) Log.i(TAG, "Direct DWG read completed request=$requestId process=$abi")
-                        else Log.e(TAG, "Direct DWG read failed request=$requestId status=$result process=$abi: $diagnostic")
+                        if (result == 0) Log.i(TAG, "Direct DWG $operation completed request=$requestId process=$abi")
+                        else Log.e(TAG, "Direct DWG $operation failed request=$requestId status=$result process=$abi: $diagnostic")
                         try {
                             reply.send(Message.obtain(null, MSG_RESULT).apply {
                                 data = Bundle().apply {

@@ -32165,15 +32165,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           activeSelectedStair?.width ?? _elementTool.stairWidth,
                     ),
                   ),
-                  onStairRiserChanged: (targetRiser) => _applyQuickStairDesign(
-                    activeSelectedStair,
-                    activeStairDesign.copyWith(
-                      manualRisers: ArchitectStairRules.risersForTargetHeight(
-                        activeStairDesign,
-                        targetRiser,
-                      ),
-                    ),
-                  ),
+                  onStairRiserChanged: (targetRiser) {
+                    final fitted = ArchitectStairRules.applyTargetRiser(
+                      activeStairDesign, targetRiser,
+                    );
+                    if (fitted == null) {
+                      _operationError();
+                      return;
+                    }
+                    _applyQuickStairDesign(activeSelectedStair, fitted);
+                  },
                   onStairTurnChanged: (turnLeft) => _applyQuickStairDesign(
                     activeSelectedStair,
                     activeStairDesign.copyWith(turnLeft: turnLeft),

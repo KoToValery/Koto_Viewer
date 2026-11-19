@@ -187,11 +187,56 @@ void main() {
         );
         expect(ArchitectStairLayoutResolver.check(edited.design!), isEmpty);
         expect(edited.design!.rise, closeTo(3.00, 1e-6));
+        await _enterStairDimension(tester, 'stair-riser-input', '15');
+        final fitted = commands.project.activeStorey.stairs.single;
+        expect(fitted.design!.risers, 20);
+        expect(fitted.design!.riser, closeTo(.15, 1e-9));
+        expect(ArchitectStairLayoutResolver.check(fitted.design!), isEmpty);
+        commands.undo();
+        await tester.pumpAndSettle();
+        expect(commands.project.activeStorey.stairs.single.design!.risers,
+            edited.design!.risers);
       },
     );
   });
 
   group('Landing handle editing', () {
+    test('lateral flight handle preserves risers and reconnects landing', () {
+      for (final shape in [StairShape.halfTurn, StairShape.quarterTurn]) {
+        final stair = ArchitectStair(
+          id: 'lateral',
+          startPoint: Offset.zero,
+          endPoint: const Offset(1, 0),
+          width: 1,
+          design: ArchitectStairDesign(
+            shape: shape,
+            rise: 2.8,
+            followStoreys: false,
+            totalWidth: 2.4,
+            landingDepth: 1.2,
+          ),
+        );
+        final handle = ArchitectStairHandles.handles(
+          stair,
+          .25,
+        ).firstWhere((h) => h.lateral);
+        final direction = (handle.handle - handle.anchor) / .25;
+        final moved = ArchitectStairHandles.applyDrag(
+          stair,
+          handle,
+          handle.anchor + direction * .2,
+        );
+        expect(moved.design!.risers, stair.design!.risers);
+        expect(moved.design!.riser, closeTo(stair.design!.riser, 1e-9));
+        expect(moved.width, stair.width);
+        expect(ArchitectStairLayoutResolver.check(moved.design!), isEmpty);
+        expect(
+          (ArchitectStairHandles.anchorFor(moved, handle) - handle.anchor)
+              .distance,
+          closeTo(.2, 1e-6),
+        );
+      }
+    });
     test('halfTurn landing flight handles and outer landing back edge adjust cleanly in both directions', () {
       const stair = ArchitectStair(
         id: 'u_stair',
@@ -227,6 +272,9 @@ void main() {
         f0Back.design!.layout!.flights[0].risers,
         stair.design!.flightRisers[0] - 1,
       );
+
+      expect(f0Back.design!.risers, stair.design!.risers);
+      expect(f0Back.design!.riser, closeTo(stair.design!.riser, 1e-9));
 
       // 2. Push flight 0 end forward into landing (lengthens flight 0 & pushes back edge cleanly).
       final f0Forward = ArchitectStairHandles.applyDrag(

@@ -4,6 +4,28 @@
 #include <unistd.h>
 
 extern int32_t koto_acadrust_read_utf16(const uint16_t *input, size_t input_len, int32_t fd);
+extern int32_t koto_acadrust_write_dwg(int32_t input_fd, int32_t output_fd, uint8_t *error, size_t capacity);
+
+JNIEXPORT jint JNICALL
+Java_com_koto_kotoviewer_DwgConverterService_writeDwgWithAcadrust(
+    JNIEnv *env, jclass clazz, jint input_fd, jint output_fd, jbyteArray diagnostic) {
+    (void)clazz;
+    if (input_fd < 0 || output_fd < 0 || !diagnostic) return -1;
+    jbyte *error = (*env)->GetByteArrayElements(env, diagnostic, NULL);
+    if (!error) return -1;
+    const int in_copy = dup(input_fd);
+    const int out_copy = dup(output_fd);
+    jint result = -1;
+    if (in_copy >= 0 && out_copy >= 0) {
+        result = koto_acadrust_write_dwg(in_copy, out_copy, (uint8_t *)error,
+            (size_t)(*env)->GetArrayLength(env, diagnostic));
+    } else {
+        if (in_copy >= 0) close(in_copy);
+        if (out_copy >= 0) close(out_copy);
+    }
+    (*env)->ReleaseByteArrayElements(env, diagnostic, error, 0);
+    return result;
+}
 extern int32_t koto_acadrust_read_utf16_detailed(const uint16_t *input, size_t input_len,
                                                int32_t fd, uint8_t *error, size_t capacity);
 

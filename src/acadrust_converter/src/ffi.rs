@@ -1,5 +1,39 @@
 use std::{panic, path::Path, slice, thread};
 
+/// # Safety
+/// The two duplicated FDs are owned by this call. A non-null diagnostic buffer
+/// contains `capacity` writable bytes. No Rust unwind crosses the JNI boundary.
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn koto_acadrust_write_dwg(
+    input_fd: i32, output_fd: i32, diagnostic: *mut u8, capacity: usize,
+) -> i32 {
+    use std::{fs::File, io::BufWriter, os::fd::FromRawFd};
+    if input_fd < 0 || output_fd < 0 { return -1; }
+    let input = unsafe { File::from_raw_fd(input_fd) };
+    let output = unsafe { File::from_raw_fd(output_fd) };
+    let (code, message) = panic::catch_unwind(|| {
+        match thread::Builder::new().name("acadrust-write".into())
+            .stack_size(8 * 1024 * 1024).spawn(move || {
+                match crate::write_dwg(input, BufWriter::new(output)) {
+                    Ok(()) => (0, String::new()),
+                    Err(error) => (-3, error.to_string()),
+                }
+            }) {
+            Ok(worker) => worker.join().unwrap_or((-4, "Native DWG writer panicked".into())),
+            Err(error) => (-5, format!("Cannot start DWG writer: {error}")),
+        }
+    }).unwrap_or((-4, "Native DWG writer panicked".into()));
+    if !diagnostic.is_null() && capacity > 0 {
+        let count = message.len().min(capacity - 1);
+        unsafe {
+            std::ptr::copy_nonoverlapping(message.as_ptr(), diagnostic, count);
+            *diagnostic.add(count) = 0;
+        }
+    }
+    code
+}
+
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub unsafe extern "C" fn koto_acadrust_read_utf16(input: *const u16, len: usize, fd: i32) -> i32 {

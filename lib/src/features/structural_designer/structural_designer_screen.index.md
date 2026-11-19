@@ -44,6 +44,12 @@ These are existing reference patterns, not mandatory templates. For a new featur
 
 ## 4. Cross-cutting state and owners
 
+`[TAG:STRUCT_DWG_EXPORT]` / `_showExportDialog` reuses the CAD export/share
+sheet. In a BIM project it delegates to `bimContext.onExport`; standalone DWG
+uses `StructuralPersistenceService.exportToDwgFile` for the current storey, its
+effective grid axes and CAD units. DXF retains its existing scope. Export does
+not mutate the project, undo history or viewport. Both sheets scroll on phones.
+
 - `_project` (`StructuralProject`): Active structural engineering model and active storey (`_project.activeStorey`).
 - `_activeTool` (`StructuralDrawTool`): Currently selected structural tool (`select`, `gridAxis`, `column`, `shearWall`, `beam`, `slab`, `slabOpening`, `measure`, `layers`).
 - `_viewportNavigation` & `_transformController`: Viewport transform and `BimEditingViewport` navigation controller; pan locking is driven by `_viewportDragging`.

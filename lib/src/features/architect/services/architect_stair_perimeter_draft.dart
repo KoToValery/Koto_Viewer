@@ -39,10 +39,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
       targetRisers = seed.design!.manualRisers,
       super(
         seed.copyWith(
-          design: seed.design!.copyWith(
-            clearLayout: true,
-            autoRisers: true,
-          ),
+          design: seed.design!.copyWith(clearLayout: true, autoRisers: true),
         ),
         create: true,
       );
@@ -167,6 +164,14 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
 
   void unlock() {
     reviewing = false;
+    notifyListeners();
+  }
+
+  /// Discard only the provisional endpoint, leaving accepted parts intact.
+  void rejectPart() {
+    target = anchor;
+    reviewing = false;
+    _going = _effectiveGoing(visibleSegments);
     notifyListeners();
   }
 
@@ -319,19 +324,23 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     List<Offset> pendingHull,
     double going,
     double side,
-  }) _buildGeometry(List<StairPerimeterSegment> source, {double? overrideSide}) {
+  })
+  _buildGeometry(List<StairPerimeterSegment> source, {double? overrideSide}) {
     final sSide = overrideSide ?? _sideFor(source);
     // Pass 1: derive each flight's clear corridor after inward turning landings
     // trim the preceding flight end and advance the following flight start.
-    final drafts = <({
-      Offset origin,
-      Offset axis,
-      Offset normal,
-      double width,
-      double run,
-      bool trimmedByTurn,
-      List<List<Offset>> precedingPending,
-    })>[];
+    final drafts =
+        <
+          ({
+            Offset origin,
+            Offset axis,
+            Offset normal,
+            double width,
+            double run,
+            bool trimmedByTurn,
+            List<List<Offset>> precedingPending,
+          })
+        >[];
     final pending = <List<Offset>>[];
     var truncated = false;
     for (final s in source) {
@@ -431,7 +440,9 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
         axis: d.axis,
         width: d.width,
         risers: treads + 1,
-        fixedRun: isFirst || (d.run - fittedRun).abs() <= 1e-6 ? fittedRun : null,
+        fixedRun: isFirst || (d.run - fittedRun).abs() <= 1e-6
+            ? fittedRun
+            : null,
       );
       if (i > 0 && d.precedingPending.isNotEmpty) {
         final previous = flights.last;
@@ -447,10 +458,8 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     final pendingHull = pending.isNotEmpty && flights.isNotEmpty
         ? _hull([
             for (final quad in pending) ...quad,
-            flights.last.end(g) -
-                flights.last.normal * flights.last.width / 2,
-            flights.last.end(g) +
-                flights.last.normal * flights.last.width / 2,
+            flights.last.end(g) - flights.last.normal * flights.last.width / 2,
+            flights.last.end(g) + flights.last.normal * flights.last.width / 2,
           ])
         : const <Offset>[];
     return (
@@ -622,6 +631,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     _designKey = (base, _going);
     return _designValue = base.copyWith(manualGoing: _going);
   }
+
   @override
   void replaceDesign(ArchitectStairDesign next) {
     _baseGoing = ArchitectStairDesign.roundGoing(next.going);
@@ -677,14 +687,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     if (segments.isEmpty) return null;
     final geom = _buildGeometry(segments);
     final g = geom.going;
-    final key = (
-      design,
-      segments.length,
-      segments.last,
-      side,
-      sideLocked,
-      g,
-    );
+    final key = (design, segments.length, segments.last, side, sideLocked, g);
     if (_snapKey == key) return _snapValue;
     _snapKey = key;
     final l = geom.layout;

@@ -7,7 +7,9 @@ chips (`stair-width-input`, `stair-total-width-input`,
 `stair-outer-diameter-input`, `stair-landing-depth-input`, `stair-going-input`,
 `stair-riser-input`) for both placement defaults and `selectedStair` editing,
 alongside the `onStairProperties` button. Freeform opens the workspace session
-under `[TAG:STAIR_FREEFORM]`. Both supported ARB locales provide all labels.
+under `[TAG:STAIR_FREEFORM]`. The riser chip also supports custom layouts;
+the workspace fits the requested integer count while respecting layout locks.
+Both supported ARB locales provide all labels.
 > **Path**: `lib/src/features/architect/widgets/architect_tool_palette.dart`  
 > **Primary class**: `_ArchitectToolPaletteState` (+1 more)  
 > **Important**: Treat this map as a discovery aid, not a specification. Verify concrete symbols, anchors, and behavior in the current source with `rg -n`.

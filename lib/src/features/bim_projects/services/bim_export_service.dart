@@ -5,6 +5,8 @@ import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../core/services/dxf_exporter_service.dart';
+import '../../../core/services/dwg_export_service.dart';
+import '../../../core/services/acadrust_converter_service.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import 'bim_analysis_snapshot.dart';
 import '../../structural_designer/models/structural_element.dart';
@@ -19,6 +21,38 @@ import 'bim_project_asset_service.dart';
 /// Service responsible for exporting individual storey DXF drawings (with original
 /// CAD coordinates, preserved layer states, and structural BiM layers) and full-project ZIP packages.
 class BimExportService {
+  /// Reuses storey alignment, units and visible layers from the established CAD
+  /// export. All working CAD files are owned by this job and removed afterwards.
+  static Future<File> exportStoreyDwg({
+    required BimWorkProject project,
+    required StructuralProject structural,
+    required String storeyId,
+    double? cadUnitsPerMeter,
+    Directory? outputDirectory,
+    BimProjectLibraryService? libraryService,
+  }) async {
+    final directory = outputDirectory ?? await getTemporaryDirectory();
+    await directory.create(recursive: true);
+    final work = await directory.createTemp('bim_dwg_export_');
+    try {
+      final cad = await exportStoreyDxf(
+        project: project,
+        structural: structural,
+        storeyId: storeyId,
+        cadUnitsPerMeter: cadUnitsPerMeter,
+        outputDirectory: work,
+        libraryService: libraryService,
+      );
+      final bytes = await DwgExportService.encode(await cad.readAsBytes());
+      final name = cad.uri.pathSegments.last;
+      return File(
+        '${directory.path}/${name.substring(0, name.length - 4)}.dwg',
+      ).writeAsBytes(bytes, flush: true);
+    } finally {
+      await work.delete(recursive: true);
+    }
+  }
+
   /// Exports a single storey level as an AutoCAD DXF file merged with the structural BiM model.
   /// If an architectural underlay is attached, the structural elements are transformed back into
   /// the drawing's original local coordinate space, and layer on/off states are preserved.
@@ -98,9 +132,10 @@ class BimExportService {
     // 2. If underlay drawing exists, merge with it and apply layerVisibility
     if (bimStorey.hasUnderlay) {
       final path = bimStorey.isKcad
-          ? bimStorey.processing['dxf'] as String?
+          ? (bimStorey.processing['dxf'] ?? bimStorey.processing['source'])
+                as String?
           : bimStorey.underlayFileName;
-      if (path == null) {
+      if (path == null || path.toLowerCase().endsWith('.kcad')) {
         throw UnsupportedError(
           'DXF export of a KCAD-only underlay requires its original DXF. The KCAD underlay is preserved.',
         );
@@ -132,8 +167,8 @@ class BimExportService {
 
       if (await underlayFile.exists()) {
         final finalDxfFile = File('${tempDir.path}/$outBaseName.dxf');
-        return DxfExporterService.exportMergedDxf(
-          baseFile: underlayFile,
+        return _mergeStoreySource(
+          underlayFile: underlayFile,
           importedFiles: [structDxfFile],
           layerVisibility: visibility,
           outputFile: finalDxfFile,
@@ -142,6 +177,52 @@ class BimExportService {
     }
 
     return structDxfFile;
+  }
+
+  static Future<File> _mergeStoreySource({
+    required File underlayFile,
+    required List<File> importedFiles,
+    required Map<String, bool> layerVisibility,
+    required File outputFile,
+  }) async {
+    Directory? work;
+    try {
+      var base = underlayFile;
+      if (base.path.toLowerCase().endsWith('.dwg')) {
+        // Explicit export only. Opening the underlay continues to read DWG directly.
+        work = await outputFile.parent.createTemp('bim_export_source_');
+        final exchange = File('${work.path}/source.dxf');
+        final bool success;
+        if (Platform.isAndroid) {
+          success = await AcadrustConverterService.convertAndroid(
+            input: base,
+            output: exchange,
+          );
+        } else {
+          final executable = AcadrustConverterService.findExecutable();
+          if (executable == null) {
+            throw UnsupportedError('Native CAD export unavailable');
+          }
+          success = await AcadrustConverterService.convert(
+            executable: executable,
+            input: base,
+            output: exchange,
+          );
+        }
+        if (!success) {
+          throw StateError('Could not export original DWG underlay');
+        }
+        base = exchange;
+      }
+      return await DxfExporterService.exportMergedDxf(
+        baseFile: base,
+        importedFiles: importedFiles,
+        layerVisibility: layerVisibility,
+        outputFile: outputFile,
+      );
+    } finally {
+      if (work != null) await work.delete(recursive: true);
+    }
   }
 
   /// A self-contained package: authoritative model, original working sources,

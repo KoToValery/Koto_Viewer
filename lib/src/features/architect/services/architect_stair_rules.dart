@@ -77,8 +77,7 @@ class ArchitectStairRules {
         const StairCheck(StairCheckKind.layout, StairCheckState.error),
       );
     }
-    final measuredHeadroom =
-        project != null && storey != null && !d.isSpiral
+    final measuredHeadroom = project != null && storey != null && !d.isSpiral
         ? ArchitectStairHeadroom.minimum(project, storey, stair)
         : null;
     void range(
@@ -119,8 +118,12 @@ class ArchitectStairRules {
     range(StairCheckKind.width, width, min: .90);
     range(StairCheckKind.riser, d.riser, min: minRiser, max: maxRiser);
     if (!d.isSpiral) {
-      final hasStraightTreads = !d.hasWinders ||
-          d.risers - 1 - d.winderLayout(stair.width).perQuarter * d.turnQuarters > 0;
+      final hasStraightTreads =
+          !d.hasWinders ||
+          d.risers -
+                  1 -
+                  d.winderLayout(stair.width).perQuarter * d.turnQuarters >
+              0;
       if (hasStraightTreads) {
         range(StairCheckKind.going, walkGoing, min: .25, max: .35);
         range(StairCheckKind.slope, d.riser / walkGoing, max: 1 / 1.5);
@@ -193,12 +196,7 @@ class ArchitectStairRules {
           advisory: false,
         );
       } else {
-        range(
-          StairCheckKind.headroom,
-          effective,
-          min: 2.1,
-          article: '2.10 m',
-        );
+        range(StairCheckKind.headroom, effective, min: 2.1, article: '2.10 m');
       }
     } else if (measuredHeadroom != null && measuredHeadroom.isFinite) {
       range(
@@ -316,10 +314,58 @@ class ArchitectStairRules {
       minRisers = math.max(minRisers, 4);
     }
     if (design.isSpiral) {
-      minRisers = math.max(minRisers, (design.sweepDegrees / 180.0).floor() + 2);
+      minRisers = math.max(
+        minRisers,
+        (design.sweepDegrees / 180.0).floor() + 2,
+      );
     }
     final safeTarget = targetRiser > 0.001 ? targetRiser : design.riser;
     return (design.rise / safeTarget).round().clamp(minRisers, 500);
+  }
+
+  /// Fit an integer total to the target while respecting locked custom geometry.
+  /// Returns null when the constraints cannot accommodate that total.
+  static ArchitectStairDesign? applyTargetRiser(
+    ArchitectStairDesign design,
+    double targetRiser,
+  ) {
+    final count = risersForTargetHeight(design, targetRiser);
+    final requested = design.copyWith(
+      manualRisers: count,
+      manualGoing: design.layout == null ? null : design.going,
+    );
+    final layout = design.layout;
+    if (layout == null) return requested;
+    final difference = count - layout.risers;
+    // Prefer changing a free end: this retains the landing connection and
+    // keeps all other flights in place.
+    for (final index in {layout.flights.length - 1, 0}) {
+      if (index < 0) continue;
+      final flight = layout.flights[index];
+      final nextCount = flight.risers + difference;
+      if (flight.countLocked ||
+          flight.fixedRun != null ||
+          nextCount < 2 ||
+          nextCount > 500) {
+        continue;
+      }
+      final origin = index == 0 && layout.flights.length > 1
+          ? flight.end(design.going) -
+                flight.axis * ((nextCount - 1) * design.going)
+          : flight.origin;
+      final nextLayout = layout.copyWith(
+        flights: [
+          for (var i = 0; i < layout.flights.length; i++)
+            i == index
+                ? flight.copyWith(origin: origin, risers: nextCount)
+                : layout.flights[i],
+        ],
+      );
+      final candidate = requested.copyWith(layout: nextLayout);
+      if (ArchitectStairLayoutResolver.check(candidate).isEmpty)
+        return candidate;
+    }
+    return ArchitectStairLayoutResolver.fit(requested);
   }
 
   /// Applies a rounded going (`0.1 cm` = `0.001 m`) and recalculates riser
@@ -377,7 +423,8 @@ class ArchitectStairRules {
       return rounded;
     }
     if (design.hasWinders) {
-      final turnCount = design.winderLayout(width).perQuarter * design.turnQuarters;
+      final turnCount =
+          design.winderLayout(width).perQuarter * design.turnQuarters;
       final minRisers = turnCount + 3;
       final currentStraightRun = math.max(
         0.0,
@@ -388,10 +435,7 @@ class ArchitectStairRules {
         minRisers,
         500,
       );
-      return design.copyWith(
-        manualGoing: nextGoing,
-        manualRisers: nextRisers,
-      );
+      return design.copyWith(manualGoing: nextGoing, manualRisers: nextRisers);
     }
     final flights = design.flightCount;
     final currentRun = math.max(
@@ -401,10 +445,7 @@ class ArchitectStairRules {
     final targetTreads = math.max(flights, (currentRun / nextGoing).round());
     final minRisers = design.shape == StairShape.straight ? 2 : 4;
     final nextRisers = (targetTreads + flights).clamp(minRisers, 500);
-    return design.copyWith(
-      manualGoing: nextGoing,
-      manualRisers: nextRisers,
-    );
+    return design.copyWith(manualGoing: nextGoing, manualRisers: nextRisers);
   }
 }
 

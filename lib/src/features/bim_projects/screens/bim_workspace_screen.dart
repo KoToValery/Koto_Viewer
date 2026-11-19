@@ -191,197 +191,211 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.share_rounded,
-                    color: Color(0xFF00E5FF),
-                    size: 22,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.share_rounded,
+                      color: Color(0xFF00E5FF),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      context.l10n.exportBimModel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Storey CAD export uses the existing share/error flow.
+                for (final dwg in [true, false])
+                  ListTile(
+                    key: ValueKey(
+                      dwg ? 'bim-export-storey-dwg' : 'bim-export-storey-dxf',
+                    ),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFB300).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const AppIcon(
+                        AppIconId.measureAngle,
+                        color: Color(0xFFFFB300),
+                      ),
+                    ),
+                    title: Text(
+                      dwg
+                          ? context.l10n.bimProjectExportStoreyDwg
+                          : context.l10n.bimProjectExportStoreyDxf,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      context.l10n.bimProjectExportStoreyDxfSubtitle,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                    onTap: () async {
+                      Navigator.of(ctx).pop();
+                      try {
+                        final export = dwg
+                            ? BimExportService.exportStoreyDwg
+                            : BimExportService.exportStoreyDxf;
+                        final file = await export(
+                          project: _project,
+                          structural: project,
+                          storeyId: activeStoreyId,
+                          cadUnitsPerMeter: _underlays?.cadUnitsPerMeter ?? 1.0,
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                context.l10n.bimProjectExportSuccess(
+                                  file.uri.pathSegments.last,
+                                ),
+                              ),
+                              backgroundColor: const Color(0xFF1E88E5),
+                            ),
+                          );
+                        }
+                        await BimExportService.shareFile(file);
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                context.l10n.exportFailed(e.toString()),
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    },
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    context.l10n.exportBimModel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                const Divider(color: Colors.white12),
+                // Full Project Package ZIP Export
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const AppIcon(
+                      AppIconId.archive,
+                      color: Color(0xFF00E5FF),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Storey DXF Export
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFB300).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+                  title: Text(
+                    context.l10n.bimProjectExportAllZip,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  child: const AppIcon(
-                    AppIconId.measureAngle,
-                    color: Color(0xFFFFB300),
+                  subtitle: Text(
+                    context.l10n.bimProjectExportAllZipSubtitle,
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
                   ),
-                ),
-                title: Text(
-                  context.l10n.bimProjectExportStoreyDxf,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  context.l10n.bimProjectExportStoreyDxfSubtitle,
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
-                ),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  try {
-                    final file = await BimExportService.exportStoreyDxf(
-                      project: _project,
-                      structural: project,
-                      storeyId: activeStoreyId,
-                      cadUnitsPerMeter: _underlays?.cadUnitsPerMeter ?? 1.0,
-                    );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            context.l10n.bimProjectExportSuccess(
-                              file.uri.pathSegments.last,
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                    try {
+                      final file = await BimExportService.exportProjectZip(
+                        project: _project,
+                        structural: project,
+                        cadUnitsPerMeter: _underlays?.cadUnitsPerMeter ?? 1.0,
+                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              context.l10n.bimProjectExportSuccess(
+                                file.uri.pathSegments.last,
+                              ),
                             ),
+                            backgroundColor: const Color(0xFF1E88E5),
                           ),
-                          backgroundColor: const Color(0xFF1E88E5),
-                        ),
-                      );
-                    }
-                    await BimExportService.shareFile(file);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            context.l10n.exportFailed(e.toString()),
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                },
-              ),
-              const Divider(color: Colors.white12),
-              // Full Project Package ZIP Export
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const AppIcon(
-                    AppIconId.archive,
-                    color: Color(0xFF00E5FF),
-                  ),
-                ),
-                title: Text(
-                  context.l10n.bimProjectExportAllZip,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  context.l10n.bimProjectExportAllZipSubtitle,
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
-                ),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  try {
-                    final file = await BimExportService.exportProjectZip(
-                      project: _project,
-                      structural: project,
-                      cadUnitsPerMeter: _underlays?.cadUnitsPerMeter ?? 1.0,
-                    );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            context.l10n.bimProjectExportSuccess(
-                              file.uri.pathSegments.last,
-                            ),
-                          ),
-                          backgroundColor: const Color(0xFF1E88E5),
-                        ),
-                      );
-                    }
-                    await BimExportService.shareFile(file);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            context.l10n.exportFailed(e.toString()),
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                },
-              ),
-              const Divider(color: Colors.white12),
-              // BiM Model JSON Export
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFAB47BC).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const AppIcon(
-                    AppIconId.code,
-                    color: Color(0xFFAB47BC),
-                  ),
-                ),
-                title: Text(
-                  context.l10n.exportBimJson,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  context.l10n.commandUiJsonBimJson,
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
-                ),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  try {
-                    final file =
-                        await StructuralPersistenceService.exportToJsonFile(
-                          project: project,
-                          baseName: _project.name,
                         );
-                    await StructuralPersistenceService.shareFile(file);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            context.l10n.exportFailed(e.toString()),
+                      }
+                      await BimExportService.shareFile(file);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              context.l10n.exportFailed(e.toString()),
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      }
                     }
-                  }
-                },
-              ),
-            ],
+                  },
+                ),
+                const Divider(color: Colors.white12),
+                // BiM Model JSON Export
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFAB47BC).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const AppIcon(
+                      AppIconId.code,
+                      color: Color(0xFFAB47BC),
+                    ),
+                  ),
+                  title: Text(
+                    context.l10n.exportBimJson,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    context.l10n.commandUiJsonBimJson,
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                    try {
+                      final file =
+                          await StructuralPersistenceService.exportToJsonFile(
+                            project: project,
+                            baseName: _project.name,
+                          );
+                      await StructuralPersistenceService.shareFile(file);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              context.l10n.exportFailed(e.toString()),
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

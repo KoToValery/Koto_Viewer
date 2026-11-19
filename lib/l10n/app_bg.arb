@@ -4587,5 +4587,10 @@
   "stairRiserRangeWarning": "Височината на стъпалото е извън {min}–{max} cm",
   "stairQuickHeight": "Височина H",
   "stairQuickWellGap": "Око: {gap}",
-  "stairQuickLandingOffset": "Отстояние"
+  "stairQuickLandingOffset": "Отстояние",
+  "architectExportDwgViews": "DWG чертежи",
+  "architectExportDwgSheets": "DWG листове",
+  "bimProjectExportStoreyDwg": "Етаж (DWG)",
+  "exportStructuralDwg": "Етаж (DWG)",
+  "exportStructuralDwgHint": "Колони, стени, греди, плочи и оси"
 }

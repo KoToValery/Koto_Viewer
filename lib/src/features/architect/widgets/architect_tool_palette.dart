@@ -1810,7 +1810,7 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
             maxCm: 30,
             warning: riserWarning,
             warningTooltip: riserWarnText,
-            onChangedMeters: hasCustomLayout ? null : widget.onStairRiserChanged,
+            onChangedMeters: widget.onStairRiserChanged,
           ),
           Padding(
             padding: const EdgeInsets.only(left: 6),

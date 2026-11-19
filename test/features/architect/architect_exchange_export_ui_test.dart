@@ -133,6 +133,22 @@ void main() {
     expect(
       tester
           .widget<PopupMenuItem<String>>(
+            find.byKey(const ValueKey('architect-sheet-export-dwg-views')),
+          )
+          .enabled,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<PopupMenuItem<String>>(
+            find.byKey(const ValueKey('architect-sheet-export-dwg-sheets')),
+          )
+          .enabled,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<PopupMenuItem<String>>(
             find.byKey(const ValueKey('architect-sheet-export-dxf-views')),
           )
           .enabled,
@@ -203,6 +219,52 @@ void main() {
     },
   );
 
+  for (final language in ['bg', 'en']) {
+    testWidgets(
+      '$language DWG uses the existing view and sheet selection flow',
+      (tester) async {
+        final l = await _open(
+          tester,
+          ArchitectExchangeFormat.dwgViews,
+          language: language,
+          textScale: 1.5,
+        );
+        expect(find.text(l.architectExportDwgViews), findsOneWidget);
+        expect(
+          tester
+              .widget<CheckboxListTile>(
+                find.byKey(const ValueKey('architect-export-view-plan:s')),
+              )
+              .value,
+          isTrue,
+        );
+        await tester.tap(find.byKey(const ValueKey('architect-export-cancel')));
+        await tester.pumpAndSettle();
+        await _open(
+          tester,
+          ArchitectExchangeFormat.dwgSheets,
+          language: language,
+        );
+        expect(find.text(l.architectExportDwgSheets), findsOneWidget);
+        final current = find.byKey(
+          const ValueKey('architect-export-sheet-sheet-b'),
+        );
+        expect(tester.widget<CheckboxListTile>(current).value, isTrue);
+        await tester.tap(current);
+        await tester.pump();
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('architect-export-run')),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'IFC save closes the job and opens its report on surviving route',
     (tester) async {
@@ -265,4 +327,42 @@ void main() {
     expect(find.byType(ArchitectExchangeExportDialog), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'selected DWG sheets save as a ZIP of genuine binaries',
+    (tester) async {
+      final temp = Directory.systemTemp.createTempSync('architect_dwg_zip_');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final picker = _SavePicker('${temp.path}/sheets.zip');
+      FilePicker.platform = picker;
+      await _open(tester, ArchitectExchangeFormat.dwgSheets);
+      await tester.tap(
+        find.byKey(const ValueKey('architect-export-sheet-sheet-a')),
+      );
+      await tester.pump();
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(const ValueKey('architect-export-run')));
+        await tester.pump();
+        for (var i = 0; i < 500 && picker.saved == null; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+      final archive = ZipDecoder().decodeBytes(picker.saved!);
+      expect(archive.files.length, 2);
+      for (final file in archive.files) {
+        expect(file.name, endsWith('.dwg'));
+        expect(
+          String.fromCharCodes((file.content as List<int>).take(6)),
+          'AC1032',
+        );
+      }
+      expect(find.byType(ArchitectExchangeExportDialog), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+    skip:
+        !Platform.isWindows ||
+        !const bool.fromEnvironment('RUN_DWG_EXPORT_INTEGRATION'),
+  );
 }

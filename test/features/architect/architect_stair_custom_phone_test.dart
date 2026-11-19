@@ -54,7 +54,10 @@ void main() {
         );
         await tester.tap(find.byKey(const ValueKey('stair-tool-freeform')));
         await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('stair-setup-confirm')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('stair-setup-confirm')),
+          findsOneWidget,
+        );
         await tester.tap(find.byKey(const ValueKey('stair-setup-confirm')));
         await tester.pumpAndSettle();
         final draft = tester
@@ -90,13 +93,23 @@ void main() {
             )
             .onLength(1.4);
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('wall-continue')));
+        await tester.tap(find.byKey(const ValueKey('stair-part-reject')));
+        await tester.pumpAndSettle();
+        expect(draft.segments, isEmpty);
+        expect(draft.reviewing, isFalse);
+        tester
+            .widget<ArchitectWallDraftingPanel>(
+              find.byKey(const ValueKey('stair-perimeter-panel')),
+            )
+            .onLength(1.4);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('stair-part-accept')));
         await tester.pumpAndSettle();
         expect(draft.segments, hasLength(1));
 
         await tester.tapAt(workspace.screen(tester, const Offset(2.6, 0)));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('wall-continue')));
+        await tester.tap(find.byKey(const ValueKey('stair-part-accept')));
         await tester.pumpAndSettle();
         await tester.tapAt(workspace.screen(tester, const Offset(2.6, 1.4)));
         await tester.pumpAndSettle();
@@ -106,7 +119,7 @@ void main() {
             )
             .onLength(1.4);
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('wall-continue')));
+        await tester.tap(find.byKey(const ValueKey('stair-part-accept')));
         await tester.pumpAndSettle();
         expect(draft.committedPreview!.design!.layout!.flights, hasLength(2));
         if (Platform.environment['UPDATE_STAIR_PERIMETER_PREVIEW'] == 'true') {

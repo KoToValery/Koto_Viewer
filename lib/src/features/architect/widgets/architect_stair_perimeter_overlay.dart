@@ -74,6 +74,44 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
             ),
           ),
         ),
+        if (draft.reviewing && draft.target != null)
+          Positioned(
+            left: (toScreen(draft.target!).dx - 48).clamp(
+              8.0,
+              (MediaQuery.sizeOf(context).width - 112).clamp(
+                8.0,
+                double.infinity,
+              ),
+            ),
+            top: (toScreen(draft.target!).dy - 58).clamp(
+              48.0,
+              (MediaQuery.sizeOf(context).height - 180).clamp(
+                48.0,
+                double.infinity,
+              ),
+            ),
+            child: Material(
+              elevation: 3,
+              borderRadius: BorderRadius.circular(24),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    key: const ValueKey('stair-part-reject'),
+                    tooltip: l.cancel,
+                    onPressed: draft.rejectPart,
+                    icon: const Icon(Icons.close),
+                  ),
+                  IconButton(
+                    key: const ValueKey('stair-part-accept'),
+                    tooltip: l.stairSetupConfirm,
+                    onPressed: draft.acceptPart,
+                    icon: const Icon(Icons.check, color: Colors.green),
+                  ),
+                ],
+              ),
+            ),
+          ),
         Positioned(
           top: 8,
           left: 8,
@@ -130,6 +168,7 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
                 unit: project.units.symbol,
                 decimals: project.distanceDecimals,
                 continuePrimary: true,
+                showContinue: false,
                 minimumLength: 0,
                 title: draft.part == StairPerimeterPart.flight
                     ? l.stairFlight

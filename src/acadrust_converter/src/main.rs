@@ -2,6 +2,12 @@ use std::{env, path::Path, process::ExitCode};
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 1 && args[0] == "--write-dwg" {
+        return match koto_acadrust::write_dwg(std::io::stdin().lock(), std::io::stdout().lock()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => { eprintln!("DWG export failed: {error}"); ExitCode::FAILURE }
+        };
+    }
     if args.len() == 2 && args[0] == "--read" {
         return match koto_acadrust::read_to_writer(Path::new(&args[1]), std::io::stdout().lock()) {
             Ok(()) => ExitCode::SUCCESS,

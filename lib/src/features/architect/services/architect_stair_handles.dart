@@ -14,6 +14,7 @@ class StairEndpointHandle {
   final Offset handle;
   final Offset opposite;
   final bool isOffset;
+  final bool lateral;
 
   const StairEndpointHandle({
     required this.flightIndex,
@@ -23,6 +24,7 @@ class StairEndpointHandle {
     required this.handle,
     required this.opposite,
     this.isOffset = true,
+    this.lateral = false,
   });
 
   StairEndpointHandle withOffset(bool offset) => StairEndpointHandle(
@@ -33,6 +35,7 @@ class StairEndpointHandle {
     handle: handle,
     opposite: opposite,
     isOffset: offset,
+    lateral: lateral,
   );
 }
 
@@ -120,13 +123,22 @@ class ArchitectStairHandles {
           );
         }(),
       ],
+      for (var i = 1; i < flights.length; i++)
+        () {
+          final f = flights[i];
+          final anchor =
+              f.origin + f.axis * (f.run / 2) + f.normal * (f.width / 2);
+          return StairEndpointHandle(
+            flightIndex: i,
+            atStart: false,
+            anchor: anchor,
+            handle: anchor + f.normal * clearance,
+            opposite: anchor,
+            lateral: true,
+          );
+        }(),
       for (var i = 0; i < landings.length && i < flights.length; i++)
-        if (_landingBackHandle(
-          landings[i],
-          flights[i],
-          i,
-          clearance,
-        )
+        if (_landingBackHandle(landings[i], flights[i], i, clearance)
             case final landingHandle?)
           landingHandle,
     ];
@@ -202,14 +214,12 @@ class ArchitectStairHandles {
     return bestDirect?.withOffset(false);
   }
 
-  static Offset anchorFor(
-    ArchitectStair stair,
-    StairEndpointHandle hit,
-  ) {
+  static Offset anchorFor(ArchitectStair stair, StairEndpointHandle hit) {
     final items = handles(stair, 0);
     for (final h in items) {
       if (h.landingIndex == hit.landingIndex &&
           h.flightIndex == hit.flightIndex &&
+          h.lateral == hit.lateral &&
           h.atStart == hit.atStart) {
         return h.anchor;
       }
@@ -228,6 +238,33 @@ class ArchitectStairHandles {
       final end = hit.atStart ? original.endPoint : snappedPoint;
       if ((end - start).distance < 0.1) return original;
       return original.copyWith(startPoint: start, endPoint: end);
+    }
+    if (hit.lateral) {
+      final layout =
+          d.layout ?? ArchitectStairLayoutResolver.fromStair(original);
+      if (hit.flightIndex >= layout.flights.length) return original;
+      final u = original.unitVector;
+      final v = original.normalVector * (d.turnLeft ? -1 : 1);
+      final f = layout.flights[hit.flightIndex];
+      final delta = snappedPoint - hit.anchor;
+      final localDelta = Offset(
+        ArchitectStairGeometry.dot(delta, u),
+        ArchitectStairGeometry.dot(delta, v),
+      );
+      final shift = f.normal * ArchitectStairGeometry.dot(localDelta, f.normal);
+      final updated = ArchitectStairLayoutResolver.updateFlightWithPorts(
+        layout,
+        d.going,
+        f,
+        f.copyWith(origin: f.origin + shift),
+      );
+      final next = d.copyWith(layout: updated, manualGoing: d.going);
+      if (ArchitectStairLayoutResolver.check(next).isNotEmpty) {
+        throw ArgumentError('Invalid lateral stair handle drag');
+      }
+      return ArchitectStairLayoutResolver.normalizePlacement(
+        original.copyWith(design: next),
+      );
     }
     if (d.layout == null &&
         d.shape == StairShape.straight &&
@@ -260,7 +297,8 @@ class ArchitectStairHandles {
         final nextU = d.turnLeft
             ? Offset(-targetRadial.dy, targetRadial.dx)
             : Offset(targetRadial.dy, -targetRadial.dx);
-        final nextStart = centre + targetRadial * (d.innerRadius + original.width / 2);
+        final nextStart =
+            centre + targetRadial * (d.innerRadius + original.width / 2);
         return original.copyWith(
           startPoint: nextStart,
           endPoint: nextStart + nextU * math.max(1.0, original.length),
@@ -425,12 +463,50 @@ class ArchitectStairHandles {
         fixedRun: f.fixedRun != null ? nextRun : null,
       );
     }
-    final nextLayout = ArchitectStairLayoutResolver.updateFlightWithPorts(
+    var nextLayout = ArchitectStairLayoutResolver.updateFlightWithPorts(
       baseLayout,
       going,
       f,
       nextFlight,
     );
+    // Keep the existing total (and therefore riser height) when the opposite
+    // free end can absorb the changed number of treads without breaking the
+    // landing or a locked dimension.
+    final difference = baseLayout.risers - nextLayout.risers;
+    if (difference != 0 && nextLayout.flights.length > 1) {
+      final otherIndex = hit.flightIndex == 0
+          ? nextLayout.flights.length - 1
+          : 0;
+      final other = nextLayout.flights[otherIndex];
+      final count = other.risers + difference;
+      if (!other.countLocked &&
+          other.fixedRun == null &&
+          count >= 2 &&
+          count <= 500) {
+        final newOrigin = otherIndex == 0
+            ? other.end(going) - other.axis * ((count - 1) * going)
+            : other.origin;
+        final candidate = nextLayout.copyWith(
+          flights: [
+            for (var i = 0; i < nextLayout.flights.length; i++)
+              i == otherIndex
+                  ? other.copyWith(origin: newOrigin, risers: count)
+                  : nextLayout.flights[i],
+          ],
+        );
+        final candidateDesign = d.copyWith(
+          shape: StairShape.straight,
+          winderSteps: false,
+          manualGoing: going,
+          manualRisers: d.manualRisers == null ? null : candidate.risers,
+          autoRisers: d.manualRisers == null,
+          layout: candidate,
+        );
+        if (ArchitectStairLayoutResolver.check(candidateDesign).isEmpty) {
+          nextLayout = candidate;
+        }
+      }
+    }
     final nextDesign = d.copyWith(
       shape: StairShape.straight,
       winderSteps: false,

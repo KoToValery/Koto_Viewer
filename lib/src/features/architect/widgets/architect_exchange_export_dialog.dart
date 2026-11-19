@@ -8,11 +8,12 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../services/architect_drawing_publisher.dart';
 import '../services/architect_dxf_export.dart';
+import '../services/architect_dwg_export.dart';
 import '../services/architect_ifc_export.dart';
 import '../services/architect_sheet_composer.dart';
 import 'architect_dialog.dart';
 
-enum ArchitectExchangeFormat { dxfViews, dxfSheets, ifc }
+enum ArchitectExchangeFormat { dxfViews, dxfSheets, dwgViews, dwgSheets, ifc }
 
 Future<void> showArchitectExchangeExport(
   BuildContext context, {
@@ -60,7 +61,7 @@ class _ExchangeExportState extends State<ArchitectExchangeExportDialog> {
       .where((d) => ArchitectDrawingPublisher.hasSource(widget.project, d))
       .toList();
   late final chosen = <String>{
-    if (widget.format == ArchitectExchangeFormat.dxfViews)
+    if (isViews)
       ...drawings.map((d) => d.id)
     else if (widget.initialSheetId != null)
       widget.initialSheetId!
@@ -71,10 +72,15 @@ class _ExchangeExportState extends State<ArchitectExchangeExportDialog> {
   bool busy = false, cancelled = false;
   double progress = 0;
   String? error;
+  bool get isViews =>
+      widget.format == ArchitectExchangeFormat.dxfViews ||
+      widget.format == ArchitectExchangeFormat.dwgViews;
 
   String title(AppLocalizations l) => switch (widget.format) {
     ArchitectExchangeFormat.dxfViews => l.architectExportDxfViews,
     ArchitectExchangeFormat.dxfSheets => l.architectExportDxfSheets,
+    ArchitectExchangeFormat.dwgViews => l.architectExportDwgViews,
+    ArchitectExchangeFormat.dwgSheets => l.architectExportDwgSheets,
     ArchitectExchangeFormat.ifc => l.architectExportIfc,
   };
 
@@ -114,7 +120,11 @@ class _ExchangeExportState extends State<ArchitectExchangeExportDialog> {
       Map<String, Uint8List> files;
       switch (widget.format) {
         case ArchitectExchangeFormat.dxfViews:
-          files = await ArchitectDxfExport.exportViews(
+        case ArchitectExchangeFormat.dwgViews:
+          final export = widget.format == ArchitectExchangeFormat.dwgViews
+              ? ArchitectDwgExport.exportViews
+              : ArchitectDxfExport.exportViews;
+          files = await export(
             widget.project,
             drawings.where((d) => chosen.contains(d.id)).toList(),
             l,
@@ -123,6 +133,7 @@ class _ExchangeExportState extends State<ArchitectExchangeExportDialog> {
             isCancelled: () => isCancelled,
           );
         case ArchitectExchangeFormat.dxfSheets:
+        case ArchitectExchangeFormat.dwgSheets:
           final sheets = widget.project.document.sheets
               .where((s) => chosen.contains(s.id))
               .toList();
@@ -134,7 +145,10 @@ class _ExchangeExportState extends State<ArchitectExchangeExportDialog> {
             setState(() => error = problems.toSet().join('\n'));
             return;
           }
-          files = await ArchitectDxfExport.exportSheets(
+          final export = widget.format == ArchitectExchangeFormat.dwgSheets
+              ? ArchitectDwgExport.exportSheets
+              : ArchitectDxfExport.exportSheets;
+          files = await export(
             widget.project,
             sheets,
             l,
@@ -275,7 +289,7 @@ class _ExchangeExportState extends State<ArchitectExchangeExportDialog> {
                     ),
                     const SizedBox(height: 12),
                     Text(l.architectExportIfcHint),
-                  ] else if (widget.format == ArchitectExchangeFormat.dxfViews)
+                  ] else if (isViews)
                     for (final drawing in drawings)
                       CheckboxListTile(
                         key: ValueKey('architect-export-view-${drawing.id}'),

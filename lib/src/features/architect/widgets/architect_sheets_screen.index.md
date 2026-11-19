@@ -7,6 +7,12 @@
 
 ## 1. How to use this map
 
+DWG views/sheets use `exchange` and `ArchitectExchangeExportDialog`, following
+the existing DXF selection, progress, cancellation and save/ZIP flow.
+`ArchitectDwgExport` reuses the vector publication snapshot and sends its CAD
+stream to `DwgExportService` for native DWG encoding; no project mutation or
+viewport/gesture routing change is involved.
+
 1. Use this map to find the relevant section tag, class, or method name.
 2. Search the current Dart source with `rg -n "\[TAG:<NAME>\]|<SymbolName>" lib/src/features/architect/widgets/architect_sheets_screen.dart`.
 3. For behavior changes, read the target implementation and its immediate callers/callees; follow the Reference-First protocol in `AGENTS.md` / `GEMINI.md`.

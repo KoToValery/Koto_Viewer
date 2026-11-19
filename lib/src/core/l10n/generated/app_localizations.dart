@@ -24215,6 +24215,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Offset'**
   String get stairQuickLandingOffset;
+
+  /// No description provided for @architectExportDwgViews.
+  ///
+  /// In en, this message translates to:
+  /// **'DWG drawings'**
+  String get architectExportDwgViews;
+
+  /// No description provided for @architectExportDwgSheets.
+  ///
+  /// In en, this message translates to:
+  /// **'DWG sheets'**
+  String get architectExportDwgSheets;
+
+  /// No description provided for @bimProjectExportStoreyDwg.
+  ///
+  /// In en, this message translates to:
+  /// **'Storey (DWG)'**
+  String get bimProjectExportStoreyDwg;
+
+  /// No description provided for @exportStructuralDwg.
+  ///
+  /// In en, this message translates to:
+  /// **'Storey (DWG)'**
+  String get exportStructuralDwg;
+
+  /// No description provided for @exportStructuralDwgHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Columns, walls, beams, slabs and axes'**
+  String get exportStructuralDwgHint;
 }
 
 class _AppLocalizationsDelegate

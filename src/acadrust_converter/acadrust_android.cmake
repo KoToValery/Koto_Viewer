@@ -77,6 +77,7 @@ add_custom_command(OUTPUT "${KOTO_RUST_ARCHIVE}"
     "${KOTO_ACADRUST_SOURCE}/Cargo.toml" "${KOTO_ACADRUST_SOURCE}/Cargo.lock"
     "${KOTO_ACADRUST_SOURCE}/src/lib.rs" "${KOTO_ACADRUST_SOURCE}/src/ffi.rs"
     "${KOTO_ACADRUST_SOURCE}/src/reader.rs"
+    "${KOTO_ACADRUST_SOURCE}/src/writer.rs"
   WORKING_DIRECTORY "${KOTO_ACADRUST_SOURCE}"
   COMMENT "Building acadrust for ${ANDROID_ABI}"
   VERBATIM)

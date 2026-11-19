@@ -24,7 +24,7 @@ foreach ($abi in @('arm64-v8a', 'armeabi-v7a', 'x86_64')) {
     $hash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
     $manifest += "set(KOTO_ACADRUST_SHA256_$abi `"$hash`")"
 }
-$inputs = @('Cargo.toml', 'Cargo.lock', 'src/lib.rs', 'src/ffi.rs', 'src/reader.rs', '../../android/app/src/main/cpp/acadrust_jni.c')
+$inputs = @('Cargo.toml', 'Cargo.lock', 'src/lib.rs', 'src/ffi.rs', 'src/reader.rs', 'src/writer.rs', '../../android/app/src/main/cpp/acadrust_jni.c')
 $manifest += "set(KOTO_ACADRUST_NATIVE_INPUTS `"$($inputs -join ';')`")"
 $index = 0
 foreach ($input in $inputs) {
@@ -36,4 +36,4 @@ foreach ($input in $inputs) {
     $index++
 }
 Set-Content -LiteralPath "$bundle/manifest.cmake" -Value $manifest -Encoding utf8
-Write-Output 'Bundled Android DWG reader: arm64-v8a, armeabi-v7a, x86_64. Commit prebuilt/android together with the source changes.'
+Write-Output 'Bundled Android DWG reader/writer: arm64-v8a, armeabi-v7a, x86_64. Commit prebuilt/android together with the source changes.'

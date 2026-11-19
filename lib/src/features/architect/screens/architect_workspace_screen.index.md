@@ -9,12 +9,17 @@
 
 New placement follows the wall drafting archetype: `ArchitectStairPerimeterDraft`
 traces outside-edge flight/landing segments and `ArchitectStairPerimeterOverlay`
-embeds `ArchitectWallDraftingPanel` with the shared numeric keypad. The existing
+embeds `ArchitectWallDraftingPanel` with the shared numeric keypad. Endpoint
+review offers accept/reject controls; rejection preserves prior parts. The existing
 `StructuralPointerPainter` renders the lifted pointer; `_freeStairPoint` uses
 anchored `_snapElement` and midpoint tracking with a stable unpublished stair
 as an additional snap source. Pan/pinch restore provisional aiming through
 `beginPointer`/`cancelPointer`. Existing layout editing retains its separate
 controller. Regression: `architect_stair_perimeter_test.dart` and both phone locales.
+
+Selected stair handles in `ArchitectStairHandles` include lateral flight moves;
+these retain riser counts and reconnect adjacent landing ports. Quick riser edits
+use `ArchitectStairRules.applyTargetRiser` and the normal stair command/history path.
 
 `[TAG:STAIR_FREEFORM]`: `_startFreeStair` owns an unpublished
 `ArchitectStairDraftController`; `_applyFreeStair` normalizes its placement frame

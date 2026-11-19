@@ -68,6 +68,18 @@ class MainActivity : FlutterActivity() {
         dwgConverterChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DWG_CONVERTER_CHANNEL)
         dwgConverterChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
+                "writeDwg" -> {
+                    val input = call.argument<ByteArray>("dxfBytes")
+                    val jobId = call.argument<String>("jobId")
+                    if (input == null || input.isEmpty() || input.size > 256 * 1024 * 1024 || jobId == null) {
+                        result.error("INVALID_ARGUMENT", "Valid dxfBytes and jobId required", null)
+                    } else try { AndroidDwgReaderClient(this).write(input, jobId, result) }
+                    catch (error: Exception) { result.error("DWG_WRITE_FAILED", error.message, null) }
+                }
+                "cancelDwgExport" -> {
+                    call.argument<String>("jobId")?.let { AndroidDwgReaderClient.cancelExport(it) }
+                    result.success(null)
+                }
                 "readDwg" -> {
                     val input = call.argument<String>("inputPath")
                     if (input == null) result.error("INVALID_ARGUMENT", "inputPath required", null)

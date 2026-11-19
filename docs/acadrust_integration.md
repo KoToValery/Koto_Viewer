@@ -111,6 +111,35 @@ Explicit KCAD output uses version 6 to preserve the mask flag, while the reader
 still accepts versions 1–5. This does not introduce a KCAD intermediate when
 opening a source DWG.
 
+## Architectural and BIM DWG export
+
+Architecture's exchange dialog offers DWG drawings and DWG sheets with the same
+selection, progress, cancel and save/ZIP behavior as DXF. `ArchitectDwgExport`
+reuses publication vectors, including real project units, localized text, layer
+styles and native sheet layouts/viewports. The project snapshot is not mutated.
+BIM project export offers the current storey with its original underlay coordinates
+and structural layers. Standalone structural export also writes the current
+storey and effective axes. Structural CAD headers retain their physical units.
+
+`DwgExportService` sends the publication's in-memory CAD stream to acadrust's
+`DwgWriter` and returns a real R2018 (`AC1032`) binary. Windows uses stdin/stdout
+with `--write-dwg`; Android uses input/output FD pipes in the isolated service.
+Binder only carries descriptors, cancellation and bounded diagnostics. Native
+encoding validates the complete input and re-reads the binary before publishing
+any bytes. Both transports retain size/deadline limits and cancellation.
+
+Architectural export creates no intermediate CAD files. BIM reuses its existing
+CAD merger in a job-owned temporary directory, removed after export; an original
+DWG underlay can participate in that explicit export. Original DWG **opening**
+still uses direct native reading without DXF/KCAD intermediates.
+
+Regenerate and commit all three Android JNI libraries with the source updates
+using the build/bundle scripts above. `test/dwg_module_export_test.dart` is an
+opt-in real Windows integration test (`RUN_DWG_EXPORT_INTEGRATION=true`).
+`test/dwg_export_service_test.dart` covers Android transport/failure/cancel paths;
+`tool/qa/dwg_export_smoke.dart` verifies real Android architecture/sheet/BIM
+exports and a 22,000-entity exchange larger than Binder's message limit.
+
 ## Zoom rendering
 
 `DxfPainter` limits hatch pattern enumeration to the buffered scene viewport,

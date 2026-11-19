@@ -1,4 +1,6 @@
 use acadrust::{CadDocument, DwgReader, DxfVersion, DxfWriter};
+mod writer;
+pub use writer::write_dwg;
 use std::{
     fs::File,
     io::{BufWriter, Write},

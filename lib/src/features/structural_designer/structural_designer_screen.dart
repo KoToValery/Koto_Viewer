@@ -6909,6 +6909,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _applyDetectedWallsAndAxes(result);
   }
 
+  // --- SUBSECTION: [TAG:STRUCT_DWG_EXPORT] CAD export and existing BIM-project delegate ---
   Future<void> _showExportDialog() async {
     if (widget.bimContext != null) {
       await widget.bimContext!.onExport(context, _project, _project.activeStorey.id,
@@ -6923,7 +6924,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -6985,6 +6986,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 },
               ),
               const Divider(color: Colors.white12),
+              for (final dwg in [true, false])
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
@@ -6997,18 +6999,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   ),
                 ),
                 title: Text(
-                  context.l10n.exportStructuralDxf,
+                  dwg ? context.l10n.exportStructuralDwg : context.l10n.exportStructuralDxf,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600,
                   ),
                 ),
                 subtitle: Text(
-                  context.l10n.commandUiAutocadDxfSColSWallSBeamSSlabSAxis,
+                  dwg ? context.l10n.exportStructuralDwgHint : context.l10n.commandUiAutocadDxfSColSWallSBeamSSlabSAxis,
                   style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
                 onTap: () async {
                   Navigator.of(ctx).pop();
                   try {
-                    final file = await StructuralPersistenceService.exportToDxfFile(
+                    final export = dwg ? StructuralPersistenceService.exportToDwgFile : StructuralPersistenceService.exportToDxfFile;
+                    final file = await export(
                       project: _project,
                       baseName: baseName,
                       cadUnitsPerMeter: _cadUnitsPerMeter,
@@ -7027,7 +7030,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               ),
             ],
           ),
-        ),
+        )),
       ),
     );
   }
