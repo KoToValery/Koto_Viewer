@@ -92,12 +92,14 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
     BimWorkProject? bimProject;
     await ArchitectProjectWizardDialog.show(
       context,
-      onCreate: (archProject) async {
+      onCreate: (archProject, underlays) async {
         final created = await createArchitectWorkProject(
           library: _library,
           archProject: archProject,
+          underlays: underlays,
         );
         bimProject = created.$1;
+        return created.$2;
       },
     );
     if (bimProject == null || !mounted) return;

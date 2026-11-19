@@ -57,13 +57,15 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
     ArchitectProject? updatedArchProject;
     await ArchitectProjectWizardDialog.show(
       context,
-      onCreate: (archProject) async {
+      onCreate: (archProject, underlays) async {
         final created = await createArchitectWorkProject(
           library: _library,
           archProject: archProject,
+          underlays: underlays,
         );
         bimProject = created.$1;
         updatedArchProject = created.$2;
+        return created.$2;
       },
     );
     if (bimProject == null || updatedArchProject == null || !mounted) return;

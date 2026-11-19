@@ -61,6 +61,7 @@ class ArchitectGeodeticDetector {
     required String storeyId,
     Offset? lockedOrigin,
     double? lockedUnitsPerMeter,
+    bool invertY = false,
     ArchitectGeodeticSurvey? existingSurvey,
   }) {
     final bounds = doc.bounds;
@@ -97,6 +98,7 @@ class ArchitectGeodeticDetector {
     final frame = BimCoordinateFrame(
       origin: origin,
       unitsPerMeter: unitsPerMeter,
+      invertY: invertY,
     );
 
     // 1. Collect numeric elevation texts and survey point markers (circles, points, inserts, cross ticks)
@@ -115,7 +117,7 @@ class ArchitectGeodeticDetector {
               localPosition: frame.toModel(cadPos),
               value: parsed.value,
               hasDecimal: parsed.hasDecimal,
-              rotationRad: entity.rotationDeg * math.pi / 180.0,
+              rotationRad: (invertY ? -1 : 1) * entity.rotationDeg * math.pi / 180.0,
               layer: entity.layer,
             ),
           );
@@ -129,7 +131,7 @@ class ArchitectGeodeticDetector {
               localPosition: frame.toModel(entity.insertPoint),
               value: parsed.value,
               hasDecimal: parsed.hasDecimal,
-              rotationRad: entity.rotationDeg * math.pi / 180.0,
+              rotationRad: (invertY ? -1 : 1) * entity.rotationDeg * math.pi / 180.0,
               layer: entity.layer,
             ),
           );

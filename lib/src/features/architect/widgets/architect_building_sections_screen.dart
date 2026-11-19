@@ -1,5 +1,6 @@
 import 'architect_dialog.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
+import '../rendering/architect_canvas_palette.dart';
 import '../rendering/architect_hatch_geometry.dart';
 import '../services/architect_section_junctions.dart';
 import '../services/architect_projection_loader.dart';
@@ -13,7 +14,6 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_section.dart';
-import '../models/architect_slab_assembly.dart';
 import '../services/architect_building_section.dart';
 import '../services/architect_command_controller.dart';
 import '../services/architect_roof_geometry.dart';
@@ -1335,6 +1335,7 @@ class ArchitectSectionDrawing {
   }
 }
 
+// --- SUBSECTION: [TAG:SECTION_PLOT_STYLE] Shared section viewport and plot styling ---
 class ArchitectBuildingSectionPainter extends CustomPainter {
   final ArchitectSectionDrawing drawing;
   final Offset centre;
@@ -1343,6 +1344,28 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final color = drawing.colors.onSurface;
+    final scope = ArchitectTextScope.current;
+    final publication = scope?.publication == true;
+    final unitsPerMm =
+        (scope?.denominator ?? drawing.project.dimensionScale.denominator) /
+        1000 *
+        scale;
+    double strokeWidth(ArchitectSectionLineWeight weight) =>
+        publication ? weight.paperMm * unitsPerMm : weight.screenPixels;
+    final hatchInk = color.withValues(alpha: .78);
+    final hatchPen = Paint()
+      ..color = publication
+          ? Color.alphaBlend(
+              color.withValues(alpha: .65),
+              ArchitectPaperStyle.paper,
+            )
+          : hatchInk
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth(ArchitectSectionLineWeight.hatch);
+    // Hide the pattern at distant zoom levels where its strokes would merge.
+    final showPaperHatches =
+        publication || unitsPerMm * ArchitectSectionHatch.densityScale >= .75;
+    final viewport = Offset.zero & size;
     Offset p(Offset v) => Offset(
       size.width / 2 + (v.dx - centre.dx) * scale,
       size.height / 2 - (v.dy - centre.dy) * scale,
@@ -1353,13 +1376,13 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       ..setEntry(0, 3, size.width / 2 - centre.dx * scale)
       ..setEntry(1, 3, size.height / 2 + centre.dy * scale);
     canvas.save();
-    canvas.clipRect(Offset.zero & size);
+    canvas.clipRect(viewport);
     final background = drawing.data.background;
     if (background != null) {
       final pen = Paint()
         ..color = color.withValues(alpha: .9)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = .7;
+        ..strokeWidth = strokeWidth(ArchitectSectionLineWeight.projection);
       for (final face in background.faces) {
         architectDrawingSources(
           canvas,
@@ -1371,82 +1394,18 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
         canvas.drawPath(face.transform(matrix.storage), pen);
       }
       for (final op in background.operations) {
+        architectDrawingSources(canvas, const [], 'sectionProjection');
         canvas.save();
         canvas.clipPath(op.clip.transform(matrix.storage));
         canvas.drawPath(op.lines.transform(matrix.storage), pen);
         canvas.restore();
       }
     }
-    for (final region in drawing.data.drawingRegions) {
-      final sources = drawing.data.regions
-          .where(
-            (r) =>
-                r.material == region.material &&
-                r.path.getBounds().overlaps(region.path.getBounds()),
-          )
-          .map((r) => r.sourceId)
-          .toSet();
-      architectDrawingSources(canvas, sources, 'sectionRegion');
-      final path = region.path.transform(matrix.storage);
-      final isSelectedRoof =
-          drawing.selectedRoofId != null &&
-          region.slabId == drawing.selectedRoofId;
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = isSelectedRoof ? drawing.colors.primary : color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = isSelectedRoof
-              ? 1.5
-              : (region.material == SlabMaterial.concrete ||
-                        region.timberCrossSectionPolygon != null
-                    ? 1.1
-                    : .65),
-      );
-      architectDrawingSources(canvas, sources, 'sectionHatch');
-      if (!region.drawHatch) continue;
-      if (region.timberCrossSectionPolygon != null &&
-          region.timberCrossSectionPolygon!.length == 4) {
-        final pts = region.timberCrossSectionPolygon!.map(p).toList();
-        final diagPaint = Paint()
-          ..color = (isSelectedRoof ? drawing.colors.primary : color)
-              .withValues(alpha: 0.65)
-          ..strokeWidth = 0.65;
-        canvas.save();
-        canvas.clipPath(path);
-        canvas.drawLine(pts[0], pts[2], diagPaint);
-        canvas.drawLine(pts[1], pts[3], diagPaint);
-        canvas.restore();
-      } else if (region.hatchPattern != null ||
-          (ArchitectSectionHatch.slab(region.material) != null &&
-              region.path.getBounds().height * scale > 4)) {
-        final pattern =
-            region.hatchPattern ?? ArchitectSectionHatch.slab(region.material)!;
-        canvas.save();
-        canvas.clipPath(path);
-        canvas.drawPath(
-          ArchitectHatchGeometry.path(
-            boundary: path,
-            pattern: pattern,
-            unitsPerMm:
-                (ArchitectTextScope.current?.denominator ??
-                    drawing.project.dimensionScale.denominator) /
-                1000 *
-                scale,
-            origin: p(Offset.zero),
-            visibleBounds: Offset.zero & size,
-          ),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..color = color.withValues(alpha: .6)
-            ..strokeWidth = .5,
-        );
-        canvas.restore();
-      }
-    }
-    // Draw Proposed Terrain (solid line + 35 cm earth hatch, stops at building exterior walls)
     final propHatch = drawing.data.proposedTerrainHatchBand;
-    if (propHatch != null && !propHatch.getBounds().isEmpty) {
+    if (propHatch != null &&
+        !propHatch.getBounds().isEmpty &&
+        showPaperHatches) {
+      architectDrawingSources(canvas, const [], 'sectionHatch');
       final screenBand = propHatch.transform(matrix.storage);
       canvas.save();
       canvas.clipPath(screenBand);
@@ -1454,21 +1413,70 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
         ArchitectHatchGeometry.path(
           boundary: screenBand,
           pattern: ArchitectSectionHatch.preset('earth'),
-          unitsPerMm:
-              (ArchitectTextScope.current?.denominator ??
-                  drawing.project.dimensionScale.denominator) /
-              1000 *
-              scale,
+          unitsPerMm: unitsPerMm,
+          scale: ArchitectSectionHatch.densityScale,
           origin: p(Offset.zero),
-          visibleBounds: Offset.zero & size,
+          visibleBounds: viewport,
         ),
-        Paint()
-          ..color = color.withValues(alpha: 0.72)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 0.65,
+        hatchPen,
       );
       canvas.restore();
     }
+    for (final region in drawing.data.drawingRegions) {
+      final sources = drawing.data.regions
+          .where(
+            (r) =>
+                r.material == region.material &&
+                r.structural == region.structural &&
+                r.path.getBounds().overlaps(region.path.getBounds()),
+          )
+          .map((r) => r.sourceId)
+          .toSet();
+      final path = region.path.transform(matrix.storage);
+      final isSelectedRoof = region.sourceId == drawing.selectedRoofId;
+      final timber = region.timberCrossSectionPolygon;
+      final pattern = region.effectiveHatch;
+      if (region.drawHatch && path.getBounds().shortestSide > 2) {
+        architectDrawingSources(canvas, sources, 'sectionHatch');
+        if (timber != null && timber.length == 4) {
+          final pts = timber.map(p).toList();
+          canvas.save();
+          canvas.clipPath(path);
+          canvas.drawLine(pts[0], pts[2], hatchPen);
+          canvas.drawLine(pts[1], pts[3], hatchPen);
+          canvas.restore();
+        } else if (pattern != null && showPaperHatches) {
+          canvas.save();
+          canvas.clipPath(path);
+          canvas.drawPath(
+            ArchitectHatchGeometry.path(
+              boundary: path,
+              pattern: pattern,
+              unitsPerMm: unitsPerMm,
+              scale: ArchitectSectionHatch.densityScale,
+              origin: p(Offset.zero),
+              visibleBounds: viewport,
+            ),
+            hatchPen,
+          );
+          canvas.restore();
+        }
+      }
+      architectDrawingSources(canvas, sources, 'sectionRegion');
+      final width = strokeWidth(
+        region.structural
+            ? ArchitectSectionLineWeight.structuralCut
+            : ArchitectSectionLineWeight.secondaryCut,
+      );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = isSelectedRoof ? drawing.colors.primary : color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = isSelectedRoof ? math.max(1.5, width) : width,
+      );
+    }
+    architectDrawingSources(canvas, const [], 'sectionTerrain');
     final propLine = drawing.data.proposedTerrainLine;
     if (propLine != null && !propLine.getBounds().isEmpty) {
       canvas.drawPath(
@@ -1476,7 +1484,7 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
         Paint()
           ..color = color
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.75
+          ..strokeWidth = strokeWidth(ArchitectSectionLineWeight.secondaryCut)
           ..strokeCap = StrokeCap.round,
       );
     }
@@ -1487,7 +1495,7 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       final dashPaint = Paint()
         ..color = color.withValues(alpha: 0.78)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.1;
+        ..strokeWidth = strokeWidth(ArchitectSectionLineWeight.projection);
       for (final metric in screenEx.computeMetrics()) {
         for (var s = 0.0; s < metric.length; s += 13.0) {
           canvas.drawPath(

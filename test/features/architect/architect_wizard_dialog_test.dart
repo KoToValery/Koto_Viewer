@@ -9,6 +9,7 @@ import 'package:kotoview/src/features/architect/widgets/architect_project_wizard
 import 'package:kotoview/src/features/bim_projects/widgets/bim_new_project_wizard.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_distance_drafting_panel.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_shape_dimension_panel.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Widget app(
   Widget home, {
@@ -26,6 +27,7 @@ Finder field(String kind, int index) =>
 String input(WidgetTester tester, String kind, int index) =>
     tester.widget<TextFormField>(field(kind, index)).controller!.text;
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   testWidgets(
     'centimetres by default; axes only; editable linked storeys and persisted precision',
     (tester) async {
@@ -331,9 +333,10 @@ void main() {
             builder: (context) => TextButton(
               onPressed: () => ArchitectProjectWizardDialog.show(
                 context,
-                onCreate: (p) async {
+                onCreate: (p, _) async {
                   createdProject = p;
                   await completer.future;
+                  return p;
                 },
               ),
               child: const Text('Open'),

@@ -22605,7 +22605,7 @@ abstract class AppLocalizations {
   /// Snackbar notice when external CAD file changes and reloads
   ///
   /// In en, this message translates to:
-  /// **'External CAD underlay updated automatically: {fileName}'**
+  /// **'CAD underlay refreshed: {fileName}'**
   String architectCadUnderlayReloadedNotice(String fileName);
 
   /// Snackbar notice when CAD underlay is imported
@@ -22797,7 +22797,7 @@ abstract class AppLocalizations {
   /// Action to adjust underlay scale or units
   ///
   /// In en, this message translates to:
-  /// **'Scale & Units'**
+  /// **'Scale'**
   String get architectUnderlayScale;
 
   /// Action to configure underlay clipping mask
@@ -23987,6 +23987,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Original colors'**
   String get architectUnderlayOriginalColors;
+
+  /// No description provided for @architectUnderlayAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get architectUnderlayAdd;
+
+  /// No description provided for @architectRasterChooseUnderlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Select underlay'**
+  String get architectRasterChooseUnderlay;
+
+  /// No description provided for @architectUnderlaySettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get architectUnderlaySettings;
+
+  /// No description provided for @architectUnderlayShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get architectUnderlayShow;
+
+  /// No description provided for @architectUnderlayCrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Crop'**
+  String get architectUnderlayCrop;
+
+  /// No description provided for @architectUnderlayGeodesy.
+  ///
+  /// In en, this message translates to:
+  /// **'Survey'**
+  String get architectUnderlayGeodesy;
+
+  /// No description provided for @architectCadImportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import CAD underlay'**
+  String get architectCadImportTitle;
+
+  /// No description provided for @architectCadReplaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace CAD underlay'**
+  String get architectCadReplaceTitle;
+
+  /// No description provided for @architectCadImportAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get architectCadImportAccept;
+
+  /// No description provided for @architectCadReplaceAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get architectCadReplaceAccept;
+
+  /// No description provided for @architectCadScaleAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get architectCadScaleAuto;
+
+  /// No description provided for @architectCadScaleCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get architectCadScaleCurrent;
+
+  /// No description provided for @architectCadScaleFromFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Units from file'**
+  String get architectCadScaleFromFile;
+
+  /// No description provided for @architectCadUnitsPerMeter.
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing units per metre'**
+  String get architectCadUnitsPerMeter;
+
+  /// No description provided for @architectCadScaleEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'Units estimated from drawing size'**
+  String get architectCadScaleEstimated;
+
+  /// No description provided for @architectCadOrientation.
+  ///
+  /// In en, this message translates to:
+  /// **'Match CAD orientation'**
+  String get architectCadOrientation;
+
+  /// No description provided for @architectCadOrientationHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Check alignment with existing walls and grids before changing orientation.'**
+  String get architectCadOrientationHelp;
+
+  /// No description provided for @architectCadImportEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The file has no model-space geometry.'**
+  String get architectCadImportEmpty;
+
+  /// No description provided for @architectUnderlayShowCrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable crop'**
+  String get architectUnderlayShowCrop;
+
+  /// No description provided for @architectUnderlayHideCrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable crop'**
+  String get architectUnderlayHideCrop;
+
+  /// No description provided for @architectUnderlayRemoveCrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear crop'**
+  String get architectUnderlayRemoveCrop;
+
+  /// No description provided for @architectUnderlayRectangleCrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangle'**
+  String get architectUnderlayRectangleCrop;
+
+  /// No description provided for @architectUnderlayPolygonCrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Polygon'**
+  String get architectUnderlayPolygonCrop;
+
+  /// No description provided for @architectUnderlayUnsupportedFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported file type'**
+  String get architectUnderlayUnsupportedFormat;
 
   /// Preserve source CAD entity and layer lineweights in an underlay
   ///

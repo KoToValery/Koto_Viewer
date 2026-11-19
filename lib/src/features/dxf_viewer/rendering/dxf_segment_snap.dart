@@ -42,8 +42,9 @@ class DxfSegmentSnap {
         return;
       }
       final layer = e.layer == '0' ? inheritedLayer : e.layer;
-      if (document.layers[layer]?.isVisible == false ||
-          layerVisibility[layer] == false) {
+      final sourceLayer = document.layers[layer];
+      if (!(layerVisibility[layer] ??
+          (sourceLayer == null || (sourceLayer.isVisible && !sourceLayer.isFrozen)))) {
         return;
       }
       var type = (e.lineType ?? 'BYLAYER').toUpperCase();

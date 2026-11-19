@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:async';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -9,6 +9,8 @@ import '../models/architect_wall_type.dart';
 import '../services/architect_hatch_patterns.dart';
 import '../services/architect_line_styles.dart';
 import '../services/architect_wall_library.dart';
+import '../services/architect_underlay_service.dart';
+import 'architect_cad_import_dialog.dart';
 import 'architect_grid_scheme.dart';
 import 'architect_grid_preset_label.dart';
 import 'architect_numeric_keypad.dart';
@@ -16,22 +18,34 @@ import 'architect_structural_scheme_labels.dart';
 
 class ArchitectProjectWizardDialog extends StatefulWidget {
   final String? initialProjectName;
-  final Future<void> Function(ArchitectProject project)? onCreate;
+  final String? underlayOwnerId;
+  final Future<ArchitectProject> Function(
+    ArchitectProject project,
+    Map<String, ArchitectCadImportSelection> underlays,
+  )?
+  onCreate;
   const ArchitectProjectWizardDialog({
     super.key,
     this.initialProjectName,
+    this.underlayOwnerId,
     this.onCreate,
   });
 
   static Future<ArchitectProject?> show(
     BuildContext context, {
     String? initialProjectName,
-    Future<void> Function(ArchitectProject project)? onCreate,
+    String? underlayOwnerId,
+    Future<ArchitectProject> Function(
+      ArchitectProject project,
+      Map<String, ArchitectCadImportSelection> underlays,
+    )?
+    onCreate,
   }) => showDialog<ArchitectProject>(
     context: context,
     barrierDismissible: onCreate == null,
     builder: (_) => ArchitectProjectWizardDialog(
       initialProjectName: initialProjectName,
+      underlayOwnerId: underlayOwnerId,
       onCreate: onCreate,
     ),
   );
@@ -43,13 +57,14 @@ class ArchitectProjectWizardDialog extends StatefulWidget {
 
 class _LevelDraft {
   double elevation, height;
-  File? overlayFile;
+  ArchitectCadImportSelection? overlay;
   final TextEditingController elevationInput = TextEditingController();
   final TextEditingController heightInput = TextEditingController();
   _LevelDraft(this.elevation, this.height);
   String get elevationLabel =>
       ArchitectStorey(id: '', name: '', elevation: elevation).elevationLabel;
   void dispose() {
+    unawaited(overlay?.prepared.dispose());
     elevationInput.dispose();
     heightInput.dispose();
   }
@@ -64,6 +79,7 @@ class _ArchitectProjectWizardDialogState
   final _levels = [_LevelDraft(0, 3)];
   int _step = 0, _decimals = 1;
   bool _isCreating = false;
+  bool _isPickingOverlay = false;
   ArchitectUnit _unit = ArchitectUnit.centimeters;
   ArchitectStructuralScheme _structuralScheme =
       ArchitectStructuralScheme.flatSlab;
@@ -169,7 +185,7 @@ class _ArchitectProjectWizardDialogState
   }
 
   Future<void> _create() async {
-    if (_isCreating) return;
+    if (_isCreating || _isPickingOverlay) return;
     if (!_levelsForm.currentState!.validate()) return;
     final l = context.l10n;
     final storeys = [
@@ -181,56 +197,53 @@ class _ArchitectProjectWizardDialogState
           height: _levels[i].height,
         ),
     ];
-    final configs = <String, ArchitectCadUnderlayConfig>{};
-    for (var i = 0; i < storeys.length; i++) {
-      final file = _levels[i].overlayFile;
-      if (file != null) {
-        configs[storeys[i].id] = ArchitectCadUnderlayConfig(
-          storeyId: storeys[i].id,
-          fileName: file.uri.pathSegments.last,
-          externalSourcePath: file.path,
-          internalCopyPath: file.path,
-        );
-      }
-    }
+    final underlays = {
+      for (var i = 0; i < storeys.length; i++)
+        storeys[i].id: ?_levels[i].overlay,
+    };
     setState(() => _isCreating = true);
     try {
       await ArchitectWallLibrary.loadCustomTypes();
       final customLines = await ArchitectLineStyleLibrary.load();
       final customHatches = await ArchitectHatchPatternLibrary.load();
       if (!mounted) return;
-      final baseProject = ArchitectProject.starterWithCatalog(
-        name: _name.text.trim().isEmpty
-            ? l.architectDefaultProjectName
-            : _name.text.trim(),
-        storeyCount: storeys.length,
-        groundHeight: storeys.first.height,
-        gridPreset: _grid,
-        spacingsX: _spacingsX,
-        spacingsY: _spacingsY,
-        structuralScheme: _structuralScheme,
-        units: _unit,
-        wallTypes: ArchitectWallType.standardCatalog(
-          l10n: l,
-          parapetHeight: ArchitectWallType.resolveParapetHeight(
-            storeyElevation: storeys.last.elevation + storeys.last.height,
-            storeyIndex: storeys.length,
-          ),
-        ),
-      ).copyWith(
-        storeys: storeys,
-        cadUnderlays: configs,
-        distanceDecimals: _decimals,
-        lineStyles: customLines,
-        hatchPatterns: customHatches,
-      );
+      final baseProject =
+          ArchitectProject.starterWithCatalog(
+            name: _name.text.trim().isEmpty
+                ? l.architectDefaultProjectName
+                : _name.text.trim(),
+            storeyCount: storeys.length,
+            groundHeight: storeys.first.height,
+            gridPreset: _grid,
+            spacingsX: _spacingsX,
+            spacingsY: _spacingsY,
+            structuralScheme: _structuralScheme,
+            units: _unit,
+            wallTypes: ArchitectWallType.standardCatalog(
+              l10n: l,
+              parapetHeight: ArchitectWallType.resolveParapetHeight(
+                storeyElevation: storeys.last.elevation + storeys.last.height,
+                storeyIndex: storeys.length,
+              ),
+            ),
+          ).copyWith(
+            storeys: storeys,
+            distanceDecimals: _decimals,
+            lineStyles: customLines,
+            hatchPatterns: customHatches,
+          );
       final project = ArchitectWallLibrary.mergeCustomTypes(baseProject);
-      if (widget.onCreate == null) {
-        Navigator.pop(context, project);
-        return;
-      }
-      await widget.onCreate!(project);
-      if (mounted) Navigator.pop(context, project);
+      final onCreate = widget.onCreate;
+      final created = onCreate == null
+          ? project.copyWith(
+              cadUnderlays: await ArchitectUnderlayService.instance
+                  .commitCadUnderlays(
+                    widget.underlayOwnerId ?? project.id,
+                    underlays,
+                  ),
+            )
+          : await onCreate(project, underlays);
+      if (mounted) Navigator.pop(context, created);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isCreating = false);
@@ -269,7 +282,7 @@ class _ArchitectProjectWizardDialogState
                           const CircularProgressIndicator(),
                           const SizedBox(height: 16),
                           Text(
-                            _levels.any((e) => e.overlayFile != null)
+                            _levels.any((e) => e.overlay != null)
                                 ? l.architectWizardLoadingUnderlay
                                 : l.architectWizardCreatingProject,
                             style: Theme.of(context).textTheme.titleMedium,
@@ -485,10 +498,7 @@ class _ArchitectProjectWizardDialogState
             for (final scheme in ArchitectStructuralScheme.values)
               DropdownMenuItem(
                 value: scheme,
-                child: Text(
-                  scheme.label(l),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                child: Text(scheme.label(l), overflow: TextOverflow.ellipsis),
               ),
           ],
           onChanged: (val) {
@@ -636,8 +646,9 @@ class _ArchitectProjectWizardDialogState
                               : () async {
                                   FocusScope.of(context).unfocus();
                                   final temp = TextEditingController(
-                                    text: _levels[i].elevation
-                                        .toStringAsFixed(_elevationDecimals),
+                                    text: _levels[i].elevation.toStringAsFixed(
+                                      _elevationDecimals,
+                                    ),
                                   );
                                   await openArchitectNumericKeypad(
                                     context: context,
@@ -666,7 +677,8 @@ class _ArchitectProjectWizardDialogState
                           validator: (text) {
                             final value = _parse(text ?? '', elevation: true);
                             return value == null ||
-                                    (i > 0 && value <= _levels[i - 1].elevation) ||
+                                    (i > 0 &&
+                                        value <= _levels[i - 1].elevation) ||
                                     (i + 1 < _levels.length &&
                                         value >= _levels[i + 1].elevation)
                                 ? l.architectWizardInvalidLevel
@@ -738,103 +750,95 @@ class _ArchitectProjectWizardDialogState
     );
   }
 
+  Future<void> _pickStoreyUnderlay(_LevelDraft level) async {
+    if (_isPickingOverlay) return;
+    setState(() => _isPickingOverlay = true);
+    ArchitectPreparedCadUnderlay? prepared;
+    try {
+      final source = await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
+      if (source == null || !mounted || !_levels.contains(level)) return;
+      prepared = await ArchitectUnderlayService.instance.prepareCadUnderlay(
+        source,
+      );
+      if (!mounted || !_levels.contains(level)) return;
+      final selected = await showArchitectCadImportDialog(
+        context: context,
+        prepared: prepared,
+      );
+      if (selected == null || !mounted || !_levels.contains(level)) return;
+      final old = level.overlay;
+      setState(() => level.overlay = selected);
+      prepared = null;
+      await old?.prepared.dispose();
+    } catch (error) {
+      if (!mounted) return;
+      final l = context.l10n;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is ArchitectEmptyCadUnderlay
+                ? l.architectCadImportEmpty
+                : l.architectUnderlayLoadError(error.toString()),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isPickingOverlay = false);
+      await prepared?.dispose();
+    }
+  }
+
   Widget _buildStoreyOverlayPicker(int index, AppLocalizations l) {
     final level = _levels[index];
-    if (level.overlayFile == null) {
+    final overlay = level.overlay;
+    final colors = Theme.of(context).colorScheme;
+    final VoidCallback? pick = _isPickingOverlay
+        ? null
+        : () => _pickStoreyUnderlay(level);
+    if (overlay == null) {
       return Align(
-        alignment: Alignment.centerLeft,
-        child: InkWell(
+        alignment: AlignmentDirectional.centerStart,
+        child: OutlinedButton.icon(
           key: ValueKey('architect-wizard-overlay-add-$index'),
-          borderRadius: BorderRadius.circular(8),
-          onTap: () async {
-            final file =
-                await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
-            if (file != null && mounted) {
-              setState(() {
-                level.overlayFile = file;
-              });
-            }
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Theme.of(context).dividerColor.withValues(alpha: 0.35),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const AppIcon(AppIconId.cadUnderlay, size: 14),
-                const SizedBox(width: 6),
-                Text(
-                  l.architectWizardAddOverlay,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(fontSize: 11.5),
-                ),
-              ],
-            ),
-          ),
+          onPressed: pick,
+          icon: const AppIcon(AppIconId.cadUnderlay, size: 16),
+          label: Text(l.architectWizardAddOverlay),
         ),
       );
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsetsDirectional.only(start: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
+        color: colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
-        ),
       ),
       child: Row(
         children: [
-          const AppIcon(AppIconId.cadUnderlay, size: 14, color: Color(0xFF00E5FF)),
+          const AppIcon(AppIconId.cadUnderlay, size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              level.overlayFile!.uri.pathSegments.last,
+              overlay.prepared.fileName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
-          InkWell(
-            onTap: () async {
-              final file =
-                  await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
-              if (file != null && mounted) {
-                setState(() {
-                  level.overlayFile = file;
-                });
-              }
-            },
-            child: Tooltip(
-              message: l.architectWizardChangeOverlay,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
-                child: AppIcon(AppIconId.edit, size: 14),
-              ),
-            ),
+          IconButton(
+            tooltip: l.architectWizardChangeOverlay,
+            onPressed: pick,
+            icon: const AppIcon(AppIconId.edit, size: 16),
           ),
-          InkWell(
+          IconButton(
             key: ValueKey('architect-wizard-overlay-remove-$index'),
-            onTap: () {
-              setState(() {
-                level.overlayFile = null;
-              });
-            },
-            child: Tooltip(
-              message: l.architectWizardRemoveOverlay,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
-                child: AppIcon(AppIconId.close, size: 14),
-              ),
-            ),
+            tooltip: l.architectWizardRemoveOverlay,
+            icon: const AppIcon(AppIconId.close, size: 16),
+            onPressed: _isPickingOverlay
+                ? null
+                : () {
+                    setState(() => level.overlay = null);
+                    unawaited(overlay.prepared.dispose());
+                  },
           ),
         ],
       ),

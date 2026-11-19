@@ -3,6 +3,9 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import '../../bim_editing/geometry/bim_coordinate_frame.dart';
+import '../../dxf_viewer/models/dxf_models.dart';
+
 /// Alignment / deskew mode for 2-point raster calibration.
 enum ArchitectRasterAlignMode { keepAngle, horizontal, vertical }
 
@@ -19,7 +22,9 @@ class ArchitectCadUnderlayConfig {
   final double? lockedCadOriginX;
   final double? lockedCadOriginY;
   final double? unitsPerMeter;
+  final bool cadOrientation;
   final Set<String> hiddenDxfLayers;
+  final Set<String> shownDxfLayers;
   final bool isGeodetic;
   final String? detectedCrsName;
   final double opacity;
@@ -41,7 +46,9 @@ class ArchitectCadUnderlayConfig {
     this.lockedCadOriginX,
     this.lockedCadOriginY,
     this.unitsPerMeter,
+    this.cadOrientation = false,
     this.hiddenDxfLayers = const {},
+    this.shownDxfLayers = const {},
     this.isGeodetic = false,
     this.detectedCrsName,
     this.opacity = 0.42,
@@ -54,9 +61,50 @@ class ArchitectCadUnderlayConfig {
 
   bool get hasLockedOrigin =>
       lockedCadOriginX != null &&
+      lockedCadOriginX!.isFinite &&
       lockedCadOriginY != null &&
-      unitsPerMeter != null &&
-      unitsPerMeter! > 0;
+      lockedCadOriginY!.isFinite &&
+      _validScale;
+
+  bool get _validScale =>
+      unitsPerMeter != null && unitsPerMeter!.isFinite && unitsPerMeter! > 0;
+
+  BimCoordinateFrame frame(BimCoordinateFrame fallback) => BimCoordinateFrame(
+    origin: hasLockedOrigin
+        ? Offset(lockedCadOriginX!, lockedCadOriginY!)
+        : (_validScale ? Offset.zero : fallback.origin),
+    unitsPerMeter: _validScale ? unitsPerMeter! : fallback.unitsPerMeter,
+    invertY: cadOrientation,
+  );
+
+  Map<String, bool> get layerOverrides => {
+    for (final name in shownDxfLayers) name: true,
+    for (final name in hiddenDxfLayers) name: false,
+  };
+
+  bool isLayerVisible(DxfLayer layer) =>
+      !hiddenDxfLayers.contains(layer.name) &&
+      (shownDxfLayers.contains(layer.name) ||
+          (layer.isVisible && !layer.isFrozen));
+
+  ArchitectCadUnderlayConfig withFrame(
+    BimCoordinateFrame next, {
+    bool transformMask = false,
+  }) {
+    final previous = frame(const BimCoordinateFrame());
+    return copyWith(
+      lockedCadOriginX: next.origin.dx,
+      lockedCadOriginY: next.origin.dy,
+      unitsPerMeter: next.unitsPerMeter,
+      cadOrientation: next.invertY,
+      maskPolygon: transformMask && previous != next && maskPolygon != null
+          ? [
+              for (final point in maskPolygon!)
+                next.toModel(previous.toCad(point)),
+            ]
+          : maskPolygon,
+    );
+  }
 
   bool get hasActiveMask =>
       maskEnabled && maskPolygon != null && maskPolygon!.length >= 3;
@@ -74,7 +122,9 @@ class ArchitectCadUnderlayConfig {
     double? lockedCadOriginX,
     double? lockedCadOriginY,
     double? unitsPerMeter,
+    bool? cadOrientation,
     Set<String>? hiddenDxfLayers,
+    Set<String>? shownDxfLayers,
     bool? isGeodetic,
     String? detectedCrsName,
     double? opacity,
@@ -98,7 +148,9 @@ class ArchitectCadUnderlayConfig {
     lockedCadOriginX: lockedCadOriginX ?? this.lockedCadOriginX,
     lockedCadOriginY: lockedCadOriginY ?? this.lockedCadOriginY,
     unitsPerMeter: unitsPerMeter ?? this.unitsPerMeter,
+    cadOrientation: cadOrientation ?? this.cadOrientation,
     hiddenDxfLayers: hiddenDxfLayers ?? this.hiddenDxfLayers,
+    shownDxfLayers: shownDxfLayers ?? this.shownDxfLayers,
     isGeodetic: isGeodetic ?? this.isGeodetic,
     detectedCrsName: detectedCrsName ?? this.detectedCrsName,
     opacity: (opacity ?? this.opacity).clamp(0.05, 1.0),
@@ -122,7 +174,9 @@ class ArchitectCadUnderlayConfig {
     if (lockedCadOriginX != null) 'lockedCadOriginX': lockedCadOriginX,
     if (lockedCadOriginY != null) 'lockedCadOriginY': lockedCadOriginY,
     if (unitsPerMeter != null) 'unitsPerMeter': unitsPerMeter,
+    if (cadOrientation) 'cadOrientation': true,
     if (hiddenDxfLayers.isNotEmpty) 'hiddenDxfLayers': hiddenDxfLayers.toList(),
+    if (shownDxfLayers.isNotEmpty) 'shownDxfLayers': shownDxfLayers.toList(),
     if (isGeodetic) 'isGeodetic': true,
     if (detectedCrsName != null) 'detectedCrsName': detectedCrsName,
     'opacity': opacity,
@@ -151,9 +205,14 @@ class ArchitectCadUnderlayConfig {
         lockedCadOriginX: (json['lockedCadOriginX'] as num?)?.toDouble(),
         lockedCadOriginY: (json['lockedCadOriginY'] as num?)?.toDouble(),
         unitsPerMeter: (json['unitsPerMeter'] as num?)?.toDouble(),
+        cadOrientation: json['cadOrientation'] == true,
         hiddenDxfLayers: {
           for (final l in json['hiddenDxfLayers'] as List? ?? const [])
             if (l is String) l,
+        },
+        shownDxfLayers: {
+          for (final layer in json['shownDxfLayers'] as List? ?? const [])
+            if (layer is String) layer,
         },
         isGeodetic: json['isGeodetic'] == true,
         detectedCrsName: json['detectedCrsName'] as String?,

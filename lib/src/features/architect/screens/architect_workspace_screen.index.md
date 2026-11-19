@@ -50,7 +50,7 @@ editor. Tests: `architect_stair_custom_test.dart` and
 | [TAG:STATE_FIELDS] | Tool flags, drafting state, caches, and preview state |
 | [TAG:UNDERLAY_TOOLS] | CAD/raster underlay handlers and related state |
 | [TAG:UNDERLAY_CROP] | Selected CAD/raster clipping grips, isolated preview and one-release commit |
-| [TAG:CAD_INSERTION] | Interactive CAD underlay placement |
+| [TAG:CAD_UNDERLAY_IMPORT] | Preview CAD units and orientation, then publish an owned revision |
 | [TAG:UNDERLAY_DRAG] | Underlay snap and repositioning |
 | [TAG:DRAG_TOOL] | Two-point drag and element relocation |
 | [TAG:STATE_LIFECYCLE] | Initialization, listeners, and disposal |
@@ -95,14 +95,15 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Selected-element context actions | [TAG:SELECTION_BAR], [TAG:FENEST_RADIAL], [TAG:GRID_AXIS]; _handleSelectionTap, _buildSelectionBar | Selection hit path, contextual actions, property controls, cancellation/closing, state updates |
 | Two-point drag of elements or underlays | [TAG:DRAG_TOOL], [TAG:UNDERLAY_DRAG], [TAG:TOUCH_DOWN], [TAG:TOUCH_MOVE], [TAG:TOUCH_UP]; _startDragSession, _startUnderlaySnapDrag, _updateDragTarget, _cancelDragGesture, _confirmDragPlacement, _cancelDragPlacement, ArchitectDragController | Dormant touch input allows pan/pinch before either pick; taps or precision holds choose points. Navigation preserves the session and placed target; Apply commits once. Both element and underlay drag use the same controller and lifecycle, with no generic geometry-command preview. |
 | Multi-step geometry modification | Wall split: [TAG:WALL_SPLIT]. Chamfer/fillet and edge-curving: [TAG:FLOATING_HUD]; _startChamferFilletSession, _buildChamferFilletFloatingOverlay | Session state, preview/rubber band, pan and gesture arbitration, confirm/cancel controls, model command and history |
-| CAD/raster underlay placement or repositioning | [TAG:UNDERLAY_DRAG], [TAG:CAD_INSERTION], [TAG:DRAG_TOOL]; _startUnderlaySnapDrag, _confirmDragPlacement | Import/configuration, shared drag lifecycle, calibration, preview, commit and persistence |
+| CAD/raster underlay placement or repositioning | [TAG:CAD_UNDERLAY_IMPORT], [TAG:UNDERLAY_DRAG], [TAG:DRAG_TOOL]; _loadExternalCadFileForStorey, _startUnderlaySnapDrag, _confirmDragPlacement | CAD preview and snapshot, raster calibration, and shared drag lifecycle |
 
 ### CAD underlay display settings
 
 `_openCadEditDialog` uses `_updateCadPresentation` to commit opacity, source
 colors and source lineweights through the existing model/history/autosave path.
-`ArchitectUnderlayPainter` passes the active config into `drawUnderlay`;
-`ArchitectUnderlayPresentation` resolves display pens without mutating the CAD
+`ArchitectUnderlayPainter` passes the active config and frame into
+`paintArchitectCadUnderlay`; `DxfPainter` draws the source model in that frame.
+The display controls resolve color, lineweight and opacity without mutating the CAD
 document. Its opacity applies to both uniform tint and original colors. Raster
 images retain their existing image-opacity controls; CAD-specific style toggles
 are omitted for raster inputs. Underlay masks, hit testing and snap geometry
@@ -399,6 +400,10 @@ snaps and never enter the wall distance checkpoint.
 ### Project snapshots and editable underlay crops
 
 `_underlayOwnerId` is the attached manifest ID or standalone model ID.
+`_loadExternalCadFileForStorey` prepares a private original for review before
+publishing. `_syncCadRevisionHistory` switches cached documents when Undo/Redo
+selects an older revision. A CAD config carries units, orientation and layer
+overrides. `BimCoordinateFrame.placing` supplies both drag ghost and commit.
 `_restorePersistedUnderlays` prefers saved architectural snapshots over supplied
 fallback documents. Architectural opening uses
 `BimUnderlayLoadMode.architecturalOriginal`; aligned fallback originals are

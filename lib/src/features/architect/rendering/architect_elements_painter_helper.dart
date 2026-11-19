@@ -69,13 +69,14 @@ class ArchitectElementsPainterHelper {
                   ))
               .query(visibleRect);
     for (final entity in entities) {
-      if (layerVisibility[entity.layer] == false ||
-          (layerVisibility[entity.layer] == null &&
-              underlayDoc.layers[entity.layer]?.isVisible == false)) {
+      final layer = underlayDoc.layers[entity.layer];
+      if (entity.isPaperSpace ||
+          !(layerVisibility[entity.layer] ??
+              (layer == null || (layer.isVisible && !layer.isFrozen)))) {
         continue;
       }
 
-      final underlayPaint = presentation.pen(entity, underlayDoc.layers[entity.layer]);
+      final underlayPaint = presentation.pen(entity, layer);
 
       if (entity is DxfLine) {
         canvas.drawLine(entity.p1, entity.p2, underlayPaint);

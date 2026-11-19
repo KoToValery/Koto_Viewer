@@ -67,3 +67,17 @@ class ArchitectLineWeights {
   /// Stroke for overhead elements above the cut plane (beams, ceiling voids).
   static const double overhead = 1.0;
 }
+
+/// Section pens use paper widths for publication and legible pixel widths
+/// independently of drawing zoom in the viewport.
+enum ArchitectSectionLineWeight {
+  structuralCut(.50, ArchitectLineWeights.cutHeavy),
+  secondaryCut(.25, 1.2),
+  projection(.15, .7),
+  hatch(.09, .45);
+
+  const ArchitectSectionLineWeight(this.paperMm, this.screenPixels);
+
+  final double paperMm;
+  final double screenPixels;
+}

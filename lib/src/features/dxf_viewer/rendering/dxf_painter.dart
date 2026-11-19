@@ -144,6 +144,20 @@ class DxfCachedTextLayout {
   });
 }
 
+// [TAG:MODEL_PLACEMENT]
+/// Positions model-space CAD geometry in an existing drawing plane.
+class DxfModelPlacement {
+  final Offset Function(Offset) toCanvas;
+  final double scale;
+  final bool invertY;
+
+  const DxfModelPlacement({
+    required this.toCanvas,
+    required this.scale,
+    required this.invertY,
+  });
+}
+
 // === SECTION: PAINTER DECLARATION & MAIN PAINT LOOP ===
 /// CustomPainter for rendering entire DXF drawing.
 class DxfPainter extends CustomPainter {
@@ -172,6 +186,8 @@ class DxfPainter extends CustomPainter {
   final Set<String> originalStyleLayers;
   /// Stroke width in screen pixels, independent of CAD lineweights and zoom.
   final double? drawingStrokeWidthOverride;
+  final DxfModelPlacement? modelPlacement;
+  final Map<String, bool>? modelLayerOverrides;
 
   // Scene-space counterpart of the same buffered CAD query used below. Block
   // and paper-viewport mappers also produce scene coordinates, so hatch clipping
@@ -198,14 +214,15 @@ class DxfPainter extends CustomPainter {
     this.drawingColorOverride,
     this.originalStyleLayers = const {},
     this.drawingStrokeWidthOverride,
+    this.modelPlacement,
+    this.modelLayerOverrides,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty || size.width <= 0 || size.height <= 0) return;
     _paintedVisibleCadRect = visibleCadRect;
-    _preserveCadDrawOrder = document.entities.any((e) => e is DxfHatch && e.isWipeout) ||
-        document.blocks.values.any((b) => b.entities.any((e) => e is DxfHatch && e.isWipeout));
+    _preserveCadDrawOrder = hasWipeouts(document);
     _drawingBackground = activeLayout == 'Model' ? theme.bgColor : Colors.white;
 
     _paintCallCount++;
@@ -244,7 +261,7 @@ class DxfPainter extends CustomPainter {
     final double availW = math.max(size.width - padding * 2, 10.0);
     final double availH = math.max(size.height - padding * 2, 10.0);
 
-    final double fitScale = math.min(availW / docW, availH / docH);
+    final double fitScale = modelPlacement?.scale ?? math.min(availW / docW, availH / docH);
 
     final double scaledW = docW * fitScale;
     final double scaledH = docH * fitScale;
@@ -259,6 +276,8 @@ class DxfPainter extends CustomPainter {
 
     // Helper: convert CAD point (Y up) to Canvas point (Y down)
     Offset toCanvas(Offset cadPoint) {
+      final placement = modelPlacement;
+      if (placement != null) return placement.toCanvas(cadPoint);
       return Offset(
         tx + (cadPoint.dx - minX) * fitScale,
         ty + (maxY - cadPoint.dy) * fitScale,
@@ -431,11 +450,13 @@ class DxfPainter extends CustomPainter {
 
     for (final entity in entitiesToDraw) {
       try {
+        if (modelPlacement != null && entity.isPaperSpace) continue;
         if (entityFilter != null && !entityFilter!(entity)) {
           continue;
         }
         final layer = document.layers[entity.layer];
-        if (layer != null && (!layer.isVisible || layer.isFrozen)) {
+        if (!_layerIsVisible(entity.layer)) {
+          if (modelLayerOverrides != null) continue;
           // If entity is an Insert on a hidden layer (e.g. layer 0),
           // don't drop the entire block if it contains child entities on layers that ARE visible!
           if (entity is DxfInsert) {
@@ -705,6 +726,7 @@ class DxfPainter extends CustomPainter {
     );
     lastStats = stats;
 
+    if (modelPlacement != null) return;
     debugPrint('[DxfPainter #$_paintCallCount] FINISHED in ${totalMs.toStringAsFixed(1)}ms | rendered $renderedEntities/${document.entities.length} entities | scale=${currentScale.toStringAsFixed(2)}');
     debugPrint('  -> Inserts: ${insertMs.toStringAsFixed(1)}ms ($insertCount)');
     debugPrint('  -> Polylines: ${polyMs.toStringAsFixed(1)}ms ($polyCount)');
@@ -746,6 +768,24 @@ class DxfPainter extends CustomPainter {
 
   Color? _colorOverrideFor(String layer) =>
       originalStyleLayers.contains(layer) ? null : drawingColorOverride;
+
+  static final _wipeouts = Expando<bool>();
+  static bool hasWipeouts(DxfDocument document) => _wipeouts[document] ??=
+      document.entities.any((e) => e is DxfHatch && e.isWipeout) ||
+          document.blocks.values.any(
+            (b) => b.entities.any((e) => e is DxfHatch && e.isWipeout),
+          );
+
+  bool get _invertY => modelPlacement?.invertY ?? true;
+
+  bool _layerIsVisible(String name) {
+    final layer = document.layers[name];
+    return modelLayerOverrides?[name] ??
+        (layer == null || (layer.isVisible && !layer.isFrozen));
+  }
+
+  String _modelLayer(String layer, String? inherited) =>
+      modelLayerOverrides != null && layer == '0' ? inherited ?? layer : layer;
 
   double _calcStrokeWidth(double? lineWeight, {DxfLayer? layer, bool isThick = false}) {
     final scale = currentScale.clamp(0.001, 10000.0);
@@ -929,9 +969,11 @@ class DxfPainter extends CustomPainter {
     Map<String, DxfBlockDiagEntry>? blockDiagnostics,
     DxfAffineMatrix? parentMatrix,
     Offset? parentBasePoint,
+    String? inheritedLayer,
   }) {
     final scale = currentScale.clamp(0.001, 10000.0);
-    final layer = layers[entity.layer];
+    final layerName = _modelLayer(entity.layer, inheritedLayer);
+    final layer = layers[layerName];
     final String? layerLineType = layer?.lineType;
     final double? entityLtScale = entity.lineTypeScale;
 
@@ -1113,6 +1155,7 @@ class DxfPainter extends CustomPainter {
         blockDiagnostics: blockDiagnostics,
         parentMatrix: parentMatrix,
         parentBasePoint: parentBasePoint,
+        effectiveLayer: layerName,
       );
     } else if (entity is DxfDimension) {
       _renderDimension(
@@ -1646,7 +1689,7 @@ class DxfPainter extends CustomPainter {
 
       final double totalRot = entity.rotationDeg + blockRotationDeg;
       if (totalRot != 0.0) {
-        final double rad = -totalRot * math.pi / 180.0;
+        final double rad = (_invertY ? -totalRot : totalRot) * math.pi / 180.0;
         canvas.rotate(rad);
       }
 
@@ -1827,7 +1870,7 @@ class DxfPainter extends CustomPainter {
 
       final double totalRot = entity.rotationDeg + blockRotationDeg;
       if (totalRot != 0.0) {
-        final double rad = -totalRot * math.pi / 180.0;
+        final double rad = (_invertY ? -totalRot : totalRot) * math.pi / 180.0;
         canvas.rotate(rad);
       }
 
@@ -1901,7 +1944,12 @@ class DxfPainter extends CustomPainter {
 
     // --- SUBSECTION: [TAG:PAINTER_WIPEOUT] Mask previous geometry with the drawing background ---
     if (hatch.isWipeout) {
-      canvas.drawPath(path, Paint()..color = _drawingBackground);
+      canvas.drawPath(
+        path,
+        modelPlacement == null
+            ? (Paint()..color = _drawingBackground)
+            : (Paint()..blendMode = BlendMode.clear),
+      );
       return;
     }
 
@@ -2219,9 +2267,10 @@ class DxfPainter extends CustomPainter {
     Map<String, DxfBlockDiagEntry>? blockDiagnostics,
     DxfAffineMatrix? parentMatrix,
     Offset? parentBasePoint,
+    required String effectiveLayer,
   }) {
     final block = blocks[insert.blockName];
-    if (block == null || block.entities.isEmpty) return;
+    if (block == null || block.entities.isEmpty || depth >= 32) return;
 
     final int startUs = blockDiagnostics != null ? DateTime.now().microsecondsSinceEpoch : 0;
 
@@ -2265,6 +2314,7 @@ class DxfPainter extends CustomPainter {
             rotationDeg: insert.rotationDeg,
             canvasOrigin: toCanvas(Offset(offsetX, offsetY)),
             fitScale: fitScale,
+            invertY: _invertY,
           );
         } else {
           final localChildMatrix = DxfAffineMatrix.forNestedInsert(
@@ -2283,8 +2333,9 @@ class DxfPainter extends CustomPainter {
 
           for (int i = 0; i < compiled.subpaths.length; i++) {
             final subpath = compiled.subpaths[i];
-            final childLayer = layers[subpath.layer];
-            if (childLayer != null && (!childLayer.isVisible || childLayer.isFrozen)) {
+            final layerName = _modelLayer(subpath.layer, effectiveLayer);
+            final childLayer = layers[layerName];
+            if (!_layerIsVisible(layerName)) {
               continue;
             }
 
@@ -2334,8 +2385,9 @@ class DxfPainter extends CustomPainter {
 
           for (final child in compiled.otherEntities) {
             if (entityFilter != null && !entityFilter!(child)) continue;
-            final childLayer = layers[child.layer];
-            if (childLayer != null && (!childLayer.isVisible || childLayer.isFrozen)) continue;
+            final layerName = _modelLayer(child.layer, effectiveLayer);
+            final childLayer = layers[layerName];
+            if (!_layerIsVisible(layerName)) continue;
 
             final childColor = _colorOverrideFor(childLayer?.name ?? insert.layer) ?? DxfColorTable.resolveColor(
               colorIndex: child.colorIndex ?? insert.colorIndex,
@@ -2376,6 +2428,7 @@ class DxfPainter extends CustomPainter {
               blockDiagnostics: blockDiagnostics,
               parentMatrix: matrix,
               parentBasePoint: block.basePoint,
+              inheritedLayer: effectiveLayer,
             );
           }
         }
@@ -2825,7 +2878,7 @@ class DxfPainter extends CustomPainter {
     textPainter.layout();
 
     final double cadAngle = math.atan2(u12.dy, u12.dx);
-    double canvasAngle = -cadAngle;
+    double canvasAngle = _invertY ? -cadAngle : cadAngle;
     while (canvasAngle > math.pi / 2.0) {
       canvasAngle -= math.pi;
     }
@@ -3834,6 +3887,8 @@ class DxfPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant DxfPainter oldDelegate) {
+    if (oldDelegate.modelPlacement != modelPlacement ||
+        oldDelegate.modelLayerOverrides != modelLayerOverrides) return true;
     if (oldDelegate.originalStyleLayers != originalStyleLayers ||
         oldDelegate.drawingColorOverride != drawingColorOverride ||
         oldDelegate.drawingStrokeWidthOverride != drawingStrokeWidthOverride) {

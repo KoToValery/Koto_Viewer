@@ -16,18 +16,63 @@ import '../../bim_editing/geometry/bim_coordinate_frame.dart';
 import '../../dxf_viewer/binary/kcad_service.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/parser/dxf_parser.dart';
+import '../../structural_designer/analysis/structural_underlay_source.dart';
 import '../models/architect_underlay_models.dart';
-import 'architect_geodetic_detector.dart';
 
 class ArchitectCadImportResult {
   final DxfDocument document;
   final ArchitectCadUnderlayConfig config;
-  final ArchitectGeodeticDetectionResult geodeticResult;
 
   const ArchitectCadImportResult({
     required this.document,
     required this.config,
-    required this.geodeticResult,
+  });
+}
+
+class ArchitectPreparedCadUnderlay {
+  final File source;
+  final File _stagedFile;
+  final String fileName;
+  final int _lastModifiedMs;
+  final DxfDocument document;
+
+  const ArchitectPreparedCadUnderlay._(
+    this.source,
+    this._stagedFile,
+    this.fileName,
+    this._lastModifiedMs,
+    this.document,
+  );
+
+  DxfUnit get declaredUnit => DxfUnit.fromCode(document.getInsertionUnits());
+  bool get scaleIsEstimated => declaredUnit == DxfUnit.unitless;
+
+  double get suggestedUnitsPerMeter {
+    if (!scaleIsEstimated) return 1 / declaredUnit.toMeters;
+    final span = document.bounds.longestSide;
+    if (span > 500) return 1000;
+    if (span > 60) return 100;
+    return 1;
+  }
+
+  Future<void> dispose() async {
+    try {
+      await _stagedFile.parent.delete(recursive: true);
+    } on FileSystemException catch (error) {
+      debugPrint('[ArchitectUnderlayService] CAD preview cleanup: $error');
+    }
+  }
+}
+
+class ArchitectCadImportSelection {
+  final ArchitectPreparedCadUnderlay prepared;
+  final double unitsPerMeter;
+  final bool cadOrientation;
+
+  const ArchitectCadImportSelection({
+    required this.prepared,
+    required this.unitsPerMeter,
+    required this.cadOrientation,
   });
 }
 
@@ -85,6 +130,7 @@ class ArchitectUnderlayService {
       lockedCadOriginX: frame.origin.dx,
       lockedCadOriginY: frame.origin.dy,
       unitsPerMeter: frame.unitsPerMeter,
+      cadOrientation: frame.invertY,
       autoReload: false,
     );
   }
@@ -112,100 +158,184 @@ class ArchitectUnderlayService {
     return cleaned.isEmpty ? 'underlay' : cleaned;
   }
 
-  /// Imports or reloads an external DWG/DXF/KCAD file into the project's
-  /// internal `underlays/cad/` directory, locks or preserves the coordinate
-  /// origin, and runs automatic geodetic contour detection.
+  /// Reads a private temporary copy so the preview and committed revision
+  /// represent the same bytes even when the external file changes.
+  Future<ArchitectPreparedCadUnderlay> prepareCadUnderlay(File source) async {
+    final fileName = source.uri.pathSegments.last;
+    final extension = fileName.split('.').last.toLowerCase();
+    if (!const {'dxf', 'dwg', 'kcad'}.contains(extension)) {
+      throw FormatException(extension);
+    }
+    final directory = await Directory.systemTemp.createTemp('koto_cad_');
+    try {
+      final staged = await source.copy(
+        '${directory.path}/${_sanitizeFileName(fileName)}',
+      );
+      final document = await _parseCadFile(staged, extension);
+      if (!document.entities.any((entity) => !entity.isPaperSpace)) {
+        throw const ArchitectEmptyCadUnderlay();
+      }
+      final stat = await source.stat();
+      return ArchitectPreparedCadUnderlay._(
+        source,
+        staged,
+        fileName,
+        stat.modified.millisecondsSinceEpoch,
+        document,
+      );
+    } catch (_) {
+      await directory.delete(recursive: true);
+      rethrow;
+    }
+  }
+
+  /// Reload an existing snapshot or import with the automatically suggested scale.
   Future<ArchitectCadImportResult> importOrReloadCadUnderlay({
     required String projectId,
     required String storeyId,
     required File sourceFile,
     ArchitectCadUnderlayConfig? existingConfig,
-    ArchitectGeodeticSurvey? existingSurvey,
     bool preserveExistingOrigin = true,
+    bool Function()? isCurrent,
   }) async {
-    final cadDir = await getCadUnderlayDir(projectId);
-    final fileName = sourceFile.uri.pathSegments.isNotEmpty
-        ? sourceFile.uri.pathSegments.last
-        : sourceFile.path.split(RegExp(r'[/\\]')).last;
-    final ext = fileName.contains('.')
-        ? fileName.split('.').last.toLowerCase()
-        : 'dxf';
-
-    final safeStorey = _sanitizeFileName(storeyId);
-    final safeName = _sanitizeFileName(fileName);
-    // A revision is published only through its returned config after parsing.
-    // Failed refreshes therefore never overwrite the currently displayed snapshot.
-    final revision = await cadDir.createTemp('${safeStorey}_revision_');
-    final internalCopy = File('${revision.path}/$safeName');
-    if (sourceFile.absolute.path != internalCopy.absolute.path) {
-      await sourceFile.copy(internalCopy.path);
-    }
-
-    final stat = await sourceFile.stat();
-    final lastModMs = stat.modified.millisecondsSinceEpoch;
-
-    // Parse or convert DWG -> DXF -> DxfDocument
-    final doc = await _parseCadFile(internalCopy, ext);
-
-    // Determine whether to lock to existing origin
-    ui.Offset? lockedOrigin;
-    double? lockedUnitsPerMeter;
-    if (preserveExistingOrigin &&
-        existingConfig != null &&
-        existingConfig.lockOrigin &&
-        existingConfig.hasLockedOrigin) {
-      lockedOrigin = ui.Offset(
-        existingConfig.lockedCadOriginX!,
-        existingConfig.lockedCadOriginY!,
-      );
-      lockedUnitsPerMeter = existingConfig.unitsPerMeter!;
-    }
-
-    final geodeticResult = ArchitectGeodeticDetector.analyzeDocument(
-      doc: doc,
-      storeyId: storeyId,
-      lockedOrigin: lockedOrigin,
-      lockedUnitsPerMeter: lockedUnitsPerMeter,
-      existingSurvey: existingSurvey,
-    );
-
-    final kcadCache = File('${revision.path}/snapshot.kcad');
+    final prepared = await prepareCadUnderlay(sourceFile);
     try {
-      await KcadService.exportKcadFile(doc, kcadCache.path);
-    } catch (e) {
-      debugPrint('[ArchitectUnderlayService] KCAD cache export note: $e');
+      return await commitCadUnderlay(
+        projectId: projectId,
+        storeyId: storeyId,
+        selection: ArchitectCadImportSelection(
+          prepared: prepared,
+          unitsPerMeter:
+              existingConfig?.frame(const BimCoordinateFrame()).unitsPerMeter ??
+              prepared.suggestedUnitsPerMeter,
+          cadOrientation: existingConfig?.cadOrientation ?? true,
+        ),
+        existingConfig: existingConfig,
+        preserveExistingOrigin: preserveExistingOrigin,
+        isCurrent: isCurrent,
+      );
+    } finally {
+      await prepared.dispose();
     }
+  }
 
-    final config = ArchitectCadUnderlayConfig(
-      storeyId: storeyId,
-      fileName: fileName,
-      externalSourcePath: sourceFile.path,
-      internalCopyPath: await projectRelativePath(projectId, internalCopy),
-      kcadCachePath: await kcadCache.exists()
-          ? await projectRelativePath(projectId, kcadCache)
-          : null,
-      autoReload: false,
-      lockOrigin: existingConfig?.lockOrigin ?? true,
-      lastModifiedMs: lastModMs,
-      lockedCadOriginX: geodeticResult.frame.origin.dx,
-      lockedCadOriginY: geodeticResult.frame.origin.dy,
-      unitsPerMeter: geodeticResult.frame.unitsPerMeter,
-      hiddenDxfLayers: existingConfig?.hiddenDxfLayers ?? const {},
-      isGeodetic: geodeticResult.isGeodetic,
-      detectedCrsName: geodeticResult.coordinateSystem.name,
-      opacity: existingConfig?.opacity ?? 0.42,
-      useOriginalColors: existingConfig?.useOriginalColors ?? false,
-      useOriginalLineweights: existingConfig?.useOriginalLineweights ?? false,
-      visible: existingConfig?.visible ?? true,
-      maskPolygon: existingConfig?.maskPolygon,
-      maskEnabled: existingConfig?.maskEnabled ?? true,
+  /// Publishes an immutable project-owned revision after preview confirmation.
+  Future<ArchitectCadImportResult> commitCadUnderlay({
+    required String projectId,
+    required String storeyId,
+    required ArchitectCadImportSelection selection,
+    ArchitectCadUnderlayConfig? existingConfig,
+    bool preserveExistingOrigin = true,
+    bool Function()? isCurrent,
+  }) async {
+    final prepared = selection.prepared;
+    final units = selection.unitsPerMeter;
+    if (!units.isFinite || units <= 0) {
+      throw ArgumentError.value(units, 'unitsPerMeter');
+    }
+    if (isCurrent?.call() == false) throw const ArchitectStaleCadImport();
+    final previousFrame = existingConfig?.frame(const BimCoordinateFrame());
+    final frame = BimCoordinateFrame(
+      origin:
+          preserveExistingOrigin &&
+              existingConfig != null &&
+              existingConfig.lockOrigin &&
+              existingConfig.hasLockedOrigin
+          ? previousFrame!.origin
+          : prepared.document.bounds.center,
+      unitsPerMeter: units,
+      invertY: selection.cadOrientation,
     );
 
-    return ArchitectCadImportResult(
-      document: doc,
-      config: config,
-      geodeticResult: geodeticResult,
+    final cadDir = await getCadUnderlayDir(projectId);
+    final revision = await cadDir.createTemp(
+      '${_sanitizeFileName(storeyId)}_revision_',
     );
+    try {
+      final sourceDirectory = await Directory(
+        '${revision.path}/source',
+      ).create();
+      final internalCopy = await prepared._stagedFile.copy(
+        '${sourceDirectory.path}/${_sanitizeFileName(prepared.fileName)}',
+      );
+      final kcadCache = File('${revision.path}/snapshot.kcad');
+      String? cachePath;
+      try {
+        await KcadService.exportKcadFile(prepared.document, kcadCache.path);
+        cachePath = await projectRelativePath(projectId, kcadCache);
+      } catch (error) {
+        debugPrint('[ArchitectUnderlayService] KCAD cache export: $error');
+      }
+
+      final config = ArchitectCadUnderlayConfig(
+        storeyId: storeyId,
+        fileName: prepared.fileName,
+        externalSourcePath: prepared.source.path,
+        internalCopyPath: await projectRelativePath(projectId, internalCopy),
+        kcadCachePath: cachePath,
+        lockOrigin: existingConfig?.lockOrigin ?? true,
+        lastModifiedMs: prepared._lastModifiedMs,
+        lockedCadOriginX: frame.origin.dx,
+        lockedCadOriginY: frame.origin.dy,
+        unitsPerMeter: units,
+        cadOrientation: frame.invertY,
+        hiddenDxfLayers: existingConfig?.hiddenDxfLayers ?? const {},
+        shownDxfLayers: existingConfig?.shownDxfLayers ?? const {},
+        opacity: existingConfig?.opacity ?? 0.42,
+        useOriginalColors: existingConfig?.useOriginalColors ?? false,
+        useOriginalLineweights: existingConfig?.useOriginalLineweights ?? false,
+        visible: existingConfig?.visible ?? true,
+        maskPolygon: switch (existingConfig?.maskPolygon) {
+          final mask? when previousFrame != frame => [
+            for (final point in mask)
+              frame.toModel(previousFrame!.toCad(point)),
+          ],
+          final mask => mask,
+        },
+        maskEnabled: existingConfig?.maskEnabled ?? true,
+      );
+      if (isCurrent?.call() == false) throw const ArchitectStaleCadImport();
+      return ArchitectCadImportResult(
+        document: prepared.document,
+        config: config,
+      );
+    } catch (_) {
+      await revision.delete(recursive: true);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, ArchitectCadUnderlayConfig>> commitCadUnderlays(
+    String projectId,
+    Map<String, ArchitectCadImportSelection> selections,
+  ) async {
+    final configs = <String, ArchitectCadUnderlayConfig>{};
+    try {
+      for (final entry in selections.entries) {
+        final imported = await commitCadUnderlay(
+          projectId: projectId,
+          storeyId: entry.key,
+          selection: entry.value,
+        );
+        configs[entry.key] = imported.config;
+      }
+      return configs;
+    } catch (_) {
+      // These generated revisions have never been referenced by a project.
+      for (final config in configs.values) {
+        try {
+          final source = await resolveOwnedAsset(
+            projectId,
+            config.internalCopyPath,
+            adoptLegacy: false,
+          );
+          await source?.parent.parent.delete(recursive: true);
+        } on FileSystemException catch (error) {
+          debugPrint('[ArchitectUnderlayService] CAD revision cleanup: $error');
+        }
+      }
+      rethrow;
+    }
   }
 
   /// Loads a previously saved CAD underlay from the project's internal cache or copy.
@@ -233,7 +363,11 @@ class ArchitectUnderlayService {
   }
 
   Future<DxfDocument> _parseCadFile(File file, String ext) async {
-    if (ext == 'kcad') return KcadService.loadKcadFile(file);
+    if (ext == 'kcad') {
+      return StructuralUnderlaySource.original(
+        await KcadService.loadKcadFile(file),
+      );
+    }
     if (ext == 'dwg') return DwgReaderService.read(file.path);
     return compute(_parseDxfIsolate, file.path);
   }
@@ -416,14 +550,16 @@ DxfDocument _parseDxfIsolate(String path) {
   final content = UniversalEncodingService.decodeBytes(
     File(path).readAsBytesSync(),
   );
-  return DxfParser.parseString(content).toIsolateSafe();
+  return DxfParser.parseString(
+    content,
+    preserveSourceLayers: true,
+  ).toIsolateSafe();
 }
 
-/// Compatibility shell for existing callers. Project snapshots never watch files.
-class ArchitectCadFileWatcher {
-  final void Function(String storeyId, File externalFile)
-  onExternalFileModified;
-  ArchitectCadFileWatcher({required this.onExternalFileModified});
-  void updateConfigs(Map<String, ArchitectCadUnderlayConfig> configs) {}
-  void dispose() {}
+class ArchitectEmptyCadUnderlay implements Exception {
+  const ArchitectEmptyCadUnderlay();
+}
+
+class ArchitectStaleCadImport implements Exception {
+  const ArchitectStaleCadImport();
 }

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/models/architect_slab_assembly.dart';
@@ -9,7 +10,9 @@ import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.d
 import 'package:kotoview/src/features/architect/rendering/architect_canvas_palette.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_roof_painter_helper.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_snap_geometry.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_vector_scene.dart';
 import 'package:kotoview/src/features/architect/services/architect_building_section.dart';
+import 'package:kotoview/src/features/architect/services/architect_drawing_publisher.dart';
 import 'package:kotoview/src/features/architect/services/architect_polygon_dimensions.dart';
 import 'package:kotoview/src/features/architect/models/architect_roof_drainage.dart';
 import 'package:kotoview/src/features/architect/services/architect_polygon_geometry.dart';
@@ -808,6 +811,80 @@ void main() {
       // Snaps to wall endpoint from highest wall storey below
       final originHits = snapGeo.query(const Offset(0, 0), 0.2);
       expect(originHits.any((h) => h.label == 'Endpoint'), isTrue);
+    });
+
+    test('roof underlay distinguishes the core and finished facade', () {
+      const wall = ArchitectWall(
+        id: 'wall',
+        startPoint: Offset.zero,
+        endPoint: Offset(6, 0),
+        thickness: .37,
+        insulationThicknessOverride: .12,
+      );
+      const floor = ArchitectStorey(
+        id: 'floor',
+        name: 'Ground',
+        elevation: 0,
+        height: 3,
+        walls: [wall],
+      );
+      final project = ArchitectProject(
+        id: 'project',
+        name: 'Roof outline',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: const [floor],
+        activeStoreyId: floor.id,
+      ).ensureRoofStorey();
+      Iterable<ArchitectVectorPath> paint(ArchitectProject model) {
+        final canvas = ArchitectVectorCanvas();
+        ArchitectRoofPainterHelper.drawSupportingWallUnderlay(
+          canvas: canvas,
+          project: model,
+          palette: const ArchitectCanvasPalette.light(),
+          scale: 100,
+        );
+        return canvas.operations.whereType<ArchitectVectorPath>();
+      }
+
+      final strokes = paint(project);
+      final core = strokes.singleWhere((op) => op.role == 'roofSupportCore');
+      final facade = strokes.singleWhere(
+        (op) => op.role == 'roofFacadeOutline',
+      );
+      expect(core.path.getBounds().bottom, closeTo(.125, 1e-5));
+      expect(facade.path.getBounds().bottom, closeTo(.245, 1e-5));
+      expect(facade.path.getBounds().top, greaterThanOrEqualTo(.125 - 1e-5));
+      expect(facade.width, lessThan(core.width));
+      expect(facade.path.computeMetrics().length, greaterThan(1));
+
+      final plain = floor.copyWith(
+        walls: [wall.copyWith(thickness: .25, insulationThicknessOverride: 0)],
+      );
+      final coincident = paint(
+        project.copyWith(storeys: [plain, project.roofStorey!]),
+      );
+      expect(coincident.map((op) => op.role), ['roofSupportCore']);
+
+      final scene = ArchitectDrawingPublisher.build(
+        project,
+        ArchitectSavedDrawing(
+          id: 'roof-plan',
+          sourceId: project.roofStorey!.id,
+          kind: ArchitectDrawingKind.plan,
+        ),
+        100,
+        lookupAppLocalizations(const Locale('en')),
+      );
+      final paper = scene.operations.whereType<ArchitectVectorPath>();
+      expect(
+        paper.singleWhere((op) => op.role == 'roofSupportCore').width,
+        closeTo(.25, 1e-6),
+      );
+      expect(
+        paper.singleWhere((op) => op.role == 'roofFacadeOutline').width,
+        closeTo(.13, 1e-6),
+      );
     });
 
     test('drawSupportingWallUnderlay runs cleanly and lower-level roofs render with elevation badge', () {

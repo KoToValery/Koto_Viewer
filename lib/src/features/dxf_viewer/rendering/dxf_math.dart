@@ -410,17 +410,19 @@ class DxfAffineMatrix {
     required double rotationDeg,
     required Offset canvasOrigin, // toCanvas(insertPoint)
     required double fitScale,
+    bool invertY = true,
   }) {
     final rad = rotationDeg * math.pi / 180.0;
     final c = math.cos(rad);
     final s = math.sin(rad);
+    final yScale = invertY ? -fitScale : fitScale;
 
     return DxfAffineMatrix(
       m00: scaleX * c * fitScale,
       m01: -scaleY * s * fitScale,
       m02: canvasOrigin.dx,
-      m10: -scaleX * s * fitScale,
-      m11: -scaleY * c * fitScale,
+      m10: scaleX * s * yScale,
+      m11: scaleY * c * yScale,
       m12: canvasOrigin.dy,
     );
   }

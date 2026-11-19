@@ -314,14 +314,15 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
       initialProjectName: _nameController.text.trim().isNotEmpty
           ? _nameController.text.trim()
           : null,
-      onCreate: (archProject) async {
-        if (mounted) setState(() => _isCreating = true);
+      onCreate: (archProject, underlays) async {
         final created = await createArchitectWorkProject(
           library: BimProjectLibraryService.instance,
           archProject: archProject,
+          underlays: underlays,
           location: _locationController.text.trim(),
         );
         bimProject = created.$1;
+        return created.$2;
       },
     );
     if (bimProject == null || !mounted) return;

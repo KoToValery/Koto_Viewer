@@ -171,9 +171,10 @@ void main() {
     expect(wood, isNotEmpty);
     expect(concrete, isNotEmpty);
     expect(
-      wood.map((r) => ArchitectSectionHatch.slab(r.material)!.id).toSet(),
+      wood.where((r) => r.structural).map((r) => r.effectiveHatch?.id).toSet(),
       {'wood'},
     );
+    expect(wood.any((r) => !r.structural && r.effectiveHatch == null), isTrue);
     expect(
       concrete.map((r) => ArchitectSectionHatch.slab(r.material)!.id).toSet(),
       {'concrete'},

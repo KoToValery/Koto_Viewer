@@ -12468,7 +12468,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String architectCadUnderlayReloadedNotice(String fileName) {
-    return 'Външната CAD подложка се обнови автоматично: $fileName';
+    return 'CAD подложката е обновена ($fileName)';
   }
 
   @override
@@ -12589,7 +12589,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectUnderlayEdit => 'Редактиране';
 
   @override
-  String get architectUnderlayScale => 'Мащабиране';
+  String get architectUnderlayScale => 'Мащаб';
 
   @override
   String get architectUnderlayMask => 'Маска / Изрязване';
@@ -13257,6 +13257,80 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectUnderlayOriginalColors => 'Оригинални цветове';
+
+  @override
+  String get architectUnderlayAdd => 'Добави';
+
+  @override
+  String get architectRasterChooseUnderlay => 'Избери подложка';
+
+  @override
+  String get architectUnderlaySettings => 'Настройки';
+
+  @override
+  String get architectUnderlayShow => 'Покажи';
+
+  @override
+  String get architectUnderlayCrop => 'Изрязване';
+
+  @override
+  String get architectUnderlayGeodesy => 'Геодезия';
+
+  @override
+  String get architectCadImportTitle => 'Импорт на CAD подложка';
+
+  @override
+  String get architectCadReplaceTitle => 'Замяна на CAD подложка';
+
+  @override
+  String get architectCadImportAccept => 'Импорт';
+
+  @override
+  String get architectCadReplaceAccept => 'Замени';
+
+  @override
+  String get architectCadScaleAuto => 'Автоматично';
+
+  @override
+  String get architectCadScaleCurrent => 'Текущ';
+
+  @override
+  String get architectCadScaleFromFile => 'Единици от файла';
+
+  @override
+  String get architectCadUnitsPerMeter => 'Чертожни единици за метър';
+
+  @override
+  String get architectCadScaleEstimated => 'Единиците са оценени по габарита';
+
+  @override
+  String get architectCadOrientation => 'Ориентация като в CAD';
+
+  @override
+  String get architectCadOrientationHelp =>
+      'Преди смяна на ориентацията проверете съвпадението със съществуващите стени и оси.';
+
+  @override
+  String get architectCadImportEmpty =>
+      'В моделното пространство на файла няма геометрия.';
+
+  @override
+  String get architectUnderlayShowCrop => 'Включи изрязването';
+
+  @override
+  String get architectUnderlayHideCrop => 'Изключи изрязването';
+
+  @override
+  String get architectUnderlayRemoveCrop => 'Премахни изрязването';
+
+  @override
+  String get architectUnderlayRectangleCrop => 'Правоъгълник';
+
+  @override
+  String get architectUnderlayPolygonCrop => 'Полигон';
+
+  @override
+  String get architectUnderlayUnsupportedFormat => 'Неподдържан файлов формат';
 
   @override
   String get architectUnderlayOriginalLineweights => 'Оригинални дебелини';

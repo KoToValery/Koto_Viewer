@@ -17,6 +17,11 @@
 | Painter core | `DxfPainter`, `_drawGrid`, `_renderEntity` | Main `CustomPainter` pipeline, culling, grid, and entity dispatch |
 | Specialized renderers | `_renderSinglePatternLineFamily`, `_renderInsert`, `_renderDimensionText`, `_drawSingleLeaderAnnotation`, `_drawBadge` | Hatch patterns, block inserts, dimensions, leaders, and measurement badges |
 
+`[TAG:MODEL_PLACEMENT]` embeds `DxfModelPlacement` in the architectural plan,
+drag ghost and import preview. The caller supplies the CAD-to-canvas mapping,
+the viewport's CAD bounds and layer overrides. Embedded wipeouts clear an
+isolated underlay layer so they affect only earlier geometry in that underlay.
+
 `[TAG:HATCH_VIEWPORT_WORK]` maps the buffered CAD viewport into scene coordinates
 once per paint. `_renderHatchPatternLines` intersects the hatch's scene bounds
 with that rectangle before enumerating pattern lines and dash cycles. The

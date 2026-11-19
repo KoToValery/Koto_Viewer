@@ -143,10 +143,17 @@ class DxfSnapHelper {
     bool allowNearest = true,
     bool includeIntersections = false,
     bool Function(Offset)? pointFilter,
+    Map<String, bool>? layerVisibility,
   }) {
     if (toleranceCad <= 0) return null;
 
     final double maxDistSq = toleranceCad * toleranceCad;
+    bool layerIsVisible(String name) {
+      final layer = document.layers[name];
+      return layerVisibility?[name] ??
+          (layer == null ||
+              (layer.isVisible && (layerVisibility == null || !layer.isFrozen)));
+    }
 
     DxfSnapResult? bestEndpointSnap;
     double minEndpointDistSq = maxDistSq;
@@ -355,8 +362,8 @@ class DxfSnapHelper {
 
     // Iterate through visible entities
     for (final entity in candidates) {
-      final layer = document.layers[entity.layer];
-      if (layer != null && !layer.isVisible) continue;
+      if (!layerIsVisible(entity.layer) ||
+          (layerVisibility != null && entity.isPaperSpace)) continue;
 
       if (entity is DxfLine) {
         testLandmark(entity.p1, DxfSnapType.endpoint);
@@ -565,8 +572,10 @@ class DxfSnapHelper {
           }
 
           for (final child in block.entities) {
-            final childLayer = document.layers[child.layer];
-            if (childLayer != null && !childLayer.isVisible) continue;
+            final layer = layerVisibility != null && child.layer == '0'
+                ? entity.layer
+                : child.layer;
+            if (!layerIsVisible(layer)) continue;
 
             if (child is DxfLine) {
               final p1 = transformPt(child.p1);

@@ -42,6 +42,7 @@ class ArchitectDragController extends ChangeNotifier {
   String _underlayName = '';
   String _storeyId = '';
   double _unitsPerMeter = 1.0;
+  bool _invertCadY = false;
 
   Offset? _originalCadOrigin;
   Offset? _originalRasterPosition;
@@ -109,10 +110,13 @@ class ArchitectDragController extends ChangeNotifier {
         _currentPointModel == null) {
       return null;
     }
-    final scale = _unitsPerMeter > 0 ? _unitsPerMeter : 1.0;
-    final newOrigin = _basePointCad! - _currentPointModel! * scale;
-    return BimCoordinateFrame(origin: newOrigin, unitsPerMeter: scale);
+    return _frameAt(_currentPointModel!);
   }
+
+  BimCoordinateFrame _frameAt(Offset target) => BimCoordinateFrame(
+    unitsPerMeter: _unitsPerMeter,
+    invertY: _invertCadY,
+  ).placing(_basePointCad ?? _originalCadOrigin ?? Offset.zero, target);
 
   /// Ghost top-left position for raster underlay during drag.
   Offset? get ghostRasterPosition {
@@ -135,6 +139,7 @@ class ArchitectDragController extends ChangeNotifier {
     String underlayName = '',
     String storeyId = '',
     double unitsPerMeter = 1.0,
+    bool invertCadY = false,
     Offset? originalCadOrigin,
     Offset? originalRasterPosition,
     Offset? defaultAnchor,
@@ -148,7 +153,8 @@ class ArchitectDragController extends ChangeNotifier {
     _rasterId = rasterId;
     _underlayName = underlayName;
     _storeyId = storeyId;
-    _unitsPerMeter = unitsPerMeter > 0 ? unitsPerMeter : 1.0;
+    _unitsPerMeter = unitsPerMeter.isFinite && unitsPerMeter > 0 ? unitsPerMeter : 1.0;
+    _invertCadY = invertCadY;
     _originalCadOrigin = originalCadOrigin;
     _originalRasterPosition = originalRasterPosition;
 
@@ -184,6 +190,7 @@ class ArchitectDragController extends ChangeNotifier {
     double scale = 1.0,
     DxfDocument? dxfDoc,
     BimCoordinateFrame? frame,
+    Map<String, bool> visibility = const {},
     ArchitectRasterUnderlay? raster,
     bool snapToDefaultGrip = true,
     bool relocateHandle = false,
@@ -221,6 +228,7 @@ class ArchitectDragController extends ChangeNotifier {
         project: project,
         dxfDoc: dxfDoc,
         frame: frame ?? const BimCoordinateFrame(),
+        visibility: visibility,
         raster: raster,
         scale: scale,
       );
@@ -237,6 +245,7 @@ class ArchitectDragController extends ChangeNotifier {
         wallCoresOnly: _usesWallCores(project),
         underlay: _isCadUnderlay ? null : dxfDoc,
         frame: frame ?? const BimCoordinateFrame(),
+        visibility: visibility,
       );
       _currentPointModel = snap.point;
       _currentSnapLabel = snap.snapLabel;
@@ -292,6 +301,7 @@ class ArchitectDragController extends ChangeNotifier {
     required ArchitectProject project,
     DxfDocument? dxfDoc,
     required BimCoordinateFrame frame,
+    required Map<String, bool> visibility,
     ArchitectRasterUnderlay? raster,
     required double scale,
   }) {
@@ -326,6 +336,7 @@ class ArchitectDragController extends ChangeNotifier {
         toleranceCad: tolCad,
         includeIntersections: true,
         pointFilter: (point) => visible(frame.toModel(point)),
+        layerVisibility: visibility,
       );
       if (snap != null) {
         _currentPointModel = frame.toModel(snap.point);
@@ -381,6 +392,8 @@ class ArchitectDragController extends ChangeNotifier {
     _basePointModel = basePoint;
     if (_isUnderlay && _isCadUnderlay && frame != null) {
       _basePointCad = frame.toCad(basePoint);
+      _invertCadY = frame.invertY;
+      _unitsPerMeter = frame.unitsPerMeter;
     }
     _currentPointModel = basePoint;
     _phase = ArchitectDragPhase.draggingToTarget;
@@ -434,10 +447,7 @@ class ArchitectDragController extends ChangeNotifier {
     required Offset targetPointModel,
     List<Offset>? existingMask,
   }) {
-    final scale = _unitsPerMeter > 0 ? _unitsPerMeter : 1.0;
-    final baseCad = _basePointCad ?? (_originalCadOrigin ?? Offset.zero);
-    final newOriginX = baseCad.dx - targetPointModel.dx * scale;
-    final newOriginY = baseCad.dy - targetPointModel.dy * scale;
+    final origin = _frameAt(targetPointModel).origin;
 
     List<Offset>? translatedMask;
     final d = targetPointModel - (_basePointModel ?? targetPointModel);
@@ -446,8 +456,8 @@ class ArchitectDragController extends ChangeNotifier {
     }
 
     return (
-      newOriginX: newOriginX,
-      newOriginY: newOriginY,
+      newOriginX: origin.dx,
+      newOriginY: origin.dy,
       translatedMask: translatedMask,
     );
   }

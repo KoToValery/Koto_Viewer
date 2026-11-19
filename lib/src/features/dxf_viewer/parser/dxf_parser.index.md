@@ -18,6 +18,10 @@
 | Blocks & entities | `_parseBlocksSection`, `_parseEntitiesSection`, `_parseEntity` | Block definitions and per-entity group-code dispatch |
 | Text & hatches | `_cleanCadText`, `_cleanMText`, `_parseHatchBoundaryPaths`, `_parseHatchPatternLines` | Shared `CadTextDecoder` text cleanup and DXF hatch parsing |
 
+`[TAG:SOURCE_LAYER_STATES]` is used by
+`ArchitectUnderlayService` through `parseString(preserveSourceLayers: true)`
+to retain the source layer table and avoid the viewer's empty-visibility recovery.
+
 ## Direct DWG path
 
 `[TAG:DWG_DIRECT_READ]` routes original DWGs through `DwgReaderService` and

@@ -101,6 +101,8 @@ class BimProjectLibraryService {
     required List<BimStoreyUnderlay> storeys,
     BimProjectType projectType = BimProjectType.structural,
     ArchitectProject? initialArchitectProject,
+    Future<Map<String, ArchitectCadUnderlayConfig>> Function(String projectId)?
+        prepareArchitecturalUnderlays,
   }) async {
     storeys = [...storeys]..sort((a, b) => a.elevation.compareTo(b.elevation));
     final now = DateTime.now();
@@ -110,6 +112,23 @@ class BimProjectLibraryService {
         .padLeft(6, '0');
     final id = 'bim_${now.millisecondsSinceEpoch}_$randSuffix';
 
+    final cad = await prepareArchitecturalUnderlays?.call(id);
+    if (cad != null) {
+      storeys = [
+        for (final storey in storeys)
+          if (cad[storey.storeyId] case final config?)
+            storey.copyWith(
+              sourceFileName: config.fileName,
+              underlayFileName: config.internalCopyPath,
+              processing: {
+                'source': config.internalCopyPath,
+                'pure': ?config.kcadCachePath,
+              },
+            )
+          else
+            storey,
+      ];
+    }
     final hasUnderlays = storeys.any((s) => s.hasUnderlay);
     final project = BimWorkProject(
       id: id,
@@ -123,7 +142,8 @@ class BimProjectLibraryService {
     );
 
     await getProjectDirectory(id);
-    if (!await saveProjectManifest(project)) {
+    if (projectType != BimProjectType.architectural &&
+        !await saveProjectManifest(project)) {
       throw FileSystemException('Cannot create project');
     }
 
@@ -134,6 +154,7 @@ class BimProjectLibraryService {
               name: project.name,
               createdAt: now,
               updatedAt: now,
+              cadUnderlays: cad,
             )
           : () {
               final initialArchitectStoreys = storeys.map((s) {
@@ -169,6 +190,9 @@ class BimProjectLibraryService {
 
       if (!await saveArchitectProject(id, initialArchitect)) {
         throw FileSystemException('Cannot initialize architectural model');
+      }
+      if (!await saveProjectManifest(project)) {
+        throw FileSystemException('Cannot create project');
       }
     } else {
       // Initialize corresponding structural project

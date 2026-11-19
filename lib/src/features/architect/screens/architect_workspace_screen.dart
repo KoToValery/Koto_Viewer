@@ -10,6 +10,7 @@ import '../widgets/architect_polygon_angle_control.dart';
 import '../widgets/architect_slab_draft_bar.dart';
 import '../services/architect_geodetic_detector.dart';
 import '../widgets/architect_underlay_bar.dart';
+import '../widgets/architect_cad_import_dialog.dart';
 import '../../bim_projects/services/bim_underlay_picker_helper.dart';
 import '../widgets/architect_dialog.dart';
 import '../widgets/architect_numeric_keypad.dart';
@@ -373,7 +374,7 @@ import '../widgets/architect_wall_overshoot_banner.dart';
 //   ↳ [SUB]        [TAG:UNDERLAY_CROP] Selected underlay edge-grip clipping
 //   ↳ [SUB]        [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG CONTROLLER
 //   ↳ [SUB]        [TAG:UNDERLAY_DRAG] UNDERLAY 2-POINT SNAP DRAG & SELECTION
-//   ↳ [SUB]        [TAG:CAD_INSERTION] CAD UNDERLAY INTERACTIVE PLACEMENT
+//   ↳ [SUB]        [TAG:CAD_UNDERLAY_IMPORT] REVIEW AND PUBLISH A CAD REVISION
 //   ↳ [SUB]        [TAG:ARC_EXACT_PLACEMENT] Chord input, shaping, exact rise, commit
 //   ↳ [SUB]        [TAG:WALL_ENDPOINT_ANGLE] Endpoint angle constraint and fine adjustment
 //   ↳ [SUB]        [TAG:POLYGON_ANGLE_LOCK] Temporary on-canvas contour angle constraint
@@ -530,9 +531,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         underlays: _showUnderlay ? _underlaysByStorey : const {},
 
-        frame: _effectiveUnderlayFrame,
-
-        visibility: _effectiveUnderlayLayerVisibility,
+        frame: _restoredUnderlayFrame ?? widget.underlayFrame,
 
       );
 
@@ -4184,16 +4183,60 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:UNDERLAY_TOOLS] CAD Xref & Raster Underlay State & Handlers ---
   // Underlays
   Map<String, DxfDocument> _underlaysByStorey = {};
-  final Map<String, Map<String, bool>> _underlayVisibilityByStorey = {};
-  Map<String, bool> get _underlayLayerVisibility => _underlayVisibilityByStorey
-      .putIfAbsent(_project.activeStoreyId, () => {});
+  final _cadRevisionDocs = <(String, String, String?), DxfDocument>{};
+  Map<String, ArchitectCadUnderlayConfig> _knownCadConfigs = const {};
+
+  (String, String, String?) _cadRevisionKey(ArchitectCadUnderlayConfig cfg) =>
+      (_underlayOwnerId, cfg.internalCopyPath, cfg.kcadCachePath);
+
+  void _cacheCadRevision(
+    (String, String, String?) revision,
+    DxfDocument document,
+  ) {
+    _cadRevisionDocs.remove(revision);
+    _cadRevisionDocs[revision] = document;
+    // Older history entries still resolve their project-owned files on demand.
+    final limit = _project.cadUnderlays.length + 4;
+    while (_cadRevisionDocs.length > limit) {
+      _cadRevisionDocs.remove(_cadRevisionDocs.keys.first);
+    }
+  }
+
+  // A historical project selects the matching source revision as well as its frame.
+  void _syncCadRevisionHistory() {
+    final next = _project.cadUnderlays;
+    if (identical(next, _knownCadConfigs)) return;
+    final old = _knownCadConfigs;
+    _knownCadConfigs = next;
+    for (final key in old.keys) {
+      if (!next.containsKey(key)) {
+        _underlaysByStorey.remove(key);
+        _unavailableUnderlayStoreys.remove(key);
+      }
+    }
+    var restore = false;
+    for (final entry in next.entries) {
+      final previous = old[entry.key];
+      final revision = _cadRevisionKey(entry.value);
+      if (previous != null && _cadRevisionKey(previous) == revision) continue;
+      final cached = _cadRevisionDocs[revision];
+      if (cached != null) {
+        _underlaysByStorey[entry.key] = cached;
+        _unavailableUnderlayStoreys.remove(entry.key);
+      } else if (entry.value.internalCopyPath.isNotEmpty || entry.value.kcadCachePath != null) {
+        _underlaysByStorey.remove(entry.key);
+        restore = true;
+      }
+    }
+    if (restore) unawaited(_restorePersistedUnderlays(loadInherited: false));
+  }
+
   final Set<String> _unavailableUnderlayStoreys = {};
   int _underlayRestoreEpoch = 0;
   BimCoordinateFrame? _restoredUnderlayFrame;
   bool _showUnderlay = true;
   bool _underlayBusy = false;
   String? _underlayBusyMessage;
-  ArchitectCadFileWatcher? _cadFileWatcher;
   final Map<String, ui.Image> _rasterImages = {};
   String? _selectedRasterId;
   int _rasterCalibrationStep = 0; // 0 = idle, 1 = pick P1, 2 = pick P2
@@ -4233,7 +4276,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           raster.hasActiveMask ? raster.maskPolygon : null, point);
 
   List<Offset>? get _selectedUnderlayCrop {
-    if (!_commands.isPlan || _dragController.isActive || _draggingRasterId != null || _cadInsertionActive ||
+    if (!_commands.isPlan || _dragController.isActive || _draggingRasterId != null ||
         _underlayMaskDrafting || _rasterCalibrationStep != 0) return null;
     if (_underlayCropEditor.active) return _underlayCropEditor.preview;
     if (_isCadUnderlaySelected && _currentUnderlayDoc != null) {
@@ -4362,30 +4405,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // confirmation, and cancellation lifecycle stays identical to element drag.
   bool _isCadUnderlaySelected = false;
 
-  // --- SUBSECTION: [TAG:CAD_INSERTION] CAD UNDERLAY INTERACTIVE PLACEMENT ---
-  bool _cadInsertionActive = false;
-  Offset? _cadInsertionControlPoint;
-  Offset? _cadInsertionPendingPoint;
-  Offset? _cadInsertionHoverPoint;
-  DxfDocument? _cadInsertionDoc;
-  double _cadInsertionUnitsPerMeter = 1.0;
-  ArchitectCadUnderlayConfig? _cadInsertionConfig;
-
-  BimCoordinateFrame? get _ghostUnderlayFrame {
-    if (_dragController.isDraggingToTarget && _dragController.isCadUnderlay) {
-      return _dragController.ghostCadFrame;
-    }
-    if (!_cadInsertionActive || _cadInsertionControlPoint == null) return null;
-    final target = _cadInsertionPendingPoint ??
-        _cadInsertionHoverPoint ??
-        _cursorModel ??
-        Offset.zero;
-    final scale =
-        _cadInsertionUnitsPerMeter > 0 ? _cadInsertionUnitsPerMeter : 1.0;
-    final origin = _cadInsertionControlPoint! - target * scale;
-    return BimCoordinateFrame(origin: origin, unitsPerMeter: scale);
-  }
-
   double _componentRotation = 0.0;
   bool _showFurnitureLayer = true;
 
@@ -4398,32 +4417,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _project.cadUnderlayForStorey(_project.activeStorey.id);
 
   BimCoordinateFrame get _effectiveUnderlayFrame {
-    final cfg = _currentCadUnderlayConfig;
-    if (cfg != null && cfg.hasLockedOrigin) {
-      return BimCoordinateFrame(
-        origin: Offset(cfg.lockedCadOriginX!, cfg.lockedCadOriginY!),
-        unitsPerMeter: cfg.unitsPerMeter ?? 1.0,
-      );
-    }
-    if (cfg != null && cfg.unitsPerMeter != null && cfg.unitsPerMeter! > 0) {
-      return BimCoordinateFrame(
-        origin: Offset.zero,
-        unitsPerMeter: cfg.unitsPerMeter!,
-      );
-    }
-    return _restoredUnderlayFrame ?? widget.underlayFrame;
+    final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
+    return _currentCadUnderlayConfig?.frame(fallback) ?? fallback;
   }
 
-  Map<String, bool> get _effectiveUnderlayLayerVisibility {
-    final cfg = _currentCadUnderlayConfig;
-    if (cfg != null && cfg.hiddenDxfLayers.isNotEmpty) {
-      return {
-        ..._underlayLayerVisibility,
-        for (final hidden in cfg.hiddenDxfLayers) hidden: false,
-      };
-    }
-    return _underlayLayerVisibility;
-  }
+  Map<String, bool> get _effectiveUnderlayLayerVisibility =>
+      _currentCadUnderlayConfig?.layerOverrides ?? const {};
 
   DxfDocument? get _currentUnderlayDoc {
     if (!_showUnderlay || !_commands.isPlan) return null;
@@ -4446,16 +4445,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return list.last;
   }
 
-  Future<void> _restorePersistedUnderlays() async {
+  Future<void> _restorePersistedUnderlays({bool loadInherited = true}) async {
     final ownerId = _underlayOwnerId;
     final epoch = ++_underlayRestoreEpoch;
     bool current() => mounted && epoch == _underlayRestoreEpoch && ownerId == _underlayOwnerId;
     final configs = Map<String, ArchitectCadUnderlayConfig>.of(_project.cadUnderlays);
+    for (final storey in _project.excludedInheritedCadStoreys) {
+      if (!configs.containsKey(storey)) _underlaysByStorey.remove(storey);
+    }
     for (final entry in configs.entries) {
       final storeyId = entry.key, cfg = entry.value;
+      if (!loadInherited && _underlaysByStorey.containsKey(storeyId)) continue;
       if (cfg.internalCopyPath.isEmpty && (cfg.kcadCachePath?.isEmpty ?? true) &&
           _underlaysByStorey.containsKey(storeyId)) continue;
-      final doc = await ArchitectUnderlayService.instance
+      final revision = _cadRevisionKey(cfg);
+      final doc = _cadRevisionDocs[revision] ?? await ArchitectUnderlayService.instance
           .loadSavedCadUnderlay(cfg, projectId: ownerId);
       if (!current()) return;
       if (_project.cadUnderlays[storeyId] != cfg) continue;
@@ -4466,15 +4470,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         } else {
           _underlaysByStorey[storeyId] = doc;
           _unavailableUnderlayStoreys.remove(storeyId);
-          _underlayVisibilityByStorey[storeyId] = {
-            for (final name in doc.layers.keys) name: !cfg.hiddenDxfLayers.contains(name),
-          };
+          _cacheCadRevision(revision, doc);
         }
       });
     }
-    if (widget.bimProject != null) {
+    if (loadInherited && widget.bimProject != null) {
       final missing = widget.bimProject!.storeys.where((s) =>
           s.hasUnderlay && !configs.containsKey(s.storeyId) &&
+          !_project.excludedInheritedCadStoreys.contains(s.storeyId) &&
           !_underlaysByStorey.containsKey(s.storeyId)).toList();
       if (missing.isNotEmpty) {
         final loaded = await BimUnderlayLoader.loadAndAlign(
@@ -4485,6 +4488,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _restoredUnderlayFrame = BimCoordinateFrame(
           origin: loaded.referenceControlPoint, unitsPerMeter: loaded.cadUnitsPerMeter);
         for (final storey in missing) {
+          if (_project.excludedInheritedCadStoreys.contains(storey.storeyId) ||
+              _project.cadUnderlays.containsKey(storey.storeyId)) continue;
           final doc = loaded.underlaysByStorey[storey.storeyId];
           if (doc != null) _underlaysByStorey[storey.storeyId] = doc;
           else _unavailableUnderlayStoreys.add(storey.storeyId);
@@ -4493,7 +4498,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       // Capture the already aligned original so masks and future reloads use
       // exactly the same coordinate frame, without structural working files.
       for (final entry in Map<String, DxfDocument>.of(_underlaysByStorey).entries) {
-        if (_modelCommands.project.cadUnderlays.containsKey(entry.key)) continue;
+        if (_modelCommands.project.cadUnderlays.containsKey(entry.key) ||
+            _modelCommands.project.excludedInheritedCadStoreys.contains(entry.key)) continue;
         try {
           final cfg = await ArchitectUnderlayService.instance.captureCadSnapshot(
             projectId: ownerId, storeyId: entry.key,
@@ -4501,7 +4507,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           );
           if (!current()) return;
           final project = _modelCommands.project;
-          if (project.cadUnderlays.containsKey(entry.key)) continue;
+          if (project.cadUnderlays.containsKey(entry.key) ||
+              project.excludedInheritedCadStoreys.contains(entry.key)) continue;
+          _cacheCadRevision(_cadRevisionKey(cfg), entry.value);
           _modelCommands.commit(project.copyWith(cadUnderlays: {
             ...project.cadUnderlays, entry.key: cfg,
           }));
@@ -4525,184 +4533,109 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (current()) setState(() {});
   }
 
-  Future<void> _importOrReplaceCadUnderlay() async {
-    if (_underlayBusy) return;
-    try {
-      final file = await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
-      if (file == null || !mounted) return;
-      final isDwg = file.path.toLowerCase().endsWith('.dwg');
-      setState(() {
-        _underlayBusy = true;
-        _underlayBusyMessage = isDwg
-            ? context.l10n.convertingDwg
-            : context.l10n.bimProjectConvertingUnderlay;
-      });
-      await _loadExternalCadFileForStorey(
-        storeyId: _project.activeStorey.id,
-        sourceFile: file,
-        isAutoReload: false,
-      );
-    } catch (e, stack) {
-      debugPrint('[ArchitectWorkspaceScreen] pickCadUnderlay error: $e\n$stack');
-      if (mounted) {
-        setState(() {
-          _underlayBusy = false;
-          _underlayBusyMessage = null;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.architectUnderlayLoadError(e.toString())),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
-  }
+  Future<void> _importOrReplaceCadUnderlay() => _loadExternalCadFileForStorey(
+    storeyId: _project.activeStoreyId,
+  );
 
+  // --- SUBSECTION: [TAG:CAD_UNDERLAY_IMPORT] Review and publish a CAD revision ---
   Future<void> _loadExternalCadFileForStorey({
     required String storeyId,
-    required File sourceFile,
-    required bool isAutoReload,
+    bool refresh = false,
   }) async {
-    if (!mounted) return;
+    if (_underlayBusy || !mounted) return;
     final ownerId = _underlayOwnerId;
-    final isDwg = sourceFile.path.toLowerCase().endsWith('.dwg');
-    setState(() {
-      _underlayBusy = true;
-      _underlayBusyMessage = isDwg
-          ? context.l10n.convertingDwg
-          : context.l10n.bimProjectConvertingUnderlay;
-    });
+    final existing = _project.cadUnderlays[storeyId];
+    bool isCurrent() => mounted && ownerId == _underlayOwnerId &&
+        _project.storeys.any((storey) => storey.id == storeyId) &&
+        _project.cadUnderlays[storeyId] == existing;
+
+    final service = ArchitectUnderlayService.instance;
+    ArchitectPreparedCadUnderlay? prepared;
+    setState(() => _underlayBusy = true);
     try {
-      final existingCfg = _project.cadUnderlays[storeyId];
-      final importRes = await ArchitectUnderlayService.instance
-          .importOrReloadCadUnderlay(
-            projectId: ownerId,
-            storeyId: storeyId,
-            sourceFile: sourceFile,
-            existingConfig: existingCfg,
-            existingSurvey: _project.geodeticSurvey,
-            preserveExistingOrigin: existingCfg?.lockOrigin ?? true,
-          );
-      if (!mounted || ownerId != _underlayOwnerId ||
-          !_project.storeys.any((s) => s.id == storeyId) ||
-          _project.cadUnderlays[storeyId] != existingCfg) return;
-
-      final doc = importRes.document;
-      final nextCfg = importRes.config;
-      final detection = importRes.geodeticResult;
-
-      final updatedUnderlays = Map<String, ArchitectCadUnderlayConfig>.from(
-        _project.cadUnderlays,
-      )..[storeyId] = nextCfg;
-
-      _cadFileWatcher ??= ArchitectCadFileWatcher(
-        onExternalFileModified: _onExternalCadModified,
-      );
-      _cadFileWatcher!.updateConfigs(updatedUnderlays);
-
+      final externalPath = refresh ? existing?.externalSourcePath : null;
+      final external = externalPath == null ? null : File(externalPath);
+      final reload = external != null && await external.exists();
+      if (!isCurrent()) return;
+      final file = reload ? external : await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
+      if (file == null || !isCurrent()) return;
       setState(() {
-        _underlaysByStorey[storeyId] = doc;
-        _unavailableUnderlayStoreys.remove(storeyId);
-        _underlayVisibilityByStorey[storeyId] = {
-          for (final name in doc.layers.keys) name: !nextCfg.hiddenDxfLayers.contains(name),
-        };
-        _commands.commit(
-          _project.copyWith(
-            cadUnderlays: updatedUnderlays,
-            geodeticSurvey: detection.hasTopography
-                ? detection.survey
-                : _project.geodeticSurvey,
-          ),
+        _underlayBusyMessage = file.path.toLowerCase().endsWith('.dwg')
+            ? context.l10n.convertingDwg : context.l10n.architectWizardLoadingUnderlay;
+      });
+
+      final ArchitectCadImportResult imported;
+      if (reload) {
+        imported = await service.importOrReloadCadUnderlay(
+          projectId: ownerId,
+          storeyId: storeyId,
+          sourceFile: file,
+          existingConfig: existing,
+          isCurrent: isCurrent,
         );
+      } else {
+        prepared = await service.prepareCadUnderlay(file);
+        if (!isCurrent()) return;
+        setState(() => _underlayBusyMessage = null);
+        final selection = await showArchitectCadImportDialog(
+          context: context,
+          prepared: prepared,
+          existing: existing,
+        );
+        if (selection == null || !isCurrent()) return;
+        setState(() => _underlayBusyMessage = context.l10n.architectWizardLoadingUnderlay);
+        imported = await service.commitCadUnderlay(
+          projectId: ownerId,
+          storeyId: storeyId,
+          selection: selection,
+          existingConfig: existing,
+          isCurrent: isCurrent,
+        );
+      }
+      if (!isCurrent()) return;
+      final config = imported.config;
+      setState(() {
+        _cacheCadRevision(_cadRevisionKey(config), imported.document);
+        _underlaysByStorey[storeyId] = imported.document;
+        _unavailableUnderlayStoreys.remove(storeyId);
+        _commands.commit(_project.copyWith(cadUnderlays: {
+          ..._project.cadUnderlays, storeyId: config,
+        }));
+        if (!reload && _project.activeStoreyId == storeyId) {
+          _isCadUnderlaySelected = config.visible;
+          _selectedRasterId = null;
+          _selectionIds.clear();
+          _selectedElementId = null;
+          _touchCandidates = null;
+        }
+      });
+      if (existing == null && _project.activeStoreyId == storeyId) _initTransform();
+      final l = context.l10n;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(reload
+            ? l.architectCadUnderlayReloadedNotice(config.fileName)
+            : l.architectCadUnderlayLoadedSuccess(config.fileName)),
+        duration: const Duration(seconds: 2),
+      ));
+    } on ArchitectStaleCadImport {
+      // The request was superseded by another project edit.
+    } catch (error, stack) {
+      debugPrint('[ArchitectWorkspaceScreen] CAD underlay: $error\n$stack');
+      if (isCurrent()) {
+        final l = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(error is ArchitectEmptyCadUnderlay
+              ? l.architectCadImportEmpty
+              : l.architectUnderlayLoadError(error.toString())),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() {
         _underlayBusy = false;
         _underlayBusyMessage = null;
       });
-      _saveBiMProjectIfAttached();
-
-      if (!isAutoReload && existingCfg == null && _project.activeStoreyId == storeyId) {
-        _initTransform();
-      }
-
-      if (mounted) {
-        final l10n = context.l10n;
-        final String message;
-        if (isAutoReload) {
-          message = l10n.architectCadUnderlayReloadedNotice(nextCfg.fileName);
-        } else if (detection.hasTopography) {
-          message = l10n.architectGeodesyDetectedNotice(
-            detection.coordinateSystem.name,
-            detection.contours.length,
-            detection.spotElevations.length,
-          );
-        } else {
-          message = l10n.architectCadUnderlayLoadedSuccess(nextCfg.fileName);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-        if (!isAutoReload && _project.activeStoreyId == storeyId) {
-          setState(() {
-            _isCadUnderlaySelected = true;
-            _selectedRasterId = null;
-            _selectionIds.clear();
-            _selectedElementId = null;
-          });
-        }
-      }
-    } catch (e, stack) {
-      debugPrint('[ArchitectWorkspaceScreen] _loadExternalCadFileForStorey error: $e\n$stack');
-      if (mounted) {
-        setState(() {
-          _underlayBusy = false;
-          _underlayBusyMessage = null;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.architectUnderlayLoadError(e.toString())),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    } finally {
-      if (mounted && _underlayBusy) {
-        setState(() {
-          _underlayBusy = false;
-          _underlayBusyMessage = null;
-        });
-      }
+      await prepared?.dispose();
     }
-  }
-
-  void _onExternalCadModified(String storeyId, File externalFile) {
-    if (!mounted) return;
-    unawaited(
-      _loadExternalCadFileForStorey(
-        storeyId: storeyId,
-        sourceFile: externalFile,
-        isAutoReload: true,
-      ),
-    );
-  }
-
-  void _toggleCadAutoReload(bool value) {
-    final cfg = _currentCadUnderlayConfig;
-    if (cfg == null) return;
-    final updated = cfg.copyWith(autoReload: value);
-    final map = Map<String, ArchitectCadUnderlayConfig>.from(
-      _project.cadUnderlays,
-    )..[cfg.storeyId] = updated;
-    _cadFileWatcher ??= ArchitectCadFileWatcher(
-      onExternalFileModified: _onExternalCadModified,
-    );
-    _cadFileWatcher!.updateConfigs(map);
-    setState(() {
-      _commands.commit(_project.copyWith(cadUnderlays: map));
-    });
-    _saveBiMProjectIfAttached();
   }
 
   void _toggleCadOriginLock(bool value) {
@@ -4718,87 +4651,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _saveBiMProjectIfAttached();
   }
 
-  Future<void> _reloadCurrentCadUnderlayNow() async {
-    if (_underlayBusy) return;
-    final cfg = _currentCadUnderlayConfig;
-    if (cfg == null) return;
-    final ownerId = _underlayOwnerId;
-    final extPath = cfg.externalSourcePath;
-    final sourceFile = (extPath != null && await File(extPath).exists())
-        ? File(extPath)
-        : await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
-    if (sourceFile == null || !mounted || ownerId != _underlayOwnerId ||
-        _project.cadUnderlays[cfg.storeyId] != cfg) return;
-    await _loadExternalCadFileForStorey(
-      storeyId: cfg.storeyId,
-      sourceFile: sourceFile,
-      isAutoReload: true,
-    );
-  }
-
-  Future<void> _repositionCurrentCadUnderlay() async {
-    final storeyId = _project.activeStorey.id;
-    final cfg = _project.cadUnderlays[storeyId];
-    final doc = _underlaysByStorey[storeyId];
-    if (cfg == null || doc == null) return;
-    _startUnderlaySnapDrag(isCad: true);
-  }
-
-  void _confirmCadInsertion() {
-    if (!_cadInsertionActive ||
-        _cadInsertionControlPoint == null ||
-        _cadInsertionPendingPoint == null) {
-      return;
-    }
-    final scale =
-        _cadInsertionUnitsPerMeter > 0 ? _cadInsertionUnitsPerMeter : 1.0;
-    final newOriginX =
-        _cadInsertionControlPoint!.dx - _cadInsertionPendingPoint!.dx * scale;
-    final newOriginY =
-        _cadInsertionControlPoint!.dy - _cadInsertionPendingPoint!.dy * scale;
-
-    final storeyId = _project.activeStorey.id;
-    final cfg = _project.cadUnderlays[storeyId] ?? _cadInsertionConfig;
-    if (cfg != null) {
-      final updated = cfg.copyWith(
-        lockedCadOriginX: newOriginX,
-        lockedCadOriginY: newOriginY,
-        unitsPerMeter: scale,
-        lockOrigin: true,
-      );
-      final map =
-          Map<String, ArchitectCadUnderlayConfig>.from(_project.cadUnderlays)
-            ..[storeyId] = updated;
-
-      setState(() {
-        _commands.commit(_project.copyWith(cadUnderlays: map));
-        _cadInsertionActive = false;
-        _cadInsertionControlPoint = null;
-        _cadInsertionPendingPoint = null;
-        _cadInsertionHoverPoint = null;
-        _cadInsertionDoc = null;
-        _cadInsertionConfig = null;
-      });
-      _saveBiMProjectIfAttached();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.architectUnderlayPlacedSuccess),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  void _cancelCadInsertion() {
-    setState(() {
-      _cadInsertionActive = false;
-      _cadInsertionControlPoint = null;
-      _cadInsertionPendingPoint = null;
-      _cadInsertionHoverPoint = null;
-      _cadInsertionDoc = null;
-      _cadInsertionConfig = null;
-    });
-  }
+  Future<void> _reloadCurrentCadUnderlayNow() => _loadExternalCadFileForStorey(
+    storeyId: _project.activeStoreyId,
+    refresh: true,
+  );
 
   void _startUnderlaySnapDrag({required bool isCad, String? rasterId}) async {
     _discardGeometryCommand();
@@ -4807,14 +4663,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (isCad) {
       var cfg = _currentCadUnderlayConfig;
       var doc = _currentUnderlayDoc;
-      if (doc == null && cfg != null) {
-        final projId = widget.bimProject?.id ?? (_project.id.isNotEmpty ? _project.id : null);
-        final loaded = await ArchitectUnderlayService.instance.loadSavedCadUnderlay(cfg, projectId: projId);
-        if (loaded != null && mounted) {
-          setState(() => _underlaysByStorey[storeyId] = loaded);
-          doc = loaded;
-        }
-      }
+      if (cfg?.visible == false || !_showUnderlay ||
+          !_project.isLayerVisible(ArchitectLayer.cadUnderlayLayerId)) return;
       if ((doc == null || cfg == null) && widget.bimProject != null) {
         final owner = _underlayOwnerId;
         await _restorePersistedUnderlays();
@@ -4832,7 +4682,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         isCadUnderlay: true,
         underlayName: cfg.fileName,
         storeyId: storeyId,
-        unitsPerMeter: cfg.unitsPerMeter ?? 1.0,
+        unitsPerMeter: _effectiveUnderlayFrame.unitsPerMeter,
+        invertCadY: _effectiveUnderlayFrame.invertY,
         originalCadOrigin: currentOrigin,
         defaultAnchor: defaultAnchor,
         handleOffsetLength: _handleOffsetLength,
@@ -4846,9 +4697,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _selectedElementId = null;
       });
     } else {
-      final raster = _selectedRasterUnderlay ??
-          _project.rasterUnderlaysForStorey(storeyId).where((r) => r.id == rasterId).firstOrNull;
-      if (raster == null || raster.locked) return;
+      final raster = rasterId == null
+          ? _selectedRasterUnderlay
+          : _project.rasterUnderlaysForStorey(storeyId).where((r) => r.id == rasterId).firstOrNull;
+      if (raster == null || raster.locked || !raster.visible) return;
       final defaultAnchor = raster.localBounds.center;
       _dragController.startDrag(
         isUnderlay: true,
@@ -4873,100 +4725,61 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _openCadDxfLayersSheet() {
-    final doc = _underlaysByStorey[_project.activeStorey.id];
     final cfg = _currentCadUnderlayConfig;
-    if (doc == null || doc.layers.isEmpty) return;
+    final doc = _underlaysByStorey[_project.activeStoreyId];
+    if (cfg == null || doc == null || doc.layers.isEmpty) return;
+    final revision = _cadRevisionKey(cfg);
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF1E242C),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            final vis = _effectiveUnderlayLayerVisibility;
-            return SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        const AppIcon(
-                          AppIconId.layers,
-                          color: Colors.cyanAccent,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            context.l10n.architectCadUnderlayLayersFilter,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+      showDragHandle: true,
+      builder: (ctx) => ListenableBuilder(
+        listenable: _commands,
+        builder: (ctx, _) {
+          final current = _project.cadUnderlays[cfg.storeyId];
+          if (current == null || _cadRevisionKey(current) != revision) {
+            return const SizedBox.shrink();
+          }
+          final list = doc.layers.values.toList();
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const AppIcon(AppIconId.layers),
+                  title: Text(ctx.l10n.layers),
+                ),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: list.length,
+                    itemBuilder: (_, index) {
+                      final layer = list[index];
+                      return SwitchListTile(
+                        title: Text(layer.name),
+                        value: current.isLayerVisible(layer),
+                        onChanged: (visible) {
+                          final hidden = {...current.hiddenDxfLayers}..remove(layer.name);
+                          final shown = {...current.shownDxfLayers}..remove(layer.name);
+                          if (visible != (layer.isVisible && !layer.isFrozen)) {
+                            (visible ? shown : hidden).add(layer.name);
+                          }
+                          final updated = current.copyWith(
+                            hiddenDxfLayers: hidden,
+                            shownDxfLayers: shown,
+                          );
+                          _commands.commit(_project.copyWith(cadUnderlays: {
+                            ..._project.cadUnderlays, cfg.storeyId: updated,
+                          }));
+                        },
+                      );
+                    },
                   ),
-                  Flexible(
-                    child: Builder(
-                      builder: (_) {
-                        final layerNames = doc.layers.keys.toList();
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: layerNames.length,
-                          itemBuilder: (_, idx) {
-                            final layerName = layerNames[idx];
-                            final isOn = vis[layerName] ?? true;
-                            return SwitchListTile(
-                              dense: true,
-                              title: Text(
-                                layerName,
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                              value: isOn,
-                              activeThumbColor: Colors.cyanAccent,
-                              onChanged: (next) {
-                                setState(() {
-                                  _underlayLayerVisibility[layerName] = next;
-                                  if (cfg != null) {
-                                    final nextHidden = Set<String>.from(
-                                      cfg.hiddenDxfLayers,
-                                    );
-                                    if (next) {
-                                      nextHidden.remove(layerName);
-                                    } else {
-                                      nextHidden.add(layerName);
-                                    }
-                                    final map =
-                                        Map<
-                                          String,
-                                          ArchitectCadUnderlayConfig
-                                        >.from(_project.cadUnderlays)
-                                          ..[cfg.storeyId] = cfg.copyWith(
-                                            hiddenDxfLayers: nextHidden,
-                                          );
-                                    _commands.commit(
-                                      _project.copyWith(cadUnderlays: map),
-                                    );
-                                  }
-                                });
-                                setSheetState(() {});
-                                _saveBiMProjectIfAttached();
-                              },
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -4982,6 +4795,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ? Offset(cfg.lockedCadOriginX!, cfg.lockedCadOriginY!)
           : null,
       lockedUnitsPerMeter: cfg?.unitsPerMeter,
+      invertY: _effectiveUnderlayFrame.invertY,
       existingSurvey: _project.geodeticSurvey,
     );
     setState(() {
@@ -5062,10 +4876,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final nextUnderlays = Map<String, ArchitectCadUnderlayConfig>.from(
       _project.cadUnderlays,
     )..remove(storeyId);
-    _cadFileWatcher?.updateConfigs(nextUnderlays);
     setState(() {
       _underlaysByStorey.remove(storeyId);
-      _commands.commit(_project.copyWith(cadUnderlays: nextUnderlays));
+      _commands.commit(_project.copyWith(
+        cadUnderlays: nextUnderlays,
+        excludedInheritedCadStoreys: {
+          ..._project.excludedInheritedCadStoreys,
+          if (widget.bimProject?.storeys.any(
+                (storey) => storey.storeyId == storeyId && storey.hasUnderlay,
+              ) == true)
+            storeyId,
+        },
+      ));
+      _isCadUnderlaySelected = false;
     });
     _saveBiMProjectIfAttached();
   }
@@ -5155,7 +4978,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                context.l10n.architectUnderlayLoadError('Unsupported format: $lowerExt'),
+                context.l10n.architectUnderlayUnsupportedFormat,
               ),
               backgroundColor: Colors.orange,
             ),
@@ -5268,7 +5091,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final selected = _selectedRasterUnderlay;
     if (selected == null) return;
     setState(() {
-      _rasterImages.remove(selected.id);
       if (_selectedRasterId == selected.id) _selectedRasterId = null;
       _rasterCalibrationStep = 0;
       _rasterCalibrationP1 = null;
@@ -5396,28 +5218,52 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Future<void> _openCadContextMenu(Offset globalPosition) async {
     final cfg = _currentCadUnderlayConfig;
-    if (cfg == null) return;
+    if (cfg == null || _underlayBusy) return;
+    final storeyId = cfg.storeyId;
+    final owner = _underlayOwnerId;
+    bool current() => mounted && owner == _underlayOwnerId &&
+        _project.activeStoreyId == storeyId && _currentCadUnderlayConfig == cfg;
+    final hasDocument = _underlaysByStorey[storeyId] != null;
+    final survey = _project.geodeticSurvey;
+    final hasSurvey = (survey?.contoursForStorey(storeyId).isNotEmpty ?? false) ||
+        (survey?.pointsForStorey(storeyId).isNotEmpty ?? false);
     final action = await showArchitectUnderlayContextMenu(
       context: context,
       globalPosition: globalPosition,
       isCad: true,
-      hasMask: cfg.hasActiveMask,
-      maskEnabled: cfg.maskEnabled,
+      visible: cfg.visible,
+      canMove: _currentUnderlayDoc != null,
+      hasDocument: hasDocument,
+      hasSurvey: hasSurvey,
     );
-    if (!mounted || action == null) return;
+    if (!current() || action == null) return;
     switch (action) {
       case 'position':
-      case 'reposition':
-      case 'drag':
         _startUnderlaySnapDrag(isCad: true);
-      case 'hide':
-        _toggleCadVisibility(false);
+      case 'visibility':
+        _toggleCadVisibility(!cfg.visible);
       case 'edit':
         _openCadEditDialog();
       case 'scale':
         _openCadScaleDialog();
+      case 'layers':
+        _openCadDxfLayersSheet();
       case 'mask':
         _openCadMaskMenu(globalPosition);
+      case 'replace':
+        _importOrReplaceCadUnderlay();
+      case 'reload':
+        _reloadCurrentCadUnderlayNow();
+      case 'survey':
+        final surveyAction = await showArchitectUnderlaySurveyMenu(
+          context: context,
+          globalPosition: globalPosition,
+          canExtract: hasDocument,
+          hasSurvey: hasSurvey,
+        );
+        if (!current()) return;
+        if (surveyAction == 'extract') _extractGeodesyFromCurrentUnderlay();
+        if (surveyAction == 'terrain') _applyGeodesyTo3DTerrain();
       case 'remove':
         _removeCurrentCadUnderlay();
     }
@@ -5462,8 +5308,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       context: context,
       currentUnitsPerMeter: cfg.unitsPerMeter ?? 1.0,
     );
-    if (!mounted || newScale == null) return;
-    final updated = cfg.copyWith(unitsPerMeter: newScale);
+    if (!mounted || newScale == null || _currentCadUnderlayConfig != cfg) return;
+    final frame = _effectiveUnderlayFrame;
+    if (newScale == frame.unitsPerMeter) return;
+    final updated = cfg.withFrame(
+      BimCoordinateFrame(origin: frame.origin, unitsPerMeter: newScale, invertY: frame.invertY),
+      transformMask: true,
+    );
     final map = Map<String, ArchitectCadUnderlayConfig>.from(
       _project.cadUnderlays,
     )..[cfg.storeyId] = updated;
@@ -5501,39 +5352,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       onUseOriginalColorsChanged: (value) => _updateCadPresentation(useOriginalColors: value),
       initialUseOriginalLineweights: cfg.useOriginalLineweights,
       onUseOriginalLineweightsChanged: (value) => _updateCadPresentation(useOriginalLineweights: value),
-      onOpenLayers: _openCadDxfLayersSheet,
-      isAutoReload: cfg.autoReload,
-      onToggleAutoReload: _toggleCadAutoReload,
       isLockOrigin: cfg.lockOrigin,
       onToggleLockOrigin: _toggleCadOriginLock,
-      onRemove: _removeCurrentCadUnderlay,
     );
   }
 
   Future<void> _openRasterContextMenu(Offset globalPosition) async {
     final sel = _selectedRasterUnderlay;
-    if (sel == null) return;
+    if (sel == null || _underlayBusy) return;
+    final owner = _underlayOwnerId;
     final action = await showArchitectUnderlayContextMenu(
       context: context,
       globalPosition: globalPosition,
       isCad: false,
-      hasMask: sel.hasActiveMask,
-      maskEnabled: sel.maskEnabled,
+      visible: sel.visible,
+      canMove: !sel.locked,
+      canEditGeometry: !sel.locked && sel.visible,
     );
-    if (!mounted || action == null) return;
+    if (!mounted || action == null || owner != _underlayOwnerId ||
+        _selectedRasterUnderlay != sel) return;
     switch (action) {
       case 'position':
-      case 'reposition':
-      case 'drag':
         _startUnderlaySnapDrag(isCad: false, rasterId: sel.id);
-      case 'hide':
-        _toggleRasterVisibility(sel.id, false);
+      case 'visibility':
+        _toggleRasterVisibility(sel.id, !sel.visible);
       case 'edit':
         _openRasterEditDialog();
       case 'scale':
         _openRasterScaleDialog();
       case 'mask':
         _openRasterMaskMenu(globalPosition);
+      case 'add':
+        _importRasterUnderlay();
       case 'remove':
         _deleteSelectedRaster();
     }
@@ -5568,12 +5418,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _openRasterScaleDialog() {
+    final raster = _selectedRasterUnderlay;
+    if (raster == null || raster.locked || !raster.visible) return;
     setState(() {
+      _activeTool = ArchitectTool.rasterUnderlay;
+      _selectedRasterId = raster.id;
       _rasterCalibrationStep = 1;
       _rasterCalibrationP1 = null;
       _rasterCalibrationP2 = null;
     });
   }
+
+  void _cancelRasterCalibration() => setState(() {
+    _rasterCalibrationStep = 0;
+    _rasterCalibrationP1 = null;
+    _rasterCalibrationP2 = null;
+  });
 
   void _openRasterEditDialog() {
     final sel = _selectedRasterUnderlay;
@@ -5595,7 +5455,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _updateSelectedRaster(current.copyWith(locked: !current.locked));
         }
       },
-      onRotateCcw: () {
+      onRotateCcw: sel.locked ? null : () {
         final current = _selectedRasterUnderlay;
         if (current != null) {
           _updateSelectedRaster(
@@ -5603,7 +5463,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           );
         }
       },
-      onRotateCw: () {
+      onRotateCw: sel.locked ? null : () {
         final current = _selectedRasterUnderlay;
         if (current != null) {
           _updateSelectedRaster(
@@ -5611,7 +5471,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           );
         }
       },
-      onRemove: _deleteSelectedRaster,
+      onResetTransform: sel.locked ? null : () {
+        final current = _selectedRasterUnderlay;
+        if (current != null) _updateSelectedRaster(current.copyWith(
+          rotationRad: 0,
+          metersPerPixel: current.imageWidthPx > 0 ? 20 / current.imageWidthPx : .01,
+        ));
+      },
     );
   }
 
@@ -5669,6 +5535,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _onModelChanged() {
+    _syncCadRevisionHistory();
     if (_stairDraft != null && !identical(_stairDraftDocument, _modelCommands.project)) {
       _closeFreeStair();
     }
@@ -9038,6 +8905,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    _knownCadConfigs = _project.cadUnderlays;
     unawaited(_restorePersistedUnderlays());
 
 
@@ -9178,8 +9046,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void dispose() {
     _closeFreeStair();
     _dragController.dispose();
+    for (final image in _rasterImages.values) {
+      image.dispose();
+    }
 
-    _cadFileWatcher?.dispose();
 
     _sectionLoader.dispose();
     _facadeLoader.dispose();
@@ -9554,15 +9424,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _repaintPreview();
         return;
       }
-    }
-
-    if (_cadInsertionActive) {
-      final snap = _snapDimensionPoint(rawModel);
-      setState(() {
-        _cadInsertionPendingPoint = snap.point;
-        _cadInsertionHoverPoint = snap.point;
-      });
-      return;
     }
 
     if (_underlayMaskDrafting) {
@@ -11896,6 +11757,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           scale: _currentScale,
           dxfDoc: _currentUnderlayDoc,
           frame: _effectiveUnderlayFrame,
+          visibility: _effectiveUnderlayLayerVisibility,
           raster: _selectedRasterUnderlay,
         );
       } else if (_dragController.isDraggingToTarget) {
@@ -11904,16 +11766,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _cursorModel = _dragController.currentPointModel;
       _activeSnapLabel = _dragController.currentSnapLabel;
       _activeMagneticGuides = _dragController.magneticGuides;
-      _repaintPreview();
-      return;
-    }
-
-    if (_cadInsertionActive) {
-      final snap = _snapDimensionPoint(rawModel);
-      _cadInsertionHoverPoint = snap.point;
-      _cursorModel = snap.point;
-      _activeSnapLabel = snap.snapLabel;
-      _activeMagneticGuides = snap.magneticGuides;
       _repaintPreview();
       return;
     }
@@ -20581,7 +20433,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _onContextHold(Offset screenPoint) {
     _dismissTouchCandidates();
-    if (_marqueeTool.isDrafting || _curvingEdgeElementId != null) return false;
+    if (_marqueeTool.isDrafting || _curvingEdgeElementId != null ||
+        _underlayBusy || _underlayMaskDrafting || _rasterCalibrationStep != 0 ||
+        _underlayCropEditor.active || _draggingRasterId != null) return false;
 
     // Candidates already respect the active drawing tool. Existing elements
     // keep their context menu while that tool is active, as well as in Select.
@@ -20628,7 +20482,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
 
-    // Context menu for Raster Underlay
+    final candidates = _selectionCandidates(raw);
+    final overModelElement = candidates.any(
+      (id) => id != 'underlay_cad' && !id.startsWith('underlay_raster_'),
+    );
+
+    // In Select/Pan, a large underlay must not take the model object's menu.
     final storeyRasters = _project.rasterUnderlaysForStorey(
       _project.activeStorey.id,
     );
@@ -20637,18 +20496,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         .firstOrNull;
     if (hitRaster != null &&
         (_activeTool == ArchitectTool.rasterUnderlay ||
-            _activeTool == ArchitectTool.pan ||
-            _activeTool == ArchitectTool.select)) {
+            (!overModelElement && (_activeTool == ArchitectTool.pan ||
+                _activeTool == ArchitectTool.select)))) {
       setState(() {
         _cancelActiveDrags();
         _selectedRasterId = hitRaster.id;
         _isCadUnderlaySelected = false;
         _selectedElementId = null;
         _selectionIds.clear();
-        _radialMenuScreenPosition = screenPoint;
-        _radialMenuElementId = 'underlay_raster_${hitRaster.id}';
-        _radialMenuItems = _buildRadialMenuItems('underlay_raster_${hitRaster.id}');
       });
+      final box = context.findRenderObject() as RenderBox?;
+      unawaited(_openRasterContextMenu(box?.localToGlobal(screenPoint) ?? screenPoint));
       return true;
     }
 
@@ -20661,19 +20519,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _cadUnderlayContains(raw);
     if (isOverCad &&
         (_activeTool == ArchitectTool.cadUnderlay ||
-            _activeTool == ArchitectTool.pan ||
-            (_activeTool == ArchitectTool.select &&
-                _effectiveSelection.isEmpty))) {
+            (!overModelElement && (_activeTool == ArchitectTool.pan ||
+                (_activeTool == ArchitectTool.select && _effectiveSelection.isEmpty))))) {
       setState(() {
         _cancelActiveDrags();
         _isCadUnderlaySelected = true;
         _selectedRasterId = null;
         _selectedElementId = null;
         _selectionIds.clear();
-        _radialMenuScreenPosition = screenPoint;
-        _radialMenuElementId = 'underlay_cad';
-        _radialMenuItems = _buildRadialMenuItems('underlay_cad');
       });
+      final box = context.findRenderObject() as RenderBox?;
+      unawaited(_openCadContextMenu(box?.localToGlobal(screenPoint) ?? screenPoint));
       return true;
     }
 
@@ -20695,8 +20551,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }
       }
     }
-
-    final candidates = _selectionCandidates(raw);
 
     final ok =
         selectedHitId != null ||
@@ -26204,7 +26058,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         isCadUnderlay: true,
         underlayName: cfg?.fileName ?? 'underlay.kcad',
         storeyId: storeyId,
-        unitsPerMeter: cfg?.unitsPerMeter ?? 1.0,
+        unitsPerMeter: _effectiveUnderlayFrame.unitsPerMeter,
+        invertCadY: _effectiveUnderlayFrame.invertY,
         originalCadOrigin: currentOrigin,
         defaultAnchor: defaultAnchor,
         handleOffsetLength: _handleOffsetLength,
@@ -26303,6 +26158,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         scale: _currentScale,
         dxfDoc: _currentUnderlayDoc,
         frame: _effectiveUnderlayFrame,
+        visibility: _effectiveUnderlayLayerVisibility,
         raster: _selectedRasterUnderlay,
         snapToDefaultGrip: false,
         relocateHandle: true,
@@ -29778,6 +29634,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (ids.isEmpty && (_isCadUnderlaySelected || _selectedRasterId != null)) {
       final isCad = _isCadUnderlaySelected;
+      if (_activeTool == (isCad ? ArchitectTool.cadUnderlay : ArchitectTool.rasterUnderlay)) {
+        return const SizedBox.shrink();
+      }
       final raster = _selectedRasterUnderlay;
       return ArchitectSelectionActionBar(
         actions: [
@@ -30984,6 +30843,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       context,
 
       initialProjectName: _project.name,
+      underlayOwnerId: widget.bimProject?.id,
 
     );
 
@@ -32965,57 +32825,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ),
 
-                    if (_underlayBusy)
+                    if (_underlayBusyMessage case final message?)
                       Positioned.fill(
                         child: AbsorbPointer(
                           child: Center(
-                            child: Material(
-                              elevation: 12,
-                              borderRadius: BorderRadius.circular(16),
-                              color: const Color(0xF01E242C),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 18,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
-                                    width: 1.5,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Material(
+                                elevation: 6,
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox.square(
+                                        dimension: 22,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Flexible(child: Semantics(
+                                        liveRegion: true,
+                                        child: Text(message),
+                                      )),
+                                    ],
                                   ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.5),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.8,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFF00E5FF),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Text(
-                                      _underlayBusyMessage ??
-                                          context.l10n.bimProjectConvertingUnderlay,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
                                 ),
                               ),
                             ),
@@ -34295,18 +34130,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     cadConfig: _paintCadUnderlayConfig,
                     maskDraftPoints: _underlayMaskPoints,
                     isMaskDrafting: _underlayMaskDrafting,
-                    isPlacingCadUnderlay: _cadInsertionActive ||
-                        (_dragController.isDraggingToTarget &&
-                            _dragController.isCadUnderlay),
-                    ghostCadDocument: _cadInsertionDoc ??
-                        (_dragController.isCadUnderlay ? _currentUnderlayDoc : null),
-                    ghostCadFrame: _ghostUnderlayFrame,
-                    ghostInsertionPoint: _dragController.isDraggingToTarget &&
-                            _dragController.isCadUnderlay
-                        ? _dragController.currentPointModel
-                        : (_cadInsertionPendingPoint ??
-                            _cadInsertionHoverPoint ??
-                            _cursorModel),
+                    isPlacingCadUnderlay: _dragController.isDraggingToTarget &&
+                        _dragController.isCadUnderlay,
+                    ghostCadDocument: _dragController.isCadUnderlay ? _currentUnderlayDoc : null,
+                    ghostCadFrame: _dragController.ghostCadFrame,
+                    ghostInsertionPoint: _dragController.isCadUnderlay
+                        ? _dragController.currentPointModel : null,
                   ),
                 ),
               ),
@@ -35223,301 +35052,60 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         ),
 
-      if (_activeTool == ArchitectTool.cadUnderlay && _effectiveSelection.isEmpty)
+      if (_activeTool == ArchitectTool.cadUnderlay && _effectiveSelection.isEmpty &&
+          !_dragController.isActive && !_underlayMaskDrafting)
         Positioned(
-          top: 8,
-          left: 8,
-          right: 8,
+          top: 8, left: 8, right: 8,
           child: Align(
             alignment: Alignment.topLeft,
             child: ArchitectCadUnderlayBar(
               config: _currentCadUnderlayConfig,
-              contourCount:
-                  _project.geodeticSurvey
-                      ?.contoursForStorey(_project.activeStorey.id)
-                      .length ??
-                  0,
-              spotPointCount:
-                  _project.geodeticSurvey
-                      ?.pointsForStorey(_project.activeStorey.id)
-                      .length ??
-                  0,
               isBusy: _underlayBusy,
               onImportCad: _importOrReplaceCadUnderlay,
-              onReplaceCad: _importOrReplaceCadUnderlay,
-              onToggleAutoReload: _toggleCadAutoReload,
-              onToggleLockOrigin: _toggleCadOriginLock,
-              onReloadNow: _reloadCurrentCadUnderlayNow,
-              onOpenDxfLayers: _openCadDxfLayersSheet,
-              onExtractContours: _extractGeodesyFromCurrentUnderlay,
-              onApplyToTerrain: _applyGeodesyTo3DTerrain,
-              onRemoveUnderlay: _removeCurrentCadUnderlay,
-              onReposition: _repositionCurrentCadUnderlay,
-              onDrag: () => _startUnderlaySnapDrag(isCad: true),
+              onMove: () => _startUnderlaySnapDrag(isCad: true),
               onOpenScale: _openCadScaleDialog,
-              onOpenMaskMenu: (pos) => _openCadMaskMenu(pos),
-              onOpenContextMenu: (pos) => _openCadContextMenu(pos),
+              onOpenContextMenu: _openCadContextMenu,
             ),
           ),
         ),
 
-      if (_activeTool == ArchitectTool.rasterUnderlay && _effectiveSelection.isEmpty)
+      if (_activeTool == ArchitectTool.rasterUnderlay && _effectiveSelection.isEmpty &&
+          !_dragController.isActive && !_underlayMaskDrafting)
         Positioned(
-          top: 8,
-          left: 8,
-          right: 8,
+          top: 8, left: 8, right: 8,
           child: Align(
             alignment: Alignment.topLeft,
             child: ArchitectRasterUnderlayBar(
-              underlays: _project.rasterUnderlaysForStorey(
-                _project.activeStorey.id,
-              ),
+              underlays: _project.rasterUnderlaysForStorey(_project.activeStoreyId),
               selectedUnderlay: _selectedRasterUnderlay,
               calibrationStep: _rasterCalibrationStep,
               isBusy: _underlayBusy,
               onImportRaster: _importRasterUnderlay,
-              onSelectUnderlay: (id) => setState(() => _selectedRasterId = id),
-              onDrag: () => _startUnderlaySnapDrag(
-                isCad: false,
-                rasterId: _selectedRasterUnderlay?.id,
-              ),
-              onStartCalibration: () => setState(() {
-                _rasterCalibrationStep = 1;
-                _rasterCalibrationP1 = null;
-                _rasterCalibrationP2 = null;
+              onSelectUnderlay: (id) => setState(() {
+                _selectedRasterId = id;
+                _isCadUnderlaySelected = false;
               }),
-              onCancelCalibration: () => setState(() {
-                _rasterCalibrationStep = 0;
-                _rasterCalibrationP1 = null;
-                _rasterCalibrationP2 = null;
-              }),
-              onChangeOpacity: (val) {
-                final sel = _selectedRasterUnderlay;
-                if (sel != null) {
-                  _updateSelectedRaster(sel.copyWith(opacity: val));
-                }
-              },
-              onToggleLock: () {
-                final sel = _selectedRasterUnderlay;
-                if (sel != null) {
-                  _updateSelectedRaster(sel.copyWith(locked: !sel.locked));
-                }
-              },
-              onRotateCcw: () {
-                final sel = _selectedRasterUnderlay;
-                if (sel != null) {
-                  _updateSelectedRaster(
-                    sel.copyWith(rotationRad: sel.rotationRad - math.pi / 2),
-                  );
-                }
-              },
-              onRotateCw: () {
-                final sel = _selectedRasterUnderlay;
-                if (sel != null) {
-                  _updateSelectedRaster(
-                    sel.copyWith(rotationRad: sel.rotationRad + math.pi / 2),
-                  );
-                }
-              },
-              onResetTransform: () {
-                final sel = _selectedRasterUnderlay;
-                if (sel != null) {
-                  _updateSelectedRaster(
-                    sel.copyWith(
-                      rotationRad: 0.0,
-                      metersPerPixel: sel.imageWidthPx > 0
-                          ? (20.0 / sel.imageWidthPx)
-                          : 0.01,
-                    ),
-                  );
-                }
-              },
-              onDeleteRaster: _deleteSelectedRaster,
-              onOpenScale: _openRasterScaleDialog,
-              onOpenMaskMenu: (pos) => _openRasterMaskMenu(pos),
-              onOpenContextMenu: (pos) => _openRasterContextMenu(pos),
+              onMove: () => _startUnderlaySnapDrag(isCad: false),
+              onStartCalibration: _openRasterScaleDialog,
+              onCancelCalibration: _cancelRasterCalibration,
+              onOpenContextMenu: _openRasterContextMenu,
             ),
           ),
         ),
 
       if (_underlayMaskDrafting)
         Positioned(
-          top: 16,
-          left: 16,
-          right: 16,
-          child: Center(
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(12),
-              color: const Color(0xEE1E293B),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const AppIcon(
-                      AppIconId.crop,
-                      size: 20,
-                      color: Color(0xFF00E5FF),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      _underlayMaskMode == 'rect'
-                          ? context.l10n.architectUnderlayMaskRectPrompt
-                          : context.l10n.architectUnderlayMaskPolyPrompt,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    if (_underlayMaskMode == 'polygon') ...[
-                      FilledButton(
-                        onPressed: _underlayMaskPoints.length >= 3
-                            ? () => _commitUnderlayMask(_underlayMaskPoints)
-                            : null,
-                        child: Text(context.l10n.architectUnderlayMaskFinish),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    TextButton(
-                      onPressed: _cancelUnderlayMaskDraft,
-                      child: Text(context.l10n.architectUnderlayMaskCancel),
-                    ),
-                  ],
-                ),
-              ),
+          top: 8, left: 8, right: 8,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: ArchitectUnderlayCropBar(
+              polygon: _underlayMaskMode == 'polygon',
+              onApply: _underlayMaskPoints.length >= 3
+                  ? () => _commitUnderlayMask(_underlayMaskPoints)
+                  : null,
+              onCancel: _cancelUnderlayMaskDraft,
             ),
           ),
-        ),
-
-      if (_cadInsertionActive)
-        Positioned(
-          top: 16,
-          left: 16,
-          right: 16,
-          child: Center(
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(12),
-              color: const Color(0xEE1E293B),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const AppIcon(
-                      AppIconId.newPoint,
-                      size: 20,
-                      color: Color(0xFF00E676),
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _cadInsertionPendingPoint == null
-                              ? context.l10n.architectUnderlayInsertionPrompt
-                              : '${context.l10n.architectUnderlayInsertionConfirm}: (${_cadInsertionPendingPoint!.dx.toStringAsFixed(2)}, ${_cadInsertionPendingPoint!.dy.toStringAsFixed(2)})',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (_cadInsertionControlPoint != null)
-                          Text(
-                            'CAD Base: (${_cadInsertionControlPoint!.dx.toStringAsFixed(2)}, ${_cadInsertionControlPoint!.dy.toStringAsFixed(2)})',
-                            style: const TextStyle(
-                              color: Color(0xFF81D4FA),
-                              fontSize: 11,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(width: 14),
-                    if (_cadInsertionPendingPoint != null) ...[
-                      Tooltip(
-                        message: context.l10n.architectUnderlayInsertionConfirm,
-                        child: IconButton.filled(
-                          onPressed: _confirmCadInsertion,
-                          style: IconButton.styleFrom(
-                            backgroundColor: const Color(0xFF00C853),
-                            foregroundColor: Colors.white,
-                          ),
-                          icon: const AppIcon(AppIconId.confirm, size: 18),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    Tooltip(
-                      message: context.l10n.architectUnderlayInsertionCancel,
-                      child: IconButton.outlined(
-                        onPressed: _cancelCadInsertion,
-                        style: IconButton.styleFrom(
-                          foregroundColor: Colors.white70,
-                          side: const BorderSide(color: Colors.white24),
-                        ),
-                        icon: const AppIcon(AppIconId.close, size: 18),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-
-      // In-canvas floating confirmation badge pinned directly at insertion point
-      if (_cadInsertionActive && _cadInsertionPendingPoint != null)
-        Builder(
-          builder: (ctx) {
-            final screenPos = _modelToScreen(_cadInsertionPendingPoint!);
-            return Positioned(
-              left: (screenPos.dx - 64).clamp(16.0, MediaQuery.of(ctx).size.width - 140),
-              top: (screenPos.dy - 56).clamp(64.0, MediaQuery.of(ctx).size.height - 80),
-              child: Material(
-                elevation: 6,
-                borderRadius: BorderRadius.circular(24),
-                color: const Color(0xEE1E293B),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: context.l10n.architectUnderlayInsertionConfirm,
-                        onPressed: _confirmCadInsertion,
-                        icon: const Icon(
-                          Icons.check_circle_rounded,
-                          color: Color(0xFF00E676),
-                          size: 26,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        tooltip: context.l10n.architectUnderlayInsertionCancel,
-                        onPressed: _cancelCadInsertion,
-                        icon: const Icon(
-                          Icons.cancel_rounded,
-                          color: Colors.redAccent,
-                          size: 26,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
         ),
 
       if (_activeTool == ArchitectTool.roofSlope && _effectiveSelection.isEmpty)
@@ -37599,7 +37187,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    underlayLayerVisibility: _underlayLayerVisibility,
+    underlayLayerVisibility: _effectiveUnderlayLayerVisibility,
 
     slabDraftPoints: _elementTool.slabDraftPoints,
 

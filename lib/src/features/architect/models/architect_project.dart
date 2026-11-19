@@ -477,6 +477,7 @@ class ArchitectProject {
   final List<ArchitectLayer> layers;
   final Map<String, String> elementLayers;
   final Map<String, ArchitectCadUnderlayConfig> cadUnderlays;
+  final Set<String> excludedInheritedCadStoreys;
   final List<ArchitectRasterUnderlay> rasterUnderlays;
   final ArchitectGeodeticSurvey? geodeticSurvey;
   final ArchitectTerrainSurface existingTerrain;
@@ -512,6 +513,7 @@ class ArchitectProject {
     this.layers = const [],
     this.elementLayers = const {},
     this.cadUnderlays = const {},
+    this.excludedInheritedCadStoreys = const {},
     this.rasterUnderlays = const [],
     this.geodeticSurvey,
     this.existingTerrain = const ArchitectTerrainSurface(
@@ -785,6 +787,7 @@ class ArchitectProject {
     List<ArchitectLayer>? layers,
     Map<String, String>? elementLayers,
     Map<String, ArchitectCadUnderlayConfig>? cadUnderlays,
+    Set<String>? excludedInheritedCadStoreys,
     List<ArchitectRasterUnderlay>? rasterUnderlays,
     ArchitectGeodeticSurvey? geodeticSurvey,
     bool clearGeodeticSurvey = false,
@@ -821,6 +824,8 @@ class ArchitectProject {
     layers: layers ?? this.layers,
     elementLayers: elementLayers ?? this.elementLayers,
     cadUnderlays: cadUnderlays ?? this.cadUnderlays,
+    excludedInheritedCadStoreys:
+        excludedInheritedCadStoreys ?? this.excludedInheritedCadStoreys,
     rasterUnderlays: rasterUnderlays ?? this.rasterUnderlays,
     geodeticSurvey: clearGeodeticSurvey
         ? null
@@ -860,6 +865,8 @@ class ArchitectProject {
     if (elementLayers.isNotEmpty) 'elementLayers': elementLayers,
     if (cadUnderlays.isNotEmpty)
       'cadUnderlays': cadUnderlays.map((k, v) => MapEntry(k, v.toJson())),
+    if (excludedInheritedCadStoreys.isNotEmpty)
+      'excludedInheritedCadStoreys': excludedInheritedCadStoreys.toList(),
     if (rasterUnderlays.isNotEmpty)
       'rasterUnderlays': rasterUnderlays.map((r) => r.toJson()).toList(),
     if (geodeticSurvey != null) 'geodeticSurvey': geodeticSurvey!.toJson(),
@@ -986,6 +993,10 @@ class ArchitectProject {
           entry.key as String: ArchitectCadUnderlayConfig.fromJson(
             Map<String, dynamic>.from(entry.value as Map),
           ),
+    },
+    excludedInheritedCadStoreys: {
+      for (final id in json['excludedInheritedCadStoreys'] as List? ?? const [])
+        if (id is String) id,
     },
     rasterUnderlays: [
       for (final r in json['rasterUnderlays'] as List? ?? const [])

@@ -8,8 +8,8 @@ import '../../bim_projects/controllers/bim_viewport_controller.dart';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../models/architect_underlay_models.dart';
+import 'architect_cad_underlay_renderer.dart';
 import 'architect_canvas_palette.dart';
-import 'architect_elements_painter_helper.dart';
 
 /// Independent background layer rendering Raster Underlays (`A-RAST`),
 /// CAD Xref Underlays (`A-XREF`), and Geodetic Contours & Spot Elevations (`G-TOPO`).
@@ -226,32 +226,18 @@ class ArchitectUnderlayPainter extends CustomPainter {
         canvas.clipPath(clipPath);
       }
 
-      canvas.save();
-      if (hasGhostCad) {
-        canvas.saveLayer(
-          null,
-          Paint()..color = const Color.fromRGBO(255, 255, 255, 0.28),
-        );
-      }
-      canvas.scale(1.0 / frame.unitsPerMeter);
-      canvas.translate(-frame.origin.dx, -frame.origin.dy);
-      ArchitectElementsPainterHelper.drawUnderlay(
+      paintArchitectCadUnderlay(
         canvas: canvas,
+        size: size,
+        document: document!,
+        frame: frame,
+        visibleModel: viewport.visibleRect,
+        viewportScale: viewport.scale,
         palette: palette,
-        underlayDoc: document,
-        opacity: cadConfig?.opacity,
-        useOriginalColors: cadConfig?.useOriginalColors ?? false,
-        useOriginalLineweights: cadConfig?.useOriginalLineweights ?? false,
-        zoomScale: viewport.scale / frame.unitsPerMeter,
-        layerVisibility: visibility,
-        visibleRect: frame
-            .rectToCad(viewport.visibleRect)
-            .inflate(2 * frame.unitsPerMeter / viewport.scale),
+        visibility: visibility,
+        config: cadConfig,
+        opacityMultiplier: hasGhostCad ? .28 : 1,
       );
-      if (hasGhostCad) {
-        canvas.restore();
-      }
-      canvas.restore();
 
       if (hasCadMask) {
         canvas.restore(); // restore clip
@@ -294,7 +280,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
 
     // 6. Paint Ghost CAD Underlay Placement Preview
     if (hasGhostCad) {
-      _paintGhostCadPlacement(canvas);
+      _paintGhostCadPlacement(canvas, size);
     }
 
     // 7. Paint CAD Selection Highlight
@@ -308,34 +294,33 @@ class ArchitectUnderlayPainter extends CustomPainter {
     }
   }
 
-  void _paintGhostCadPlacement(Canvas canvas) {
+  void _paintGhostCadPlacement(Canvas canvas, Size size) {
     if (ghostCadDocument == null || ghostCadFrame == null) return;
     canvas.save();
     canvas.translate(viewport.translation.dx, viewport.translation.dy);
     canvas.scale(viewport.scale);
 
-    canvas.save();
-    canvas.scale(1.0 / ghostCadFrame!.unitsPerMeter);
-    canvas.translate(-ghostCadFrame!.origin.dx, -ghostCadFrame!.origin.dy);
-
-    final ghostPalette = palette.isDark
-        ? const ArchitectCanvasPalette.dark()
-        : const ArchitectCanvasPalette.light();
-
-    ArchitectElementsPainterHelper.drawUnderlay(
+    final mask = cadConfig?.maskPolygon;
+    final clip = cadConfig?.hasActiveMask == true && mask != null;
+    if (clip) {
+      final from = dragBasePoint;
+      final to = dragCurrentPoint;
+      final delta = from == null || to == null ? Offset.zero : to - from;
+      canvas.save();
+      canvas.clipPath(Path()..addPolygon([for (final p in mask) p + delta], true));
+    }
+    paintArchitectCadUnderlay(
       canvas: canvas,
-      palette: ghostPalette,
-      underlayDoc: ghostCadDocument,
-      opacity: cadConfig?.opacity,
-      useOriginalColors: cadConfig?.useOriginalColors ?? false,
-      useOriginalLineweights: cadConfig?.useOriginalLineweights ?? false,
-      zoomScale: viewport.scale / ghostCadFrame!.unitsPerMeter,
-      layerVisibility: visibility,
-      visibleRect: ghostCadFrame!
-          .rectToCad(viewport.visibleRect)
-          .inflate(4 * ghostCadFrame!.unitsPerMeter / viewport.scale),
+      size: size,
+      document: ghostCadDocument!,
+      frame: ghostCadFrame!,
+      visibleModel: viewport.visibleRect,
+      viewportScale: viewport.scale,
+      palette: palette,
+      visibility: visibility,
+      config: cadConfig,
     );
-    canvas.restore();
+    if (clip) canvas.restore();
 
     if (ghostInsertionPoint != null) {
       final pt = ghostInsertionPoint!;

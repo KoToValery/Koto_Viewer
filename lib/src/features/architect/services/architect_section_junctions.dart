@@ -528,6 +528,7 @@ class ArchitectSectionJunctions {
                   SlabMaterial.concrete,
                   stemPath,
                   slab: true,
+                  structural: true,
                 ),
               );
               groundSubBaseCutout.addRect(
@@ -758,6 +759,16 @@ class ArchitectSectionJunctions {
                 surface.layer.material,
                 rawPath,
                 slab: true,
+                structural: sIdx == coreIdx,
+                drawHatch:
+                    sIdx == coreIdx ||
+                    switch (surface.layer.role) {
+                      SlabLayerRole.insulation ||
+                      SlabLayerRole.acoustic ||
+                      SlabLayerRole.base ||
+                      SlabLayerRole.fill => true,
+                      _ => false,
+                    },
               ),
             );
           }
@@ -967,6 +978,7 @@ class ArchitectSectionJunctions {
             SlabMaterial.parquet,
             Path()..addPolygon(platePoly, true),
             slab: true,
+            structural: true,
             timberCrossSectionPolygon: platePoly,
             customFillColor: const Color(0xFFD7A86E),
           ),
@@ -1055,6 +1067,7 @@ class ArchitectSectionJunctions {
           Path()..addRect(rect),
           customFillColor: layer.material.color,
           hatchPattern: ArchitectSectionHatch.wall(layer.material),
+          drawHatch: layer.role == ArchitectLayerRole.insulation,
         ),
       );
     }

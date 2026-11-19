@@ -82,9 +82,12 @@ class DxfParser {
   }
 
   /// Parses DXF string content and automatically builds its spatial index.
-  static DxfDocument parseString(String content) {
+  static DxfDocument parseString(
+    String content, {
+    bool preserveSourceLayers = false,
+  }) {
     final pairs = _tokenize(content);
-    final doc = _parsePairs(pairs);
+    final doc = _parsePairs(pairs, preserveSourceLayers: preserveSourceLayers);
     doc.spatialIndex = DxfQuadTree.build(
       doc.entities.where((e) => !e.isPaperSpace).toList(),
       doc.blocks,
@@ -114,7 +117,10 @@ class DxfParser {
   }
 
   /// Main parser loop through sections.
-  static DxfDocument _parsePairs(List<_DxfPair> pairs) {
+  static DxfDocument _parsePairs(
+    List<_DxfPair> pairs, {
+    required bool preserveSourceLayers,
+  }) {
     final Map<String, DxfLayer> layers = {};
     final Map<String, DxfBlock> blocks = {};
     final List<DxfEntity> entities = [];
@@ -250,14 +256,14 @@ class DxfParser {
       ensureLayer(name);
     }
 
-    // 1. Requirement: Do not load layers without objects in them
-    if (usedLayers.isNotEmpty) {
-      layers.removeWhere((name, _) => !usedLayers.contains(name));
-    } else {
-      // Fallback for completely empty drawings with zero entities
-      layers.removeWhere((name, _) => name != '0');
-      if (!layers.containsKey('0')) {
-        layers['0'] = DxfLayer(name: '0', colorIndex: 7);
+    // [TAG:SOURCE_LAYER_STATES] Architectural underlays expose the source
+    // layer table for manual edits.
+    if (!preserveSourceLayers) {
+      if (usedLayers.isNotEmpty) {
+        layers.removeWhere((name, _) => !usedLayers.contains(name));
+      } else {
+        layers.removeWhere((name, _) => name != '0');
+        layers.putIfAbsent('0', () => DxfLayer(name: '0', colorIndex: 7));
       }
     }
 
@@ -277,7 +283,7 @@ class DxfParser {
           }
         }
       }
-    } else {
+    } else if (!preserveSourceLayers) {
       // Fallback for DXF files converted by LibreDWG or corrupted where all or nearly all used layers ended up hidden
       final int visibleUsedCount = layers.values.where((l) => l.isVisible).length;
       final bool isCorruptedLibreDwg = (visibleUsedCount == 0) ||

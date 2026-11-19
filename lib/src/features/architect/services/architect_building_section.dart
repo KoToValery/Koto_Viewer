@@ -1,5 +1,6 @@
 // === SECTION: [SEC-00-TOC] TABLE OF CONTENTS ===
 // [SEC-01-REGIONS] ArchitectSectionRegion data class
+//   --- SUBSECTION: [TAG:SECTION_DRAWING_REGIONS] Material contours and cut lineweights ---
 // [SEC-02-ROOF_MAT] Roof member materials to SlabMaterial
 // [SEC-03-BUILD_MAIN] ArchitectBuildingSection.build
 //   --- SUBSECTION: [TAG:SPANDREL_INFILL] Window Spandrel Aerated Concrete Infill ---
@@ -49,6 +50,7 @@ class ArchitectSectionRegion {
   final Path path;
   final bool slab;
   final bool roof;
+  final bool structural;
   final List<Offset>? timberCrossSectionPolygon;
   final Color? customFillColor;
   final ArchitectHatchPattern? hatchPattern;
@@ -62,6 +64,7 @@ class ArchitectSectionRegion {
     this.path, {
     this.slab = false,
     this.roof = false,
+    this.structural = false,
     this.timberCrossSectionPolygon,
     this.customFillColor,
     this.hatchPattern,
@@ -69,6 +72,9 @@ class ArchitectSectionRegion {
     this.mergeOutline = true,
     this.occludesProjection = true,
   });
+
+  ArchitectHatchPattern? get effectiveHatch =>
+      drawHatch ? hatchPattern ?? ArchitectSectionHatch.slab(material) : null;
 }
 
 class ArchitectBuildingSection {
@@ -144,6 +150,7 @@ class ArchitectBuildingSection {
             path(r.path),
             slab: r.slab,
             roof: r.roof,
+            structural: r.structural,
             timberCrossSectionPolygon: r.timberCrossSectionPolygon
                 ?.map(point)
                 .toList(),
@@ -184,8 +191,9 @@ class ArchitectBuildingSection {
     );
   }
 
-  /// Ownership stays in [regions] for picking; equal materials share one
-  /// published contour, including across vertical bands and wall junctions.
+  // --- SUBSECTION: [TAG:SECTION_DRAWING_REGIONS] Material contours and cut lineweights ---
+  /// Ownership stays in [regions] for picking. Matching materials and cut
+  /// weights share one contour across vertical bands and wall junctions.
   List<ArchitectSectionRegion> get drawingRegions =>
       _drawingCache[this] ??= _mergeDrawingRegions();
   List<ArchitectSectionRegion> _mergeDrawingRegions() {
@@ -202,14 +210,13 @@ class ArchitectBuildingSection {
       final isMonolithicShared =
           region.material == SlabMaterial.concrete ||
           region.material == SlabMaterial.xps;
-      final effectiveHatch =
-          region.hatchPattern ?? ArchitectSectionHatch.slab(region.material);
+      final effectiveHatch = region.effectiveHatch;
       final key = (
             region.material,
             isMonolithicShared ? null : region.customFillColor?.toARGB32(),
             isMonolithicShared ? true : region.slab,
             effectiveHatch,
-            region.drawHatch,
+            region.structural,
           ),
           index = indices[key];
       if (index == null) {
@@ -223,6 +230,7 @@ class ArchitectBuildingSection {
         previous.material,
         Path.combine(PathOperation.union, previous.path, region.path),
         slab: previous.slab || region.slab,
+        structural: previous.structural,
         customFillColor: previous.customFillColor,
         hatchPattern: previous.hatchPattern ?? effectiveHatch,
         drawHatch: previous.drawHatch,
@@ -346,6 +354,7 @@ class ArchitectBuildingSection {
               r.path.shift(shift),
               slab: r.slab,
               roof: r.roof,
+              structural: r.structural,
               customFillColor: r.customFillColor,
               hatchPattern: r.hatchPattern,
               drawHatch: r.drawHatch,
@@ -551,7 +560,12 @@ class ArchitectBuildingSection {
         if (colPath != null) {
           columnCutouts.add(colPath);
           regions.add(
-            ArchitectSectionRegion(col.id, SlabMaterial.concrete, colPath),
+            ArchitectSectionRegion(
+              col.id,
+              SlabMaterial.concrete,
+              colPath,
+              structural: true,
+            ),
           );
         }
       }
@@ -783,7 +797,7 @@ class ArchitectBuildingSection {
                 cutOp.id,
                 SlabMaterial.tile,
                 cleanOpeningSection,
-                drawHatch: !cutOp.isWindow,
+                drawHatch: false,
                 customFillColor: cutOp.isWindow
                     ? const Color(0xffffffff)
                     : null,
@@ -862,6 +876,7 @@ class ArchitectBuildingSection {
                     SlabMaterial.concrete,
                     beamCut,
                     slab: true,
+                    structural: true,
                   ),
                 );
               }
@@ -929,6 +944,7 @@ class ArchitectBuildingSection {
                     SlabMaterial.concrete,
                     lintelCut,
                     slab: true,
+                    structural: true,
                   ),
                 );
               }
@@ -1007,6 +1023,7 @@ class ArchitectBuildingSection {
                       SlabMaterial.concrete,
                       clippedBelt,
                       slab: true,
+                      structural: true,
                     ),
                   );
                 }
@@ -1035,12 +1052,18 @@ class ArchitectBuildingSection {
               id,
               SlabMaterial.tile,
               clipped,
-              drawHatch: !isWindow,
+              drawHatch: false,
               customFillColor: isWindow ? const Color(0xffffffff) : null,
             ),
           );
         }
         if (!wallPath!.getBounds().isEmpty) {
+          // Reuse the junction's bearing inference for conventional walls.
+          // Stud frames and sandwich panel envelopes are secondary to their supports.
+          final bearingCore =
+              wall.system.isLog ||
+              (!wall.system.isSpecial &&
+                  (cutWallByWallId[wall.id]?.isFoundationBearing ?? false));
           if (useCompositions) {
             var remaining = wallPath;
             for (final part in sharedSolids.where(
@@ -1137,11 +1160,20 @@ class ArchitectBuildingSection {
                   wall.id,
                   material,
                   region,
+                  structural:
+                      bearingCore &&
+                      part.layer.role == ArchitectLayerRole.core &&
+                      !(part.componentId?.startsWith(
+                            'construction:${wall.id}:casing_',
+                          ) ??
+                          false),
                   customFillColor: part.layer.material.color,
                   hatchPattern: ArchitectSectionHatch.wall(part.layer.material),
                   // Each course keeps its seated profile. Uniting tangent log
                   // contours erases shared arcs and leaves numerical slivers.
-                  drawHatch: !wall.system.isLog,
+                  drawHatch:
+                      !wall.system.isLog &&
+                      part.layer.role != ArchitectLayerRole.finish,
                   mergeOutline: !wall.system.isLog,
                 ),
               );
@@ -1154,6 +1186,7 @@ class ArchitectBuildingSection {
                     ? SlabMaterial.concrete
                     : SlabMaterial.plaster,
                 wallPath,
+                structural: bearingCore,
                 hatchPattern: ArchitectSectionHatch.core(wall.coreMaterial),
               ),
             );
@@ -1195,21 +1228,36 @@ class ArchitectBuildingSection {
         );
         if (beamPath != null) {
           regions.add(
-            ArchitectSectionRegion(beam.id, SlabMaterial.concrete, beamPath),
+            ArchitectSectionRegion(
+              beam.id,
+              SlabMaterial.concrete,
+              beamPath,
+              structural: true,
+            ),
           );
         }
       }
 
       for (final stair in floor.stairs) {
-        final solids = [
-          ...ArchitectStairMesh.body(
+        final body = ArchitectStairMesh.body(
+          stair,
+          firstRiserBottom: ArchitectStairFloorContact.firstRiserBottom(
+            project,
+            floor,
             stair,
-            firstRiserBottom: ArchitectStairFloorContact.firstRiserBottom(
-              project,
-              floor,
-              stair,
-            ),
           ),
+        );
+        final elevation = Vector3(0, 0, floor.elevation);
+        StairSolid atStorey(StairSolid solid) => StairSolid(solid.material, [
+          for (final t in solid.triangles)
+            Triangle3D(
+              v0: t.v0 + elevation,
+              v1: t.v1 + elevation,
+              v2: t.v2 + elevation,
+            ),
+        ]);
+        final solids = [
+          ...body,
           ...ArchitectStairMesh.railings(
             stair,
             storey: floor,
@@ -1217,49 +1265,72 @@ class ArchitectBuildingSection {
           ),
         ];
         final section = ArchitectStairSection.build(
-          [
-            for (final solid in solids)
-              StairSolid(solid.material, [
-                for (final t in solid.triangles)
-                  Triangle3D(
-                    v0: t.v0 + Vector3(0, 0, floor.elevation),
-                    v1: t.v1 + Vector3(0, 0, floor.elevation),
-                    v2: t.v2 + Vector3(0, 0, floor.elevation),
-                  ),
-              ]),
-          ],
+          solids.map(atStorey).toList(),
           cut.start,
           cut.axis,
         );
         for (final entry in section.regions.entries) {
-          final stairPath = Path.combine(
+          var stairPath = Path.combine(
             PathOperation.intersect,
             entry.value,
             Path()..addRect(Rect.fromLTRB(0, -1e6, cut.length, 1e6)),
           );
-          if (!stairPath.getBounds().isEmpty) {
-            regions.add(
-              ArchitectSectionRegion(
-                stair.id,
-                entry.key == StairSolidMaterial.concrete
-                    ? SlabMaterial.concrete
-                    : entry.key == StairSolidMaterial.timber
-                    ? SlabMaterial.parquet
-                    : SlabMaterial.custom,
+          if (stairPath.getBounds().isEmpty) continue;
+          if (entry.key == StairSolidMaterial.metal &&
+              stair.design?.construction == StairConstruction.steel) {
+            final steelBody = ArchitectStairSection.build(
+              body.map(atStorey).toList(),
+              cut.start,
+              cut.axis,
+            ).regions[StairSolidMaterial.metal];
+            if (steelBody != null &&
+                steelBody.getBounds().overlaps(stairPath.getBounds())) {
+              final cutSteel = Path.combine(
+                PathOperation.intersect,
                 stairPath,
-                hatchPattern: ArchitectHatchPattern.presets.firstWhere(
-                  (p) =>
-                      p.id ==
-                      switch (entry.key) {
-                        StairSolidMaterial.concrete => 'concrete',
-                        StairSolidMaterial.timber => 'wood',
-                        StairSolidMaterial.metal => 'metal',
-                        StairSolidMaterial.finish => 'diagonal',
-                      },
-                ),
-              ),
-            );
+                steelBody,
+              );
+              if (!cutSteel.getBounds().isEmpty) {
+                regions.add(
+                  ArchitectSectionRegion(
+                    stair.id,
+                    SlabMaterial.custom,
+                    cutSteel,
+                    structural: true,
+                    hatchPattern: ArchitectSectionHatch.preset('metal'),
+                  ),
+                );
+                stairPath = Path.combine(
+                  PathOperation.difference,
+                  stairPath,
+                  cutSteel,
+                );
+              }
+            }
           }
+          if (stairPath.getBounds().isEmpty) continue;
+          final structural =
+              entry.key == StairSolidMaterial.concrete ||
+              entry.key == StairSolidMaterial.timber;
+          regions.add(
+            ArchitectSectionRegion(
+              stair.id,
+              switch (entry.key) {
+                StairSolidMaterial.concrete => SlabMaterial.concrete,
+                StairSolidMaterial.timber => SlabMaterial.timber,
+                _ => SlabMaterial.custom,
+              },
+              stairPath,
+              structural: structural,
+              drawHatch: structural,
+              hatchPattern: ArchitectSectionHatch.preset(switch (entry.key) {
+                StairSolidMaterial.concrete => 'concrete',
+                StairSolidMaterial.timber => 'wood',
+                StairSolidMaterial.metal => 'metal',
+                StairSolidMaterial.finish => 'diagonal',
+              }),
+            ),
+          );
         }
       }
 
@@ -1268,6 +1339,17 @@ class ArchitectBuildingSection {
       for (final slice in floorSlices) {
         for (final member in slice.members) {
           if (member.path.getBounds().isEmpty) continue;
+          final structural = switch (member.kind) {
+            ArchitectRoofMemberKind.rafter ||
+            ArchitectRoofMemberKind.wallPlate ||
+            ArchitectRoofMemberKind.ringBeam ||
+            ArchitectRoofMemberKind.ridgePurlin ||
+            ArchitectRoofMemberKind.intermediatePurlin => true,
+            ArchitectRoofMemberKind.layer =>
+              member.role == ArchitectRoofLayerRole.structure ||
+                  member.material == ArchitectRoofMaterial.rcSlab,
+            _ => false,
+          };
           regions.add(
             ArchitectSectionRegion(
               member.roofId,
@@ -1275,14 +1357,21 @@ class ArchitectBuildingSection {
               member.path,
               slab: true,
               roof: true,
+              structural: structural,
               timberCrossSectionPolygon: member.drawTimberDiagonals
                   ? member.polygon
                   : null,
               customFillColor: _roofMemberColor(member),
-              hatchPattern:
-                  member.material == ArchitectRoofMaterial.metalSeam ||
-                      member.material == ArchitectRoofMaterial.steel
-                  ? ArchitectSectionHatch.preset('metal')
+              hatchPattern: structural
+                  ? switch (member.material) {
+                      ArchitectRoofMaterial.steel =>
+                        ArchitectSectionHatch.preset('metal'),
+                      ArchitectRoofMaterial.timberBoarding ||
+                      ArchitectRoofMaterial.osb => ArchitectSectionHatch.preset(
+                        'wood',
+                      ),
+                      _ => null,
+                    }
                   : null,
             ),
           );
@@ -1312,6 +1401,7 @@ class ArchitectBuildingSection {
               trimmed,
               slab: r.slab,
               roof: r.roof,
+              structural: r.structural,
               timberCrossSectionPolygon: r.timberCrossSectionPolygon,
               customFillColor: r.customFillColor,
               hatchPattern: r.hatchPattern,
@@ -1360,6 +1450,7 @@ class ArchitectBuildingSection {
               Path.combine(PathOperation.difference, r.path, clean),
               slab: r.slab,
               roof: r.roof,
+              structural: r.structural,
               timberCrossSectionPolygon: r.timberCrossSectionPolygon,
               customFillColor: r.customFillColor,
               hatchPattern: r.hatchPattern,
@@ -1501,6 +1592,7 @@ class ArchitectBuildingSection {
                 Path.combine(PathOperation.difference, r.path, decorPath),
                 slab: r.slab,
                 roof: r.roof,
+                structural: r.structural,
                 timberCrossSectionPolygon: r.timberCrossSectionPolygon,
                 customFillColor: r.customFillColor,
                 hatchPattern: r.hatchPattern,
@@ -1531,9 +1623,7 @@ class ArchitectBuildingSection {
               decor.material.sectionMaterial,
               decorPath,
               customFillColor: decor.effectiveColor,
-              hatchPattern: ArchitectSectionHatch.preset(
-                decor.material.defaultHatchId,
-              ),
+              drawHatch: false,
               mergeOutline: false,
             ),
           );
@@ -1566,6 +1656,7 @@ class ArchitectBuildingSection {
           Path.combine(PathOperation.difference, r.path, stairCut),
           slab: r.slab,
           roof: r.roof,
+          structural: r.structural,
           customFillColor: r.customFillColor,
           hatchPattern: r.hatchPattern,
           drawHatch: r.drawHatch,
@@ -1771,6 +1862,7 @@ class ArchitectBuildingSection {
               r.path.shift(shift),
               slab: r.slab,
               roof: r.roof,
+              structural: r.structural,
               customFillColor: r.customFillColor,
               hatchPattern: r.hatchPattern,
               drawHatch: r.drawHatch,
@@ -2007,6 +2099,7 @@ class ArchitectBuildingSection {
                 pathway.id,
                 SlabMaterial.concrete,
                 curbRect,
+                drawHatch: false,
                 mergeOutline: false,
               ),
             );
@@ -2066,6 +2159,7 @@ class ArchitectBuildingSection {
                 street.id,
                 SlabMaterial.concrete,
                 curbRect,
+                drawHatch: false,
                 mergeOutline: false,
               ),
             );
@@ -2142,6 +2236,7 @@ class ArchitectBuildingSection {
                   fence.id,
                   SlabMaterial.concrete,
                   Path.combine(PathOperation.union, stem, footing),
+                  structural: true,
                   mergeOutline: false,
                 ),
               );
@@ -2170,6 +2265,7 @@ class ArchitectBuildingSection {
                   fence.id,
                   SlabMaterial.concrete,
                   plinth,
+                  drawHatch: false,
                   mergeOutline: false,
                 ),
               );

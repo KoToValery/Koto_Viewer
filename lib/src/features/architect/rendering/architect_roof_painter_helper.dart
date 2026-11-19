@@ -1,12 +1,15 @@
 import 'architect_roof_drainage_painter.dart';
 import 'architect_vector_scene.dart';
 import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
+import '../../bim_editing/geometry/bim_polygon_geometry.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. Committed Roof Planes 2D Painter (Hatch, Eaves Overhang Dashed Line, Ridge/Hip Edges, Slope Arrow & Badge)
 // 2. Interactive Roof Drafting Preview (Rubber-band Polygon, Edge Dimensions, Snap Guides)
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../models/architect_line_style.dart';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
 import '../services/architect_roof_geometry.dart';
@@ -15,13 +18,16 @@ import '../services/architect_roof_junctions.dart';
 import '../services/architect_service_geometry.dart';
 import 'architect_panel_roof_geometry.dart';
 import 'architect_canvas_palette.dart';
+import 'architect_line_pattern.dart';
 import 'architect_path_solid.dart';
+import 'architect_wall_geometry.dart';
 import 'architect_wall_network.dart';
 
 // === SECTION: COMMITTED ROOF PLANES 2D PAINTER ===
 
 class ArchitectRoofPainterHelper {
   static final _slopeIndicatorCenters = Expando<Offset>();
+  static final _supportOutlines = Expando<({Path core, Path facade})>();
 
   /// Dashed overhead edges on the next floor below the roof, using the same
   /// cleaned footprints as its own plan and drawing shared ridges only once.
@@ -82,8 +88,7 @@ class ArchitectRoofPainterHelper {
     }
   }
 
-  /// Draws the dashed perimeter contour of the enclosing walls from the highest
-  /// supporting storey below that has walls and distribution.
+  /// Shows the outside face of the core and the finished facade below the roof.
   static void drawSupportingWallUnderlay({
     required Canvas canvas,
     required ArchitectProject project,
@@ -93,33 +98,142 @@ class ArchitectRoofPainterHelper {
     final wallStorey = project.highestWallStorey;
     if (wallStorey == null || wallStorey.walls.isEmpty) return;
 
-    final wallPath = ArchitectWallNetwork.body(wallStorey.walls);
-    if (wallPath.getBounds().isEmpty) return;
+    final outlines = _supportOutlines[wallStorey.walls] ??=
+        _buildSupportOutlines(wallStorey);
+    final scope = ArchitectTextScope.current;
+    final publication = scope?.publication == true;
+    final patternUnit = publication ? scope!.denominator / 1000 : 2 / scale;
+    final clip = publication
+        ? null
+        : canvas.getLocalClipBounds().inflate(2 / scale);
+    final wallIds = wallStorey.walls
+        .where((w) => !w.isParapet)
+        .map((w) => w.id);
+    void draw(
+      Path path,
+      String role,
+      Color color,
+      double width,
+      double dashScale,
+    ) {
+      if (path.computeMetrics().isEmpty) return;
+      architectDrawingSources(canvas, wallIds, role);
+      canvas.drawPath(
+        ArchitectLinePattern.path(
+          path,
+          ArchitectLineStyle.dashed,
+          patternUnit * dashScale,
+          visibleBounds: clip,
+        ),
+        Paint()
+          ..color = palette.foreground(color)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width,
+      );
+    }
 
-    final dashPaint = Paint()
-      ..color = palette.isDark
-          ? const Color(0xFF00E5FF).withValues(alpha: 0.72)
-          : const Color(0xFF00838F).withValues(alpha: 0.80)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6 / scale
-      ..strokeCap = StrokeCap.round;
+    draw(
+      outlines.facade,
+      'roofFacadeOutline',
+      ArchitectPaperStyle.rule,
+      publication ? .13 * patternUnit : .8 / scale,
+      .65,
+    );
+    draw(
+      outlines.core,
+      'roofSupportCore',
+      ArchitectPaperStyle.ink,
+      publication ? .25 * patternUnit : 1.6 / scale,
+      1,
+    );
+  }
 
-    final contours = ArchitectPathSolid.contours(wallPath);
-    final dash = 6.0 / scale;
-    final gap = 3.5 / scale;
+  static ({Path core, Path facade}) _buildSupportOutlines(
+    ArchitectStorey storey,
+  ) {
+    final walls = storey.walls.where((w) => !w.isParapet).toList();
+    List<List<Offset>> perimeter(Path footprint) {
+      final loops = ArchitectPathSolid.contours(footprint);
+      return [
+        for (final loop in loops)
+          if (!loops.any(
+            (other) =>
+                other != loop && BimPolygonGeometry.contains(other, loop.first),
+          ))
+            loop,
+      ];
+    }
 
-    for (final poly in contours) {
-      if (poly.length < 3) continue;
-      final path = Path()..addPolygon(poly, true);
-      for (final metric in path.computeMetrics()) {
-        for (var start = 0.0; start < metric.length; start += dash + gap) {
-          canvas.drawPath(
-            metric.extractPath(start, math.min(start + dash, metric.length)),
-            dashPaint,
-          );
+    final core = Path();
+    final facade = Path();
+    final facadeLoops = perimeter(ArchitectWallNetwork.body(walls));
+    if (walls.every((w) => (w.thickness - w.coreThickness).abs() < 1e-6)) {
+      for (final loop in facadeLoops) {
+        core.addPolygon(loop, true);
+      }
+      return (core: core, facade: facade);
+    }
+
+    final coreLoops = perimeter(
+      ArchitectWallNetwork.body(ArchitectWallGeometry.coreWalls(walls)),
+    );
+    for (final loop in coreLoops) {
+      core.addPolygon(loop, true);
+    }
+    Iterable<(Offset, Offset)> edges(List<Offset> loop) sync* {
+      for (var i = 0; i < loop.length; i++) {
+        yield (loop[i], loop[(i + 1) % loop.length]);
+      }
+    }
+
+    final coreEdges = coreLoops.expand(edges).toList();
+    for (final loop in facadeLoops) {
+      Offset? previous;
+      for (final (a, b) in edges(loop)) {
+        for (final (start, end) in _exposedFacadeEdge(a, b, coreEdges)) {
+          if (previous == null || (previous - start).distance > 1e-5) {
+            facade.moveTo(start.dx, start.dy);
+          }
+          facade.lineTo(end.dx, end.dy);
+          previous = end;
         }
       }
     }
+    return (core: core, facade: facade);
+  }
+
+  /// Keep just the portions of the facade edge that differ from the core.
+  static Iterable<(Offset, Offset)> _exposedFacadeEdge(
+    Offset a,
+    Offset b,
+    List<(Offset, Offset)> coreEdges,
+  ) sync* {
+    const tolerance = 1e-5;
+    final delta = b - a;
+    final length = delta.distance;
+    if (length < tolerance) return;
+    final axis = delta / length;
+    final shared = <(double, double)>[];
+    for (final (c, d) in coreEdges) {
+      if (BimLineGeometry.cross(axis, c - a).abs() > tolerance ||
+          BimLineGeometry.cross(axis, d - a).abs() > tolerance) {
+        continue;
+      }
+      final start = BimLineGeometry.dot(axis, c - a);
+      final end = BimLineGeometry.dot(axis, d - a);
+      final lo = math.max(0.0, math.min(start, end));
+      final hi = math.min(length, math.max(start, end));
+      if (hi > lo) shared.add((lo, hi));
+    }
+    shared.sort((a, b) => a.$1.compareTo(b.$1));
+    var cursor = 0.0;
+    for (final (start, end) in shared) {
+      if (start - cursor >= tolerance) {
+        yield (a + axis * cursor, a + axis * start);
+      }
+      cursor = math.max(cursor, end);
+    }
+    if (length - cursor >= tolerance) yield (a + axis * cursor, b);
   }
 
   static void paintRoofs({

@@ -230,19 +230,29 @@ class ArchitectDrawingPublisher {
         );
         if (visible['axes'] == false) plan = plan.copyWith(gridAxes: []);
         canvas.scale(1000 / denominator);
+        final cad = plan.cadUnderlayForStorey(drawing.sourceId);
         final showUnderlay =
             drawing.visibility['underlay'] != false &&
+            cad?.visible != false &&
             effectiveProject.isLayerVisible(ArchitectLayer.cadUnderlayLayerId);
         if (showUnderlay && sources.underlays[drawing.sourceId] != null) {
+          final frame = cad?.frame(sources.frame) ?? sources.frame;
           canvas.save();
-          canvas.scale(1 / sources.frame.unitsPerMeter);
-          canvas.translate(-sources.frame.origin.dx, -sources.frame.origin.dy);
+          if (cad?.hasActiveMask == true) {
+            canvas.clipPath(Path()..addPolygon(cad!.maskPolygon!, true));
+          }
+          canvas.scale(
+            1 / frame.unitsPerMeter,
+            (frame.invertY ? -1 : 1) / frame.unitsPerMeter,
+          );
+          canvas.translate(-frame.origin.dx, -frame.origin.dy);
           ArchitectElementsPainterHelper.drawUnderlay(
             canvas: canvas,
             underlayDoc: sources.underlays[drawing.sourceId],
-            zoomScale: scope.renderScale / sources.frame.unitsPerMeter,
+            zoomScale: scope.renderScale / frame.unitsPerMeter,
             layerVisibility: {
               ...sources.visibility,
+              ...?cad?.layerOverrides,
               for (final e in drawing.visibility.entries.where(
                 (e) => e.key.startsWith('cad:'),
               ))

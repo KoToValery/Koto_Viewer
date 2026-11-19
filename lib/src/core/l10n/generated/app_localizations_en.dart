@@ -12423,7 +12423,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String architectCadUnderlayReloadedNotice(String fileName) {
-    return 'External CAD underlay updated automatically: $fileName';
+    return 'CAD underlay refreshed: $fileName';
   }
 
   @override
@@ -12543,7 +12543,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectUnderlayEdit => 'Edit Properties';
 
   @override
-  String get architectUnderlayScale => 'Scale & Units';
+  String get architectUnderlayScale => 'Scale';
 
   @override
   String get architectUnderlayMask => 'Mask / Crop';
@@ -13208,6 +13208,79 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectUnderlayOriginalColors => 'Original colors';
+
+  @override
+  String get architectUnderlayAdd => 'Add';
+
+  @override
+  String get architectRasterChooseUnderlay => 'Select underlay';
+
+  @override
+  String get architectUnderlaySettings => 'Settings';
+
+  @override
+  String get architectUnderlayShow => 'Show';
+
+  @override
+  String get architectUnderlayCrop => 'Crop';
+
+  @override
+  String get architectUnderlayGeodesy => 'Survey';
+
+  @override
+  String get architectCadImportTitle => 'Import CAD underlay';
+
+  @override
+  String get architectCadReplaceTitle => 'Replace CAD underlay';
+
+  @override
+  String get architectCadImportAccept => 'Import';
+
+  @override
+  String get architectCadReplaceAccept => 'Replace';
+
+  @override
+  String get architectCadScaleAuto => 'Automatic';
+
+  @override
+  String get architectCadScaleCurrent => 'Current';
+
+  @override
+  String get architectCadScaleFromFile => 'Units from file';
+
+  @override
+  String get architectCadUnitsPerMeter => 'Drawing units per metre';
+
+  @override
+  String get architectCadScaleEstimated => 'Units estimated from drawing size';
+
+  @override
+  String get architectCadOrientation => 'Match CAD orientation';
+
+  @override
+  String get architectCadOrientationHelp =>
+      'Check alignment with existing walls and grids before changing orientation.';
+
+  @override
+  String get architectCadImportEmpty => 'The file has no model-space geometry.';
+
+  @override
+  String get architectUnderlayShowCrop => 'Enable crop';
+
+  @override
+  String get architectUnderlayHideCrop => 'Disable crop';
+
+  @override
+  String get architectUnderlayRemoveCrop => 'Clear crop';
+
+  @override
+  String get architectUnderlayRectangleCrop => 'Rectangle';
+
+  @override
+  String get architectUnderlayPolygonCrop => 'Polygon';
+
+  @override
+  String get architectUnderlayUnsupportedFormat => 'Unsupported file type';
 
   @override
   String get architectUnderlayOriginalLineweights => 'Original lineweights';
