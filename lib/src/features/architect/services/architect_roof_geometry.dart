@@ -1142,21 +1142,6 @@ class ArchitectRoofGeometry {
       sectionLine.start,
       sectionLine.end,
     ).inflate(.0001);
-    final diagonalSections = [
-      for (final beam in framing.diagonals)
-        if (beam.footprint.getBounds().overlaps(sectionBounds))
-          (
-            beam,
-            ArchitectMeshSection.verticalClipped(
-              beam.mesh(),
-              sectionLine.start,
-              lineDir,
-              lineLen,
-            ),
-          ),
-    ]..removeWhere((entry) => entry.$2.getBounds().isEmpty);
-    final emittedDiagonals = <ArchitectRoofDiagonalRafter>{};
-    final rafterSections = <String, List<Path>>{};
     final ridgeSections = <(ArchitectRoofRidgeBeam, Path)>[
       for (final beam in ridgeBeams)
         (
@@ -1173,6 +1158,28 @@ class ArchitectRoofGeometry {
         ),
     ]..removeWhere((entry) => entry.$2.getBounds().isEmpty);
     final emittedRidges = <ArchitectRoofRidgeBeam>{};
+    final diagonalSections = <(ArchitectRoofDiagonalRafter, Path)>[];
+    for (final beam in framing.diagonals) {
+      if (!beam.footprint.getBounds().overlaps(sectionBounds)) continue;
+      var path = ArchitectMeshSection.verticalClipped(
+        beam.mesh(),
+        sectionLine.start,
+        lineDir,
+        lineLen,
+      );
+      for (final (ridge, profile) in ridgeSections) {
+        if (!ridge.footprint.getBounds().overlaps(beam.footprint.getBounds()) ||
+            !profile.getBounds().overlaps(path.getBounds())) {
+          continue;
+        }
+        // A slice through the ridge end can include the coincident end faces
+        // of both timbers. Preserve the ridge seat's ownership in section.
+        path = Path.combine(PathOperation.difference, path, profile);
+      }
+      if (!path.getBounds().isEmpty) diagonalSections.add((beam, path));
+    }
+    final emittedDiagonals = <ArchitectRoofDiagonalRafter>{};
+    final rafterSections = <String, List<Path>>{};
     final wallPlates = ArchitectRoofWallPlate.build(
       storey,
       project: project,

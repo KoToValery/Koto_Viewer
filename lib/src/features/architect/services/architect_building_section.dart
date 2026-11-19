@@ -1756,22 +1756,21 @@ class ArchitectBuildingSection {
     // Keep disconnected members separate while triangulating: decomposing one
     // large union creates artificial strips at every other member's X station.
     final cutMasks = [
-      for (final maskPath in [
+      for (final (maskPath, isRoof) in [
         for (final region in regions)
-          if (region.occludesProjection) region.path,
-        ...extraCutMaskPaths,
+          if (region.occludesProjection) (region.path, region.roof),
+        for (final path in extraCutMaskPaths) (path, false),
       ])
-        for (final t in ArchitectPathSolid.extrude(
-          maskPath,
-          0,
-          1,
-          const Color(0xff000000),
-          contourTolerance: .00001,
+        for (final (a, b, c) in ArchitectPathSolid.triangulateContours(
+          ArchitectPathSolid.contours(
+            maskPath,
+            tolerance: .00001,
+            preserveShortEdges: isRoof,
+          ),
+          fillType: maskPath.fillType,
+          compact: false,
         ))
-          if (t.normal.z > .5)
-            [
-              for (final p in [t.v0, t.v1, t.v2]) Offset(p.x, p.y) - shift,
-            ],
+          [a - shift, b - shift, c - shift],
     ];
     if (!includeProjection) {
       final partial = _finishProjection(

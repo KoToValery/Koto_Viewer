@@ -6,10 +6,20 @@ import '../../dxf_3d_viewer/models/mesh_3d.dart';
 /// Extrudes boolean-clean paths, including holes and disconnected contours.
 /// Vertical decomposition avoids bridging a hole with an arbitrary diagonal.
 class ArchitectPathSolid {
-  static List<List<Offset>> contours(Path path, {double tolerance = .002}) {
+  static List<List<Offset>> contours(
+    Path path, {
+    double tolerance = .002,
+    bool preserveShortEdges = false,
+  }) {
     final result = <List<Offset>>[];
+    // A shallow subdivision can skip the short end edge of a long, thin
+    // section layer and replace both corners with a diagonal.
+    final depthLimit = preserveShortEdges ? 20 : 6;
     for (final metric in path.computeMetrics()) {
       final points = <Offset>[];
+      // PathMetric takes float32 distances. Stop once further subdivision
+      // reaches that precision or the requested contour tolerance.
+      final minInterval = math.max(tolerance, metric.length * 1.2e-7);
       Offset at(double s) => metric.getTangentForOffset(s)!.position;
       void flatten(double a, double b, int depth) {
         final p = at(a), q = at(b), delta = q - p;
@@ -22,7 +32,8 @@ class ArchitectPathSolid {
           at((a + b) / 2),
           at(a + (b - a) * .75),
         ];
-        if (depth >= 6 ||
+        if (depth >= depthLimit ||
+            (preserveShortEdges && b - a <= minInterval) ||
             ((b - a - length).abs() < tolerance &&
                 samples.every((r) => error(r) < tolerance))) {
           points.add(p);

@@ -366,7 +366,16 @@ class Architect3dBuilder {
                   : null,
             ),
       ];
-      joinedRoofs = joinedRoofs || roofJunctions.trimmed.isNotEmpty;
+      // Auto-generated slopes often already share exact edges, so no plan
+      // trimming is required even though their prism end faces touch.
+      final roofGroups = <String>{};
+      joinedRoofs =
+          joinedRoofs ||
+          roofJunctions.trimmed.isNotEmpty ||
+          storey.roofs.any(
+            (roof) =>
+                roof.roofGroupId != null && !roofGroups.add(roof.roofGroupId!),
+          );
       for (var i = 0; i < storey.roofs.length; i++) {
         final roof = storey.roofs[i];
         if (roof.assembly.panels != null) {

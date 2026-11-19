@@ -7,6 +7,7 @@ import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_mesh_section.dart';
+import 'package:kotoview/src/features/architect/services/architect_building_section.dart';
 import 'package:kotoview/src/features/architect/services/architect_roof_framing.dart';
 import 'package:kotoview/src/features/architect/services/architect_roof_geometry.dart';
 import 'package:kotoview/src/features/architect/services/architect_roof_junctions.dart';
@@ -23,6 +24,39 @@ ArchitectRoofFraming framing(ArchitectStorey floor) =>
       ArchitectRoofJunctions.of(floor),
       ArchitectRoofRidgeBeam.build(floor),
     );
+
+ArchitectProject automaticHipProject(double width) {
+  final floor = ArchitectStorey(
+    id: 'roof',
+    name: 'Roof',
+    elevation: 3,
+    slabs: [
+      ArchitectSlab(
+        id: 'slab',
+        thickness: .2,
+        polygon: [
+          Offset.zero,
+          Offset(width, 0),
+          Offset(width, 6),
+          const Offset(0, 6),
+        ],
+      ),
+    ],
+  );
+  final project = ArchitectProject(
+    id: 'auto-roof',
+    name: 'Automatic roof',
+    createdAt: DateTime(2026),
+    updatedAt: DateTime(2026),
+    activeStoreyId: floor.id,
+    storeys: [floor],
+  );
+  final roofs = ArchitectRoofGeometry.generateAutoRoof(
+    project: project,
+    type: AutoRoofType.hip,
+  );
+  return project.copyWith(storeys: [floor.copyWith(roofs: roofs)]);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -172,29 +206,8 @@ void main() {
   }
 
   test('An automatically generated hipped roof has four diagonal timbers', () {
-    const floor = ArchitectStorey(
-      id: 'roof',
-      name: 'Roof',
-      slabs: [
-        ArchitectSlab(
-          id: 'slab',
-          thickness: .2,
-          polygon: [Offset(0, 0), Offset(12, 0), Offset(12, 6), Offset(0, 6)],
-        ),
-      ],
-    );
-    final roofs = ArchitectRoofGeometry.generateAutoRoof(
-      project: ArchitectProject(
-        id: 'auto-roof',
-        name: 'Automatic roof',
-        createdAt: DateTime(2026),
-        updatedAt: DateTime(2026),
-        activeStoreyId: floor.id,
-        storeys: const [floor],
-      ),
-      type: AutoRoofType.hip,
-    );
-    final layout = framing(floor.copyWith(roofs: roofs));
+    final floor = automaticHipProject(12).activeStorey;
+    final layout = framing(floor);
     expect(layout.diagonals, hasLength(4));
     expect(
       layout.diagonals.map((beam) => beam.kind),
@@ -217,10 +230,77 @@ void main() {
     }
     expect(
       framing(
-        floor.copyWith(roofs: roofs.reversed.toList()),
+        floor.copyWith(roofs: floor.roofs.reversed.toList()),
       ).diagonals.map((b) => (b.kind, b.start, b.end)),
       layout.diagonals.map((b) => (b.kind, b.start, b.end)),
     );
+  });
+
+  test('Short hip ridge section keeps projection out of thin cut layers', () {
+    final project = automaticHipProject(7);
+    final floor = project.activeStorey;
+    final ridge = ArchitectRoofRidgeBeam.build(floor).single;
+    expect((ridge.end - ridge.start).distance, closeTo(1, 1e-7));
+
+    for (final cut in const [
+      ArchitectSection(
+        id: 'centre',
+        start: Offset(3.5, -1),
+        end: Offset(3.5, 7),
+      ),
+      ArchitectSection(
+        id: 'ridge-end',
+        start: Offset(3, -1),
+        end: Offset(3, 7),
+      ),
+      ArchitectSection(id: 'oblique', start: Offset(-1, -1), end: Offset(7, 7)),
+    ]) {
+      final data = ArchitectBuildingSection.build(project, cut);
+      final cutRoof = data.regions
+          .where((region) => region.roof && region.occludesProjection)
+          .fold(
+            Path(),
+            (path, region) =>
+                Path.combine(PathOperation.union, path, region.path),
+          );
+      final background = data.background!.faces;
+      expect(background, isNotEmpty);
+      for (final face in background) {
+        expect(
+          sectionArea(Path.combine(PathOperation.intersect, cutRoof, face)),
+          lessThan(1e-5),
+          reason: 'Projection crosses cut material in ${cut.id}',
+        );
+      }
+    }
+  });
+
+  test('Cut at a short ridge end gives the purlin its full seat', () {
+    final project = automaticHipProject(7);
+    final members = ArchitectRoofGeometry.buildSectionSlices(
+      storey: project.activeStorey,
+      sectionLine: const ArchitectSection(
+        id: 'ridge-end',
+        start: Offset(3, -1),
+        end: Offset(3, 7),
+      ),
+      project: project,
+    ).expand((slice) => slice.members).toList();
+    final ridge = members.singleWhere(
+      (member) => member.kind == ArchitectRoofMemberKind.ridgePurlin,
+    );
+    final hips = members.where(
+      (member) => member.kind == ArchitectRoofMemberKind.diagonalRafter,
+    );
+    expect(hips, hasLength(2));
+    for (final hip in hips) {
+      expect(
+        sectionArea(
+          Path.combine(PathOperation.intersect, hip.path, ridge.path),
+        ),
+        lessThan(1e-7),
+      );
+    }
   });
 
   test('Reference roof sections cut the hips without double material', () {
