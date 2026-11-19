@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/core/services/dwg_export_service.dart';
 import 'package:kotoview/src/core/services/dwg_reader_service.dart';
+import 'package:kotoview/src/features/architect/models/architect_grid_axis.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/models/architect_zone.dart';
@@ -31,6 +32,14 @@ ArchitectProject fixture() => ArchitectProject(
   updatedAt: DateTime(2026),
   activeStoreyId: 's',
   units: ArchitectUnit.millimeters,
+  gridAxes: const [
+    StructuralGridAxis(
+      id: 'grid',
+      name: 'Б2',
+      start: Offset(0, -2),
+      end: Offset(6, -2),
+    ),
+  ],
   storeys: const [
     ArchitectStorey(
       id: 's',
@@ -117,13 +126,27 @@ void main() {
         onProgress: progress.add,
       );
       expect(files.keys.single, endsWith('.dwg'));
-      final file = await File(
-        '${temp.path}/План 🏠.dwg',
-      ).writeAsBytes(files.values.single);
+      final dwg = files.values.single;
+      // The AC1032 file header stores the 16-bit code page at 0x13.
+      expect(dwg.sublist(0x13, 0x15), [30, 0]); // ANSI_1252
+      final file = await File('${temp.path}/План 🏠.dwg').writeAsBytes(dwg);
       final doc = await DwgReaderService.read(file.path);
       expect(doc.headerVars[r'$INSUNITS'], '4');
       expect(doc.entities.whereType<DxfLwPolyline>(), isNotEmpty);
       expect(doc.entities.whereType<DxfHatch>(), isNotEmpty);
+      final gridCenters = doc.entities
+          .whereType<DxfCircle>()
+          .where((circle) => circle.layer == 'A-GRID')
+          .map((circle) => circle.center);
+      final gridLabels = doc.entities
+          .whereType<DxfMText>()
+          .where((text) => text.cleanText == 'Б2')
+          .toList();
+      expect(gridLabels, hasLength(2));
+      for (final text in gridLabels) {
+        expect(text.attachmentPoint, 5);
+        expect(gridCenters, contains(text.insertPoint));
+      }
       expect(
         doc.entities.whereType<DxfMText>().any(
           (t) => t.cleanText.contains('Дневна'),

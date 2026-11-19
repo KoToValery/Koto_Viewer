@@ -184,11 +184,12 @@ class ArchitectTextPainter {
         ),
       )
       .toList();
-  void paint(Canvas canvas, Offset offset) {
+  void paint(Canvas canvas, Offset offset, {Offset? cadCenter}) {
     if (canvas is ArchitectVectorCanvas) {
       final plain = text?.toPlainText() ?? '';
+      final lines = computeLineMetrics();
       var start = 0;
-      for (final line in computeLineMetrics()) {
+      for (final line in lines) {
         final boundary = getLineBoundary(TextPosition(offset: start));
         final end = boundary.end.clamp(start, plain.length);
         final value = plain.substring(start, end).replaceAll('\n', '');
@@ -203,6 +204,7 @@ class ArchitectTextPainter {
             style,
             elementId,
             span is ArchitectAnnotationSpan ? span.role : role,
+            cadCenter: lines.length == 1 ? cadCenter : null,
           );
         }
         start = end;
@@ -231,6 +233,8 @@ class ArchitectVectorPath extends ArchitectVectorOp {
   final Color color;
   final double width;
   final bool fill;
+  final bool knockout;
+  final (Offset, double)? circle;
   final StrokeJoin strokeJoin;
   final StrokeCap strokeCap;
   final double strokeMiterLimit;
@@ -242,6 +246,8 @@ class ArchitectVectorPath extends ArchitectVectorOp {
     super.clip,
     super.sources,
     super.role, {
+    this.knockout = false,
+    this.circle,
     this.strokeJoin = StrokeJoin.miter,
     this.strokeCap = StrokeCap.butt,
     this.strokeMiterLimit = 4.0,
@@ -258,16 +264,24 @@ class ArchitectVectorPath extends ArchitectVectorOp {
   }
 
   @override
-  void paint(Canvas canvas) => canvas.drawPath(
-    path,
-    Paint()
+  void paint(Canvas canvas) {
+    if (knockout) {
+      architectDrawKnockout(canvas, path, color);
+      return;
+    }
+    final paint = Paint()
       ..color = color
       ..strokeWidth = width
       ..style = fill ? PaintingStyle.fill : PaintingStyle.stroke
       ..strokeJoin = strokeJoin
       ..strokeCap = strokeCap
-      ..strokeMiterLimit = strokeMiterLimit,
-  );
+      ..strokeMiterLimit = strokeMiterLimit;
+    if (circle case (final center, final radius)) {
+      canvas.drawCircle(center, radius, paint);
+    } else {
+      canvas.drawPath(path, paint);
+    }
+  }
 }
 
 class ArchitectVectorText extends ArchitectVectorOp {
@@ -278,6 +292,7 @@ class ArchitectVectorText extends ArchitectVectorOp {
   final FontWeight weight;
   final FontStyle fontStyle;
   final TextDecoration decoration;
+  final Offset? cadCenter;
   ArchitectVectorText(
     this.text,
     this.position,
@@ -290,6 +305,7 @@ class ArchitectVectorText extends ArchitectVectorOp {
     super.role, {
     this.fontStyle = FontStyle.normal,
     this.decoration = TextDecoration.none,
+    this.cadCenter,
   });
   TextPainter? _painter;
   Size? _measuredSize;
@@ -336,6 +352,8 @@ class ArchitectVectorText extends ArchitectVectorOp {
   @override
   void paint(Canvas canvas) {
     if (canvas is ArchitectVectorCanvas) {
+      final delta = cadCenter == null ? null : cadCenter! - position;
+      final c = math.cos(rotation), s = math.sin(rotation);
       canvas.save();
       canvas.translate(position.dx, position.dy);
       canvas.rotate(rotation);
@@ -354,6 +372,9 @@ class ArchitectVectorText extends ArchitectVectorOp {
           (e) => e.name == role,
           orElse: () => ArchitectAnnotationRole.ordinary,
         ),
+        cadCenter: delta == null
+            ? null
+            : Offset(c * delta.dx + s * delta.dy, c * delta.dy - s * delta.dx),
       );
       canvas.restore();
       return;
@@ -425,8 +446,9 @@ class ArchitectVectorCanvas implements Canvas {
     Offset at,
     TextStyle style,
     String? id,
-    ArchitectAnnotationRole role,
-  ) {
+    ArchitectAnnotationRole role, {
+    Offset? cadCenter,
+  }) {
     operations.add(
       ArchitectVectorText(
         text,
@@ -440,16 +462,25 @@ class ArchitectVectorCanvas implements Canvas {
         role.name,
         fontStyle: style.fontStyle ?? FontStyle.normal,
         decoration: style.decoration ?? TextDecoration.none,
+        cadCenter: cadCenter == null ? null : _point(cadCenter),
       ),
     );
   }
 
   @override
-  void drawPath(Path path, Paint paint) {
+  void drawPath(Path path, Paint paint) => _drawPath(path, paint);
+
+  void _drawPath(
+    Path path,
+    Paint paint, {
+    bool knockout = false,
+    (Offset, double)? circle,
+  }) {
     if (paint.color.a == 0) return;
     final transformed = path.transform(_matrix.storage);
     var color = paint.color;
-    if (paint.style == PaintingStyle.fill &&
+    if (!knockout &&
+        paint.style == PaintingStyle.fill &&
         _role != 'cadFill' &&
         transformed.getBounds().size.width *
                 transformed.getBounds().size.height >
@@ -466,6 +497,8 @@ class ArchitectVectorCanvas implements Canvas {
         _clip,
         _owners ?? sourceIds,
         _role ?? paint.style.name,
+        knockout: knockout,
+        circle: circle,
         strokeJoin: paint.strokeJoin,
         strokeCap: paint.strokeCap,
         strokeMiterLimit: paint.strokeMiterLimit,
@@ -583,8 +616,13 @@ class ArchitectVectorCanvas implements Canvas {
   void drawOval(Rect rect, Paint paint) =>
       drawPath(Path()..addOval(rect), paint);
   @override
-  void drawCircle(Offset c, double radius, Paint paint) =>
-      drawOval(Rect.fromCircle(center: c, radius: radius), paint);
+  void drawCircle(Offset c, double radius, Paint paint) => _drawPath(
+    Path()..addOval(Rect.fromCircle(center: c, radius: radius)),
+    paint,
+    circle: _role == 'axis' && paint.style == PaintingStyle.stroke
+        ? (_point(c), radius * _scale)
+        : null,
+  );
   @override
   void drawArc(
     Rect rect,
@@ -611,4 +649,14 @@ class ArchitectVectorCanvas implements Canvas {
 
 void architectDrawingSources(Canvas canvas, Iterable<String> ids, String role) {
   if (canvas is ArchitectVectorCanvas) canvas.sources(ids.toSet(), role);
+}
+
+/// A background mask is painted on paper and removes covered geometry in CAD.
+void architectDrawKnockout(Canvas canvas, Path path, Color color) {
+  final paint = Paint()..color = color;
+  if (canvas is ArchitectVectorCanvas) {
+    canvas._drawPath(path, paint, knockout: true);
+  } else {
+    canvas.drawPath(path, paint);
+  }
 }

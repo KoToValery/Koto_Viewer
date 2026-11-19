@@ -252,7 +252,9 @@ class _Document {
     }
 
     header(r'$ACADVER', 1, 'AC1027');
-    header(r'$DWGCODEPAGE', 3, 'UTF-8');
+    // AC1027 text is UTF-8 by version. Use the conventional AutoCAD code
+    // page in metadata so the DWG converter does not write NLS page 1200.
+    header(r'$DWGCODEPAGE', 3, 'ANSI_1252');
     header(r'$INSUNITS', 70, units);
     header(r'$MEASUREMENT', 70, units == 1 || units == 2 ? 0 : 1);
     header(r'$TILEMODE', 70, isSheet ? 0 : 1);
@@ -454,6 +456,7 @@ class _Document {
     final kind = switch (type) {
       'text' => 'MTEXT',
       'hatch' => 'HATCH',
+      'circle' => 'CIRCLE',
       _ => 'LWPOLYLINE',
     };
     final t = base(kind, owner, name, paperSpace, handle: handle);
@@ -463,7 +466,7 @@ class _Document {
       t.point(10, _point(e['at']), three: true);
       t.add(40, e['height']!);
       t.add(41, e['width']!);
-      t.add(71, 1);
+      t.add(71, e['attachment'] ?? 1);
       t.add(72, 1);
       t.add(7, e['style'] ?? 'KOTO_REGULAR');
       // An explicit direction vector avoids differing historical meanings of
@@ -502,6 +505,10 @@ class _Document {
       for (var i = 0; i < chunks.length; i++) {
         t.add(i + 1 == chunks.length ? 1 : 3, chunks[i]);
       }
+    } else if (type == 'circle') {
+      t.add(100, 'AcDbCircle');
+      t.point(10, _point(e['at']), three: true);
+      t.add(40, e['radius']!);
     } else if (type == 'hatch') {
       t.add(100, 'AcDbHatch');
       t.point(10, const [0, 0], three: true);
@@ -687,13 +694,16 @@ class _Document {
         t.add(70, 0);
         t.add(40, 0.0);
         t.add(41, 1.0);
-        t.add(50, e.key.contains('ITALIC') ? 15.0 : 0.0);
+        t.add(50, 0.0);
         t.add(71, 0);
         t.add(42, 2.5);
-        t.add(
-          3,
-          e.key.contains('BOLD') ? 'NotoSans-Bold.ttf' : 'NotoSans-Regular.ttf',
-        );
+        // A Windows font with Cyrillic avoids AutoCAD's SHX substitution.
+        t.add(3, switch (e.key) {
+          'KOTO_BOLD' => 'arialbd.ttf',
+          'KOTO_ITALIC' => 'ariali.ttf',
+          'KOTO_BOLD_ITALIC' => 'arialbi.ttf',
+          _ => 'arial.ttf',
+        });
         t.add(4, '');
       }
     });

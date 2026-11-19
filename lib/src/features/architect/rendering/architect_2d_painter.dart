@@ -1684,10 +1684,13 @@ class Architect2dPainter extends CustomPainter {
         }
       }
 
-      // Unobtrusive midpoint edit handle for extrusion/step move
-      final midPoint = wall.referencePointAt(.5);
-      canvas.drawCircle(midPoint, 3.2 / draftingScale, midDotPaint);
-      canvas.drawCircle(midPoint, 3.2 / draftingScale, midBorderPaint);
+      // Midpoint handles belong to the drafting workspace.
+      if (canvas is! ArchitectVectorCanvas &&
+          ArchitectTextScope.current?.publication != true) {
+        final midPoint = wall.referencePointAt(.5);
+        canvas.drawCircle(midPoint, 3.2 / draftingScale, midDotPaint);
+        canvas.drawCircle(midPoint, 3.2 / draftingScale, midBorderPaint);
+      }
 
       for (final door in planWall.doors) {
         door.paint2D(

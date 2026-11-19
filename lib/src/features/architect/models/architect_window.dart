@@ -213,10 +213,6 @@ class ArchitectWindow {
     }
 
     // Paints
-    final openingCutPaint = Paint()
-      ..color = palette.background
-      ..style = PaintingStyle.fill;
-
     final framePaint = Paint()
       ..color = isSelected
           ? const Color(0xFF00E5FF)
@@ -244,7 +240,9 @@ class ArchitectWindow {
         pLeftBase.dy + n.dy * maskHalfThick,
       )
       ..close();
-    if (!wallGeometryProvided) canvas.drawPath(openingPath, openingCutPaint);
+    if (!wallGeometryProvided) {
+      architectDrawKnockout(canvas, openingPath, palette.background);
+    }
 
     // 2. Window jamb lines
     if (!wallGeometryProvided) {

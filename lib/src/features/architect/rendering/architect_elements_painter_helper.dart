@@ -354,12 +354,12 @@ class ArchitectElementsPainterHelper {
       architectDrawingSources(canvas, {opening.id}, 'openings');
       final path = Path()..addPolygon(opening.boundary, true);
       final selected = opening.id == selectedElementId;
-      canvas.drawPath(
+      architectDrawKnockout(
+        canvas,
         path,
-        Paint()
-          ..color = ArchitectLinePresentation.paper(canvas)
-              ? Colors.white
-              : palette.background,
+        ArchitectLinePresentation.paper(canvas)
+            ? Colors.white
+            : palette.background,
       );
       canvas.drawPath(
         path,
@@ -912,12 +912,7 @@ class ArchitectElementsPainterHelper {
           prim.holes,
           bulges: prim.bulges,
         );
-        canvas.drawPath(
-          boundary,
-          Paint()
-            ..color = palette.background
-            ..style = PaintingStyle.fill,
-        );
+        architectDrawKnockout(canvas, boundary, palette.background);
         if ((prim.maskBorder ?? true) || isSelected) {
           canvas.drawPath(
             boundary,
@@ -1211,12 +1206,12 @@ class ArchitectElementsPainterHelper {
       canvas.rotate(comp.rotation);
 
       if (comp.isServiceComponent) {
-        canvas.drawPath(
+        architectDrawKnockout(
+          canvas,
           geo.block2d.boundsMask,
-          Paint()
-            ..color = ArchitectLinePresentation.paper(canvas)
-                ? Colors.white
-                : palette.background,
+          ArchitectLinePresentation.paper(canvas)
+              ? Colors.white
+              : palette.background,
         );
       }
 

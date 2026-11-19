@@ -13,7 +13,6 @@ import 'architect_line_pattern.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-import '../models/architect_document.dart';
 import '../models/architect_grid_axis.dart';
 import '../models/architect_project.dart';
 import '../services/architect_axis_geometry.dart';
@@ -72,36 +71,36 @@ class ArchitectGridAxisPainterHelper {
         );
       }
 
-      final paint = isSelected ? selectedAxisPaint : normalAxisPaint;
-      _drawDashDotLine(
-        canvas,
-        renderAxis.start,
-        renderAxis.end,
-        paint,
-        zoomScale,
-      );
-
-      // Draw bubbles
-      if (renderAxis.bubbleAtStart) {
-        _drawBubble(
-          palette: palette,
-          canvas: canvas,
-          center: renderAxis.start,
-          label: renderAxis.name,
-          elementId: renderAxis.id,
-          zoomScale: zoomScale,
-          isSelected: isSelected,
-        );
-      }
-      if (renderAxis.bubbleAtEnd) {
-        _drawBubble(
-          palette: palette,
-          canvas: canvas,
-          center: renderAxis.end,
-          label: renderAxis.name,
-          elementId: renderAxis.id,
-          zoomScale: zoomScale,
-          isSelected: isSelected,
+      final startRadius = renderAxis.bubbleAtStart
+          ? _drawBubble(
+              palette: palette,
+              canvas: canvas,
+              center: renderAxis.start,
+              label: renderAxis.name,
+              elementId: renderAxis.id,
+              zoomScale: zoomScale,
+              isSelected: isSelected,
+            )
+          : 0.0;
+      final endRadius = renderAxis.bubbleAtEnd
+          ? _drawBubble(
+              palette: palette,
+              canvas: canvas,
+              center: renderAxis.end,
+              label: renderAxis.name,
+              elementId: renderAxis.id,
+              zoomScale: zoomScale,
+              isSelected: isSelected,
+            )
+          : 0.0;
+      if (renderAxis.length > startRadius + endRadius) {
+        final direction = renderAxis.direction;
+        _drawDashDotLine(
+          canvas,
+          renderAxis.start + direction * startRadius,
+          renderAxis.end - direction * endRadius,
+          isSelected ? selectedAxisPaint : normalAxisPaint,
+          zoomScale,
         );
       }
 
@@ -320,7 +319,7 @@ class ArchitectGridAxisPainterHelper {
 
   // === SECTION: DASH-DOT & BUBBLE ROUTINES ===
 
-  static void _drawBubble({
+  static double _drawBubble({
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required Offset center,
@@ -367,13 +366,8 @@ class ArchitectGridAxisPainterHelper {
         ? 11.0
         : tp.height * ArchitectDrawingScale.fontCapRatio;
     final double bubbleRadius =
-        Offset(tp.width / 2, visualH / 2).distance + (scope != null ? 2.0 : 1.5);
-
-    final bgPaint = Paint()
-      ..color = isGhost
-          ? (palette.isDark ? const Color(0xAA1E2A38) : const Color(0xAAFFFFFF))
-          : (palette.isDark ? const Color(0xFF262A34) : Colors.white)
-      ..style = PaintingStyle.fill;
+        Offset(tp.width / 2, visualH / 2).distance +
+        (scope != null ? 2.0 : 1.5);
 
     final borderPaint = Paint()
       ..color = isGhost
@@ -386,15 +380,29 @@ class ArchitectGridAxisPainterHelper {
       ..strokeWidth = (isSelected ? 2.2 : 1.4) / zoomScale
       ..style = PaintingStyle.stroke;
 
-    canvas.drawCircle(center, bubbleRadius, bgPaint);
+    if (isGhost) {
+      canvas.drawCircle(
+        center,
+        bubbleRadius,
+        Paint()
+          ..color = palette.isDark
+              ? const Color(0xAA1E2A38)
+              : const Color(0xAAFFFFFF),
+      );
+    }
     canvas.drawCircle(center, bubbleRadius, borderPaint);
 
     final metrics = tp.computeLineMetrics();
     final glyphCenterY = metrics.isNotEmpty
         ? metrics.first.baseline - visualH / 2
         : tp.height / 2;
-    tp.paint(canvas, center - Offset(tp.width / 2, glyphCenterY));
+    tp.paint(
+      canvas,
+      center - Offset(tp.width / 2, glyphCenterY),
+      cadCenter: center,
+    );
     canvas.restore();
+    return bubbleRadius * localScale;
   }
 
   static void _drawDashDotLine(

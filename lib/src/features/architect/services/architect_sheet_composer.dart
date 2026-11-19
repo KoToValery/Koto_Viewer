@@ -211,9 +211,10 @@ class ArchitectSheetComposer {
         sheet.widthMm - sheet.marginMm - width,
         sheet.heightMm - sheet.marginMm - height,
       );
-      canvas.drawRect(
-        Rect.fromLTWH(origin.dx, origin.dy, width, height),
-        Paint()..color = Colors.white,
+      architectDrawKnockout(
+        canvas,
+        Path()..addRect(Rect.fromLTWH(origin.dx, origin.dy, width, height)),
+        Colors.white,
       );
       for (final item in template.items) {
         final r = item.rect.shift(origin);

@@ -603,6 +603,8 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('architect-sheet-export')));
         await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('architect-sheet-export-pdf')));
+        await tester.pumpAndSettle();
         await capture(tester, key, 'export-$language-$dark');
         expect(find.text(l.architectSheetExportOrder), findsOneWidget);
         expect(tester.takeException(), isNull);

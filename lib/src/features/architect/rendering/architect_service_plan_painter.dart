@@ -73,13 +73,12 @@ class ArchitectServicePlanPainter {
         pixels: .7,
         canvas: canvas,
       );
-    final mask = Paint()
-      ..color = ArchitectLinePresentation.paper(canvas)
-          ? ArchitectPaperStyle.paper
-          : palette.background;
+    final background = ArchitectLinePresentation.paper(canvas)
+        ? ArchitectPaperStyle.paper
+        : palette.background;
     for (final entry in openings.entries) {
       architectDrawingSources(canvas, {entry.key}, 'serviceRoofOpenings');
-      canvas.drawPath(entry.value, mask);
+      architectDrawKnockout(canvas, entry.value, background);
       if (flashings[entry.key] case final Path apron) {
         canvas.drawPath(apron, apronPen);
       }

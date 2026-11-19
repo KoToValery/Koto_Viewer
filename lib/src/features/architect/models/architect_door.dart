@@ -361,10 +361,6 @@ class ArchitectDoor {
     }
 
     // Paints
-    final cutMaskPaint = Paint()
-      ..color = palette.background
-      ..style = PaintingStyle.fill;
-
     final frameStrokePaint = Paint()
       ..color = isSelected
           ? const Color(0xFF00E5FF)
@@ -412,7 +408,9 @@ class ArchitectDoor {
         pLeftBase.dy + n.dy * (halfThick + 0.002),
       )
       ..close();
-    if (!wallGeometryProvided) canvas.drawPath(openingPath, cutMaskPaint);
+    if (!wallGeometryProvided) {
+      architectDrawKnockout(canvas, openingPath, palette.background);
+    }
 
     // 2. Wall jamb cut lines (Линии на зида при светлия отвор)
     if (!wallGeometryProvided) {

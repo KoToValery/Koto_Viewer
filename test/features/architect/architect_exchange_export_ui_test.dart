@@ -128,7 +128,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('architect-sheet-more')));
+    await tester.tap(find.byKey(const ValueKey('architect-sheet-export')));
     await tester.pumpAndSettle();
     expect(
       tester

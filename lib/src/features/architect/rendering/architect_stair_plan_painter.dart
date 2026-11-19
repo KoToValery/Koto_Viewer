@@ -239,20 +239,25 @@ class ArchitectStairPlanPainter {
             : other.$1 + other.$2 - a - b;
         direction = delta / delta.distance;
       }
-      for (final shift in [-spacing, spacing]) {
-        final centre = direction * (shiftIntoFlight + shift * symbolScale);
-        final slope = direction * (oblique * symbolScale);
-        final start = a + centre - slope, end = b + centre + slope;
+      final slope = direction * (oblique * symbolScale);
+      final center = direction * shiftIntoFlight;
+      final start = a + center - slope, end = b + center + slope;
+      final halfGap = direction * (spacing * symbolScale);
+      final maskEdge = halfGap + direction * (2 * symbolScale / scale);
+      architectDrawKnockout(
+        canvas,
+        Path()..addPolygon([
+          start - maskEdge,
+          end - maskEdge,
+          end + maskEdge,
+          start + maskEdge,
+        ], true),
+        background,
+      );
+      for (final shift in [-halfGap, halfGap]) {
         canvas.drawLine(
-          start,
-          end,
-          Paint()
-            ..color = background
-            ..strokeWidth = 4 * symbolScale / scale,
-        );
-        canvas.drawLine(
-          start,
-          end,
+          start + shift,
+          end + shift,
           stroke..strokeWidth = 1.5 * symbolScale / scale,
         );
       }

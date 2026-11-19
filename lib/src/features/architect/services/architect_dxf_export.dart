@@ -321,9 +321,17 @@ String _layer(String role) => switch (role.toLowerCase()) {
   _ => 'A-${role.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_').toUpperCase()}',
 };
 
-int _color(Color c) {
+int? _color(Color c, {required bool fill}) {
   int channel(double v) => (v * 255).round().clamp(0, 255);
-  return (channel(c.r) << 16) | (channel(c.g) << 8) | channel(c.b);
+  final r = channel(c.r), g = channel(c.g), b = channel(c.b);
+  final brightest = math.max(r, math.max(g, b));
+  final darkest = math.min(r, math.min(g, b));
+  // Use AutoCAD's background-aware ink for black and near-black linework.
+  if (brightest == 0 ||
+      (!fill && brightest <= 0x60 && brightest - darkest <= 0x20)) {
+    return null;
+  }
+  return (r << 16) | (g << 8) | b;
 }
 
 Future<List<Map<String, Object?>>> _prepare(
@@ -338,6 +346,41 @@ Future<List<Map<String, Object?>>> _prepare(
   _Pattern? lastPattern;
   var lastPatternIndex = -2;
   final clipContours = Map<Path, List<_Contour>>.identity();
+  final knockouts = <(int, Path, Rect)>[];
+  final clippedByKnockouts = Map<Path, (int, Path)>.identity();
+  var passedKnockouts = 0;
+  for (final (index, op) in scene.operations.indexed) {
+    if (op is ArchitectVectorPath && op.knockout) {
+      final path = op.clip == null
+          ? op.path
+          : Path.combine(PathOperation.intersect, op.path, op.clip!);
+      final bounds = path.getBounds();
+      if (!bounds.isEmpty) knockouts.add((index, path, bounds));
+    }
+  }
+
+  Path? effectiveClip(ArchitectVectorOp op) {
+    final original = op.clip;
+    if (passedKnockouts == knockouts.length) return original;
+    final cached = clippedByKnockouts[original];
+    if (cached != null && cached.$1 == passedKnockouts) return cached.$2;
+    final bounds = (original?.getBounds() ?? op.bounds).inflate(.001);
+    var clip = original;
+    for (var i = passedKnockouts; i < knockouts.length; i++) {
+      final (_, path, area) = knockouts[i];
+      if (!area.overlaps(bounds)) continue;
+      clip = Path.combine(
+        PathOperation.difference,
+        clip ?? (Path()..addRect(bounds)),
+        path,
+      );
+    }
+    if (original != null) {
+      clippedByKnockouts[original] = (passedKnockouts, clip!);
+    }
+    return clip;
+  }
+
   List<_Contour> mask(Path clip) =>
       clipContours.putIfAbsent(clip, () => _flatten(clip));
   List<double> point(Offset p) => [p.dx * factor, yOrigin - p.dy * factor];
@@ -347,7 +390,7 @@ Future<List<Map<String, Object?>>> _prepare(
     double weight,
   ) => {
     'layer': _layer(op.role),
-    'color': _color(color),
+    'color': _color(color, fill: op is ArchitectVectorPath && op.fill),
     'opacity': color.a,
     'weight': weight,
     'sources': op.sources.toList()..sort(),
@@ -379,18 +422,30 @@ Future<List<Map<String, Object?>>> _prepare(
       await architectExportCheckpoint(0, isCancelled: isCancelled);
     }
     final op = scene.operations[index];
+    if (op is ArchitectVectorPath && op.knockout) {
+      if (passedKnockouts < knockouts.length &&
+          knockouts[passedKnockouts].$1 == index) {
+        passedKnockouts++;
+      }
+      continue;
+    }
+    final clip = effectiveClip(op);
+    if (clip?.getBounds().isEmpty == true) continue;
     if (op is ArchitectVectorText) {
       // Noto Sans hhea ascent 1069 and OS/2 cap height 714 per 1000 em.
       // The publisher anchors the font box; MTEXT top attachment anchors the
       // capital top. Preserve the baseline after converting that convention.
       final capOffset = op.size * (1.069 - ArchitectDrawingScale.fontCapRatio);
       final textAt =
-          op.position +
-          Offset(-math.sin(op.rotation), math.cos(op.rotation)) * capOffset;
+          op.cadCenter ??
+          (op.position +
+              Offset(-math.sin(op.rotation), math.cos(op.rotation)) *
+                  capOffset);
       final data = <String, Object?>{
         'type': 'text',
         ...style(op, op.color, .18),
         'at': point(textAt),
+        if (op.cadCenter != null) 'attachment': 5, // MTEXT middle center.
         'height': op.size * ArchitectDrawingScale.fontCapRatio * factor,
         // The publisher already resolved line breaks and alignment. Width 0
         // is CAD's unrestricted reference width, preventing a second wrap.
@@ -408,16 +463,16 @@ Future<List<Map<String, Object?>>> _prepare(
                   ? 'KOTO_ITALIC'
                   : 'KOTO_REGULAR'),
       };
-      if (op.clip != null) {
+      if (clip != null) {
         final bounds = op.bounds;
-        if (!op.clip!.getBounds().overlaps(bounds)) continue;
+        if (!clip.getBounds().overlaps(bounds)) continue;
         // Preserve real text inside native clipped blocks, never bitmap glyphs.
-        final contours = mask(op.clip!).where((c) => c.closed).toList();
+        final contours = mask(clip).where((c) => c.closed).toList();
         if (contours.length == 1) {
           data['clipPolygons'] = [contours.single.points.map(point).toList()];
         } else {
           final mesh = ArchitectPathSolid.extrude(
-            op.clip!,
+            clip,
             0,
             1,
             const Color(0xff000000),
@@ -438,10 +493,17 @@ Future<List<Map<String, Object?>>> _prepare(
       result.add(data);
     } else if (op is ArchitectVectorPath) {
       if (op.color.a <= 0) continue;
-      if (op.fill) {
-        final region = op.clip == null
+      if ((clip, op.circle) case (null, (final center, final radius))) {
+        result.add({
+          'type': 'circle',
+          ...style(op, op.color, op.width),
+          'at': point(center),
+          'radius': radius * factor,
+        });
+      } else if (op.fill) {
+        final region = clip == null
             ? op.path
-            : Path.combine(PathOperation.intersect, op.path, op.clip!);
+            : Path.combine(PathOperation.intersect, op.path, clip);
         final rings = loops(region);
         if (rings.isNotEmpty) {
           result.add({
@@ -452,10 +514,13 @@ Future<List<Map<String, Object?>>> _prepare(
         }
       } else {
         final contours = _flatten(op.path);
-        if (op.clip != null && contours.every((c) => !c.closed)) {
-          final key = (op.clip!, op.color.toARGB32(), op.width, op.role);
+        if (clip != null &&
+            op.clip != null &&
+            !_clippedLineworkRoles.contains(op.role) &&
+            contours.every((c) => !c.closed)) {
+          final key = (clip, op.color.toARGB32(), op.width, op.role);
           if (lastPatternKey != key || lastPatternIndex != index - 1) {
-            lastPattern = _Pattern(op.clip!, style(op, op.color, op.width));
+            lastPattern = _Pattern(clip, style(op, op.color, op.width));
             patterns.add(lastPattern);
             result.add(lastPattern.packet);
           }
@@ -470,7 +535,7 @@ Future<List<Map<String, Object?>>> _prepare(
           }
         } else {
           for (final c in contours) {
-            if (op.clip == null) {
+            if (clip == null) {
               result.add({
                 'type': 'polyline',
                 ...style(op, op.color, op.width),
@@ -483,8 +548,8 @@ Future<List<Map<String, Object?>>> _prepare(
                 for (final (a, b) in _clipLine(
                   points[i - 1],
                   points[i],
-                  op.clip!,
-                  rings: mask(op.clip!),
+                  clip,
+                  rings: mask(clip),
                 )) {
                   result.add({
                     'type': 'polyline',
@@ -548,6 +613,8 @@ Future<List<Map<String, Object?>>> _prepare(
   result.removeWhere((packet) => packet.isEmpty);
   return result;
 }
+
+const _clippedLineworkRoles = {'openings', 'opening', 'stair', 'components'};
 
 class _Pattern {
   _Pattern(this.clip, this.style);

@@ -1018,10 +1018,6 @@ class ArchitectFenestrationStyle {
     final pRightBase = centerPos + u * halfW;
 
     // Paints
-    final openingCutPaint = Paint()
-      ..color = palette.background
-      ..style = PaintingStyle.fill;
-
     final framePaint = Paint()
       ..color = isSelected
           ? const Color(0xFF00E5FF)
@@ -1064,7 +1060,9 @@ class ArchitectFenestrationStyle {
         pLeftBase.dy + n.dy * maskHalfThick,
       )
       ..close();
-    if (!wallGeometryProvided) canvas.drawPath(openingPath, openingCutPaint);
+    if (!wallGeometryProvided) {
+      architectDrawKnockout(canvas, openingPath, palette.background);
+    }
 
     // 2. Wall jamb edges (Линии на зида при светлия отвор)
     if (!wallGeometryProvided) {

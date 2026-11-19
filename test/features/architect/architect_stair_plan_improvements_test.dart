@@ -229,16 +229,18 @@ void main() {
       );
       final paths = plan(stair, cutHeight: height, labels: false)
           .operations.whereType<ArchitectVectorPath>().toList();
-      final marks = paths.sublist(paths.length - 4);
+      final marks = paths.sublist(paths.length - 3);
       expect(marks.map((mark) => mark.color), [
         Colors.white,
         Colors.black,
-        Colors.white,
         Colors.black,
       ]);
+      expect(marks.map((mark) => mark.knockout), [true, false, false]);
       for (final mark in marks) {
         final line = mark.path.computeMetrics().single;
-        for (final distance in [0.0, line.length]) {
+        final samples = mark.knockout ? 100 : 1;
+        for (var i = 0; i <= samples; i++) {
+          final distance = line.length * i / samples;
           final point = line.getTangentForOffset(distance)!.position;
           final along = ArchitectStairGeometry.dot(
             point - flight.origin,

@@ -85,7 +85,7 @@
 | `collapsePane` | `ArchitectFenestrationStyle` | `[TAG:ARCH_STYLE_XFORM_COORDS]` | Collapses an individual division or pane back to a single leaf pane. |
 | `updatePane` | `ArchitectFenestrationStyle` | `[TAG:ARCH_STYLE_XFORM_COORDS]` | Updates a specific pane with new properties. |
 | `getPaneRect` | `ArchitectFenestrationStyle` | `[TAG:ARCH_STYLE_XFORM_COORDS]` | Gets the metric rect for a given pane ID. |
-| `paintPlan2D` | `ArchitectFenestrationStyle` | `[TAG:ARCH_STYLE_PAINT_PLAN2]` | Draws the horizontal 2D architectural CAD plan cut of the window/door in th |
+| `paintPlan2D` | `ArchitectFenestrationStyle` | `[TAG:ARCH_STYLE_PAINT_PLAN2]` | Draws plan frames and jambs. For openings without supplied wall geometry, it records a paper knockout that clips geometry in CAD export. |
 | `paintElevation2D` | `ArchitectFenestrationStyle` | `[TAG:ARCH_STYLE_PAINT_PLAN2]` | Draws the interactive 2D facade elevation in the editor workspace. |
 | `_renderSubdivisionElevation` | `ArchitectFenestrationStyle` | `[TAG:ARCH_STYLE_PAINT_RENDER]` | void _renderSubdivisionElevation( |
 | `_drawElevationDimensions` | `ArchitectFenestrationStyle` | `[TAG:ARCH_STYLE_DIMS_ANNOT]` | void _drawElevationDimensions(Canvas canvas, Offset origin, double scale) |

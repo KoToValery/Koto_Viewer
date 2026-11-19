@@ -6,8 +6,12 @@ import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
+import 'package:kotoview/src/features/architect/models/architect_door.dart';
+import 'package:kotoview/src/features/architect/models/architect_elements.dart';
+import 'package:kotoview/src/features/architect/models/architect_grid_axis.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
+import 'package:kotoview/src/features/architect/models/architect_window.dart';
 import 'package:kotoview/src/features/architect/models/architect_zone.dart';
 import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/models/architect_elevation.dart';
@@ -153,6 +157,104 @@ void main() {
         );
         await _artifact('source_${unit.name}.dxf', bytes);
       }
+    },
+  );
+
+  test(
+    'plan exports holes and centered grid bubbles as CAD linework',
+    () async {
+      final project = _fixture()
+          .copyWith(
+            sections: const [],
+            elevations: const [],
+            gridAxes: const [
+              StructuralGridAxis(
+                id: 'axis',
+                name: 'Б2',
+                start: Offset(0, -2),
+                end: Offset(6, -2),
+              ),
+            ],
+          )
+          .updateActiveStorey(
+            const ArchitectStorey(
+              id: 's',
+              name: 'Етаж 1',
+              walls: [
+                ArchitectWall(
+                  id: 'w',
+                  startPoint: Offset.zero,
+                  endPoint: Offset(6, 0),
+                  doors: [
+                    ArchitectDoor(
+                      id: 'door',
+                      wallId: 'w',
+                      offsetRatio: .25,
+                      uuid: 'd',
+                    ),
+                  ],
+                  windows: [
+                    ArchitectWindow(
+                      id: 'window',
+                      wallId: 'w',
+                      offsetRatio: .75,
+                      uuid: 'w',
+                    ),
+                  ],
+                ),
+              ],
+              stairs: [
+                ArchitectStair(
+                  id: 'stair',
+                  startPoint: Offset(8, 2),
+                  endPoint: Offset(12, 2),
+                  width: 1.2,
+                  design: ArchitectStairDesign(
+                    shape: StairShape.straight,
+                    showLabel: false,
+                  ),
+                ),
+              ],
+            ),
+          );
+      final bytes = (await ArchitectDxfExport.exportViews(project, [
+        _drawing,
+      ], l)).values.single;
+      final records = _records(bytes);
+      final grid = records.where((r) => _tag(r, 8) == 'A-GRID');
+      final circles = grid.where((r) => _tag(r, 0) == 'CIRCLE').toList();
+      expect(circles, hasLength(2));
+      final labels = grid.where((r) => _tag(r, 0) == 'MTEXT').toList();
+      expect(labels, hasLength(2));
+      for (var i = 0; i < circles.length; i++) {
+        expect(_tag(labels[i], 1), 'Б2');
+        expect(_tag(labels[i], 71), '5');
+        expect(_tag(labels[i], 10), _tag(circles[i], 10));
+        expect(_tag(labels[i], 20), _tag(circles[i], 20));
+      }
+      final hatches = _entities(bytes, 'HATCH');
+      expect(hatches, isNotEmpty);
+      expect(hatches.any((r) => _tag(r, 2) == 'SOLID'), isFalse);
+      expect(
+        _entities(bytes, 'LWPOLYLINE').where((r) => _tag(r, 8) == 'A-STAIR'),
+        isNotEmpty,
+      );
+      final wallOutlines = _entities(
+        bytes,
+        'LWPOLYLINE',
+      ).where((r) => _tag(r, 8) == 'A-WALL');
+      expect(wallOutlines, isNotEmpty);
+      for (final outline in wallOutlines) {
+        expect(_tag(outline, 62), '7');
+        expect(_tag(outline, 420), isNull);
+        final xs = outline
+            .where((p) => p.$1 == 10)
+            .map((p) => double.parse(p.$2));
+        for (final gap in [1.5, 4.5]) {
+          expect(xs.any((x) => x < gap) && xs.any((x) => x > gap), isFalse);
+        }
+      }
+      await _artifact('clean_plan.dxf', bytes);
     },
   );
 

@@ -30,19 +30,20 @@ void drawArchitectElevationMarkers(
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    canvas.drawRect(
-      Rect.fromLTWH(
-        point.dx - text.width / 2 - 1 / scale,
-        point.dy - .5 / scale,
-        text.width + 2 / scale,
-        text.height + 1 / scale,
+    architectDrawKnockout(
+      canvas,
+      Path()..addRect(
+        Rect.fromLTWH(
+          point.dx - text.width / 2 - 1 / scale,
+          point.dy - .5 / scale,
+          text.width + 2 / scale,
+          text.height + 1 / scale,
+        ),
       ),
-      Paint()
-        ..color =
-            ((ink ?? color).computeLuminance() > .5
-                    ? const Color(0xff14171a)
-                    : Colors.white)
-                .withValues(alpha: .9),
+      ((ink ?? color).computeLuminance() > .5
+              ? const Color(0xff14171a)
+              : Colors.white)
+          .withValues(alpha: .9),
     );
     text.paint(canvas, point - Offset(text.width / 2, 0));
   }

@@ -7,8 +7,10 @@
 
 ## 1. How to use this map
 
-DWG views/sheets use `exchange` and `ArchitectExchangeExportDialog`, following
-the existing DXF selection, progress, cancellation and save/ZIP flow.
+The export toolbar menu in `[TAG:ARCH_SHEETS_BUILD_LAYOUT]` opens `output` for
+PDF and `exchange` for DWG, DXF and IFC. The CAD options use the view or sheet
+selection in `ArchitectExchangeExportDialog`, followed by progress, cancellation
+and save/ZIP handling.
 `ArchitectDwgExport` reuses the vector publication snapshot and sends its CAD
 stream to `DwgExportService` for native DWG encoding; no project mutation or
 viewport/gesture routing change is involved.

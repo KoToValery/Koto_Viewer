@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import '../models/architect_floor_drain.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
+import 'architect_vector_scene.dart';
 import '../services/architect_floor_drain_geometry.dart';
 import 'architect_canvas_palette.dart';
 
@@ -155,7 +156,11 @@ class ArchitectFloorDrainPainterHelper {
       ..color = line
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.5 / zoomScale;
-    canvas.drawCircle(c, r, Paint()..color = Colors.white);
+    architectDrawKnockout(
+      canvas,
+      Path()..addOval(Rect.fromCircle(center: c, radius: r)),
+      paper,
+    );
     canvas.drawCircle(c, r, stroke);
     canvas.drawCircle(c, r * .62, hair);
     // Eight radial slots of the grate between the rings.
@@ -167,7 +172,11 @@ class ArchitectFloorDrainPainterHelper {
     // Outlet: quartered centre.
     canvas.drawLine(c - Offset(r * .62, 0), c + Offset(r * .62, 0), hair);
     canvas.drawLine(c - Offset(0, r * .62), c + Offset(0, r * .62), hair);
-    canvas.drawCircle(c, r * .16, Paint()..color = Colors.white);
+    architectDrawKnockout(
+      canvas,
+      Path()..addOval(Rect.fromCircle(center: c, radius: r * .16)),
+      paper,
+    );
     canvas.drawCircle(c, r * .16, hair);
   }
 
@@ -196,7 +205,7 @@ class ArchitectFloorDrainPainterHelper {
       width: drain.size,
       height: drain.width,
     );
-    canvas.drawRect(outer, Paint()..color = Colors.white);
+    architectDrawKnockout(canvas, Path()..addRect(outer), paper);
     canvas.drawRect(outer, stroke);
     final inset = drain.width * .2;
     canvas.drawRect(outer.deflate(inset), hair);
@@ -213,7 +222,11 @@ class ArchitectFloorDrainPainterHelper {
     }
     // Outlet in the middle of the channel.
     final outlet = drain.width * .26;
-    canvas.drawCircle(Offset.zero, outlet, Paint()..color = Colors.white);
+    architectDrawKnockout(
+      canvas,
+      Path()..addOval(Rect.fromCircle(center: Offset.zero, radius: outlet)),
+      paper,
+    );
     canvas.drawCircle(Offset.zero, outlet, hair);
     canvas.drawLine(Offset(-outlet, 0), Offset(outlet, 0), hair);
     canvas.drawLine(Offset(0, -outlet), Offset(0, outlet), hair);

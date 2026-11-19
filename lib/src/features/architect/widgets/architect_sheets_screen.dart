@@ -835,11 +835,71 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                   : () => sheetProperties(create: true),
               icon: const AppIcon(AppIconId.add),
             ),
-            IconButton(
+            PopupMenuButton<String>(
               key: const ValueKey('architect-sheet-export'),
-              tooltip: l.architectSheetExport,
-              onPressed: busy || editing || s == null ? null : output,
-              icon: const AppIcon(AppIconId.pdf),
+              tooltip: l.architectExportTitle,
+              enabled: !busy && !editing,
+              icon: const AppIcon(AppIconId.download),
+              onSelected: (value) {
+                if (value == 'pdf') {
+                  output();
+                } else {
+                  exchange(ArchitectExchangeFormat.values.byName(value));
+                }
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'pdf',
+                  enabled: s != null,
+                  key: const ValueKey('architect-sheet-export-pdf'),
+                  child: AppMenuLabel(
+                    icon: AppIconId.pdf,
+                    child: Text(l.architectSheetExport),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'dwgViews',
+                  key: const ValueKey('architect-sheet-export-dwg-views'),
+                  child: AppMenuLabel(
+                    icon: AppIconId.file,
+                    child: Text(l.architectExportDwgViews),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'dwgSheets',
+                  enabled: s != null,
+                  key: const ValueKey('architect-sheet-export-dwg-sheets'),
+                  child: AppMenuLabel(
+                    icon: AppIconId.layoutGrid,
+                    child: Text(l.architectExportDwgSheets),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'dxfViews',
+                  key: const ValueKey('architect-sheet-export-dxf-views'),
+                  child: AppMenuLabel(
+                    icon: AppIconId.file,
+                    child: Text(l.architectExportDxfViews),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'dxfSheets',
+                  enabled: s != null,
+                  key: const ValueKey('architect-sheet-export-dxf-sheets'),
+                  child: AppMenuLabel(
+                    icon: AppIconId.layoutGrid,
+                    child: Text(l.architectExportDxfSheets),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'ifc',
+                  key: const ValueKey('architect-sheet-export-ifc'),
+                  child: AppMenuLabel(
+                    icon: AppIconId.building,
+                    child: Text(l.architectExportIfc),
+                  ),
+                ),
+              ],
             ),
             IconButton(
               key: const ValueKey('architect-sheets-fonts'),
@@ -857,16 +917,8 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
               key: const ValueKey('architect-sheet-more'),
               enabled: !busy && !editing,
               onSelected: (v) {
-                if (v == 'dxfViews') exchange(ArchitectExchangeFormat.dxfViews);
-                if (v == 'dwgViews') exchange(ArchitectExchangeFormat.dwgViews);
-                if (v == 'dwgSheets') exchange(ArchitectExchangeFormat.dwgSheets);
-                if (v == 'dxfSheets') {
-                  exchange(ArchitectExchangeFormat.dxfSheets);
-                }
-                if (v == 'ifc') exchange(ArchitectExchangeFormat.ifc);
                 if (v == 'properties') sheetProperties();
                 if (v == 'template') template();
-                if (v == 'pdf') output();
                 if (v == 'print') output(print: true);
                 if (v == 'delete') {
                   commit(
@@ -900,14 +952,6 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                   ),
                 ),
                 PopupMenuItem(
-                  value: 'pdf',
-                  enabled: s != null,
-                  child: AppMenuLabel(
-                    icon: AppIconId.pdf,
-                    child: Text(l.architectSheetExport),
-                  ),
-                ),
-                PopupMenuItem(
                   value: 'print',
                   enabled: s != null,
                   child: AppMenuLabel(
@@ -922,45 +966,6 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
                     icon: AppIconId.delete,
                     child: Text(l.architectSheetDelete),
                   ),
-                ),
-                const PopupMenuDivider(),
-                PopupMenuItem(
-                  value: 'dxfViews',
-                  key: const ValueKey('architect-sheet-export-dxf-views'),
-                  child: AppMenuLabel(
-                    icon: AppIconId.file,
-                    child: Text(l.architectExportDxfViews),
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'dxfSheets',
-                  enabled: s != null,
-                  key: const ValueKey('architect-sheet-export-dxf-sheets'),
-                  child: AppMenuLabel(
-                    icon: AppIconId.layoutGrid,
-                    child: Text(l.architectExportDxfSheets),
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'ifc',
-                  key: const ValueKey('architect-sheet-export-ifc'),
-                  child: AppMenuLabel(
-                    icon: AppIconId.building,
-                    child: Text(l.architectExportIfc),
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'dwgViews',
-                  key: const ValueKey('architect-sheet-export-dwg-views'),
-                  child: AppMenuLabel(icon: AppIconId.file,
-                    child: Text(l.architectExportDwgViews)),
-                ),
-                PopupMenuItem(
-                  value: 'dwgSheets',
-                  enabled: s != null,
-                  key: const ValueKey('architect-sheet-export-dwg-sheets'),
-                  child: AppMenuLabel(icon: AppIconId.layoutGrid,
-                    child: Text(l.architectExportDwgSheets)),
                 ),
               ],
             ),

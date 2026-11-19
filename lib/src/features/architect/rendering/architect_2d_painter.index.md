@@ -42,7 +42,7 @@
 | `_drawNewPointPreview`, `_drawPolygonEditing`, `_drawZones` | `[TAG:ARCH_PAINTER_WALL_OPS]` | Polygon edit handles and zone fills |
 | `_drawZoneSchedule`, `_drawZoneDrafting`, `_drawZoneExtrudePreview` | `[TAG:ARCH_PAINTER_GRID_AXES]` | Zone schedule table and zone drafting previews |
 | `_drawDraftingGrid`, `_drawGridAxes` | `[TAG:ARCH_PAINTER_GRID_AXES]` | Background drafting grid and axis lines/bubbles |
-| `_drawWalls`, `_drawWallLayers` | `[TAG:ARCH_PAINTER_DRAW_WALLS]` | Wall geometry and multi-layer composition fills |
+| `_drawWalls`, `_drawWallLayers` | `[TAG:ARCH_PAINTER_DRAW_WALLS]` | Wall geometry and material hatches. Midpoint handles are workspace-only; fenestration painters record opening masks for CAD clipping. |
 | `_drawActiveDrafting`, `_drawDraftMarker`, `_drawDashedLine` | `[TAG:ARCH_PAINTER_DRAW_ACTIVE]` | Active tool rubber-bands, snap markers, and previews |
 | `shouldRepaint` | `[TAG:ARCH_PAINTER_SHOULD_REPAINT]` | Repaint diffing across all painter inputs |
 
