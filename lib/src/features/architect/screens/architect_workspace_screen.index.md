@@ -9,8 +9,10 @@
 
 New placement follows the wall drafting archetype: `ArchitectStairPerimeterDraft`
 traces outside-edge flight/landing segments and `ArchitectStairPerimeterOverlay`
-embeds `ArchitectWallDraftingPanel` with the shared numeric keypad. Endpoint
-review offers accept/reject controls; rejection preserves prior parts. The existing
+embeds `ArchitectWallDraftingPanel` with the shared numeric keypad. A picked
+endpoint opens review and enables exact length entry. Next accepts the segment,
+X discards it, and the single Apply check publishes a complete stair once the
+riser and layout checks pass. Picking a new endpoint resets the keypad. The existing
 `StructuralPointerPainter` renders the lifted pointer; `_freeStairPoint` uses
 anchored `_snapElement` and midpoint tracking with a stable unpublished stair
 as an additional snap source. Pan/pinch restore provisional aiming through

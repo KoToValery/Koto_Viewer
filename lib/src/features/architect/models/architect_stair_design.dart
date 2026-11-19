@@ -18,7 +18,9 @@ enum StairEvacuation { unspecified, none, upTo15, from16To50, over50 }
 /// starts at the limiting inner edge / handrail projection, not a column axis.
 /// A versioned rule set is stored with each design; UI text lives in ARB.
 class ArchitectStairDesign {
-  static const currentRules = 'BG-2025.1';
+  static const currentRules = 'BG-2025.2';
+  static const _legacyRules = 'BG-2025.1';
+  static const _defaultMaxGoing = .30;
   static const spiralSlicesPerGoing = 8;
   final String rulesVersion;
   final StairShape shape;
@@ -54,6 +56,8 @@ class ArchitectStairDesign {
   final double finishThickness;
   final double nosingProjection;
   final double landingStepOffset;
+  // Retain the one-sided stagger of older drawings until the value is edited.
+  final bool _balancedLandingStepOffset;
 
   const ArchitectStairDesign({
     this.rulesVersion = currentRules,
@@ -90,8 +94,19 @@ class ArchitectStairDesign {
     this.finishThickness = .02,
     this.nosingProjection = .03,
     this.landingStepOffset = 0,
-  }) : sweepDegrees =
+    bool balancedLandingStepOffset = true,
+  }) : _balancedLandingStepOffset = balancedLandingStepOffset,
+       sweepDegrees =
            sweepDegrees ?? (shape == StairShape.spiralOverlap ? 375 : 270);
+
+  /// Distance from the preset's plan datum to its actual first riser.
+  double get entryShift =>
+      layout == null &&
+          shape == StairShape.halfTurn &&
+          !hasWinders &&
+          _balancedLandingStepOffset
+      ? landingStepOffset
+      : 0;
 
   double wellGap(double flightWidth) =>
       totalWidth == null ? .1 : math.max(0.0, totalWidth! - 2 * flightWidth);
@@ -118,6 +133,7 @@ class ArchitectStairDesign {
     final parity = cornerRiser ? 0 : 1;
     var count = manualWinderSteps ?? (cornerRiser ? 2 : 3);
     if (manualWinderSteps == null) {
+      final maxGoing = math.max(_automaticMaxGoing, going);
       for (var n = count; n <= maximum; n += 2) {
         count = n;
         final factor = 2 * math.sin(math.pi / (4 * n));
@@ -127,7 +143,7 @@ class ArchitectStairDesign {
               .05 / factor,
               math.max(going / factor - width / 2, .23 / factor - .30),
             );
-        if ((radius + width / 2) * factor <= math.max(.35, going) + 1e-9) break;
+        if ((radius + width / 2) * factor <= maxGoing + 1e-9) break;
       }
     }
     // Invalid manual counts are rejected by validate; automatic counts always
@@ -205,13 +221,20 @@ class ArchitectStairDesign {
   static double roundGoing(double value) =>
       (value * 1000).roundToDouble() / 1000.0;
 
+  double get _automaticMaxGoing =>
+      rulesVersion == _legacyRules ? .35 : _defaultMaxGoing;
+
   double get riser => rise / risers;
   double get going =>
       manualGoing ??
       roundGoing(
         (.63 - 2 * riser).clamp(
-          accessible && use == StairUse.outdoorRoute ? .32 : .28,
-          .35,
+          rulesVersion == _legacyRules &&
+                  accessible &&
+                  use == StairUse.outdoorRoute
+              ? .32
+              : .28,
+          _automaticMaxGoing,
         ),
       );
   double get maximumFlightRise =>
@@ -398,6 +421,8 @@ class ArchitectStairDesign {
     finishThickness: finishThickness ?? this.finishThickness,
     nosingProjection: nosingProjection ?? this.nosingProjection,
     landingStepOffset: landingStepOffset ?? this.landingStepOffset,
+    balancedLandingStepOffset:
+        _balancedLandingStepOffset || landingStepOffset != null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -435,6 +460,8 @@ class ArchitectStairDesign {
     'finishThickness': finishThickness,
     'nosingProjection': nosingProjection,
     if (landingStepOffset != 0) 'landingStepOffset': landingStepOffset,
+    if (landingStepOffset != 0 && _balancedLandingStepOffset)
+      'balancedLandingStepOffset': true,
   };
   factory ArchitectStairDesign.fromJson(Map<String, dynamic> json) {
     T readEnum<T extends Enum>(List<T> values, String key, T fallback) =>
@@ -445,7 +472,7 @@ class ArchitectStairDesign {
           : ArchitectStairLayout.fromJson(
               Map<String, dynamic>.from(json['layout'] as Map),
             ),
-      rulesVersion: json['rulesVersion'] as String? ?? currentRules,
+      rulesVersion: json['rulesVersion'] as String? ?? _legacyRules,
       shape: readEnum(StairShape.values, 'shape', StairShape.halfTurn),
       code: readEnum(StairCode.values, 'code', StairCode.bulgaria),
       use: readEnum(StairUse.values, 'use', StairUse.common),
@@ -487,6 +514,9 @@ class ArchitectStairDesign {
       nosingProjection: (json['nosingProjection'] as num?)?.toDouble() ?? .03,
       landingStepOffset:
           (json['landingStepOffset'] as num?)?.toDouble() ?? 0,
+      balancedLandingStepOffset:
+          json['balancedLandingStepOffset'] as bool? ??
+          (json['landingStepOffset'] as num? ?? 0) == 0,
     );
     result.validate();
     return result;
@@ -673,7 +703,7 @@ class ArchitectStairPlan {
           world(radial(mid, symbolSweep * i / count)),
       ]);
     } else {
-      var origin = Offset.zero, axis = const Offset(1, 0);
+      var origin = Offset(design.entryShift, 0), axis = const Offset(1, 0);
       final flights = design.flightRisers;
       final d = math.max(width, design.landingDepth);
       var climbed = 0;
@@ -743,7 +773,7 @@ class ArchitectStairPlan {
           // A 10 cm clear well separates the two return flights unless a custom total width is set.
           final well = design.wellGap(width);
           final side = f.isEven ? normal : -normal;
-          final s = design.landingStepOffset;
+          final s = design.landingStepOffset + design.entryShift;
           if (s <= 1e-6) {
             landing([
               end - side * width / 2,

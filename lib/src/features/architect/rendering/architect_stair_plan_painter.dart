@@ -210,38 +210,51 @@ class ArchitectStairPlanPainter {
         }
       }
     }
-    if (cut.crossing != null) {
+    if (cut.crossingIndex case final index?) {
       final (a, b) = cut.crossing!;
-      final index = (((cutHeight ?? 0) - d!.startOffset) / d.riser)
-          .floor()
-          .clamp(0, d.risers - 1);
+      const spacing = .045;
+      var oblique = math.min(.28, stair.width * .22);
       Offset direction;
+      var shiftIntoFlight = 0.0;
+      var symbolScale = 1.0;
       if (geometry.flights.isNotEmpty) {
-        direction = geometry.flights
-            .firstWhere(
-              (f) => index >= f.firstRiser && index < f.firstRiser + f.count,
-            )
-            .axis;
+        final flight = geometry.flights.firstWhere(
+          (f) => index >= f.firstRiser && index < f.firstRiser + f.count,
+        );
+        direction = flight.axis;
+        oblique = math.min(.28, flight.width * .22);
+        // Shift the symbol away from the landing, including its paper mask.
+        // The actual cut, and therefore which treads are dashed, stays put.
+        final extent = oblique + spacing + 2 / scale;
+        symbolScale = math.min(1.0, flight.run / (2 * extent));
+        final inset = extent * symbolScale;
+        final along = (index - flight.firstRiser) * flight.going;
+        shiftIntoFlight =
+            along.clamp(inset, math.max(inset, flight.run - inset)) - along;
       } else {
-        final other =
-            plan.nosings[index == d.risers - 1 ? index - 1 : index + 1];
-        final delta = index == d.risers - 1
+        final last = index == plan.nosings.length - 1;
+        final other = plan.nosings[last ? index - 1 : index + 1];
+        final delta = last
             ? a + b - other.$1 - other.$2
             : other.$1 + other.$2 - a - b;
         direction = delta / delta.distance;
       }
-      for (final shift in [-.045, .045]) {
-        final oblique = math.min(.28, stair.width * .22);
-        final start = a + direction * (shift - oblique),
-            end = b + direction * (shift + oblique);
+      for (final shift in [-spacing, spacing]) {
+        final centre = direction * (shiftIntoFlight + shift * symbolScale);
+        final slope = direction * (oblique * symbolScale);
+        final start = a + centre - slope, end = b + centre + slope;
         canvas.drawLine(
           start,
           end,
           Paint()
             ..color = background
-            ..strokeWidth = 4 / scale,
+            ..strokeWidth = 4 * symbolScale / scale,
         );
-        canvas.drawLine(start, end, stroke..strokeWidth = 1.5 / scale);
+        canvas.drawLine(
+          start,
+          end,
+          stroke..strokeWidth = 1.5 * symbolScale / scale,
+        );
       }
     }
     if (labels && d != null) {
@@ -279,8 +292,7 @@ class ArchitectStairPlanPainter {
       ..color = color
       ..strokeWidth = .8 / scale
       ..style = PaintingStyle.stroke;
-    for (var i = 0; i < geometry.landings.length; i++) {
-      final landing = geometry.landings[i];
+    for (final landing in geometry.landings) {
       final elevation =
           (storey?.elevation ?? 0) +
           stair.design!.startOffset +
@@ -307,23 +319,11 @@ class ArchitectStairPlanPainter {
       final centre =
           landing.polygon.reduce((a, b) => a + b) /
           landing.polygon.length.toDouble();
-      final flight = geometry.flights[i];
-      var angle = math.atan2(flight.axis.dy, flight.axis.dx);
-      if (angle > math.pi / 2) angle -= math.pi;
-      if (angle < -math.pi / 2) angle += math.pi;
       // Fit the complete unmasked symbol inside the landing, including long
       // elevations in centimetres and larger publication text settings.
-      final axis = Offset(math.cos(angle), math.sin(angle));
-      final normal = Offset(-axis.dy, axis.dx);
-      final local =
-          (Path()..addPolygon([
-                for (final p in landing.polygon)
-                  Offset(
-                    ArchitectStairGeometry.dot(p - centre, axis),
-                    ArchitectStairGeometry.dot(p - centre, normal),
-                  ),
-              ], true))
-              .getBounds();
+      final local = (Path()..addPolygon(landing.polygon, true))
+          .getBounds()
+          .shift(-centre);
       final textHeight = text.height * modelScale;
       final content = Rect.fromLTRB(
         -size * 1.4,
@@ -346,7 +346,6 @@ class ArchitectStairPlanPainter {
       );
       canvas.save();
       canvas.translate(centre.dx, centre.dy);
-      canvas.rotate(angle);
       canvas.translate(-content.center.dx * fit, -up);
       canvas.scale(fit);
       canvas.drawCircle(Offset.zero, size, paint);

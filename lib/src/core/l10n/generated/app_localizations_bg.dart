@@ -16,6 +16,12 @@ class AppLocalizationsBg extends AppLocalizations {
       'Посочи външния ръб. Избери рамо или площадка.';
 
   @override
+  String get stairPerimeterPickEndpoint => 'Посочи края на сегмента.';
+
+  @override
+  String get stairRejectSegment => 'Отхвърли сегмента';
+
+  @override
   String get stairCustom => 'Свободна';
 
   @override
@@ -13365,11 +13371,23 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
-  String get stairLandingOffset => 'Разминаване при площадката';
+  String get stairLandingOffset => 'Отместване на рамо';
 
   @override
   String get stairLandingOffsetHelp =>
-      'Отмества първото чело на следващото рамо от ръба на площадката за по-плавен парапет и чиста долна плоча.';
+      'При П-образно стълбище всяко рамо се измества със зададеното разстояние в противоположна посока. Разминаването между рамената е двойно.';
+
+  @override
+  String get stairManualLandingOffset => 'Разминаване при площадката';
+
+  @override
+  String get stairManualLandingOffsetHelp =>
+      'Мести следващото рамо по оста му и запазва размерите на стъпалата. При нула двете рамена се подравняват при площадката.';
+
+  @override
+  String stairNumberedLandingOffset(int number) {
+    return 'Разминаване при площадка $number';
+  }
 
   @override
   String stairTargetRisersProgress(int drawn, int target) {
@@ -13390,7 +13408,7 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
-  String get stairQuickLandingOffset => 'Отстояние';
+  String get stairQuickLandingOffset => 'Отместване';
 
   @override
   String get architectExportDwgViews => 'DWG чертежи';

@@ -124,6 +124,19 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
     context,
   ).showSnackBar(SnackBar(content: Text(context.l10n.stairUnsupported)));
 
+  void _setReturnStagger(int landingIndex, double distance) {
+    try {
+      final next = ArchitectStairLayoutResolver.setReturnStagger(
+        stair,
+        landingIndex,
+        distance,
+      );
+      setState(() => stair = next);
+    } on ArgumentError {
+      invalid();
+    }
+  }
+
   String length(double value) => widget.project.formatLength(value);
   Future<void> edit(
     String key,
@@ -762,6 +775,25 @@ class _StairPropertiesState extends State<ArchitectStairPropertiesDialog> {
                                 : 3,
                           ),
                         ),
+                      if (d.layout case final layout?)
+                        for (var i = 0; i < layout.landings.length; i++)
+                          if (ArchitectStairLayoutResolver.returnStagger(d, i)
+                              case final stagger?)
+                            Tooltip(
+                              message: l.stairManualLandingOffsetHelp,
+                              child: number(
+                                'landing-offset-$i',
+                                layout.landings.length == 1
+                                    ? l.stairManualLandingOffset
+                                    : l.stairNumberedLandingOffset(i + 1),
+                                stagger,
+                                (v) => _setReturnStagger(i, v),
+                                minimum: -100,
+                                maxDecimals: unit == ArchitectUnit.centimeters
+                                    ? 1
+                                    : 3,
+                              ),
+                            ),
                     ] else ...[
                       number(
                         'radius',

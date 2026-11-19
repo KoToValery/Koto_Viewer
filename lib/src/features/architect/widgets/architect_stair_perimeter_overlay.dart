@@ -31,7 +31,8 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final preview = draft.preview;
+    final candidate = draft.reviewing ? draft.preview : draft.committedPreview;
+    final preview = candidate ?? draft.preview;
     final issues = preview == null
         ? []
         : ArchitectStairLayoutResolver.check(preview.design!);
@@ -42,26 +43,25 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
             project: project,
             storey: project.activeStorey,
           );
-    final allowed =
-        preview != null &&
+    final canContinue = draft.canAcceptPart;
+    final riser = preview?.design?.riser;
+    final riserWarning =
+        riser != null && ArchitectStairRules.isRiserOutOfRange(riser);
+    final hint = draft.anchor == null
+        ? l.stairPerimeterHint
+        : draft.reviewing
+        ? l.bimExactDistanceInputHelp
+        : l.stairPerimeterPickEndpoint;
+    final canFinish =
+        candidate != null &&
+        (!draft.reviewing ||
+            (draft.part == StairPerimeterPart.flight && canContinue)) &&
+        !riserWarning &&
         issues.isEmpty &&
-        (preview.design!.isDraft ||
+        (candidate.design!.isDraft ||
             !checks.any((c) => c.state == StairCheckState.error));
-    final saved = draft.committedPreview;
-    final savedAllowed =
-        saved != null &&
-        ArchitectStairLayoutResolver.check(saved.design!).isEmpty &&
-        (saved.design!.isDraft ||
-            !ArchitectStairRules.check(
-              saved,
-              project: project,
-              storey: project.activeStorey,
-            ).any((c) => c.state == StairCheckState.error));
     void finish() {
-      if (!allowed ||
-          draft.part == StairPerimeterPart.landing && draft.length > .001)
-        return;
-      if (draft.length > .001 && !draft.acceptPart()) return;
+      if (!canFinish || (draft.reviewing && !draft.acceptPart())) return;
       if (draft.complete) onApply();
     }
 
@@ -74,44 +74,6 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
             ),
           ),
         ),
-        if (draft.reviewing && draft.target != null)
-          Positioned(
-            left: (toScreen(draft.target!).dx - 48).clamp(
-              8.0,
-              (MediaQuery.sizeOf(context).width - 112).clamp(
-                8.0,
-                double.infinity,
-              ),
-            ),
-            top: (toScreen(draft.target!).dy - 58).clamp(
-              48.0,
-              (MediaQuery.sizeOf(context).height - 180).clamp(
-                48.0,
-                double.infinity,
-              ),
-            ),
-            child: Material(
-              elevation: 3,
-              borderRadius: BorderRadius.circular(24),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    key: const ValueKey('stair-part-reject'),
-                    tooltip: l.cancel,
-                    onPressed: draft.rejectPart,
-                    icon: const Icon(Icons.close),
-                  ),
-                  IconButton(
-                    key: const ValueKey('stair-part-accept'),
-                    tooltip: l.stairSetupConfirm,
-                    onPressed: draft.acceptPart,
-                    icon: const Icon(Icons.check, color: Colors.green),
-                  ),
-                ],
-              ),
-            ),
-          ),
         Positioned(
           top: 8,
           left: 8,
@@ -134,19 +96,16 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
                               .kind,
                         )
                       : preview != null && draft.targetRisers != null
-                      ? '${l.stairTargetRisersProgress(preview.design!.risers, draft.targetRisers!)} · ${l.stairPerimeterHint}'
-                      : l.stairPerimeterHint,
+                      ? '${l.stairTargetRisersProgress(preview.design!.risers, draft.targetRisers!)} · $hint'
+                      : hint,
                 ),
-                if (preview != null &&
-                    ArchitectStairRules.isRiserOutOfRange(
-                      preview.design!.riser,
-                    )) ...[
+                if (riserWarning) ...[
                   const SizedBox(height: 4),
                   ArchitectCanvasHint(
                     key: const ValueKey('stair-perimeter-riser-warning'),
                     warning: true,
                     message:
-                        '${project.formatLength(preview.design!.riser)} · '
+                        '${project.formatLength(riser)} · '
                         '${stairRiserRangeWarningText(l)}',
                   ),
                 ],
@@ -161,6 +120,11 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
           child: Align(
             alignment: Alignment.bottomCenter,
             child: ConstrainedBox(
+              key: ValueKey((
+                draft.endpointRevision,
+                draft.part,
+                draft.reviewing,
+              )),
               constraints: const BoxConstraints(maxWidth: 344),
               child: ArchitectWallDraftingPanel(
                 key: const ValueKey('stair-perimeter-panel'),
@@ -168,12 +132,16 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
                 unit: project.units.symbol,
                 decimals: project.distanceDecimals,
                 continuePrimary: true,
-                showContinue: false,
-                minimumLength: 0,
+                canEditLength: draft.reviewing,
+                canContinue: canContinue,
+                canEnd: canFinish,
+                showDirection: false,
+                minimumLength: draft.reviewing ? project.units.toUnit(.001) : 0,
                 title: draft.part == StairPerimeterPart.flight
                     ? l.stairFlight
                     : l.stairLandingPart,
                 endLabel: l.applyAction,
+                cancelLabel: draft.reviewing ? l.stairRejectSegment : l.cancel,
                 extraControls: Row(
                   children: [
                     Expanded(
@@ -249,21 +217,13 @@ class ArchitectStairPerimeterOverlay extends StatelessWidget {
                         ),
                       ),
                     ),
-                    IconButton(
-                      key: const ValueKey('stair-draft-apply'),
-                      tooltip: l.applyAction,
-                      onPressed: savedAllowed && draft.complete
-                          ? onApply
-                          : null,
-                      icon: const Icon(Icons.check),
-                    ),
                   ],
                 ),
                 onLength: (v) => draft.setLength(project.units.fromUnit(v)),
                 onContinue: draft.acceptPart,
                 onEnd: finish,
                 onUnlock: draft.unlock,
-                onCancel: onCancel,
+                onCancel: draft.reviewing ? draft.rejectPart : onCancel,
               ),
             ),
           ),

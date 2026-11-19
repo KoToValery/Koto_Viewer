@@ -449,7 +449,8 @@ class ArchitectStair {
         : delta / delta.distance;
     final inward =
         Offset(-axis.dy, axis.dx) * (design?.turnLeft == true ? -1 : 1);
-    final start = corner + inward * (width / 2);
+    final start =
+        corner + inward * (width / 2) - axis * (design?.entryShift ?? 0);
     return ArchitectStair(
       id: id,
       startPoint: start,
@@ -461,7 +462,8 @@ class ArchitectStair {
   }
 
   Offset get placementCorner =>
-      startPoint -
+      startPoint +
+      unitVector * (design?.entryShift ?? 0) -
       normalVector * (width / 2) * (design?.turnLeft == true ? -1 : 1);
 
   double get length => (endPoint - startPoint).distance;

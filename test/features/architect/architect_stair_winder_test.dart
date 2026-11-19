@@ -323,7 +323,7 @@ void main() {
   );
   test('winder caption reports both straight and curved going sizes', () async {
     final l = await AppLocalizations.delegate.load(const Locale('bg'));
-    final caption = stairPlanLabel(l, stair());
+    final caption = stairPlanLabel(l, stair(design.copyWith(manualWinderSteps: 5)));
     expect(caption, contains('30–'));
     expect(caption, contains('H=3,20'));
   });

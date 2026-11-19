@@ -616,6 +616,59 @@ class ArchitectStairLayoutResolver {
     );
   }
 
+  /// Slides a flight as a unit while rebuilding its landing connections.
+  static ArchitectStair translateFlight(
+    ArchitectStair stair,
+    int flightIndex,
+    Offset localShift,
+  ) {
+    if (localShift.distance < 1e-6) return stair;
+    final design = stair.design!;
+    final layout = design.layout ?? fromStair(stair);
+    final flight = layout.flights[flightIndex];
+    final updated = updateFlightWithPorts(
+      layout,
+      design.going,
+      flight,
+      flight.copyWith(origin: flight.origin + localShift),
+    );
+    final next = design.copyWith(layout: updated, manualGoing: design.going);
+    if (check(next).isNotEmpty) {
+      throw ArgumentError('Flight shift violates stair layout constraints');
+    }
+    return normalizePlacement(stair.copyWith(design: next));
+  }
+
+  /// Signed gap along a return stair's incoming axis between its two ports.
+  static double? returnStagger(ArchitectStairDesign design, int landingIndex) {
+    final layout = design.layout!;
+    final incoming = layout.flights[landingIndex];
+    final outgoing = layout.flights[landingIndex + 1];
+    if ((incoming.axis + outgoing.axis).distance > 1e-6) return null;
+    return ArchitectStairGeometry.dot(
+      incoming.end(design.going) - outgoing.origin,
+      incoming.axis,
+    );
+  }
+
+  static ArchitectStair setReturnStagger(
+    ArchitectStair stair,
+    int landingIndex,
+    double distance,
+  ) {
+    final design = stair.design!;
+    final oldDistance = returnStagger(design, landingIndex);
+    if (oldDistance == null || !distance.isFinite) {
+      throw ArgumentError('Invalid return stair stagger');
+    }
+    final outgoing = design.layout!.flights[landingIndex + 1];
+    return translateFlight(
+      stair,
+      landingIndex + 1,
+      outgoing.axis * (distance - oldDistance),
+    );
+  }
+
   /// Updates all flight widths in [layout] uniformly and keeps landing ports &
   /// side edges orthogonal.
   static ArchitectStairLayout resizeFlightWidths(

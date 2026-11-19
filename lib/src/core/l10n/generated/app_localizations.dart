@@ -110,6 +110,18 @@ abstract class AppLocalizations {
   /// **'Trace the outside edge. Choose flight or landing.'**
   String get stairPerimeterHint;
 
+  /// No description provided for @stairPerimeterPickEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the end of the segment.'**
+  String get stairPerimeterPickEndpoint;
+
+  /// No description provided for @stairRejectSegment.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard segment'**
+  String get stairRejectSegment;
+
   /// No description provided for @stairCustom.
   ///
   /// In en, this message translates to:
@@ -24174,17 +24186,35 @@ abstract class AppLocalizations {
   /// **'{count} steps'**
   String stairQuickStepsCount(int count);
 
-  /// Offset of the next flight's first riser past the landing edge
+  /// Longitudinal offset applied to each affected flight in a stair preset
   ///
   /// In en, this message translates to:
-  /// **'Landing stagger'**
+  /// **'Flight offset'**
   String get stairLandingOffset;
 
   /// Help text explaining landing stagger offset
   ///
   /// In en, this message translates to:
-  /// **'Offsets the next flight past the landing edge so inner handrails and concrete soffits meet cleanly.'**
+  /// **'On a U-shaped stair, each flight moves by the entered distance in opposite directions. The stagger between the flights is twice that distance.'**
   String get stairLandingOffsetHelp;
+
+  /// No description provided for @stairManualLandingOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Landing stagger'**
+  String get stairManualLandingOffset;
+
+  /// No description provided for @stairManualLandingOffsetHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Moves the next flight along its axis and keeps the steps the same size. Zero aligns the two flights at the landing.'**
+  String get stairManualLandingOffsetHelp;
+
+  /// No description provided for @stairNumberedLandingOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Landing {number} stagger'**
+  String stairNumberedLandingOffset(int number);
 
   /// Progress indicator showing drawn risers vs target risers from stair setup
   ///

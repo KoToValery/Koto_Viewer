@@ -125,14 +125,18 @@ class ArchitectStairHandles {
       ],
       for (var i = 1; i < flights.length; i++)
         () {
-          final f = flights[i];
+          final f = flights[i], incoming = flights[i - 1];
+          final away = f.origin - incoming.point(incoming.run, 0);
+          final outside = ArchitectStairGeometry.dot(away, f.normal) < 0
+              ? -f.normal
+              : f.normal;
           final anchor =
-              f.origin + f.axis * (f.run / 2) + f.normal * (f.width / 2);
+              f.origin + f.axis * (f.run / 2) + outside * (f.width / 2);
           return StairEndpointHandle(
             flightIndex: i,
             atStart: false,
             anchor: anchor,
-            handle: anchor + f.normal * clearance,
+            handle: anchor + outside * clearance,
             opposite: anchor,
             lateral: true,
           );
@@ -239,31 +243,25 @@ class ArchitectStairHandles {
       if ((end - start).distance < 0.1) return original;
       return original.copyWith(startPoint: start, endPoint: end);
     }
-    if (hit.lateral) {
-      final layout =
-          d.layout ?? ArchitectStairLayoutResolver.fromStair(original);
-      if (hit.flightIndex >= layout.flights.length) return original;
+    final atLanding =
+        hit.landingIndex == null &&
+        (hit.atStart ? hit.flightIndex > 0 : hit.flightIndex < d.flightCount - 1);
+    if (hit.lateral || atLanding) {
+      final flights = ArchitectStairGeometry.of(original).flights;
+      if (hit.flightIndex >= flights.length) return original;
       final u = original.unitVector;
       final v = original.normalVector * (d.turnLeft ? -1 : 1);
-      final f = layout.flights[hit.flightIndex];
+      final f = flights[hit.flightIndex];
+      final direction = hit.lateral ? f.normal : f.axis;
       final delta = snappedPoint - hit.anchor;
-      final localDelta = Offset(
-        ArchitectStairGeometry.dot(delta, u),
-        ArchitectStairGeometry.dot(delta, v),
-      );
-      final shift = f.normal * ArchitectStairGeometry.dot(localDelta, f.normal);
-      final updated = ArchitectStairLayoutResolver.updateFlightWithPorts(
-        layout,
-        d.going,
-        f,
-        f.copyWith(origin: f.origin + shift),
-      );
-      final next = d.copyWith(layout: updated, manualGoing: d.going);
-      if (ArchitectStairLayoutResolver.check(next).isNotEmpty) {
-        throw ArgumentError('Invalid lateral stair handle drag');
-      }
-      return ArchitectStairLayoutResolver.normalizePlacement(
-        original.copyWith(design: next),
+      final shift = direction * ArchitectStairGeometry.dot(delta, direction);
+      return ArchitectStairLayoutResolver.translateFlight(
+        original,
+        hit.flightIndex,
+        Offset(
+          ArchitectStairGeometry.dot(shift, u),
+          ArchitectStairGeometry.dot(shift, v),
+        ),
       );
     }
     if (d.layout == null &&

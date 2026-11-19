@@ -1,6 +1,8 @@
 {
   "stairLandingPart": "Landing",
   "stairPerimeterHint": "Trace the outside edge. Choose flight or landing.",
+  "stairPerimeterPickEndpoint": "Pick the end of the segment.",
+  "stairRejectSegment": "Discard segment",
   "stairCustom": "Freeform",
   "stairSetupTitle": "Freeform stair",
   "@stairSetupTitle": {"description": "Title of initial setup dialog before drawing a freeform stair"},
@@ -7361,14 +7363,18 @@
       "count": { "type": "int" }
     }
   },
-  "stairLandingOffset": "Landing stagger",
+  "stairLandingOffset": "Flight offset",
   "@stairLandingOffset": {
-    "description": "Offset of the next flight's first riser past the landing edge"
+    "description": "Longitudinal offset applied to each affected flight in a stair preset"
   },
-  "stairLandingOffsetHelp": "Offsets the next flight past the landing edge so inner handrails and concrete soffits meet cleanly.",
+  "stairLandingOffsetHelp": "On a U-shaped stair, each flight moves by the entered distance in opposite directions. The stagger between the flights is twice that distance.",
   "@stairLandingOffsetHelp": {
     "description": "Help text explaining landing stagger offset"
   },
+  "stairManualLandingOffset": "Landing stagger",
+  "stairManualLandingOffsetHelp": "Moves the next flight along its axis and keeps the steps the same size. Zero aligns the two flights at the landing.",
+  "stairNumberedLandingOffset": "Landing {number} stagger",
+  "@stairNumberedLandingOffset": {"placeholders": {"number": {"type": "int"}}},
   "stairTargetRisersProgress": "{drawn}/{target} steps",
   "@stairTargetRisersProgress": {
     "description": "Progress indicator showing drawn risers vs target risers from stair setup",

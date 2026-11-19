@@ -27,6 +27,7 @@ void main() {
   ArchitectVectorCanvas plan(
     ArchitectStair stair, {
     bool labels = true,
+    double? cutHeight,
     ArchitectStorey? floor,
     ArchitectProject? project,
   }) {
@@ -38,6 +39,7 @@ void main() {
       color: Colors.black,
       l10n: bg,
       labels: labels,
+      cutHeight: cutHeight,
       storey: floor,
       project: project,
     );
@@ -153,7 +155,7 @@ void main() {
               startOffset: -.2,
               showLabel: false,
             ),
-          );
+          ).copyWith(endPoint: const Offset(0, 1));
           final floor = fixture.floor().copyWith(elevation: 4, stairs: [stair]);
           final project = fixture.project().copyWith(
             storeys: [floor],
@@ -168,6 +170,7 @@ void main() {
             project: project,
           ).operations.whereType<ArchitectVectorText>();
           expect(ops.map((o) => o.text), [project.formatLevel(level)]);
+          expect(ops.single.rotation, 0);
           expect(ops.single.sources, {stair.id});
           expect(floor.elevationMarkers, isEmpty);
           final landing = ArchitectStairGeometry.of(stair).landings.single;
@@ -202,6 +205,51 @@ void main() {
       expect(plan(winder).operations.whereType<ArchitectVectorText>(), isEmpty);
     },
   );
+
+  test('plan cut marks and their masks fit inside the flight at a landing', () {
+    final stair = fixture.stair(
+      fixture.design.copyWith(
+        shape: StairShape.halfTurn,
+        startOffset: .13,
+        showRailing: false,
+      ),
+    ).copyWith(endPoint: const Offset(.6, .8));
+    final geometry = ArchitectStairGeometry.of(stair);
+    final level = stair.design!.startOffset + geometry.landings.single.elevation;
+    final riser = stair.design!.riser;
+    for (final (height, flight) in [
+      (level - riser / 2, geometry.flights.first),
+      (level, geometry.flights.last),
+      (level + riser / 2, geometry.flights.last),
+    ]) {
+      final cut = geometry.cut(height);
+      expect(
+        cut.crossingIndex,
+        inInclusiveRange(flight.firstRiser, flight.firstRiser + flight.count - 1),
+      );
+      final paths = plan(stair, cutHeight: height, labels: false)
+          .operations.whereType<ArchitectVectorPath>().toList();
+      final marks = paths.sublist(paths.length - 4);
+      expect(marks.map((mark) => mark.color), [
+        Colors.white,
+        Colors.black,
+        Colors.white,
+        Colors.black,
+      ]);
+      for (final mark in marks) {
+        final line = mark.path.computeMetrics().single;
+        for (final distance in [0.0, line.length]) {
+          final point = line.getTangentForOffset(distance)!.position;
+          final along = ArchitectStairGeometry.dot(
+            point - flight.origin,
+            flight.axis,
+          );
+          expect(along - mark.width / 2, greaterThanOrEqualTo(-1e-6));
+          expect(along + mark.width / 2, lessThanOrEqualTo(flight.run + 1e-6));
+        }
+      }
+    }
+  });
 
   test(
     'guards use even bays, corner posts and slender infill with no duplicate end posts',

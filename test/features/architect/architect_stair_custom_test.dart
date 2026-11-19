@@ -732,6 +732,7 @@ void main() {
       await tester.tapAt(workspace.screen(tester, const Offset(2, 0)));
       await tester.pumpAndSettle();
       expect(draft.preview!.design!.layout!.flights, hasLength(1));
+      draft.setLength(4.6);
       draft.acceptPart();
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.stairs, isEmpty);
@@ -745,7 +746,7 @@ void main() {
       await tester.pump();
       expect(workspace.camera(tester).translation, isNot(before));
       expect(draft.layout.flights, hasLength(1));
-      await tester.tap(find.byKey(const ValueKey('stair-draft-apply')));
+      await tester.tap(find.byKey(const ValueKey('wall-end')));
       await tester.pumpAndSettle();
       expect(
         model.project.activeStorey.stairs.single.design!.layout,

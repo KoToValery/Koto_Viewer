@@ -29,6 +29,8 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
   StairPerimeterPart part = StairPerimeterPart.flight;
   Offset? anchor, target;
   bool reviewing = false, sideLocked = false;
+  int _endpointRevision = 0;
+  int get endpointRevision => _endpointRevision;
   double side = 1, width;
   double _baseGoing, _going;
   final int? targetRisers;
@@ -150,6 +152,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
 
   @override
   void pick(Offset world, {double tolerance = .15}) {
+    _endpointRevision++;
     if (anchor == null) {
       anchor = world;
       target = world;
@@ -176,30 +179,47 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
   }
 
   void setLength(double value) {
-    if (!value.isFinite || value <= .001 || anchor == null) return;
-    final v = (target ?? anchor! + const Offset(1, 0)) - anchor!;
-    final axis = v.distance > .001 ? v / v.distance : const Offset(1, 0);
+    if (!value.isFinite || value < .001 || anchor == null) return;
+    final direction = (target ?? anchor!) - anchor!;
+    final axis = direction.distance > 1e-9
+        ? direction / direction.distance
+        : const Offset(1, 0);
     target = anchor! + axis * value;
     reviewing = true;
     _going = _effectiveGoing(visibleSegments);
     notifyListeners();
   }
 
-  bool acceptPart() {
-    if (anchor == null || target == null || length < .001) return false;
-    if (segments.isEmpty && part != StairPerimeterPart.flight) return false;
-    if (segments.isNotEmpty &&
-        part == StairPerimeterPart.flight &&
-        segments.last.part == part) {
-      return false;
+  List<StairPerimeterSegment>? get _reviewedSegments {
+    if (!reviewing || length <= .001) return null;
+    final needsFlight = segments.isEmpty;
+    final addingFlight = part == StairPerimeterPart.flight;
+    if (needsFlight && !addingFlight ||
+        addingFlight && segments.lastOrNull?.part == StairPerimeterPart.flight) {
+      return null;
     }
-    final segment = StairPerimeterSegment(part, anchor!, target!, width);
-    final nextSegments = [...segments, segment];
-    final expectedFlights = nextSegments
-        .where((s) => s.part == StairPerimeterPart.flight)
-        .length;
+    return visibleSegments;
+  }
+
+  bool _fitsParts(
+    List<StairPerimeterSegment> source,
+    ArchitectStairLayout layout,
+  ) =>
+      layout.risers <= 500 &&
+      layout.flights.length ==
+          source.where((s) => s.part == StairPerimeterPart.flight).length;
+
+  bool get canAcceptPart {
+    final source = _reviewedSegments;
+    return source != null && _fitsParts(source, _buildGeometry(source).layout);
+  }
+
+  bool acceptPart() {
+    final nextSegments = _reviewedSegments;
+    if (nextSegments == null) return false;
     final geom = _buildGeometry(nextSegments);
-    if (geom.layout.flights.length != expectedFlights) return false;
+    if (!_fitsParts(nextSegments, geom.layout)) return false;
+    final segment = nextSegments.last;
     if (!sideLocked && segments.isNotEmpty) {
       side = geom.side;
     }
@@ -211,6 +231,7 @@ class ArchitectStairPerimeterDraft extends ArchitectStairDraftController {
     } else {
       anchor = target;
     }
+    target = anchor;
     reviewing = false;
     part = segment.part == StairPerimeterPart.flight
         ? StairPerimeterPart.landing

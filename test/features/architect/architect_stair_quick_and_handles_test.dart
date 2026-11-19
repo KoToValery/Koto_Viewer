@@ -9,6 +9,7 @@ import 'package:kotoview/src/features/architect/rendering/architect_stair_mesh.d
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_element_tool.dart';
+import 'package:kotoview/src/features/architect/services/architect_stair_geometry.dart';
 import 'package:kotoview/src/features/architect/services/architect_stair_handles.dart';
 import 'package:kotoview/src/features/architect/services/architect_stair_layout_resolver.dart';
 import 'package:kotoview/src/features/architect/services/architect_stair_railings.dart';
@@ -103,13 +104,13 @@ void main() {
         );
 
         // Landing offset and total stair height H are editable directly in the quick bar.
-        await _enterStairDimension(tester, 'stair-landing-offset-input', '30');
+        await _enterStairDimension(tester, 'stair-landing-offset-input', '5');
         await _enterStairDimension(tester, 'stair-rise-input', '300');
 
         palette = tester.widget<ArchitectToolPalette>(
           find.byType(ArchitectToolPalette),
         );
-        expect(palette.stairDesign.landingStepOffset, closeTo(0.30, 1e-6));
+        expect(palette.stairDesign.landingStepOffset, closeTo(0.05, 1e-6));
         expect(palette.stairDesign.followStoreys, isFalse);
         expect(palette.stairDesign.rise, closeTo(3.00, 1e-6));
       },
@@ -202,7 +203,12 @@ void main() {
 
   group('Landing handle editing', () {
     test('lateral flight handle preserves risers and reconnects landing', () {
-      for (final shape in [StairShape.halfTurn, StairShape.quarterTurn]) {
+      for (final (shape, turnLeft) in [
+        (StairShape.halfTurn, false),
+        (StairShape.halfTurn, true),
+        (StairShape.quarterTurn, false),
+        (StairShape.quarterTurn, true),
+      ]) {
         final stair = ArchitectStair(
           id: 'lateral',
           startPoint: Offset.zero,
@@ -212,6 +218,7 @@ void main() {
             shape: shape,
             rise: 2.8,
             followStoreys: false,
+            turnLeft: turnLeft,
             totalWidth: 2.4,
             landingDepth: 1.2,
           ),
@@ -221,6 +228,16 @@ void main() {
           .25,
         ).firstWhere((h) => h.lateral);
         final direction = (handle.handle - handle.anchor) / .25;
+        final flights = ArchitectStairGeometry.of(stair).flights;
+        final otherPort = flights.first.point(flights.first.run, 0);
+        expect(
+          ArchitectStairGeometry.dot(direction, flights.last.origin - otherPort),
+          greaterThan(0),
+        );
+        expect(
+          ArchitectStairHandles.hitTest(stair, handle.handle, 100, 25)!.lateral,
+          isTrue,
+        );
         final moved = ArchitectStairHandles.applyDrag(
           stair,
           handle,
@@ -261,59 +278,81 @@ void main() {
       );
       final landingBack = handles.firstWhere((h) => h.landingIndex == 0);
 
-      // 1. Pull flight 0 end back (shortens flight 0, steps landing cleanly).
+      // Shift a landing connection by less than one tread in either direction.
       final f0Back = ArchitectStairHandles.applyDrag(
         stair,
         f0End,
-        f0End.anchor - const Offset(0.30, 0),
+        f0End.anchor - const Offset(0.05, 0),
       );
       expect(ArchitectStairLayoutResolver.check(f0Back.design!), isEmpty);
       expect(
         f0Back.design!.layout!.flights[0].risers,
-        stair.design!.flightRisers[0] - 1,
+        stair.design!.flightRisers[0],
       );
 
       expect(f0Back.design!.risers, stair.design!.risers);
       expect(f0Back.design!.riser, closeTo(stair.design!.riser, 1e-9));
+      expect(f0Back.design!.going, stair.design!.going);
+      expect(
+        ArchitectStairHandles.anchorFor(f0Back, f0End).dx,
+        closeTo(f0End.anchor.dx - .05, 1e-8),
+      );
 
-      // 2. Push flight 0 end forward into landing (lengthens flight 0 & pushes back edge cleanly).
       final f0Forward = ArchitectStairHandles.applyDrag(
         stair,
         f0End,
-        f0End.anchor + const Offset(0.60, 0),
+        f0End.anchor + const Offset(0.05, 0),
       );
       expect(ArchitectStairLayoutResolver.check(f0Forward.design!), isEmpty);
       expect(
         f0Forward.design!.layout!.flights[0].risers,
-        stair.design!.flightRisers[0] + 2,
+        stair.design!.flightRisers[0],
       );
       expect(
         ArchitectStairLayoutResolver.landingDepth(f0Forward.design!),
         greaterThanOrEqualTo(1.0 - 1e-6),
       );
 
-      // 3. Adjust flight 1 start at the landing back & forth.
       final f1Back = ArchitectStairHandles.applyDrag(
         stair,
         f1Start,
-        f1Start.anchor - const Offset(0.30, 0),
+        f1Start.anchor - const Offset(0.05, 0),
       );
       expect(ArchitectStairLayoutResolver.check(f1Back.design!), isEmpty);
       expect(
         f1Back.design!.layout!.flights[1].risers,
-        stair.design!.flightRisers[1] - 1,
+        stair.design!.flightRisers[1],
+      );
+      expect(
+        ArchitectStairLayoutResolver.returnStagger(f1Back.design!, 0),
+        closeTo(.05, 1e-8),
       );
 
       final f1Forward = ArchitectStairHandles.applyDrag(
         stair,
         f1Start,
-        f1Start.anchor + const Offset(0.60, 0),
+        f1Start.anchor + const Offset(0.05, 0),
       );
       expect(ArchitectStairLayoutResolver.check(f1Forward.design!), isEmpty);
       expect(
         f1Forward.design!.layout!.flights[1].risers,
-        stair.design!.flightRisers[1] + 2,
+        stair.design!.flightRisers[1],
       );
+      expect(
+        ArchitectStairLayoutResolver.returnStagger(f1Forward.design!, 0),
+        closeTo(-.05, 1e-8),
+      );
+      var exact = f1Back;
+      for (final offset in [0.0, -.035, .05]) {
+        exact = ArchitectStairLayoutResolver.setReturnStagger(exact, 0, offset);
+        final restored = ArchitectStair.fromJson(exact.toJson());
+        expect(ArchitectStairLayoutResolver.check(restored.design!), isEmpty);
+        expect(restored.design!.flightRisers, stair.design!.flightRisers);
+        expect(
+          ArchitectStairLayoutResolver.returnStagger(restored.design!, 0),
+          closeTo(offset, 1e-8),
+        );
+      }
 
       // 4. Outer landing back handle adjusts landingDepth on preset without converting layout.
       final stretchedPreset = ArchitectStairHandles.applyDrag(

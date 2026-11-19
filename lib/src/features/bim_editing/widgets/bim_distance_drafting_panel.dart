@@ -15,7 +15,8 @@ class BimDistanceDraftingPanel extends StatefulWidget {
   final VoidCallback onEnd, onContinue, onUnlock, onCancel;
   final bool showContinue, showDirection, keypadInitiallyOpen;
   final bool continuePrimary;
-  final String? title, endLabel;
+  final bool canEditLength, canContinue, canEnd;
+  final String? title, endLabel, cancelLabel;
 
   /// Tool-specific controls above the length, without changing keypad state.
   final Widget? extraControls;
@@ -34,8 +35,12 @@ class BimDistanceDraftingPanel extends StatefulWidget {
     this.continuePrimary = false,
     this.showDirection = true,
     this.keypadInitiallyOpen = false,
+    this.canEditLength = true,
+    this.canContinue = true,
+    this.canEnd = true,
     this.title,
     this.endLabel,
+    this.cancelLabel,
     this.extraControls,
   });
   @override
@@ -60,6 +65,7 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
   }
 
   void _key(String key) {
+    if (!widget.canEditLength) return;
     setState(() {
       final value = BimNumericKeypad.edit(
         _input,
@@ -80,12 +86,14 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
     return Tooltip(
       message: context.l10n.bimExactDistanceInputHelp,
       child: Semantics(
-        button: true,
+        button: widget.canEditLength,
         expanded: _keypad,
         label: label,
         child: InkWell(
           key: const ValueKey('wall-length-input'),
-          onTap: () => setState(() => _keypad = !_keypad),
+          onTap: widget.canEditLength
+              ? () => setState(() => _keypad = !_keypad)
+              : null,
           borderRadius: BorderRadius.circular(8),
           child: Container(
             constraints: const BoxConstraints(minHeight: 44),
@@ -137,7 +145,9 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                 AppIcon(
                   _keypad ? AppIconId.expandLess : AppIconId.layoutGrid,
                   size: 16,
-                  color: colors.primary,
+                  color: widget.canEditLength
+                      ? colors.primary
+                      : colors.onSurfaceVariant,
                 ),
               ],
             ),
@@ -169,6 +179,8 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final colors = Theme.of(context).colorScheme;
+    final canContinue = _valid && widget.canContinue;
+    final canEnd = _valid && widget.canEnd;
     return Focus(
       autofocus: true,
       onKeyEvent: (_, event) {
@@ -176,11 +188,14 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
           return KeyEventResult.ignored;
         }
         final character = event.character;
-        if (character != null && RegExp(r'^[0-9.,]$').hasMatch(character)) {
+        if (widget.canEditLength &&
+            character != null &&
+            RegExp(r'^[0-9.,]$').hasMatch(character)) {
           _key(character == ',' ? '.' : character);
           return KeyEventResult.handled;
         }
-        if (event.logicalKey == LogicalKeyboardKey.backspace) {
+        if (widget.canEditLength &&
+            event.logicalKey == LogicalKeyboardKey.backspace) {
           _key('⌫');
           return KeyEventResult.handled;
         }
@@ -188,8 +203,8 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                 event.logicalKey == LogicalKeyboardKey.numpadEnter) &&
             _valid) {
           if (widget.showContinue && widget.continuePrimary) {
-            widget.onContinue();
-          } else {
+            if (canContinue) widget.onContinue();
+          } else if (canEnd) {
             widget.onEnd();
           }
           return KeyEventResult.handled;
@@ -219,7 +234,7 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
               final captions = constraints.maxWidth >= 320 || !inline;
               final cancel = IconButton(
                 key: const ValueKey('wall-cancel'),
-                tooltip: l.cancel,
+                tooltip: widget.cancelLabel ?? l.cancel,
                 constraints: const BoxConstraints.tightFor(
                   width: 44,
                   height: 44,
@@ -263,10 +278,10 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                onPressed: _valid ? widget.onContinue : null,
+                onPressed: canContinue ? widget.onContinue : null,
                 icon: _symbol(
                   AppIconId.redo,
-                  _valid
+                  canContinue
                       ? widget.continuePrimary
                             ? colors.onPrimary
                             : colors.primary
@@ -292,10 +307,10 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    onPressed: _valid ? widget.onEnd : null,
+                    onPressed: canEnd ? widget.onEnd : null,
                     child: _symbol(
                       AppIconId.confirm,
-                      _valid
+                      canEnd
                           ? widget.showContinue && widget.continuePrimary
                                 ? colors.primary
                                 : colors.onPrimary

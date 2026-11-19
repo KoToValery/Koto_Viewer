@@ -10,6 +10,7 @@ import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_canvas_palette.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_stair_mesh.dart';
+import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_element_tool.dart';
 import 'package:kotoview/src/features/architect/services/architect_slab_geometry.dart';
 import 'package:kotoview/src/features/architect/services/architect_stair_geometry.dart';
@@ -239,7 +240,7 @@ void main() {
       );
     });
 
-    test('landingStepOffset staggers outgoing flight cleanly for quarterTurn and halfTurn', () {
+    test('five-centimetre stagger preserves treads and balances U flights', () {
       for (final shape in [StairShape.quarterTurn, StairShape.halfTurn]) {
         for (final turnLeft in [false, true]) {
           final stair = ArchitectStair(
@@ -253,7 +254,7 @@ void main() {
               followStoreys: false,
               turnLeft: turnLeft,
               landingDepth: 1.2,
-              landingStepOffset: .30,
+              landingStepOffset: .05,
             ),
           );
           final baseline = ArchitectStair(
@@ -267,9 +268,39 @@ void main() {
           final geom = ArchitectStairGeometry.of(stair);
           expect(geom.flights, hasLength(2));
           expect(geom.landings, hasLength(1));
+          expect(stair.design!.flightRisers, baseline.design!.flightRisers);
+          expect(stair.design!.going, baseline.design!.going);
+          final firstShift = geom.flights[0].origin - baseGeom.flights[0].origin;
+          final nextShift = geom.flights[1].origin - baseGeom.flights[1].origin;
+          if (shape == StairShape.halfTurn) {
+            expect(firstShift.dx, closeTo(.05, 1e-8));
+            expect(nextShift.dx, closeTo(-.05, 1e-8));
+            expect(
+              geom.flights[0].point(geom.flights[0].run, 0).dx -
+                  geom.flights[1].origin.dx,
+              closeTo(.10, 1e-8),
+            );
+            final placed = ArchitectStair.fromCorner(
+              id: 'placed',
+              corner: const Offset(3, 3),
+              directionPoint: const Offset(3, 5),
+              width: stair.width,
+              design: stair.design,
+            );
+            expect(placed.placementCorner, const Offset(3, 3));
+            expect(
+              [placed.plan.nosings.first.$1, placed.plan.nosings.first.$2],
+              contains(const Offset(3, 3)),
+            );
+          } else {
+            expect(firstShift, Offset.zero);
+            expect(nextShift.distance, closeTo(.05, 1e-8));
+          }
           expect(
-            (geom.flights[1].origin - baseGeom.flights[1].origin).distance,
-            closeTo(.30, 1e-6),
+            ArchitectStairLayoutResolver.check(stair.design!.copyWith(
+              layout: ArchitectStairLayoutResolver.fromStair(stair),
+            )),
+            isEmpty,
           );
           final plan = stair.plan;
           expect(plan.nosings, isNotEmpty);
@@ -278,9 +309,101 @@ void main() {
           final roundtrip = ArchitectStairDesign.fromJson(
             stair.design!.toJson(),
           );
-          expect(roundtrip.landingStepOffset, closeTo(.30, 1e-9));
+          expect(roundtrip.landingStepOffset, closeTo(.05, 1e-9));
+          expect(roundtrip.entryShift, stair.design!.entryShift);
         }
       }
+    });
+
+    test('new automatic going stops at 30 cm and old defaults round trip', () {
+      const modern = ArchitectStairDesign(rise: 2.8, manualRisers: 20);
+      expect(modern.going, .30);
+      expect(modern.copyWith(manualGoing: .34).going, .34);
+      final old = ArchitectStairDesign.fromJson({
+        ...modern.toJson(),
+        'rulesVersion': 'BG-2025.1',
+        'landingStepOffset': .05,
+      });
+      expect(old.going, .35);
+      expect(old.entryShift, 0);
+      final restored = ArchitectStairDesign.fromJson(old.toJson());
+      expect(restored.going, old.going);
+      expect(restored.entryShift, old.entryShift);
+      expect(restored.copyWith(landingStepOffset: .05).entryShift, .05);
+    });
+
+    testWidgets('custom U stair saves a five-centimetre landing stagger', (
+      tester,
+    ) async {
+      const preset = ArchitectStair(
+        id: 'st',
+        startPoint: Offset.zero,
+        endPoint: Offset(1, 0),
+        design: ArchitectStairDesign(followStoreys: false),
+      );
+      final stair = preset.copyWith(
+        design: preset.design!.copyWith(
+          layout: ArchitectStairLayoutResolver.fromStair(preset),
+        ),
+      );
+      final project = wrapStorey(
+        ArchitectStorey(id: 's', name: '0.00', stairs: [stair]),
+      ).copyWith(units: ArchitectUnit.centimeters);
+      final commands = ArchitectCommandController(project);
+      addTearDown(commands.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('bg'),
+          home: Builder(
+            builder: (context) => TextButton(
+              child: const Text('open'),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (_) => ArchitectStairPropertiesDialog(
+                  project: project,
+                  stair: stair,
+                  onApply: (s) {
+                    commands.execute(PutArchitectStair(storeyId: 's', stair: s));
+                    return true;
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      final dimensions = find.byKey(const ValueKey('stair-dimensions'));
+      await tester.ensureVisible(dimensions);
+      await tester.tap(dimensions);
+      await tester.pumpAndSettle();
+      final field = find.byKey(const ValueKey('stair-landing-offset-0'));
+      await tester.ensureVisible(field);
+      await tester.tap(field);
+      await tester.pumpAndSettle();
+      expect(find.text(bg.stairManualLandingOffset), findsWidgets);
+      await tester.tap(find.byKey(const ValueKey('bim-number-key-5')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('stair-save')));
+      await tester.pumpAndSettle();
+      ArchitectStair saved() => commands.project.activeStorey.stairs.single;
+      expect(saved().design!.flightRisers, stair.design!.flightRisers);
+      expect(
+        ArchitectStairLayoutResolver.returnStagger(saved().design!, 0),
+        closeTo(.05, 1e-8),
+      );
+      commands.undo();
+      expect(saved().toJson(), stair.toJson());
+      commands.redo();
+      expect(
+        ArchitectStairLayoutResolver.returnStagger(saved().design!, 0),
+        closeTo(.05, 1e-8),
+      );
     });
 
     test('selected stair paints without dropping wall-mounted rails, exposes handles, drags, and flips', () {

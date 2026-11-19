@@ -32,7 +32,13 @@ class StairLandingGeometry {
 class StairPlanCutGeometry {
   final Path below, above;
   final (Offset, Offset)? crossing;
-  const StairPlanCutGeometry(this.below, this.above, this.crossing);
+  final int? crossingIndex;
+  const StairPlanCutGeometry(
+    this.below,
+    this.above,
+    this.crossing, {
+    this.crossingIndex,
+  });
 }
 
 /// Finished geometry in model metres. These data also drive the guard, mesh,
@@ -98,16 +104,18 @@ class ArchitectStairGeometry {
         above = Path.combine(PathOperation.union, above, path);
       }
     }
-    final crossing = localHeight > 1e-8 && localHeight < d.rise - 1e-8
-        ? stair.plan.nosings[(localHeight / d.riser + 1e-8).floor().clamp(
-            0,
-            d.risers - 1,
-          )]
+    final crossingIndex = localHeight > 1e-8 && localHeight < d.rise - 1e-8
+        ? (localHeight / d.riser + 1e-8).floor().clamp(0, d.risers - 1)
         : null;
     if (d.layout == null && d.shape == StairShape.spiralOverlap) {
       above = Path.combine(PathOperation.difference, above, below);
     }
-    return _cuts[height] = StairPlanCutGeometry(below, above, crossing);
+    return _cuts[height] = StairPlanCutGeometry(
+      below,
+      above,
+      crossingIndex == null ? null : stair.plan.nosings[crossingIndex],
+      crossingIndex: crossingIndex,
+    );
   }
 
   double elevationAt(Offset point) {

@@ -16,6 +16,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Trace the outside edge. Choose flight or landing.';
 
   @override
+  String get stairPerimeterPickEndpoint => 'Pick the end of the segment.';
+
+  @override
+  String get stairRejectSegment => 'Discard segment';
+
+  @override
   String get stairCustom => 'Freeform';
 
   @override
@@ -13315,11 +13321,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get stairLandingOffset => 'Landing stagger';
+  String get stairLandingOffset => 'Flight offset';
 
   @override
   String get stairLandingOffsetHelp =>
-      'Offsets the next flight past the landing edge so inner handrails and concrete soffits meet cleanly.';
+      'On a U-shaped stair, each flight moves by the entered distance in opposite directions. The stagger between the flights is twice that distance.';
+
+  @override
+  String get stairManualLandingOffset => 'Landing stagger';
+
+  @override
+  String get stairManualLandingOffsetHelp =>
+      'Moves the next flight along its axis and keeps the steps the same size. Zero aligns the two flights at the landing.';
+
+  @override
+  String stairNumberedLandingOffset(int number) {
+    return 'Landing $number stagger';
+  }
 
   @override
   String stairTargetRisersProgress(int drawn, int target) {

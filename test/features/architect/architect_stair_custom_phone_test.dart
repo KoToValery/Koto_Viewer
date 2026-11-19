@@ -65,10 +65,26 @@ void main() {
               find.byType(ArchitectStairPerimeterOverlay),
             )
             .draft;
+        final finish = find.byKey(const ValueKey('wall-end'));
+        final next = find.byKey(const ValueKey('wall-continue'));
+        final lengthInput = find.byKey(const ValueKey('wall-length-input'));
+        Future<void> enterLength(String length) async {
+          await tester.tap(lengthInput);
+          await tester.pumpAndSettle();
+          for (final digit in length.split('')) {
+            await tester.tap(find.byKey(ValueKey('wall-key-$digit')));
+            await tester.pump();
+          }
+        }
+
         expect(
           find.byKey(const ValueKey('stair-perimeter-part')),
           findsOneWidget,
         );
+        expect(tester.widget<FilledButton>(finish).onPressed, isNull);
+        await tester.tap(lengthInput);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('wall-key-1')), findsNothing);
         await tester.tapAt(workspace.screen(tester, Offset.zero));
         await tester.pump();
         final gesture = await tester.startGesture(
@@ -84,44 +100,44 @@ void main() {
         await gesture.up();
         await tester.pumpAndSettle();
         expect(draft.reviewing, isTrue);
-        expect(find.byKey(const ValueKey('wall-length-input')), findsOneWidget);
-        await tester.tapAt(workspace.screen(tester, const Offset(1.4, 0)));
-        await tester.pumpAndSettle();
-        tester
-            .widget<ArchitectWallDraftingPanel>(
-              find.byKey(const ValueKey('stair-perimeter-panel')),
-            )
-            .onLength(1.4);
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('stair-part-reject')));
+        await enterLength('1.4');
+        expect(draft.length, closeTo(1.4, 1e-6));
+        expect(tester.widget<FilledButton>(finish).onPressed, isNull);
+        expect(tester.widget<IconButton>(next).onPressed, isNotNull);
+        await tester.tap(find.byKey(const ValueKey('wall-cancel')));
         await tester.pumpAndSettle();
         expect(draft.segments, isEmpty);
         expect(draft.reviewing, isFalse);
-        tester
-            .widget<ArchitectWallDraftingPanel>(
-              find.byKey(const ValueKey('stair-perimeter-panel')),
-            )
-            .onLength(1.4);
+        expect(find.byKey(const ValueKey('wall-key-1')), findsNothing);
+
+        await tester.tapAt(workspace.screen(tester, const Offset(1.4, 0)));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('stair-part-accept')));
+        await enterLength('2.1');
+        expect(draft.length, closeTo(2.1, 1e-6));
+        await tester.tap(next);
         await tester.pumpAndSettle();
         expect(draft.segments, hasLength(1));
+        expect(draft.target, draft.anchor);
+        expect(find.byKey(const ValueKey('wall-key-1')), findsNothing);
+        expect(tester.widget<FilledButton>(finish).onPressed, isNull);
 
-        await tester.tapAt(workspace.screen(tester, const Offset(2.6, 0)));
+        await tester.tapAt(workspace.screen(tester, const Offset(3.3, 0)));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('stair-part-accept')));
+        await enterLength('1.2');
+        expect(tester.widget<FilledButton>(finish).onPressed, isNull);
+        await tester.tap(next);
         await tester.pumpAndSettle();
-        await tester.tapAt(workspace.screen(tester, const Offset(2.6, 1.4)));
+        await tester.tapAt(workspace.screen(tester, const Offset(3.3, 1.4)));
         await tester.pumpAndSettle();
-        tester
-            .widget<ArchitectWallDraftingPanel>(
-              find.byKey(const ValueKey('stair-perimeter-panel')),
-            )
-            .onLength(1.4);
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('stair-part-accept')));
-        await tester.pumpAndSettle();
-        expect(draft.committedPreview!.design!.layout!.flights, hasLength(2));
+        await enterLength('3.1');
+        expect(draft.length, closeTo(3.1, 1e-6));
+        expect(draft.preview!.design!.layout!.flights, hasLength(2));
+        expect(tester.widget<FilledButton>(finish).onPressed, isNotNull);
+        if (language == 'en') {
+          await tester.tap(next);
+          await tester.pumpAndSettle();
+          expect(draft.committedPreview!.design!.layout!.flights, hasLength(2));
+        }
         if (Platform.environment['UPDATE_STAIR_PERIMETER_PREVIEW'] == 'true') {
           workspace
               .camera(tester)
@@ -141,7 +157,7 @@ void main() {
         }
 
         expect(model.project.activeStorey.stairs, isEmpty);
-        await tester.tap(find.byKey(const ValueKey('stair-draft-apply')));
+        await tester.tap(finish);
         await tester.pumpAndSettle();
         expect(model.project.activeStorey.stairs, hasLength(1));
         model.undo();
