@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_roof_painter_helper.dart';
 import 'package:kotoview/src/features/architect/services/architect_roof_geometry.dart';
 
 void main() {
@@ -213,6 +214,197 @@ void main() {
       expect(result.magneticGuides.length, 1);
       // Continuous projection along ray
       expect((result.point.dx - result.point.dy).abs(), lessThan(0.001));
+    });
+  });
+
+  group('ArchitectRoofGeometry.resolveRoofVertexDragSnap', () {
+    ArchitectProject makeProject({
+      required List<ArchitectWall> walls,
+      required ArchitectRoofPlane roof,
+    }) {
+      final ground = ArchitectStorey(
+        id: 'ground',
+        name: 'Ground',
+        elevation: 0,
+        height: 2.8,
+        walls: walls,
+      );
+      final roofPlan = ArchitectStorey(
+        id: 'roof-plan',
+        name: 'Roof',
+        elevation: 2.8,
+        height: 2.8,
+        isRoof: true,
+        roofs: [roof],
+      );
+      return ArchitectProject(
+        id: 'p1',
+        name: 'Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: [ground, roofPlan],
+        activeStoreyId: roofPlan.id,
+      );
+    }
+
+    test('1. Dual 45° hip intersection when dragging triangular roof apex', () {
+      final roof = ArchitectRoofPlane(
+        id: 'r1',
+        storeyId: 'roof-plan',
+        points: const [Offset(0, 0), Offset(6, 0), Offset(2.5, 2.2)],
+        eavesEdgeIndex: 0,
+        slopeDegrees: 30,
+      );
+      final project = makeProject(walls: const [], roof: roof);
+
+      final result = ArchitectRoofGeometry.resolveRoofVertexDragSnap(
+        raw: const Offset(3.08, 2.95),
+        originalPolygon: roof.points,
+        vertexIndex: 2,
+        roof: roof,
+        project: project,
+        snapTolerance: 0.35,
+        hip45Label: () => '45° Hip / Ridge',
+        hipAngleLabel: (deg) => '$deg° Hip / Valley',
+        hipIntersectionLabel: () => 'Hip intersection (45°)',
+        cornerHipIntersectionLabel: () => 'Corner hip intersection (45°)',
+        ridgeAlignmentLabel: () => 'Ridge / edge alignment',
+        perpToCornerLabel: () => 'Perpendicular to inner corner',
+      );
+
+      expect(result, isNotNull);
+      expect(result!.isIntersectionSnap, isTrue);
+      expect(result.snapLabel, 'Hip intersection (45°)');
+      expect((result.point - const Offset(3, 3)).distance, lessThan(0.01));
+      expect(result.magneticGuides.length, 2);
+      expect((result.magneticGuides[0].$1 - const Offset(6, 0)).distance, lessThan(0.01));
+      expect((result.magneticGuides[1].$1 - const Offset(0, 0)).distance, lessThan(0.01));
+    });
+
+    test('2. Tracks 45° ray and snaps to wall midpoint perpendicular ridge axis', () {
+      // 10m x 6m building: short left wall (0,0)-(0,6) has midpoint (0,3),
+      // whose perpendicular centerline is y = 3 (the exact ridge line).
+      final walls = const [
+        ArchitectWall(id: 'w1', startPoint: Offset(0, 0), endPoint: Offset(10, 0)),
+        ArchitectWall(id: 'w2', startPoint: Offset(10, 0), endPoint: Offset(10, 6)),
+        ArchitectWall(id: 'w3', startPoint: Offset(10, 6), endPoint: Offset(0, 6)),
+        ArchitectWall(id: 'w4', startPoint: Offset(0, 6), endPoint: Offset(0, 0)),
+      ];
+      final roof = ArchitectRoofPlane(
+        id: 'r2',
+        storeyId: 'roof-plan',
+        points: const [Offset(0, 0), Offset(10, 0), Offset(7, 2.5), Offset(3, 2.5)],
+        eavesEdgeIndex: 0,
+        slopeDegrees: 25,
+      );
+      final project = makeProject(walls: walls, roof: roof);
+
+      // Dragging vertex 3 (near (3, 3)), moving along 45° from (0,0) to meet y = 3
+      final result = ArchitectRoofGeometry.resolveRoofVertexDragSnap(
+        raw: const Offset(3.04, 2.98),
+        originalPolygon: roof.points,
+        vertexIndex: 3,
+        roof: roof,
+        project: project,
+        snapTolerance: 0.35,
+        hip45Label: () => '45° Hip / Ridge',
+        hipAngleLabel: (deg) => '$deg° Hip / Valley',
+        hipIntersectionLabel: () => 'Hip intersection (45°)',
+        cornerHipIntersectionLabel: () => 'Corner hip intersection (45°)',
+        ridgeAlignmentLabel: () => 'Ridge / edge alignment',
+        perpToCornerLabel: () => 'Perpendicular to inner corner',
+      );
+
+      expect(result, isNotNull);
+      expect(result!.isIntersectionSnap, isTrue);
+      expect((result.point - const Offset(3, 3)).distance, lessThan(0.02));
+      expect(result.magneticGuides.length, 2);
+    });
+
+    test('3. Continuous 45° ray guide when dragging away from intersections', () {
+      final roof = ArchitectRoofPlane(
+        id: 'r3',
+        storeyId: 'roof-plan',
+        points: const [Offset(0, 0), Offset(10, 0), Offset(7, 2), Offset(3, 2)],
+        eavesEdgeIndex: 0,
+        slopeDegrees: 25,
+      );
+      final project = makeProject(walls: const [], roof: roof);
+
+      final result = ArchitectRoofGeometry.resolveRoofVertexDragSnap(
+        raw: const Offset(2.5, 2.52),
+        originalPolygon: roof.points,
+        vertexIndex: 3,
+        roof: roof,
+        project: project,
+        snapTolerance: 0.25,
+        hip45Label: () => '45° Hip / Ridge',
+        hipAngleLabel: (deg) => '$deg° Hip / Valley',
+        hipIntersectionLabel: () => 'Hip intersection (45°)',
+        cornerHipIntersectionLabel: () => 'Corner hip intersection (45°)',
+        ridgeAlignmentLabel: () => 'Ridge / edge alignment',
+        perpToCornerLabel: () => 'Perpendicular to inner corner',
+      );
+
+      expect(result, isNotNull);
+      expect(result!.isIntersectionSnap, isFalse);
+      expect(result.snapLabel, '45° Hip / Ridge');
+      expect((result.point.dx - result.point.dy).abs(), lessThan(0.01));
+      expect(result.magneticGuides.length, 1);
+    });
+  });
+
+  group('ArchitectRoofPainterHelper.buildSupportingWallGuides', () {
+    test('1. Rectangular walls generate 4 corner 45° bisectors, 2 centerlines, and 2 hip apex intersections', () {
+      final storey = ArchitectStorey(
+        id: 'ground',
+        name: 'Ground',
+        elevation: 0,
+        height: 2.8,
+        walls: const [
+          ArchitectWall(id: 'w1', startPoint: Offset(0, 0), endPoint: Offset(10, 0)),
+          ArchitectWall(id: 'w2', startPoint: Offset(10, 0), endPoint: Offset(10, 6)),
+          ArchitectWall(id: 'w3', startPoint: Offset(10, 6), endPoint: Offset(0, 6)),
+          ArchitectWall(id: 'w4', startPoint: Offset(0, 6), endPoint: Offset(0, 0)),
+        ],
+      );
+
+      final guides = ArchitectRoofPainterHelper.buildSupportingWallGuides(storey);
+
+      expect(guides.bisectors.length, 4);
+      expect(guides.midPerpendiculars.length, 2);
+      expect(guides.intersections.length, 2);
+
+      // Hip-ridge apexes on a 10x6 rectangle with equal wall thickness lie at y = 3, x = 3 and x = 7
+      final xs = guides.intersections.map((p) => p.dx).toList()..sort();
+      expect(xs[0], closeTo(3.0, 0.05));
+      expect(xs[1], closeTo(7.0, 0.05));
+      for (final pt in guides.intersections) {
+        expect(pt.dy, closeTo(3.0, 0.05));
+      }
+    });
+
+    test('2. L-shaped footprint includes inward reflex valley bisector', () {
+      final storey = ArchitectStorey(
+        id: 'ground-l',
+        name: 'Ground',
+        elevation: 0,
+        height: 2.8,
+        walls: const [
+          ArchitectWall(id: 'w1', startPoint: Offset(0, 0), endPoint: Offset(10, 0)),
+          ArchitectWall(id: 'w2', startPoint: Offset(10, 0), endPoint: Offset(10, 5)),
+          ArchitectWall(id: 'w3', startPoint: Offset(10, 5), endPoint: Offset(5, 5)),
+          ArchitectWall(id: 'w4', startPoint: Offset(5, 5), endPoint: Offset(5, 10)),
+          ArchitectWall(id: 'w5', startPoint: Offset(5, 10), endPoint: Offset(0, 10)),
+          ArchitectWall(id: 'w6', startPoint: Offset(0, 10), endPoint: Offset(0, 0)),
+        ],
+      );
+
+      final guides = ArchitectRoofPainterHelper.buildSupportingWallGuides(storey);
+
+      expect(guides.bisectors.length, 6);
+      expect(guides.midPerpendiculars.length, greaterThanOrEqualTo(4));
+      expect(guides.intersections, isNotEmpty);
     });
   });
 }

@@ -63,7 +63,7 @@ class ArchitectOpeningPlanPainter {
           : palette.foreground(Colors.black),
       fontSize: 10.0,
       fontWeight: FontWeight.bold,
-      fontFamily: 'Arial',
+      fontFamily: 'ArchitectNoto',
       height: 1.0,
     );
 
@@ -145,7 +145,7 @@ class ArchitectOpeningPlanPainter {
               : palette.foreground(Colors.black),
           fontSize: 14.0,
           fontWeight: FontWeight.bold,
-          fontFamily: 'Arial',
+          fontFamily: 'ArchitectNoto',
           height: 1.0,
         ),
       ),
@@ -211,7 +211,7 @@ class ArchitectOpeningPlanPainter {
           text: '${(width * 100).round()}\n${(height * 100).round()}',
           style: const TextStyle(
             fontSize: 10,
-            fontFamily: 'Arial',
+            fontFamily: 'ArchitectNoto',
             fontWeight: FontWeight.bold,
             height: 1,
           ),
@@ -226,7 +226,7 @@ class ArchitectOpeningPlanPainter {
           text: 'h=${(sillHeight * 100).round()}',
           style: const TextStyle(
             fontSize: 10,
-            fontFamily: 'Arial',
+            fontFamily: 'ArchitectNoto',
             fontWeight: FontWeight.bold,
             height: 1,
           ),

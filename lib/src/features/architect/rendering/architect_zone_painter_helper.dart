@@ -268,7 +268,7 @@ class ArchitectZonePainterHelper {
         text: text,
         style: TextStyle(
           color: ArchitectPaperStyle.ink,
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 10.5,
           fontWeight: FontWeight.w500,
           height: 1.0,
@@ -417,7 +417,7 @@ class ArchitectZonePainterHelper {
         text: '${BimDistanceUnit.trimZeros(length.toStringAsFixed(2))} m',
         style: TextStyle(
           color: const Color(0xFFEEEEEE),
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 8.5 / zoomScale,
           fontWeight: FontWeight.bold,
         ),
@@ -474,7 +474,7 @@ class ArchitectZonePainterHelper {
         text: label,
         style: TextStyle(
           color: Colors.white,
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 10.5 / zoomScale,
           fontWeight: FontWeight.bold,
         ),
@@ -750,7 +750,7 @@ class ArchitectZonePainterHelper {
             text: '1',
             style: TextStyle(
               color: Colors.black87,
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: 12.0 / draftingScale,
               fontWeight: FontWeight.w900,
             ),
@@ -766,7 +766,7 @@ class ArchitectZonePainterHelper {
               text: '1',
               style: TextStyle(
                 color: const Color(0xFF00E5FF),
-                fontFamily: 'Roboto',
+                fontFamily: 'ArchitectNoto',
                 fontSize: 9.5 / draftingScale,
                 fontWeight: FontWeight.bold,
               ),
@@ -814,7 +814,7 @@ class ArchitectZonePainterHelper {
               text: badgeText,
               style: TextStyle(
                 color: const Color(0xFF00E676),
-                fontFamily: 'Roboto',
+                fontFamily: 'ArchitectNoto',
                 fontSize: 10.5 / draftingScale,
                 fontWeight: FontWeight.bold,
               ),
@@ -878,7 +878,7 @@ class ArchitectZonePainterHelper {
             text: '${i + 1}',
             style: TextStyle(
               color: Colors.white,
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: 11.0 / draftingScale,
               fontWeight: FontWeight.bold,
             ),
@@ -912,7 +912,7 @@ class ArchitectZonePainterHelper {
         text: text,
         style: TextStyle(
           color: Colors.white,
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 9.5 / zoomScale,
           fontWeight: FontWeight.bold,
         ),
@@ -975,7 +975,7 @@ class ArchitectZonePainterHelper {
         text: distText,
         style: TextStyle(
           color: Colors.white,
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 9.5 / zoomScale,
           fontWeight: FontWeight.bold,
         ),
@@ -1191,7 +1191,7 @@ class ArchitectZonePainterHelper {
         text: titleText,
         style: const TextStyle(
           color: ArchitectPaperStyle.ink,
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 11.0,
           fontWeight: FontWeight.bold,
           letterSpacing: 0.8,
@@ -1243,7 +1243,7 @@ class ArchitectZonePainterHelper {
           text: headers[i],
           style: const TextStyle(
             color: ArchitectPaperStyle.ink,
-            fontFamily: 'Roboto',
+            fontFamily: 'ArchitectNoto',
             fontSize: 10.0,
             fontWeight: FontWeight.bold,
           ),
@@ -1312,7 +1312,7 @@ class ArchitectZonePainterHelper {
             text: rowValues[c],
             style: TextStyle(
               color: ArchitectPaperStyle.ink,
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: 9.5,
               fontWeight: isNumeric ? FontWeight.bold : FontWeight.normal,
             ),
@@ -1377,7 +1377,7 @@ class ArchitectZonePainterHelper {
             text: '$totalLabel: ',
             style: const TextStyle(
               color: ArchitectPaperStyle.ink,
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: 10.0,
               fontWeight: FontWeight.bold,
             ),
@@ -1388,7 +1388,7 @@ class ArchitectZonePainterHelper {
                 '${BimDistanceUnit.trimZeros(totalNetArea.toStringAsFixed(2))} m²',
             style: const TextStyle(
               color: ArchitectPaperStyle.ink,
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: 11.0,
               fontWeight: FontWeight.w600,
             ),
@@ -1397,7 +1397,7 @@ class ArchitectZonePainterHelper {
             text: '   •   $countLabel: ${sortedZones.length}',
             style: const TextStyle(
               color: ArchitectPaperStyle.ink,
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: 9.5,
               fontWeight: FontWeight.w500,
             ),
@@ -1657,7 +1657,7 @@ class ArchitectZonePainterHelper {
         text: '📋 $hint',
         style: const TextStyle(
           color: Color(0xFF00E5FF),
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 12.0,
           fontWeight: FontWeight.bold,
         ),

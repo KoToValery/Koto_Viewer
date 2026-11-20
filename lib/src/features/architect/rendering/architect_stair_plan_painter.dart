@@ -55,7 +55,7 @@ class ArchitectStairPlanPainter {
         text: TextSpan(
           text: stairPlanLabel(l10n, stair),
           style: TextStyle(
-            fontFamily: 'Roboto',
+            fontFamily: 'ArchitectNoto',
             color: color,
             fontSize: math.min(dimensionScale.textHeight * scale, 24.0),
             height: 1.15,
@@ -316,7 +316,7 @@ class ArchitectStairPlanPainter {
           text: label,
           style: TextStyle(
             color: color,
-            fontFamily: 'Roboto',
+            fontFamily: 'ArchitectNoto',
             fontSize: math.min(dimensionScale.textHeight * scale, 20.0),
           ),
         ),

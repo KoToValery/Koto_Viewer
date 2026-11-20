@@ -262,7 +262,7 @@ class _ArcDistancesPainter extends CustomPainter {
           text: '${i + 1}',
           style: const TextStyle(
             color: Colors.black87,
-            fontFamily: 'Roboto',
+            fontFamily: 'ArchitectNoto',
             fontSize: 10,
           ),
         ),

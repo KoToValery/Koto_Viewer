@@ -283,7 +283,7 @@ class ArchitectColumn {
             text: text,
             style: TextStyle(
               color: palette.foreground(ArchitectPaperStyle.ink),
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: fontSize,
               fontWeight: FontWeight.bold,
             ),

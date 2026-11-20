@@ -78,7 +78,7 @@ class ArchitectDynamicDimensionPainter extends CustomPainter {
             text: '${dim.endpoint}',
             style: const TextStyle(
               color: Colors.black87,
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: 10,
               fontWeight: FontWeight.w600,
             ),

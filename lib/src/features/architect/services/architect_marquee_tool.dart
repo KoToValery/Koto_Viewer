@@ -363,7 +363,7 @@ class ArchitectMarqueeTool {
             text: TextSpan(
               text: text,
               style: TextStyle(
-                fontFamily: 'Roboto',
+                fontFamily: 'ArchitectNoto',
                 fontSize: 12,
                 fontWeight: weight,
               ),

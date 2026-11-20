@@ -176,7 +176,7 @@ class ArchitectGridAxisPainterHelper {
           text: project.formatLength(neighbor.distance.abs()),
           style: TextStyle(
             color: palette.foreground(const Color(0xFF8A4800)),
-            fontFamily: 'Roboto',
+            fontFamily: 'ArchitectNoto',
             fontSize: 12 / zoomScale,
             fontWeight: FontWeight.w600,
           ),
@@ -300,7 +300,7 @@ class ArchitectGridAxisPainterHelper {
             : '${dist.toStringAsFixed(2)} m',
         style: TextStyle(
           color: Colors.white,
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 10.0 / zoomScale,
           fontWeight: FontWeight.bold,
           backgroundColor: const Color(0xCC000000),
@@ -345,7 +345,7 @@ class ArchitectGridAxisPainterHelper {
         color: isGhost
             ? const Color(0xFF00E5FF)
             : (palette.isDark ? Colors.white : const Color(0xFFC62828)),
-        fontFamily: 'Roboto',
+        fontFamily: 'ArchitectNoto',
         fontSize: 10.5 / zoomScale,
         fontWeight: FontWeight.bold,
         height: 1.0,

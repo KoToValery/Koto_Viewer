@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import '../models/architect_line_style.dart';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
+import '../models/architect_wall.dart';
 import '../services/architect_roof_geometry.dart';
 import '../services/architect_roof_tool.dart';
 import '../services/architect_roof_junctions.dart';
@@ -23,11 +24,18 @@ import 'architect_path_solid.dart';
 import 'architect_wall_geometry.dart';
 import 'architect_wall_network.dart';
 
+typedef RoofSupportGuides = ({
+  List<(Offset, Offset)> bisectors,
+  List<(Offset, Offset)> midPerpendiculars,
+  List<Offset> intersections,
+});
+
 // === SECTION: COMMITTED ROOF PLANES 2D PAINTER ===
 
 class ArchitectRoofPainterHelper {
   static final _slopeIndicatorCenters = Expando<Offset>();
   static final _supportOutlines = Expando<({Path core, Path facade})>();
+  static final _supportGuides = Expando<RoofSupportGuides>();
 
   /// Dashed overhead edges on the next floor below the roof, using the same
   /// cleaned footprints as its own plan and drawing shared ridges only once.
@@ -146,27 +154,326 @@ class ArchitectRoofPainterHelper {
       publication ? .25 * patternUnit : 1.6 / scale,
       1,
     );
+
+    if (!publication) {
+      final guides = _supportGuides[wallStorey.walls] ??=
+          buildSupportingWallGuides(wallStorey);
+      _paintSupportingWallGuides(
+        canvas: canvas,
+        guides: guides,
+        palette: palette,
+        scale: scale,
+      );
+    }
+  }
+
+  /// Computes unobtrusive roof drafting construction guides from the exterior
+  /// wall perimeter: 45° / corner angle bisectors, mid-wall perpendiculars, and
+  /// interior bisector intersections (hip-ridge apex candidates).
+  static RoofSupportGuides buildSupportingWallGuides(ArchitectStorey storey) {
+    final walls = storey.walls.where((w) => !w.isParapet).toList();
+    if (walls.isEmpty) {
+      return (
+        bisectors: const [],
+        midPerpendiculars: const [],
+        intersections: const [],
+      );
+    }
+    final outerLoops = _exteriorPerimeterLoops(walls);
+    final bisectors = <(Offset, Offset)>[];
+    final midPerpendiculars = <(Offset, Offset)>[];
+    final intersections = <Offset>[];
+
+    for (final rawLoop in outerLoops) {
+      final loop = _simplifyCollinearLoop(rawLoop);
+      if (loop.length < 3) continue;
+      final signedArea = _signedPolygonArea(loop);
+      if (signedArea.abs() < 2.0) continue;
+      final ccw = signedArea > 0;
+
+      // Bounding box check to avoid tiny isolated wall stubs
+      var minX = loop.first.dx, maxX = loop.first.dx;
+      var minY = loop.first.dy, maxY = loop.first.dy;
+      for (final p in loop) {
+        if (p.dx < minX) minX = p.dx;
+        if (p.dx > maxX) maxX = p.dx;
+        if (p.dy < minY) minY = p.dy;
+        if (p.dy > maxY) maxY = p.dy;
+      }
+      if (math.min(maxX - minX, maxY - minY) < 1.0) continue;
+
+      final loopBisectors = <(Offset, Offset)>[];
+      for (var i = 0; i < loop.length; i++) {
+        final prev = loop[(i - 1 + loop.length) % loop.length];
+        final curr = loop[i];
+        final next = loop[(i + 1) % loop.length];
+        final inDelta = curr - prev;
+        final outDelta = next - curr;
+        if (inDelta.distance < 0.05 || outDelta.distance < 0.05) continue;
+        final inUnit = inDelta / inDelta.distance;
+        final outUnit = outDelta / outDelta.distance;
+        final nPrev = ccw
+            ? Offset(-inUnit.dy, inUnit.dx)
+            : Offset(inUnit.dy, -inUnit.dx);
+        final nNext = ccw
+            ? Offset(-outUnit.dy, outUnit.dx)
+            : Offset(outUnit.dy, -outUnit.dx);
+        final sum = nPrev + nNext;
+        if (sum.distance < 1e-4) continue;
+        var dir = sum / sum.distance;
+        if (!BimPolygonGeometry.contains(loop, curr + dir * 0.05)) {
+          if (BimPolygonGeometry.contains(loop, curr - dir * 0.05)) {
+            dir = -dir;
+          } else {
+            continue;
+          }
+        }
+        final hit = _clipRayInsideLoop(curr, dir, loop);
+        if (hit != null && (hit - curr).distance > 0.25) {
+          loopBisectors.add((curr, hit));
+        }
+      }
+      // Wavefront-trim bisectors at their earliest mutual collisions so hips
+      // terminate cleanly at ridge apexes without criss-crossing the whole plan.
+      final collisions = <({int i, int j, Offset pt, double di, double dj})>[];
+      for (var i = 0; i < loopBisectors.length; i++) {
+        final (a1, a2) = loopBisectors[i];
+        final da = a2 - a1;
+        final lenA = da.distance;
+        for (var j = i + 1; j < loopBisectors.length; j++) {
+          final (b1, b2) = loopBisectors[j];
+          if ((a1 - b1).distance < 0.05) continue;
+          final db = b2 - b1;
+          final lenB = db.distance;
+          final cross = da.dx * db.dy - da.dy * db.dx;
+          if (cross.abs() < 1e-4) continue;
+          final diff = b1 - a1;
+          final ta = (diff.dx * db.dy - diff.dy * db.dx) / cross;
+          final tb = (diff.dx * da.dy - diff.dy * da.dx) / cross;
+          if (ta > 0.02 && ta < 0.98 && tb > 0.02 && tb < 0.98) {
+            collisions.add((
+              i: i,
+              j: j,
+              pt: a1 + da * ta,
+              di: ta * lenA,
+              dj: tb * lenB,
+            ));
+          }
+        }
+      }
+      collisions.sort(
+        (a, b) => math.max(a.di, a.dj).compareTo(math.max(b.di, b.dj)),
+      );
+      final trimmedLen = [
+        for (final (a, b) in loopBisectors) (b - a).distance,
+      ];
+      for (final c in collisions) {
+        if (c.di <= trimmedLen[c.i] + 1e-3 &&
+            c.dj <= trimmedLen[c.j] + 1e-3) {
+          trimmedLen[c.i] = math.min(trimmedLen[c.i], c.di);
+          trimmedLen[c.j] = math.min(trimmedLen[c.j], c.dj);
+          if (!intersections.any((p) => (p - c.pt).distance < 0.05)) {
+            intersections.add(c.pt);
+          }
+        }
+      }
+      for (var i = 0; i < loopBisectors.length; i++) {
+        final (a, b) = loopBisectors[i];
+        final d = b - a;
+        final len = d.distance;
+        if (len > 1e-4 && trimmedLen[i] > 0.25) {
+          bisectors.add((a, a + d * (trimmedLen[i] / len)));
+        }
+      }
+
+      for (var i = 0; i < loop.length; i++) {
+        final a = loop[i];
+        final b = loop[(i + 1) % loop.length];
+        final d = b - a;
+        if (d.distance < 0.6) continue;
+        final mid = (a + b) / 2.0;
+        final u = d / d.distance;
+        final dir = ccw ? Offset(-u.dy, u.dx) : Offset(u.dy, -u.dx);
+        if (!BimPolygonGeometry.contains(loop, mid + dir * 0.05)) continue;
+        final hit = _clipRayInsideLoop(mid, dir, loop);
+        if (hit == null || (hit - mid).distance <= 0.25) continue;
+        final duplicate = midPerpendiculars.any(
+          (e) =>
+              ((e.$1 - mid).distance < 0.05 && (e.$2 - hit).distance < 0.05) ||
+              ((e.$1 - hit).distance < 0.05 && (e.$2 - mid).distance < 0.05),
+        );
+        if (!duplicate) {
+          midPerpendiculars.add((mid, hit));
+        }
+      }
+    }
+
+    return (
+      bisectors: bisectors,
+      midPerpendiculars: midPerpendiculars,
+      intersections: intersections,
+    );
+  }
+
+  static void _paintSupportingWallGuides({
+    required Canvas canvas,
+    required RoofSupportGuides guides,
+    required ArchitectCanvasPalette palette,
+    required double scale,
+  }) {
+    if (guides.bisectors.isEmpty && guides.midPerpendiculars.isEmpty) return;
+
+    final midPaint = Paint()
+      ..color = palette
+          .foreground(const Color(0xFF546E7A))
+          .withValues(alpha: 0.24)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.85 / scale;
+    for (final (a, b) in guides.midPerpendiculars) {
+      _drawDashedLine(
+        canvas,
+        a,
+        b,
+        midPaint,
+        dashLength: 10 / scale,
+        gapLength: 6 / scale,
+      );
+    }
+
+    final bisectorPaint = Paint()
+      ..color = palette
+          .foreground(const Color(0xFF00838F))
+          .withValues(alpha: 0.28)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.9 / scale;
+    for (final (a, b) in guides.bisectors) {
+      _drawDashedLine(
+        canvas,
+        a,
+        b,
+        bisectorPaint,
+        dashLength: 5 / scale,
+        gapLength: 4 / scale,
+      );
+    }
+
+    if (guides.intersections.isNotEmpty) {
+      final markScale = math.max(scale, 60.0);
+      final r = 3.2 / markScale;
+      final markPaint = Paint()
+        ..color = palette
+            .foreground(const Color(0xFF00838F))
+            .withValues(alpha: 0.42)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0 / scale;
+      for (final pt in guides.intersections) {
+        canvas.drawLine(pt - Offset(r, 0), pt + Offset(r, 0), markPaint);
+        canvas.drawLine(pt - Offset(0, r), pt + Offset(0, r), markPaint);
+      }
+    }
+  }
+
+  static List<List<Offset>> _exteriorPerimeterLoops(
+    List<ArchitectWall> walls,
+  ) => _outerContours(ArchitectWallNetwork.body(walls));
+
+  static List<List<Offset>> _outerContours(Path footprint) {
+    final loops = ArchitectPathSolid.contours(footprint);
+    return [
+      for (final loop in loops)
+        if (!loops.any(
+          (other) =>
+              other != loop && BimPolygonGeometry.contains(other, loop.first),
+        ))
+          loop,
+    ];
+  }
+
+  static List<Offset> _simplifyCollinearLoop(List<Offset> raw) {
+    final deduped = <Offset>[];
+    for (final pt in raw) {
+      if (deduped.isEmpty || (deduped.last - pt).distance > 1e-4) {
+        deduped.add(pt);
+      }
+    }
+    if (deduped.length >= 2 && (deduped.first - deduped.last).distance < 1e-4) {
+      deduped.removeLast();
+    }
+    if (deduped.length < 3) return deduped;
+
+    final result = List<Offset>.from(deduped);
+    var changed = true;
+    while (changed && result.length >= 3) {
+      changed = false;
+      for (var i = 0; i < result.length; i++) {
+        final prev = result[(i - 1 + result.length) % result.length];
+        final curr = result[i];
+        final next = result[(i + 1) % result.length];
+        final d1 = curr - prev;
+        final d2 = next - curr;
+        final l1 = d1.distance;
+        final l2 = d2.distance;
+        if (l1 < 1e-4 || l2 < 1e-4) {
+          result.removeAt(i);
+          changed = true;
+          break;
+        }
+        final cross = (d1.dx * d2.dy - d1.dy * d2.dx).abs() / (l1 * l2);
+        final dot = d1.dx * d2.dx + d1.dy * d2.dy;
+        if (cross < 1e-3 && dot > 0) {
+          result.removeAt(i);
+          changed = true;
+          break;
+        }
+      }
+    }
+    return result;
+  }
+
+  static double _signedPolygonArea(List<Offset> loop) {
+    var sum = 0.0;
+    for (var i = 0; i < loop.length; i++) {
+      final a = loop[i];
+      final b = loop[(i + 1) % loop.length];
+      sum += a.dx * b.dy - b.dx * a.dy;
+    }
+    return sum * 0.5;
+  }
+
+  static Offset? _clipRayInsideLoop(
+    Offset origin,
+    Offset dir,
+    List<Offset> loop,
+  ) {
+    double? bestT;
+    for (var i = 0; i < loop.length; i++) {
+      final a = loop[i];
+      final b = loop[(i + 1) % loop.length];
+      final seg = b - a;
+      final cross = dir.dx * seg.dy - dir.dy * seg.dx;
+      if (cross.abs() < 1e-6) continue;
+      final diff = a - origin;
+      final t = (diff.dx * seg.dy - diff.dy * seg.dx) / cross;
+      final s = (diff.dx * dir.dy - diff.dy * dir.dx) / cross;
+      if (t > 0.05 && s >= -1e-4 && s <= 1.0 + 1e-4) {
+        if (bestT == null || t < bestT) {
+          final mid = origin + dir * (t * 0.5);
+          if (BimPolygonGeometry.contains(loop, mid)) {
+            bestT = t;
+          }
+        }
+      }
+    }
+    return bestT == null ? null : origin + dir * bestT;
   }
 
   static ({Path core, Path facade}) _buildSupportOutlines(
     ArchitectStorey storey,
   ) {
     final walls = storey.walls.where((w) => !w.isParapet).toList();
-    List<List<Offset>> perimeter(Path footprint) {
-      final loops = ArchitectPathSolid.contours(footprint);
-      return [
-        for (final loop in loops)
-          if (!loops.any(
-            (other) =>
-                other != loop && BimPolygonGeometry.contains(other, loop.first),
-          ))
-            loop,
-      ];
-    }
-
     final core = Path();
     final facade = Path();
-    final facadeLoops = perimeter(ArchitectWallNetwork.body(walls));
+    final facadeLoops = _outerContours(ArchitectWallNetwork.body(walls));
     if (walls.every((w) => (w.thickness - w.coreThickness).abs() < 1e-6)) {
       for (final loop in facadeLoops) {
         core.addPolygon(loop, true);
@@ -174,7 +481,7 @@ class ArchitectRoofPainterHelper {
       return (core: core, facade: facade);
     }
 
-    final coreLoops = perimeter(
+    final coreLoops = _outerContours(
       ArchitectWallNetwork.body(ArchitectWallGeometry.coreWalls(walls)),
     );
     for (final loop in coreLoops) {
@@ -940,6 +1247,7 @@ class ArchitectRoofPainterHelper {
               text: text,
               style: TextStyle(
                 color: Colors.white,
+                fontFamily: 'ArchitectNoto',
                 fontSize: fontSize,
                 fontWeight: FontWeight.w600,
               ),

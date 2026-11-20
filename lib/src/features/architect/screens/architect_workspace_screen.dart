@@ -11923,7 +11923,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           _updateMidpointReferences(point);
 
-          return _snapApartmentEditPoint(point) ?? ArchitectSnapHelper.snapFree(
+          final aptSnap = _snapApartmentEditPoint(point);
+          if (aptSnap != null) return aptSnap;
+
+          final freeSnap = ArchitectSnapHelper.snapFree(
 
             midpointReferences: _midpointTracking.references,
 
@@ -11947,13 +11950,55 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           );
 
+          if (!_polygonEditor.edge && _magnetEnabled) {
+            final editingRoof = _elementMoveOriginal!.activeStorey.roofs
+                .where((r) => r.id == _polygonEditor.elementId)
+                .firstOrNull;
+            final objectSnap = freeSnap.isSnapped && const {
+              'Endpoint', 'Vertex', 'Intersection', 'Apparent intersection',
+              'Axis endpoint', 'Axis intersection', 'Center', 'Midpoint',
+              'Quadrant',
+            }.contains(freeSnap.snapLabel);
+            if (editingRoof != null && !objectSnap) {
+              final l10n = context.l10n;
+              final roofGuide = ArchitectRoofGeometry.resolveRoofVertexDragSnap(
+                raw: point,
+                originalPolygon: _polygonEditor.original!,
+                vertexIndex: _polygonEditor.index!,
+                roof: editingRoof,
+                project: _elementMoveOriginal!,
+                snapTolerance: (_touchInput ? 16 : 10) / _currentScale,
+                hip45Label: () => l10n.architectRoofSnap45Degrees,
+                hipAngleLabel: (deg) => l10n.architectRoofSnapHipAngle(deg),
+                hipIntersectionLabel: () =>
+                    l10n.architectRoofSnapHipIntersection,
+                cornerHipIntersectionLabel: () =>
+                    l10n.architectRoofSnapCornerHipIntersection,
+                ridgeAlignmentLabel: () => l10n.architectRoofSnapRidgeAlignment,
+                perpToCornerLabel: () => l10n.architectRoofSnapPerpToCorner,
+              );
+              if (roofGuide != null) {
+                return ArchitectSnapResult(
+                  point: roofGuide.point,
+                  isSnapped: true,
+                  snapLabel: roofGuide.snapLabel,
+                  magneticGuides: roofGuide.magneticGuides,
+                );
+              }
+            }
+          }
+
+          return freeSnap;
+
         },
 
         math.min(12 / _currentScale, .20));
 
       final snap = _polygonEditor.activeSnap;
 
-      _activeSnapLabel = _selectedRoof != null ? null : snap?.snapLabel;
+      _activeSnapLabel = (_selectedRoof != null && _polygonEditor.edge)
+          ? null
+          : snap?.snapLabel;
 
       _activeMagneticGuides = snap?.magneticGuides ?? [];
 

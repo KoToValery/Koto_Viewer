@@ -1584,6 +1584,7 @@ class DxfPainter extends CustomPainter {
   List<String> _resolveFontFallbacks(String primaryFont) {
     return [
       if (primaryFont != 'Arial') 'Arial',
+      'ArchitectNoto',
       'ISOCPEUR',
       'Segoe UI',
       'Roboto',

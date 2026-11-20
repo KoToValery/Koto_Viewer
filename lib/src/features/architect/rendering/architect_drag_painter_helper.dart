@@ -214,7 +214,7 @@ class ArchitectDragPainterHelper {
           color: palette.isDark
               ? const Color(0xFFEDF2F4)
               : const Color(0xFF34424C),
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 11,
           fontWeight: FontWeight.w500,
         ),

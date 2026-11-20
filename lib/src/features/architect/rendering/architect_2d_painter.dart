@@ -1856,7 +1856,7 @@ class Architect2dPainter extends CustomPainter {
             text: _project.formatLength(gap.distance),
             style: TextStyle(
               color: const Color(0xFF20252A),
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: 11.0,
               fontWeight: FontWeight.w700,
             ),
@@ -2292,7 +2292,7 @@ class Architect2dPainter extends CustomPainter {
         text: project.formatLength(wall.length),
         style: const TextStyle(
           color: Colors.white,
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 13.0,
           fontWeight: FontWeight.bold,
         ),

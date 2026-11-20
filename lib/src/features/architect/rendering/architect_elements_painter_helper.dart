@@ -178,7 +178,7 @@ class ArchitectElementsPainterHelper {
             text: slab.label,
             style: TextStyle(
               color: palette.foreground(const Color(0xFF37474F)),
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: 12.0,
               fontWeight: FontWeight.w600,
             ),
@@ -276,7 +276,7 @@ class ArchitectElementsPainterHelper {
               color: isSelected
                   ? const Color(0xFF00E5FF)
                   : palette.foreground(const Color(0xFF263238)),
-              fontFamily: 'Roboto',
+              fontFamily: 'ArchitectNoto',
               fontSize: fontSize,
               fontWeight: FontWeight.bold,
             ),
@@ -585,7 +585,7 @@ class ArchitectElementsPainterHelper {
                 color: isSelected
                     ? const Color(0xFF00E5FF)
                     : palette.foreground(const Color(0xFF263238)),
-                fontFamily: 'Roboto',
+                fontFamily: 'ArchitectNoto',
                 fontSize: 11.0,
                 fontWeight: FontWeight.bold,
               ),
@@ -709,7 +709,7 @@ class ArchitectElementsPainterHelper {
           text: marker.label != null ? '$label (${marker.label})' : label,
           style: TextStyle(
             color: color,
-            fontFamily: 'Roboto',
+            fontFamily: 'ArchitectNoto',
             fontSize: 12.0,
             fontWeight: FontWeight.bold,
           ),
@@ -1428,7 +1428,7 @@ class ArchitectElementsPainterHelper {
           text: unit.format(dist, decimals: decimals),
           style: const TextStyle(
             color: Colors.white,
-            fontFamily: 'Roboto',
+            fontFamily: 'ArchitectNoto',
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),

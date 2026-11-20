@@ -171,7 +171,7 @@ class ArchitectPolygonPainter {
         text: text,
         style: const TextStyle(
           color: Color(0xFF006064),
-          fontFamily: 'Roboto',
+          fontFamily: 'ArchitectNoto',
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
