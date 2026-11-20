@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_elevation.dart';
+import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_elevation_markers.dart';
@@ -229,4 +230,152 @@ void main() {
     image.dispose();
     picture.dispose();
   });
+
+  testWidgets(
+    'Section placement on floor plan snaps directly onto overhead roof ridge line',
+    (tester) async {
+      final model = workspace.commands();
+      addTearDown(model.dispose);
+      final ground = model.project.activeStorey;
+      // Angled gable ridge from (0, 1) to (6, 3) (not aligned to 0/15/45/90 deg).
+      final roofStorey = ArchitectStorey(
+        id: 'roof-storey',
+        name: 'Roof',
+        elevation: 3.0,
+        isRoof: true,
+        roofs: [
+          ArchitectRoofPlane(
+            id: 'roof-a',
+            storeyId: 'roof-storey',
+            points: const [
+              Offset(0, -2),
+              Offset(6, 0),
+              Offset(6, 3),
+              Offset(0, 1),
+            ],
+            eavesEdgeIndex: 0,
+            slopeDegrees: 30,
+          ),
+          ArchitectRoofPlane(
+            id: 'roof-b',
+            storeyId: 'roof-storey',
+            points: const [
+              Offset(6, 6),
+              Offset(0, 4),
+              Offset(0, 1),
+              Offset(6, 3),
+            ],
+            eavesEdgeIndex: 0,
+            slopeDegrees: 30,
+          ),
+        ],
+      );
+      model.commit(
+        model.project.copyWith(
+          storeys: [ground, roofStorey],
+          activeStoreyId: ground.id,
+        ),
+      );
+      await workspace.open(tester, model);
+      await headerNew(tester, 'section');
+      workspace.camera(tester).fit(const Rect.fromLTRB(-2, -3, 8, 7));
+      await tester.pumpAndSettle();
+
+      // Tap near (1, 1.333) and (5, 2.667) slightly off the ridge line.
+      await workspace.wallTap(tester, const Offset(1.0, 1.3333 + 0.06));
+      await workspace.wallTap(tester, const Offset(5.0, 2.6667 - 0.06));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('architect-view-direction-positive')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(model.project.sections, hasLength(1));
+      final sec = model.project.sections.single;
+      // Distance from point p to ridge line through (0, 1) -> (6, 3):
+      // Line normal is (-2, 6) / sqrt(40).
+      double distToRidge(Offset p) {
+        final v = p - const Offset(0, 1);
+        final cross = (v.dx * 2 - v.dy * 6).abs();
+        return cross / 6.324555320336759;
+      }
+
+      expect(distToRidge(sec.start), lessThan(1e-3));
+      expect(distToRidge(sec.end), lessThan(1e-3));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Section placement on roof plan extends cleanly along angled ridge line',
+    (tester) async {
+      final model = workspace.commands();
+      addTearDown(model.dispose);
+      final ground = model.project.activeStorey;
+      final roofStorey = ArchitectStorey(
+        id: 'roof-storey',
+        name: 'Roof',
+        elevation: 3.0,
+        isRoof: true,
+        roofs: [
+          ArchitectRoofPlane(
+            id: 'roof-a',
+            storeyId: 'roof-storey',
+            points: const [
+              Offset(0, -2),
+              Offset(6, 0),
+              Offset(6, 3),
+              Offset(0, 1),
+            ],
+            eavesEdgeIndex: 0,
+            slopeDegrees: 30,
+          ),
+          ArchitectRoofPlane(
+            id: 'roof-b',
+            storeyId: 'roof-storey',
+            points: const [
+              Offset(6, 6),
+              Offset(0, 4),
+              Offset(0, 1),
+              Offset(6, 3),
+            ],
+            eavesEdgeIndex: 0,
+            slopeDegrees: 30,
+          ),
+        ],
+      );
+      model.commit(
+        model.project.copyWith(
+          storeys: [ground, roofStorey],
+          activeStoreyId: roofStorey.id,
+        ),
+      );
+      await workspace.open(tester, model);
+      await headerNew(tester, 'section');
+      workspace.camera(tester).fit(const Rect.fromLTRB(-3, -3, 9, 7));
+      await tester.pumpAndSettle();
+
+      // Start on ridge endpoint (0, 1) and extend past (6, 3) to (7.5, 3.5).
+      await workspace.wallTap(tester, const Offset(0.03, 1.02));
+      await workspace.wallTap(tester, const Offset(7.5, 3.53));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('architect-view-direction-negative')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(model.project.sections, hasLength(1));
+      final sec = model.project.sections.single;
+      double distToRidge(Offset p) {
+        final v = p - const Offset(0, 1);
+        final cross = (v.dx * 2 - v.dy * 6).abs();
+        return cross / 6.324555320336759;
+      }
+
+      expect((sec.end - const Offset(0, 1)).distance, lessThan(1e-3));
+      expect(distToRidge(sec.start), lessThan(1e-3));
+      expect(sec.start.dx, greaterThan(7.0));
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

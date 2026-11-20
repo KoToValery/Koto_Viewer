@@ -249,6 +249,30 @@ void main() {
     expect(large, lessThan(math.max(small * 2, 10000)));
   });
 
+  test('a narrow diagonal hatch retains dash detail within the budget', () async {
+    final doc = _document(const [
+      DxfHatch(
+        isSolid: false,
+        patternName: 'DIAGONAL',
+        boundaryPaths: [
+          [Offset(0, 0), Offset(1000, 1000), Offset(1000, 1002), Offset(0, 2)],
+        ],
+        patternLines: [
+          DxfHatchPatternLine(
+            angle: 45,
+            basePoint: Offset.zero,
+            offset: Offset(-.5, .5),
+            dashes: [1.5, -1.5],
+          ),
+        ],
+      ),
+    ]);
+    final detailed = await _pixels(_record(doc, visible: _visible));
+    final preview = _record(doc, visible: _visible, interactiveHatches: true);
+    expect(DxfPainter.lastStats!.hatchPatternWork, greaterThan(0));
+    _expectSameVisibleDrawing(await _pixels(preview), detailed);
+  });
+
   test('dense interactive hatch bounds pattern work and keeps holes', () async {
     final doc = _document([
       _hatch(

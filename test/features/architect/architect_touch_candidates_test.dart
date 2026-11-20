@@ -587,4 +587,68 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'phone overlap keeps compact candidate switcher and visible deselect, delete, properties actions',
+    (tester) async {
+      final model = editing.seeded(scene);
+      addTearDown(model.dispose);
+      await phone(tester, model, language: 'bg');
+      await workspace.wallTap(tester, Offset.zero);
+      await tester.pumpAndSettle();
+
+      final pickerFinder = find.byType(ArchitectCandidatePicker);
+      final barFinder = find.byKey(const ValueKey('architect-selection-bar'));
+      expect(pickerFinder, findsOneWidget);
+      expect(barFinder, findsOneWidget);
+
+      final pickerRect = tester.getRect(pickerFinder);
+      final barRect = tester.getRect(barFinder);
+      // Compact pill instead of a full-width bulky bar, positioned above the quick bar.
+      expect(pickerRect.width, lessThan(320));
+      expect(pickerRect.height, lessThanOrEqualTo(46));
+      expect(pickerRect.bottom, lessThanOrEqualTo(barRect.top));
+
+      for (final key in [
+        'architect-selection-properties',
+        'architect-selection-delete',
+        'architect-clear-selection',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      }
+
+      // Cycle to wall underneath and confirm quick buttons stay visible and work.
+      await tapKey(tester, 'architect-candidate-next');
+      expect(workspace.overlay(tester).selectedElementIds, {'wall'});
+      expect(barFinder, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('architect-selection-properties')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-selection-delete')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-clear-selection')),
+        findsOneWidget,
+      );
+
+      // Deselect via quick button clears selection and dismisses switcher.
+      await tapKey(tester, 'architect-clear-selection');
+      expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+      expect(pickerFinder, findsNothing);
+
+      // Re-open on overlap and delete the top candidate ('column') via quick button.
+      await workspace.wallTap(tester, Offset.zero);
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).selectedElementIds, {'column'});
+      await tapKey(tester, 'architect-selection-delete');
+      expect(
+        model.project.activeStorey.columns.any((c) => c.id == 'column'),
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

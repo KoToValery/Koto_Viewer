@@ -28,6 +28,7 @@ import 'binary/kcad_service.dart';
 import 'rendering/dxf_math.dart';
 import 'rendering/dxf_painter.dart';
 import 'rendering/dxf_snap_helper.dart';
+import 'rendering/dxf_viewport_picture_cache.dart';
 import 'widgets/dxf_annotation_dialog.dart';
 import 'widgets/dxf_display_settings_sheet.dart';
 import 'widgets/dxf_entity_context_sheet.dart';
@@ -52,6 +53,7 @@ import '../structural_designer/structural_designer_screen.dart';
 // QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
 //
 // [SEC-01-WIDGET]   Widget Declaration & Public Api
+//   [TAG:VIEWPORT_PICTURE_CACHE] Retained CAD layer and layer revision
 // ============================================================================
 
 // === SECTION: [SEC-01-WIDGET] WIDGET DECLARATION & PUBLIC API ===
@@ -82,6 +84,9 @@ class DxfViewerScreen extends StatefulWidget {
 // === SECTION: STATE & LIFECYCLE (LOAD, SETTINGS, TRANSFORM) ===
 class _DxfViewerScreenState extends State<DxfViewerScreen> {
   final TransformationController _transformController = TransformationController();
+  // --- SUBSECTION: [TAG:VIEWPORT_PICTURE_CACHE] Retained CAD layer and layer revision ---
+  final _viewportPictures = DxfViewportPictureCache();
+  int _layerRevision = 0;
 
   DxfDocument? _document;
   bool _isLoading = true;
@@ -217,6 +222,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   @override
   void dispose() {
+    _viewportPictures.dispose();
     _focusNode.dispose();
     _transformSettleTimer?.cancel();
     _wheelSettleTimer?.cancel();
@@ -1361,6 +1367,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
           if (layer != null) {
             setState(() {
               layer.isVisible = false;
+              _layerRevision++;
             });
           }
         },
@@ -1369,6 +1376,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             for (final l in _document!.layers.values) {
               l.isVisible = (l.name == layerName);
             }
+            _layerRevision++;
           });
         },
         onShowAllLayers: () {
@@ -1376,6 +1384,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             for (final l in _document!.layers.values) {
               l.isVisible = true;
             }
+            _layerRevision++;
           });
         },
         onOpenLayerManager: _showLayersSheet,
@@ -1613,7 +1622,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       document: _document!,
       isDark: _canvasTheme.isDark,
       onLayersChanged: () {
-        setState(() {});
+        setState(() => _layerRevision++);
       },
     );
   }
@@ -2259,13 +2268,36 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                                     annotations: const [], // Rendered crisply on screen-space overlay above InteractiveViewer
                                     visibleCadRect: _getVisibleCadRect(),
                                     interactiveHatches: true,
-                                    highlightedEntity: _selectedEntity,
-                                    snapResult: _isMeasureMode && _snapEnabled ? (_hoveredSnap ?? _activeMeasureSnap) : null,
+                                    viewportPictures: _viewportPictures,
+                                    revision: _layerRevision,
                                     showGrid: _showGrid,
                                     settings: _displaySettings,
                                   ),
                                 ),
                               ),
+                              if (_selectedEntity != null ||
+                                  (_isMeasureMode && _snapEnabled &&
+                                      (_hoveredSnap != null || _activeMeasureSnap != null)))
+                                Positioned.fill(
+                                  child: IgnorePointer(
+                                    child: RepaintBoundary(
+                                      child: CustomPaint(
+                                        painter: DxfPainter(
+                                          document: _document!,
+                                          theme: _canvasTheme,
+                                          activeLayout: _activeLayout,
+                                          currentScale: _renderScale,
+                                          settings: _displaySettings,
+                                          overlaysOnly: true,
+                                          highlightedEntity: _selectedEntity,
+                                          snapResult: _isMeasureMode && _snapEnabled
+                                              ? (_hoveredSnap ?? _activeMeasureSnap)
+                                              : null,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               if (_showStructuralBimOverlay &&
                                   _structuralProject != null &&
                                   _structuralProject!.activeStorey.hasAnyElements)

@@ -17,6 +17,11 @@
 | Painter core | `DxfPainter`, `_drawGrid`, `_renderEntity` | Main `CustomPainter` pipeline, culling, grid, and entity dispatch |
 | Specialized renderers | `_renderSinglePatternLineFamily`, `_renderInsert`, `_renderDimensionText`, `_drawSingleLeaderAnnotation`, `_drawBadge` | Hatch patterns, block inserts, dimensions, leaders, and measurement badges |
 
+`[TAG:VIEWPORT_PICTURES]` replays a cached scene-space `Picture` when its
+buffered CAD region covers the new viewport at the same scale band. The
+Viewer supplies the cache and layer revision. Other painter callers use the
+direct path. `_paintOverlays` also supports the Viewer overlay boundary.
+
 `[TAG:PAINTER_TEXT_SCALE]` checks the selected text style before consulting the
 drawing-origin heuristics. Eligible styles share one origin result per paint.
 

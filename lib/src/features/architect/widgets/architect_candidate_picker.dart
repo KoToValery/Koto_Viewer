@@ -312,19 +312,28 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
         side: BorderSide(color: Theme.of(context).colorScheme.outline),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
             key: const ValueKey('architect-candidate-previous'),
             tooltip: l.architectPickPrevious,
+            style: IconButton.styleFrom(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: EdgeInsets.zero,
+            ),
             constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             onPressed: () =>
                 widget.onIndex((widget.index - 1) % widget.labels.length),
             icon: const AppIcon(AppIconId.chevronLeft),
           ),
-          Expanded(
+          Flexible(
             child: TextButton(
               key: const ValueKey('architect-candidate-list'),
-              style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(44, 44),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+              ),
               onPressed: _showList,
               child: Semantics(
                 label: l.architectPickPosition(
@@ -334,8 +343,9 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
                 ),
                 excludeSemantics: true,
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
+                    Flexible(
                       child: Text(
                         item.label,
                         maxLines: 1,
@@ -356,6 +366,10 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
           IconButton(
             key: const ValueKey('architect-candidate-next'),
             tooltip: l.architectPickNext,
+            style: IconButton.styleFrom(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: EdgeInsets.zero,
+            ),
             constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             onPressed: () =>
                 widget.onIndex((widget.index + 1) % widget.labels.length),
@@ -365,6 +379,10 @@ class _ArchitectCandidatePickerState extends State<ArchitectCandidatePicker> {
             IconButton(
               key: const ValueKey('architect-candidate-apply'),
               tooltip: remove ? l.architectPickRemove : l.architectPickAdd,
+              style: IconButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: EdgeInsets.zero,
+              ),
               constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               onPressed: widget.onApply,
               icon: AppIcon.fromMaterial(remove ? Icons.remove : Icons.add),

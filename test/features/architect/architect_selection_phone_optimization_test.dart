@@ -376,17 +376,25 @@ void main() {
             );
             expect(
               find.byKey(const ValueKey('architect-selection-bar')),
-              findsNothing,
-            );
-            expect(
-              find.byKey(const ValueKey('architect-selection-more')),
               findsOneWidget,
             );
+            for (final key in [
+              'architect-selection-properties',
+              'architect-selection-delete',
+              'architect-clear-selection',
+              'architect-selection-more',
+            ]) {
+              expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+            }
             await tools.chooseMulti(tester);
             await workspace.wallTap(tester, Offset.zero);
             final chooser = tester.getRect(
               find.byType(ArchitectCandidatePicker),
             );
+            if (textScale == 1.0) {
+              expect(chooser.width, lessThan(304));
+              expect(chooser.height, lessThanOrEqualTo(46));
+            }
             final position = find.byKey(
               const ValueKey('architect-candidate-position'),
             );

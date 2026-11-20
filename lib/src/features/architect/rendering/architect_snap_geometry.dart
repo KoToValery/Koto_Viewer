@@ -1,5 +1,6 @@
 import '../services/architect_ellipse_geometry.dart';
 import '../services/architect_roof_junctions.dart';
+import 'architect_panel_roof_geometry.dart';
 import 'architect_path_solid.dart';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -298,14 +299,50 @@ class ArchitectSnapGeometry {
         polygon(h, slab.id);
       }
     }
-    for (final roof in floor.roofs) {
-      if (roof.points.length >= 3) {
-        polygon(roof.points, roof.id);
-      }
-      for (final contour in ArchitectPathSolid.contours(
-        ArchitectRoofJunctions.of(floor, project: project).footprint(roof),
-      )) {
-        polygon(contour, roof.id);
+    final roofStoreys = <ArchitectStorey>[
+      if (floor.roofs.isNotEmpty) floor,
+      if (floor.isRoof)
+        ...project.storeys.where(
+          (s) => s.id != floor.id && s.roofs.isNotEmpty,
+        )
+      else ...() {
+        final overheadElevations = project.storeys
+            .where((s) => s.elevation > floor.elevation && s.roofs.isNotEmpty)
+            .map((s) => s.elevation)
+            .toList()
+          ..sort();
+        if (overheadElevations.isEmpty) return const <ArchitectStorey>[];
+        return project.storeys
+            .where(
+              (s) =>
+                  s.elevation == overheadElevations.first &&
+                  s.roofs.isNotEmpty,
+            )
+            .toList();
+      }(),
+    ];
+    for (final roofStorey in roofStoreys) {
+      final junctions = ArchitectRoofJunctions.of(roofStorey, project: project);
+      for (final roof in roofStorey.roofs) {
+        if (roof.points.length >= 3) {
+          polygon(roof.points, roof.id);
+        }
+        final footprint = roof.assembly.panels != null
+            ? ArchitectPanelRoofGeometry.panelFootprint(
+                roofStorey,
+                roof,
+                project: project,
+              )
+            : junctions.footprint(roof);
+        for (final contour in ArchitectPathSolid.contours(footprint)) {
+          polygon(contour, roof.id);
+        }
+        if (roof.isMansard) {
+          final knuckle = roof.knuckleSegment;
+          if (knuckle != null) {
+            edge(knuckle.$1, knuckle.$2, roof.id);
+          }
+        }
       }
     }
     for (final opening in floor.openings) {

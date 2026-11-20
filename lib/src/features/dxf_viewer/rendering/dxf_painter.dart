@@ -8,6 +8,7 @@ import 'dxf_hatch_pattern_helper.dart';
 import 'dxf_linetype_helper.dart';
 import 'dxf_math.dart';
 import 'dxf_snap_helper.dart';
+import 'dxf_viewport_picture_cache.dart';
 
 // ============================================================================
 // MASTER DXF PAINTER LLM SEARCH INDEX & TABLE OF CONTENTS
@@ -17,6 +18,7 @@ import 'dxf_snap_helper.dart';
 //
 // [SEC-01-ENUMS] [TAG:PAINTER_ENUMS] Enums, theme presets & paint stats models
 // [SEC-02-LOOP] [TAG:PAINTER_LOOP] DxfPainter declaration & main paint loop
+//   [TAG:VIEWPORT_PICTURES] Reuse recorded drawing regions in the Viewer
 // [SEC-03-STROKES] [TAG:PAINTER_STROKES] Canvas & stroke drawing helpers, pen colors
 // [SEC-04-GEOMETRY] [TAG:PAINTER_GEOM] Lines, arcs, circles, polylines, splines
 // [SEC-05-TEXT] [TAG:PAINTER_TEXT] Single-line TEXT & multiline MTEXT rendering
@@ -205,6 +207,8 @@ class DxfPainter extends CustomPainter {
   final Rect? visibleCadRect;
   /// Allow a lightweight preview of costly hatch patterns in the Viewer.
   final bool interactiveHatches;
+  final DxfViewportPictureCache? viewportPictures;
+  final bool overlaysOnly;
   final bool Function(DxfEntity entity)? entityFilter;
   final int revision;
   /// Optional presentation overrides; source geometry and layer styles stay intact.
@@ -222,6 +226,7 @@ class DxfPainter extends CustomPainter {
   double _remainingHatchWork = _maxHatchWorkPerPaint;
   double _hatchPatternWork = 0;
   Rect? _paintedVisibleCadRect;
+  DxfViewportPicture? _paintedPicture;
   bool? _archicadOriginForPaint;
   bool _preserveCadDrawOrder = false;
   Color _drawingBackground = const Color(0xFFFFFFFF);
@@ -239,6 +244,8 @@ class DxfPainter extends CustomPainter {
     this.settings = const DxfDisplaySettings(),
     this.visibleCadRect,
     this.interactiveHatches = false,
+    this.viewportPictures,
+    this.overlaysOnly = false,
     this.entityFilter,
     this.revision = 0,
     this.drawingColorOverride,
@@ -251,6 +258,45 @@ class DxfPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty || size.width <= 0 || size.height <= 0) return;
+    // --- SUBSECTION: [TAG:VIEWPORT_PICTURES] Reuse drawing geometry across camera changes ---
+    final cache = viewportPictures;
+    final viewport = visibleCadRect;
+    final reuseDrawing = !overlaysOnly && cache != null && viewport != null &&
+        viewport.isFinite && !viewport.isEmpty && currentScale.isFinite;
+    if (reuseDrawing) {
+      final picture = cache.obtain(
+        content: (document, revision, theme, activeLayout, size, settings,
+            showGrid, interactiveHatches, entityFilter, originalStyleLayers,
+            drawingColorOverride, drawingStrokeWidthOverride, modelPlacement,
+            modelLayerOverrides),
+        viewport: viewport,
+        drawingBounds: document.layoutBounds[activeLayout] ?? document.bounds,
+        scale: currentScale,
+        record: (target, region, scale) => DxfPainter(
+          document: document,
+          theme: theme,
+          activeLayout: activeLayout,
+          currentScale: scale,
+          visibleCadRect: region,
+          interactiveHatches: interactiveHatches,
+          settings: settings,
+          showGrid: showGrid,
+          entityFilter: entityFilter,
+          revision: revision,
+          originalStyleLayers: originalStyleLayers,
+          drawingColorOverride: drawingColorOverride,
+          drawingStrokeWidthOverride: drawingStrokeWidthOverride,
+          modelPlacement: modelPlacement,
+          modelLayerOverrides: modelLayerOverrides,
+        ).paint(target, size),
+      );
+      _paintedPicture = picture;
+      canvas.drawPicture(picture.picture);
+      if (highlightedEntity == null && snapResult == null &&
+          annotations.isEmpty && measurement == null) return;
+    } else {
+      _paintedPicture = null;
+    }
     _remainingHatchWork = _maxHatchWorkPerPaint;
     _hatchPatternWork = 0;
     _archicadOriginForPaint = null;
@@ -258,7 +304,7 @@ class DxfPainter extends CustomPainter {
     _preserveCadDrawOrder = hasWipeouts(document);
     _drawingBackground = activeLayout == 'Model' ? theme.bgColor : Colors.white;
 
-    _paintCallCount++;
+    if (!reuseDrawing && !overlaysOnly) _paintCallCount++;
     final paintStopwatch = Stopwatch()..start();
     int lastUs = paintStopwatch.elapsedMicroseconds;
 
@@ -315,6 +361,11 @@ class DxfPainter extends CustomPainter {
         tx + (cadPoint.dx - minX) * fitScale,
         ty + (maxY - cadPoint.dy) * fitScale,
       );
+    }
+
+    if (reuseDrawing || overlaysOnly) {
+      _paintOverlays(canvas, toCanvas, fitScale);
+      return;
     }
 
     // --- SUBSECTION: [TAG:HATCH_VIEWPORT_WORK] Bound pattern generation to the cached viewport ---
@@ -692,41 +743,7 @@ class DxfPainter extends CustomPainter {
       }
     }
 
-    // 3. Draw Highlighted Entity
-    if (highlightedEntity != null) {
-      try {
-        _drawEntityHighlight(canvas, highlightedEntity!, toCanvas);
-      } on Exception catch (_) {
-        // Highlight rendering failure ignored
-      }
-    }
-
-    // 4. Draw Active Snap Marker
-    if (snapResult != null) {
-      try {
-        _drawSnapMarker(canvas, snapResult!, toCanvas);
-      } on Exception catch (_) {
-        // Snap marker rendering failure ignored
-      }
-    }
-
-    // 5. Draw Saved Annotations (Leader notes)
-    if (annotations.isNotEmpty) {
-      try {
-        _drawAnnotations(canvas, toCanvas, fitScale);
-      } on Exception catch (_) {
-        // Annotations rendering failure ignored
-      }
-    }
-
-    // 6. Draw Active Measurement Overlay
-    if (measurement != null) {
-      try {
-        _drawMeasurement(canvas, measurement!, toCanvas, fitScale);
-      } on Exception catch (_) {
-        // Measurement overlay rendering failure ignored
-      }
-    }
+    _paintOverlays(canvas, toCanvas, fitScale);
 
     final totalUs = paintStopwatch.elapsedMicroseconds;
     final totalMs = totalUs / 1000.0;
@@ -802,6 +819,47 @@ class DxfPainter extends CustomPainter {
 
   Color? _colorOverrideFor(String layer) =>
       originalStyleLayers.contains(layer) ? null : drawingColorOverride;
+
+  void _paintOverlays(
+    Canvas canvas,
+    Offset Function(Offset) toCanvas,
+    double fitScale,
+  ) {
+    if (highlightedEntity != null) {
+      try {
+        _drawEntityHighlight(canvas, highlightedEntity!, toCanvas);
+      } on Exception catch (_) {
+        // Highlight rendering failure ignored
+      }
+    }
+
+    // 4. Draw Active Snap Marker
+    if (snapResult != null) {
+      try {
+        _drawSnapMarker(canvas, snapResult!, toCanvas);
+      } on Exception catch (_) {
+        // Snap marker rendering failure ignored
+      }
+    }
+
+    // 5. Draw Saved Annotations (Leader notes)
+    if (annotations.isNotEmpty) {
+      try {
+        _drawAnnotations(canvas, toCanvas, fitScale);
+      } on Exception catch (_) {
+        // Annotations rendering failure ignored
+      }
+    }
+
+    // 6. Draw Active Measurement Overlay
+    if (measurement != null) {
+      try {
+        _drawMeasurement(canvas, measurement!, toCanvas, fitScale);
+      } on Exception catch (_) {
+        // Measurement overlay rendering failure ignored
+      }
+    }
+  }
 
   static final _wipeouts = Expando<bool>();
   static bool hasWipeouts(DxfDocument document) => _wipeouts[document] ??=
@@ -2194,6 +2252,7 @@ class DxfPainter extends CustomPainter {
         for (final point in sceneBoundary) {
           final relative = point - base;
           final row = (relative.dx * normal.dx + relative.dy * normal.dy) / step;
+          if (!row.isFinite) continue;
           first = math.min(first, row);
           last = math.max(last, row);
         }
@@ -4015,8 +4074,22 @@ class DxfPainter extends CustomPainter {
         oldDelegate.snapResult != snapResult ||
         oldDelegate.showGrid != showGrid ||
         oldDelegate.interactiveHatches != interactiveHatches ||
+        oldDelegate.viewportPictures != viewportPictures ||
+        oldDelegate.overlaysOnly != overlaysOnly ||
         oldDelegate.settings != settings) {
       return true;
+    }
+
+    if (overlaysOnly) return oldDelegate.currentScale != currentScale;
+
+    final previousPicture = oldDelegate._paintedPicture;
+    if (previousPicture != null) {
+      _paintedPicture = previousPicture;
+      final viewport = visibleCadRect;
+      return viewport == null || viewport.isEmpty || !viewport.isFinite ||
+          !currentScale.isFinite || !previousPicture.covers(
+            viewport, DxfViewportPictureCache.recordingScale(currentScale),
+          );
     }
 
     // Zoom-Out & Fit-to-screen Hardware Transform Optimization:

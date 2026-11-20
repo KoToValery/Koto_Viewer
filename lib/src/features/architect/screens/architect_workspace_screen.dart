@@ -2247,8 +2247,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       onApply: _multiSelect ? _applyTouchCandidate : null,
       isSelected: _candidateSelected,
       willRemove: _candidateWillRemove,
-      trailing: MediaQuery.sizeOf(context).width < 600 && _showSelectionActions
-          ? _buildSelectionBar(menuOnly: true) : null,
     );
   }
 
@@ -12398,9 +12396,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_linearDraftTool && _draftStart == null && !_isActivelyDraggingHandle) {
 
-      final snap = _snapWall(rawModel);
+      final snap = _viewMarkerTool
+          ? _snapElement(rawModel)
+          : _snapWall(rawModel);
 
-      _adoptWallReference(snap.wallAttachment);
+      if (!_viewMarkerTool) _adoptWallReference(snap.wallAttachment);
 
       _cursorModel = snap.point;
 
@@ -12456,6 +12456,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final origNormal = Offset(-origDir.dy, origDir.dx);
 
+      final isViewMarker =
+          original.wallTypeId == 'section' ||
+          original.wallTypeId == 'elevation';
       final isStraightLinear =
           (!original.isCurved &&
               _elementMoveOriginal!.activeStorey.walls.any(
@@ -12476,6 +12479,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               underlay: _currentUnderlayDoc,
               frame: _effectiveUnderlayFrame,
               visibility: _effectiveUnderlayLayerVisibility,
+            )
+          : isViewMarker
+          ? _snapElement(
+              rawTarget,
+              anchor: _wallDragStart ? original.endPoint : original.startPoint,
+              tolerancePixels: _touchInput ? 14 : 10,
+              source: snapProject,
             )
           : ArchitectWallSnap.resolve(
               coreOnly: true,
@@ -13223,11 +13233,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (_wallDirectionLocked) return;
 
-      final snap = _snapWall(rawModel, anchor: _draftStart);
+      final snap = _viewMarkerTool
+          ? _snapElement(rawModel, anchor: _draftStart)
+          : _snapWall(rawModel, anchor: _draftStart);
 
       _activeMagneticGuides = snap.magneticGuides;
 
-      _orientWallReference(snap.point);
+      if (!_viewMarkerTool) _orientWallReference(snap.point);
 
       _draftEnd = snap.point;
 
@@ -16032,11 +16044,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (_draftStart == null) {
 
-        final snap = _snapWall(rawModel);
+        final snap = _viewMarkerTool
+            ? _snapElement(rawModel)
+            : _snapWall(rawModel);
 
-        _adoptWallReference(snap.wallAttachment);
+        if (!_viewMarkerTool) {
 
-        _wallStartAttachment = snap.wallAttachment;
+          _adoptWallReference(snap.wallAttachment);
+
+          _wallStartAttachment = snap.wallAttachment;
+
+        }
 
         setState(() {
 
@@ -16052,9 +16070,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       } else {
 
-        final snap = _snapWall(rawModel, anchor: _draftStart);
+        final snap = _viewMarkerTool
+            ? _snapElement(rawModel, anchor: _draftStart)
+            : _snapWall(rawModel, anchor: _draftStart);
 
-        _orientWallReference(snap.point);
+        if (!_viewMarkerTool) _orientWallReference(snap.point);
 
         if ((snap.point - _draftStart!).distance >= .001 &&
             !_viewMarkerTool) {
@@ -30124,6 +30144,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             l.architectUnderlayEdit,
             Icons.tune,
             isCad ? _openCadEditDialog : _openRasterEditDialog,
+            primary: true,
             color: const Color(0xFFB388FF),
           ),
           action(
@@ -30131,6 +30152,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             l.delete,
             Icons.delete_outline,
             isCad ? _removeCurrentCadUnderlay : _deleteSelectedRaster,
+            primary: true,
             color: danger,
           ),
           action(
@@ -33344,11 +33366,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               );
                             }),
                           if (_touchCandidates != null && !_is3DView && !_printPreview)
-                            Padding(padding: const EdgeInsets.all(8),
+                            Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
                               child: _buildTouchCandidatePicker(),
                               ),
-                          if (_showSelectionActions &&
-                              (_touchCandidates == null || MediaQuery.sizeOf(context).width >= 600)) Listener(
+                          if (_showSelectionActions) Listener(
                             onPointerDown: (_) => _dismissTouchCandidates(),
                             child: _buildSelectionBar(),
                               ),

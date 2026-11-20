@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/services/dwg_reader_service.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_painter.dart';
+import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_viewport_picture_cache.dart';
 
 // Opt-in local benchmark; no proprietary drawing is checked into the repository.
 void main() {
@@ -18,6 +19,7 @@ void main() {
     'DWG_ZOOM_INTERACTIVE_HATCHES',
   );
   const compareHatches = bool.fromEnvironment('DWG_ZOOM_COMPARE_HATCHES');
+  const retainPictures = bool.fromEnvironment('DWG_ZOOM_RETAIN_PICTURES');
   const requestedRepeats = int.fromEnvironment(
     'DWG_ZOOM_REPEATS',
     defaultValue: 4,
@@ -36,6 +38,8 @@ void main() {
           ? 'DWG zoom paint and raster benchmark ($mode)'
           : 'DWG zoom paint and raster benchmark',
       () async {
+        final cache = retainPictures ? DxfViewportPictureCache() : null;
+        if (cache != null) addTearDown(cache.dispose);
         final openClock = Stopwatch()..start();
         final doc = await DwgReaderService.read(input);
         openClock.stop();
@@ -56,10 +60,11 @@ void main() {
         print('DWG_ZOOM bounds=${doc.bounds} stats=${doc.entityStats}');
         final center = crop == null ? doc.bounds.center : Offset(crop[0], crop[1]);
         final zooms = crop == null
-            ? [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0]
+            ? [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, if (retainPictures) 1.0]
             : [size.width / (fit * crop[2])];
         final delta = center - doc.bounds.center;
         for (final zoom in zooms) {
+          final recordingsBefore = cache?.recordings ?? 0;
           final visible = Rect.fromCenter(
             center: center,
             width: size.width / (fit * zoom),
@@ -81,6 +86,7 @@ void main() {
               visibleCadRect: visible,
               showGrid: false,
               interactiveHatches: interactiveHatches,
+              viewportPictures: cache,
             );
             final clock = Stopwatch()..start();
             painter.paint(canvas, size);
@@ -116,6 +122,7 @@ void main() {
           print(
             'DWG_ZOOM zoom=$zoom paintMs=${_median(paints)} rasterMs=${_median(rasters)} '
             'firstPaintMs=$firstPaintMs firstRasterMs=$firstRasterMs '
+            'recordings=${(cache?.recordings ?? 0) - recordingsBefore} retained=$retainPictures '
             'peakPictureBytes=$peakPictureBytes hatchMode=$mode ${DxfPainter.lastStats}',
           );
         }
