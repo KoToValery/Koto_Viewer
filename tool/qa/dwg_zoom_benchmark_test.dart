@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/services/dwg_reader_service.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_painter.dart';
@@ -11,6 +13,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const input = String.fromEnvironment('DWG_ZOOM_INPUT');
   const output = String.fromEnvironment('DWG_ZOOM_OUTPUT');
+  const region = String.fromEnvironment('DWG_ZOOM_REGION');
   const configuredInteractiveHatches = bool.fromEnvironment(
     'DWG_ZOOM_INTERACTIVE_HATCHES',
   );
@@ -36,7 +39,10 @@ void main() {
         final openClock = Stopwatch()..start();
         final doc = await DwgReaderService.read(input);
         openClock.stop();
-        const size = Size(390, 800);
+        // Optional CAD x,y,width gives a repeatable, close-up drawing comparison.
+        final crop = region.isEmpty ? null : region.split(',').map(double.parse).toList();
+        if (crop != null && outputDirectory.isNotEmpty) await _loadWindowsFonts();
+        final size = crop == null ? const Size(390, 800) : const Size(960, 520);
         final fit = math.min(
           (size.width - 64) / doc.bounds.width,
           (size.height - 64) / doc.bounds.height,
@@ -48,9 +54,14 @@ void main() {
         );
         // ignore: avoid_print
         print('DWG_ZOOM bounds=${doc.bounds} stats=${doc.entityStats}');
-        for (final zoom in [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0]) {
+        final center = crop == null ? doc.bounds.center : Offset(crop[0], crop[1]);
+        final zooms = crop == null
+            ? [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0]
+            : [size.width / (fit * crop[2])];
+        final delta = center - doc.bounds.center;
+        for (final zoom in zooms) {
           final visible = Rect.fromCenter(
-            center: doc.bounds.center,
+            center: center,
             width: size.width / (fit * zoom),
             height: size.height / (fit * zoom),
           );
@@ -62,7 +73,7 @@ void main() {
             final canvas = Canvas(rec)..clipRect(Offset.zero & size);
             canvas.translate(size.width / 2, size.height / 2);
             canvas.scale(zoom);
-            canvas.translate(-size.width / 2, -size.height / 2);
+            canvas.translate(-size.width / 2 - delta.dx * fit, -size.height / 2 + delta.dy * fit);
             final painter = DxfPainter(
               document: doc,
               theme: DxfCanvasTheme.darkCad,
@@ -112,6 +123,19 @@ void main() {
       skip: input.isEmpty || !Platform.isWindows,
       timeout: const Timeout(Duration(minutes: 3)),
     );
+  }
+}
+
+Future<void> _loadWindowsFonts() async {
+  final windows = Platform.environment['WINDIR'];
+  if (windows == null) return;
+  const fonts = {'Arial': 'arial.ttf', 'Arial Narrow': 'arialn.ttf'};
+  for (final entry in fonts.entries) {
+    final file = File('$windows/Fonts/${entry.value}');
+    if (!await file.exists()) continue;
+    await (FontLoader(entry.key)
+          ..addFont(file.readAsBytes().then(ByteData.sublistView)))
+        .load();
   }
 }
 

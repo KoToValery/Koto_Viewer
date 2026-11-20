@@ -86,6 +86,24 @@ void main() {
       expect(bounds.right, greaterThan(80));
     });
 
+    test('Straight line dashes match the equivalent path', () {
+      const start = Offset(6, 9);
+      const end = Offset(86, 69);
+      const pattern = [12.0, 6.0, 2.0, 6.0];
+      final source = Path()..moveTo(start.dx, start.dy)..lineTo(end.dx, end.dy);
+      final expected = DxfLinetypeHelper.createDashedPath(source, pattern)
+          .computeMetrics().toList();
+      final actual = DxfLinetypeHelper.createDashedLine(start, end, pattern)
+          .computeMetrics().toList();
+      expect(actual.length, expected.length);
+      for (var i = 0; i < actual.length; i++) {
+        expect(actual[i].length, closeTo(expected[i].length, .001));
+        final startDelta = actual[i].getTangentForOffset(0)!.position -
+            expected[i].getTangentForOffset(0)!.position;
+        expect(startDelta.distance, lessThan(.001));
+      }
+    });
+
     test('Resolves Cyrillic linetype names accurately without stripping letters', () {
       expect(DxfLinetypeHelper.resolvePattern('Пунктир'), DxfLinetypeHelper.dottedPattern);
       expect(DxfLinetypeHelper.resolvePattern('Точкова'), DxfLinetypeHelper.dottedPattern);

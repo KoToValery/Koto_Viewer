@@ -1568,6 +1568,9 @@ class DxfPainter extends CustomPainter {
     if (f.contains('times')) return 'Times New Roman';
     if (f.contains('segoe')) return 'Segoe UI';
     if (f.contains('tahoma')) return 'Tahoma';
+    if (f == 'arialn.ttf' || f == 'arialn' || f.contains('arial narrow')) {
+      return 'Arial Narrow';
+    }
     if (f.contains('arial')) return 'Arial';
 
     final dotIdx = ts.fontFile!.lastIndexOf('.');
@@ -1824,7 +1827,14 @@ class DxfPainter extends CustomPainter {
       );
 
       if (entity.refWidth != null && entity.refWidth! > 0) {
-        textPainter.layout(maxWidth: (entity.refWidth! * fitScale) / scaleFactor);
+        // The DWG/DXF box describes the final, horizontally scaled text.
+        final widthFactor = entity.widthFactor > 0 &&
+                (entity.widthFactor - 1.0).abs() > 0.001
+            ? entity.widthFactor
+            : 1.0;
+        textPainter.layout(
+          maxWidth: (entity.refWidth! * fitScale) / (scaleFactor * widthFactor),
+        );
       } else {
         textPainter.layout();
       }
@@ -2055,6 +2065,7 @@ class DxfPainter extends CustomPainter {
     var work = 0.0;
     var inspected = 0.0;
     var hasDenseFamily = false;
+    List<Offset>? sceneBoundary;
     for (final line in patternLines) {
       // Include the cost of reading the definition even for subpixel families.
       final definitionWork = 1 + line.dashes.length;
@@ -2065,7 +2076,7 @@ class DxfPainter extends CustomPainter {
         return;
       }
       inspected += definitionWork;
-      final family = _planHatchPatternLineFamily(
+      var family = _planHatchPatternLineFamily(
         line: line,
         bounds: bounds,
         toCanvas: toCanvas,
@@ -2073,6 +2084,31 @@ class DxfPainter extends CustomPainter {
         scale: scale,
       );
       if (family == null) continue;
+      if (interactiveHatches && work + family.work > budget) {
+        // A long diagonal strip can intersect very few rows despite its large
+        // axis-aligned bounds. Refine small boundaries before using the tint.
+        final vertexCount = hatch.boundaryPaths.fold<int>(
+          0, (count, loop) => count + loop.length,
+        );
+        final refinementWork = sceneBoundary == null ? 2 * vertexCount : vertexCount;
+        if (vertexCount <= 64 && work + refinementWork <= budget) {
+          sceneBoundary ??= [
+            for (final loop in hatch.boundaryPaths)
+              for (final point in loop) toCanvas(point),
+          ];
+          inspected += refinementWork;
+          work += refinementWork;
+          family = _planHatchPatternLineFamily(
+            line: line,
+            bounds: bounds,
+            toCanvas: toCanvas,
+            fitScale: fitScale,
+            scale: scale,
+            sceneBoundary: sceneBoundary,
+          );
+          if (family == null) continue;
+        }
+      }
       work += family.work;
       if (interactiveHatches && work > budget) {
         _remainingHatchWork -= inspected;
@@ -2090,7 +2126,7 @@ class DxfPainter extends CustomPainter {
     if (families.isEmpty) return;
     _hatchPatternWork += work;
 
-    // Crisp CAD line thickness for hatch lines
+    // Keep the resulting stroke thin in screen space at every zoom.
     final double lineThickness = math.min(
       strokePaint.strokeWidth,
       (0.85 * settings.lineThicknessScale) / scale,
@@ -2098,7 +2134,7 @@ class DxfPainter extends CustomPainter {
     final patternStrokePaint = Paint()
       ..color = strokePaint.color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(0.15, lineThickness)
+      ..strokeWidth = lineThickness
       ..strokeCap = StrokeCap.butt
       ..isAntiAlias = true;
 
@@ -2125,6 +2161,7 @@ class DxfPainter extends CustomPainter {
     required Offset Function(Offset) toCanvas,
     required double fitScale,
     required double scale,
+    List<Offset>? sceneBoundary,
   }) {
     final angle = line.angle * math.pi / 180.0;
     final direction = Offset(math.cos(angle), -math.sin(angle));
@@ -2148,8 +2185,23 @@ class DxfPainter extends CustomPainter {
               bounds.height * normal.dy.abs()) /
           (2 * step.abs());
       if (!centerRow.isFinite || !halfRows.isFinite) return null;
-      firstRow = (centerRow - halfRows).floor();
-      lastRow = (centerRow + halfRows).ceil();
+      var minRow = centerRow - halfRows;
+      var maxRow = centerRow + halfRows;
+      if (sceneBoundary != null) {
+        var first = double.infinity;
+        var last = double.negativeInfinity;
+        for (final point in sceneBoundary) {
+          final relative = point - base;
+          final row = (relative.dx * normal.dx + relative.dy * normal.dy) / step;
+          first = math.min(first, row);
+          last = math.max(last, row);
+        }
+        minRow = math.max(minRow, first);
+        maxRow = math.min(maxRow, last);
+        if (minRow > maxRow) return null;
+      }
+      firstRow = minRow.floor();
+      lastRow = maxRow.ceil();
     }
     final rows = lastRow - firstRow + 1;
     if (rows <= 0) return null;

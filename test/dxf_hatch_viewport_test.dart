@@ -68,17 +68,18 @@ Picture _record(
   Rect? visible,
   String layout = 'Model',
   bool interactiveHatches = false,
+  double zoom = _zoom,
 }) {
   final recorder = PictureRecorder();
   final canvas = Canvas(recorder)..clipRect(Offset.zero & _size);
   canvas.drawColor(const Color(0xFFFFFFFF), BlendMode.src);
   canvas.translate(200, 200);
-  canvas.scale(_zoom);
+  canvas.scale(zoom);
   canvas.translate(-200, -200);
   DxfPainter(
     document: doc,
     theme: DxfCanvasTheme.paperWhite,
-    currentScale: _zoom,
+    currentScale: zoom,
     visibleCadRect: visible,
     activeLayout: layout,
     showGrid: false,
@@ -201,6 +202,31 @@ void main() {
       ),
       await _pixels(_record(doc, layout: 'Sheet')),
     );
+  });
+
+  test('hatch strokes stay thin at high zoom', () async {
+    const zoom = 100.0;
+    final doc = _document([
+      _hatch(hole: false, patternLines: const [
+        DxfHatchPatternLine(
+          angle: 0,
+          basePoint: Offset.zero,
+          offset: Offset(0, .2),
+          dashes: [],
+        ),
+      ]),
+    ]);
+    final visible = Rect.fromCenter(
+      center: _bounds.center,
+      width: _size.width / (_fit * zoom),
+      height: _size.height / (_fit * zoom),
+    );
+    final bytes = await _pixels(_record(
+      doc, visible: visible, interactiveHatches: true, zoom: zoom,
+    ));
+    final ink = List.generate(400, (y) => bytes[(y * 400 + 200) * 4])
+        .where((red) => red < 220).length;
+    expect(ink, inInclusiveRange(30, 130));
   });
 
   test('pattern work is bounded by the viewport instead of a large hatch', () {

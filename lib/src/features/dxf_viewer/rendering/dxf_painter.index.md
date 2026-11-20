@@ -39,6 +39,10 @@ hatch and per paint. `DxfViewerScreen` opts in through `interactiveHatches`.
 Expensive patterns use a light fill on their original even-odd boundary.
 Exact rendering callers retain the existing detail policy. Integer cycle
 iteration and batched dots also apply to the detailed path.
+Pattern strokes are limited in screen units so high zoom does not merge the
+lines into a solid fill.
+An over-budget estimate can be refined against a small hatch boundary, which
+keeps detail on diagonal strips whose axis-aligned bounds contain many empty rows.
 Pan hysteresis uses `_paintedVisibleCadRect` to accumulate movement from the
 last recorded layer, including when several small pans skip repainting.
 

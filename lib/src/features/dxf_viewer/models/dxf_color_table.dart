@@ -24,61 +24,28 @@ class DxfColorTable {
     list[8] = const Color(0xFF808080); // Dark Gray
     list[9] = const Color(0xFFC0C0C0); // Light Gray
 
-    // 10-249: 24 hues with 5 lightness/saturation variations each (10 levels per hue)
-    const hues = 24;
-    for (int hueIdx = 0; hueIdx < hues; hueIdx++) {
-      final double hue = (hueIdx * 15.0); // 0, 15, 30 ... 345 degrees
-      for (int shade = 0; shade < 10; shade++) {
-        final int index = 10 + (hueIdx * 10) + shade;
-        if (index > 249) break;
-
-        double s = 1.0;
-        double v = 1.0;
-
-        switch (shade) {
-          case 0:
-            s = 1.0;
-            v = 1.0;
-            break;
-          case 1:
-            s = 0.8;
-            v = 1.0;
-            break;
-          case 2:
-            s = 0.6;
-            v = 1.0;
-            break;
-          case 3:
-            s = 0.4;
-            v = 1.0;
-            break;
-          case 4:
-            s = 0.2;
-            v = 1.0;
-            break;
-          case 5:
-            s = 1.0;
-            v = 0.8;
-            break;
-          case 6:
-            s = 0.8;
-            v = 0.8;
-            break;
-          case 7:
-            s = 0.6;
-            v = 0.8;
-            break;
-          case 8:
-            s = 0.4;
-            v = 0.6;
-            break;
-          case 9:
-            s = 0.2;
-            v = 0.4;
-            break;
-        }
-
-        list[index] = HSVColor.fromAHSV(1.0, hue, s, v).toColor();
+    // Match the indexed palette used by the native DWG reader. Each hue has
+    // five intensity levels, with a pastel variant at each level.
+    const intensities = [255, 204, 153, 127, 76];
+    for (var hue = 0; hue < 24; hue++) {
+      final quarter = hue % 4;
+      for (var shade = 0; shade < intensities.length; shade++) {
+        final level = intensities[shade];
+        final rising = level * quarter ~/ 4;
+        final falling = level * (4 - quarter) ~/ 4;
+        final (r, g, b) = switch (hue ~/ 4) {
+          0 => (level, rising, 0),
+          1 => (falling, level, 0),
+          2 => (0, level, rising),
+          3 => (0, falling, level),
+          4 => (rising, 0, level),
+          _ => (level, 0, falling),
+        };
+        final index = 10 + hue * 10 + shade * 2;
+        list[index] = Color.fromARGB(255, r, g, b);
+        list[index + 1] = Color.fromARGB(
+          255, (r + level) ~/ 2, (g + level) ~/ 2, (b + level) ~/ 2,
+        );
       }
     }
 

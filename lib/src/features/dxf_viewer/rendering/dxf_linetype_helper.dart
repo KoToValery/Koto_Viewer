@@ -304,9 +304,31 @@ class DxfLinetypeHelper {
     List<double> pattern, {
     double scale = 1.0,
   }) {
-    final path = Path()
-      ..moveTo(p1.dx, p1.dy)
-      ..lineTo(p2.dx, p2.dy);
-    return createDashedPath(path, pattern, scale: scale);
+    final path = Path();
+    if (pattern.isEmpty || pattern.any((part) => part <= 0 || !part.isFinite)) {
+      return path..moveTo(p1.dx, p1.dy)..lineTo(p2.dx, p2.dy);
+    }
+    final delta = p2 - p1;
+    final length = delta.distance;
+    if (length == 0 || !length.isFinite) return path;
+    final direction = delta / length;
+    final effectiveScale = scale.isFinite && scale > 0 ? scale : 1.0;
+    var distance = 0.0;
+    var index = 0;
+    var draw = true;
+    while (distance < length) {
+      final end = math.min(distance + pattern[index] * effectiveScale, length);
+      if (end <= distance) break;
+      if (draw) {
+        final startPoint = p1 + direction * distance;
+        final endPoint = p1 + direction * end;
+        path.moveTo(startPoint.dx, startPoint.dy);
+        path.lineTo(endPoint.dx, endPoint.dy);
+      }
+      distance = end;
+      index = (index + 1) % pattern.length;
+      draw = !draw;
+    }
+    return path;
   }
 }

@@ -452,6 +452,8 @@ EOF
 
       final resolvedBlue = DxfColorTable.resolveColor(colorIndex: 5, isDarkBackground: true);
       expect(resolvedBlue, const Color(0xFF0000FF));
+      expect(DxfColorTable.resolveColor(colorIndex: 132), const Color(0xFF00CCCC));
+      expect(DxfColorTable.resolveColor(colorIndex: 113), const Color(0xFF66CC99));
 
       final resolvedTrueColor = DxfColorTable.resolveColor(trueColor: 65280, isDarkBackground: true);
       expect(resolvedTrueColor, const Color(0xFF00FF00));
