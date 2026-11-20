@@ -222,6 +222,7 @@ class ArchitectSavedDrawing {
   final int scale;
   final int sourceNumber;
   final bool roof;
+  final bool ceilingPlan;
   final Map<String, bool> visibility;
   const ArchitectSavedDrawing({
     required this.id,
@@ -231,11 +232,13 @@ class ArchitectSavedDrawing {
     this.scale = 100,
     this.sourceNumber = 1,
     this.roof = false,
+    this.ceilingPlan = false,
     this.visibility = const {},
   });
   ArchitectSavedDrawing copyWith({
     String? name,
     int? scale,
+    bool? ceilingPlan,
     Map<String, bool>? visibility,
   }) => ArchitectSavedDrawing(
     id: id,
@@ -245,9 +248,13 @@ class ArchitectSavedDrawing {
     scale: scale ?? this.scale,
     sourceNumber: sourceNumber,
     roof: roof,
+    ceilingPlan: ceilingPlan ?? this.ceilingPlan,
     visibility: visibility ?? this.visibility,
   );
-  String get sourceKey => '${kind.name}:$sourceId';
+  String get sourceKey =>
+      ceilingPlan && kind == ArchitectDrawingKind.plan
+          ? 'ceiling:$sourceId'
+          : '${kind.name}:$sourceId';
   Map<String, dynamic> toJson() => {
     'id': id,
     'sourceId': sourceId,
@@ -256,6 +263,7 @@ class ArchitectSavedDrawing {
     'scale': scale,
     'sourceNumber': sourceNumber,
     'roof': roof,
+    if (ceilingPlan) 'ceilingPlan': true,
     'visibility': visibility,
   };
   factory ArchitectSavedDrawing.fromJson(Map j) => ArchitectSavedDrawing(
@@ -266,6 +274,7 @@ class ArchitectSavedDrawing {
     scale: (j['scale'] as num?)?.toInt() ?? 100,
     sourceNumber: (j['sourceNumber'] as num?)?.toInt() ?? 1,
     roof: j['roof'] == true,
+    ceilingPlan: j['ceilingPlan'] == true,
     visibility: Map<String, bool>.from(j['visibility'] as Map? ?? {}),
   );
 }

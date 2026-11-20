@@ -13,6 +13,7 @@ import '../widgets/architect_building_sections_screen.dart';
 import '../widgets/architect_elevations_screen.dart';
 import 'architect_building_section.dart';
 import 'architect_building_elevation.dart';
+import 'architect_workspace_view_controller.dart';
 
 class ArchitectPublicationSources {
   final Map<String, DxfDocument> underlays;
@@ -131,6 +132,7 @@ class ArchitectDrawingPublisher {
     drawing.id,
     drawing.sourceKey,
     drawing.roof,
+    drawing.ceilingPlan,
     denominator,
     l.localeName,
     visibilityKey(drawing.visibility),
@@ -283,6 +285,9 @@ class ArchitectDrawingPublisher {
           l10n: l,
           layer: ArchitectPaintLayer.model,
           paintGrid: false,
+          planMode: drawing.ceilingPlan
+              ? ArchitectPlanMode.ceilingServices
+              : ArchitectPlanMode.floor,
           activeTool: ArchitectTool.select,
           zoomScale: scope.renderScale,
         ).paint(canvas, const Size(10000, 10000));

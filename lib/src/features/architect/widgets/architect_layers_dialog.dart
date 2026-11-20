@@ -45,6 +45,9 @@ class _ArchitectLayersDialogState extends State<ArchitectLayersDialog> {
     for (final s in storey.slabs) {
       if (widget.project.elementLayerId(s.id, ArchitectLayer.slabLayerId) == layerId) count++;
     }
+    for (final c in storey.ceilings) {
+      if (widget.project.elementLayerId(c.id, ArchitectLayer.ceilingLayerId) == layerId) count++;
+    }
     for (final r in storey.roofs) {
       if (widget.project.elementLayerId(r.id, ArchitectLayer.roofLayerId) == layerId) count++;
     }

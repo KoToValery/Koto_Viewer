@@ -49,6 +49,7 @@ class _ArchitectCopyStoreyDialogState extends State<ArchitectCopyStoreyDialog> {
     [ArchitectStoreyElementType.columns],
     [ArchitectStoreyElementType.beams],
     [ArchitectStoreyElementType.slabs],
+    [ArchitectStoreyElementType.ceilings],
     [ArchitectStoreyElementType.zones],
     [ArchitectStoreyElementType.stairs, ArchitectStoreyElementType.openings],
     [

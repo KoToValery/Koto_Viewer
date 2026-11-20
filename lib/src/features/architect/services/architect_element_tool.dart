@@ -682,6 +682,7 @@ class ArchitectElementTool extends ChangeNotifier {
       columns: tool == ArchitectTool.column ? storey.columns : [],
       beams: tool == ArchitectTool.beam ? storey.beams : [],
       slabs: tool == ArchitectTool.slab ? storey.slabs : [],
+      ceilings: tool == ArchitectTool.ceiling ? storey.ceilings : [],
       roofs: tool == ArchitectTool.roof ? storey.roofs : [],
       openings: tool == ArchitectTool.opening ? storey.openings : [],
       stairs: tool == ArchitectTool.stair ? storey.stairs : [],
@@ -1002,6 +1003,14 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
 
+    // Check Suspended Ceilings
+    for (final ceiling in storey.ceilings) {
+      if (ceiling.containsPoint(point) ||
+          _hitsInnerContour(ceiling.holes, point, tolerance)) {
+        yield ceiling.id;
+      }
+    }
+
       // Check Decorative Elements (when shown on plan)
     final showDecorAll = annotationProject?.showDecorativeOnPlan ?? false;
     for (final decor in storey.decorativeElements) {
@@ -1119,6 +1128,7 @@ class ArchitectElementTool extends ChangeNotifier {
       columns: storey.columns.where((c) => c.id != elementId).toList(),
       beams: storey.beams.where((b) => b.id != elementId).toList(),
       slabs: storey.slabs.where((s) => s.id != elementId).toList(),
+      ceilings: storey.ceilings.where((c) => c.id != elementId).toList(),
       roofs: storey.roofs.where((r) => r.id != elementId).toList(),
       openings: storey.openings.where((o) => o.id != elementId).toList(),
       stairs: storey.stairs.where((s) => s.id != elementId).toList(),
@@ -1252,6 +1262,20 @@ class ArchitectElementTool extends ChangeNotifier {
         offset,
       );
       return (storey.copyWith(slabs: [...storey.slabs, newSlab]), newId);
+    }
+
+    // 3a. Suspended Ceiling
+    final ceilingIndex = storey.ceilings.indexWhere((c) => c.id == elementId);
+    if (ceilingIndex != -1) {
+      final ceiling = storey.ceilings[ceilingIndex];
+      final newCeiling = const ArchitectCeilingEditingAdapter().translate(
+        ceiling.copyWith(id: newId, isAutoBoundary: false),
+        offset,
+      );
+      return (
+        storey.copyWith(ceilings: [...storey.ceilings, newCeiling]),
+        newId,
+      );
     }
 
     // 3b. Roof
@@ -1401,6 +1425,35 @@ class ArchitectElementTool extends ChangeNotifier {
               : slab.slopeDirection! + math.pi / 2,
         );
         return storey.copyWith(slabs: newSlabs);
+      }
+    }
+
+    // 3a. Suspended Ceiling (rotate 90 degrees around centroid)
+    final ceilingIndex = storey.ceilings.indexWhere((c) => c.id == elementId);
+    if (ceilingIndex != -1) {
+      final ceiling = storey.ceilings[ceilingIndex];
+      if (ceiling.polygon.isNotEmpty) {
+        final center =
+            ceiling.polygon.reduce((a, b) => a + b) /
+            ceiling.polygon.length.toDouble();
+        Offset rot(Offset p) {
+          final rel = p - center;
+          return center + Offset(-rel.dy, rel.dx);
+        }
+
+        final newCeilings = List<ArchitectSuspendedCeiling>.from(
+          storey.ceilings,
+        );
+        newCeilings[ceilingIndex] = ceiling.copyWith(
+          polygon: ceiling.polygon.map(rot).toList(),
+          holes: ArchitectContour.transform(ceiling.holes, rot),
+          gridOrigin: ceiling.gridOrigin == null
+              ? null
+              : rot(ceiling.gridOrigin!),
+          gridAngle: ceiling.gridAngle + math.pi / 2,
+          isAutoBoundary: false,
+        );
+        return storey.copyWith(ceilings: newCeilings);
       }
     }
 
@@ -1766,6 +1819,45 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
 
+    // 4a. Suspended Ceiling
+    final ceilingIndex = storey.ceilings.indexWhere((c) => c.id == elementId);
+    if (ceilingIndex != -1) {
+      final ceiling = storey.ceilings[ceilingIndex];
+      final newPoly = [
+        for (final p in ceiling.polygon)
+          BimTransform2D.mirror(p, origin, direction),
+      ].reversed.toList();
+      final axisAngle = math.atan2(direction.dy, direction.dx);
+      final newGridAngle = 2 * axisAngle - ceiling.gridAngle;
+      final newCeiling = ceiling.copyWith(
+        id: targetId,
+        polygon: newPoly,
+        bulges: ArchitectMirrorGeometry.reversedBulges(
+          ceiling.bulges,
+          ceiling.polygon.length,
+        ),
+        holes: ArchitectContour.transform(
+          ceiling.holes,
+          (p) => BimTransform2D.mirror(p, origin, direction),
+        ),
+        gridOrigin: ceiling.gridOrigin == null
+            ? null
+            : BimTransform2D.mirror(ceiling.gridOrigin!, origin, direction),
+        gridAngle: newGridAngle,
+        isAutoBoundary: false,
+      );
+      if (isDuplicate) {
+        return (
+          storey.copyWith(ceilings: [...storey.ceilings, newCeiling]),
+          targetId,
+        );
+      } else {
+        final ceilings = List<ArchitectSuspendedCeiling>.from(storey.ceilings);
+        ceilings[ceilingIndex] = newCeiling;
+        return (storey.copyWith(ceilings: ceilings), targetId);
+      }
+    }
+
     // 5. Roof
     final roofIndex = storey.roofs.indexWhere((r) => r.id == elementId);
     if (roofIndex != -1) {
@@ -2091,6 +2183,7 @@ class ArchitectElementTool extends ChangeNotifier {
       columns: storey.columns.where((c) => !elementIds.contains(c.id)).toList(),
       beams: storey.beams.where((b) => !elementIds.contains(b.id)).toList(),
       slabs: storey.slabs.where((s) => !elementIds.contains(s.id)).toList(),
+      ceilings: storey.ceilings.where((c) => !elementIds.contains(c.id)).toList(),
       roofs: storey.roofs.where((r) => !elementIds.contains(r.id)).toList(),
       openings: storey.openings.where((o) => !elementIds.contains(o.id)).toList(),
       stairs: storey.stairs.where((s) => !elementIds.contains(s.id)).toList(),

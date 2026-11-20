@@ -279,7 +279,7 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
 
   List<ArchitectSavedDrawing> _sourceOptions() {
     final candidates = <ArchitectSavedDrawing>[
-      for (final s in project.orderedPlanStoreys)
+      for (final s in project.orderedPlanStoreys) ...[
         ArchitectSavedDrawing(
           id: 'plan:${s.id}',
           sourceId: s.id,
@@ -290,6 +290,18 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
               document.viewScales['plan:${s.id}'] ??
               project.dimensionScale.denominator,
         ),
+        if (!s.isRoof && (s.hasCeilingPlan || s.ceilings.isNotEmpty))
+          ArchitectSavedDrawing(
+            id: 'ceiling:${s.id}',
+            sourceId: s.id,
+            kind: ArchitectDrawingKind.plan,
+            name: '${s.elevationLabel} · ${context.l10n.architectCeilingPlan}',
+            ceilingPlan: true,
+            scale:
+                document.viewScales['ceiling:${s.id}'] ??
+                project.dimensionScale.denominator,
+          ),
+      ],
       for (var i = 0; i < project.sections.length; i++)
         ArchitectSavedDrawing(
           id: 'section:${project.sections[i].id}',

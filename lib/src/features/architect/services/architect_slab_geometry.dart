@@ -86,22 +86,29 @@ class ArchitectSlabGeometry {
       inside(slab.polygon, p) &&
       !holes(storey, slab, project: project).any((h) => inside(h, p));
 
-  /// Partition at every contour crossing, then classify midpoints. Handles
-  /// concave footprints, overlapping openings and cuts through vertices.
   static List<(double, double)> intervals(
     ArchitectStorey storey,
     ArchitectSlab slab,
     ArchitectSection section, {
     ArchitectProject? project,
-  }) {
-    final contours = holes(storey, slab, project: project);
+  }) => contourIntervals(
+    slab.tessellatedPolygon,
+    holes(storey, slab, project: project),
+    section,
+  );
+
+  /// Partition at every contour crossing, then classify midpoints. Handles
+  /// concave footprints, overlapping openings and cuts through vertices.
+  static List<(double, double)> contourIntervals(
+    List<Offset> outer,
+    List<List<Offset>> holes,
+    ArchitectSection section,
+  ) {
+    if (outer.length < 3) return const [];
     final breaks = <double>[0, section.length];
     final u = section.axis;
     double cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
-    for (final polygon in [
-      slab.polygon,
-      ...contours,
-    ]) {
+    for (final polygon in [outer, ...holes]) {
       for (var i = 0; i < polygon.length; i++) {
         final a = polygon[i], v = polygon[(i + 1) % polygon.length] - a;
         final d = cross(u, v);
@@ -118,8 +125,8 @@ class ArchitectSlabGeometry {
     for (var i = 0; i < breaks.length - 1; i++) {
       final a = breaks[i], b = breaks[i + 1];
       if (b - a < 1e-8 ||
-          !inside(slab.polygon, section.pointAt((a + b) / 2)) ||
-          contours.any((h) => inside(h, section.pointAt((a + b) / 2)))) {
+          !inside(outer, section.pointAt((a + b) / 2)) ||
+          holes.any((h) => inside(h, section.pointAt((a + b) / 2)))) {
         continue;
       }
       if (result.isNotEmpty && (result.last.$2 - a).abs() < 1e-8) {
@@ -137,15 +144,22 @@ class ArchitectSlabGeometry {
     ArchitectStorey storey,
     ArchitectSlab slab, {
     ArchitectProject? project,
-  }) {
-    final poly = slab.tessellatedPolygon;
+  }) => contourFootprint(
+    slab.tessellatedPolygon,
+    holes(storey, slab, project: project),
+  );
+
+  /// Triangulates [outer] and subtracts [holes] into convex polygon fragments.
+  static List<List<Offset>> contourFootprint(
+    List<Offset> outer,
+    List<List<Offset>> holes,
+  ) {
+    if (outer.length < 3) return const [];
     var pieces = [
-      for (final (a, b, c) in ArchitectStairMesh.triangulate(poly))
-        [poly[a], poly[b], poly[c]],
+      for (final (a, b, c) in ArchitectStairMesh.triangulate(outer))
+        [outer[a], outer[b], outer[c]],
     ];
-    for (final boundary in [
-      ...holes(storey, slab, project: project),
-    ]) {
+    for (final boundary in holes) {
       for (final (a, b, c) in ArchitectStairMesh.triangulate(boundary)) {
         final clip = [boundary[a], boundary[b], boundary[c]];
         if (_cross(clip[1] - clip[0], clip[2] - clip[0]) < 0) {

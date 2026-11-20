@@ -181,6 +181,7 @@ void main() {
       ArchitectStoreyElementType.columns,
       ArchitectStoreyElementType.beams,
       ArchitectStoreyElementType.slabs,
+      ArchitectStoreyElementType.ceilings,
       ArchitectStoreyElementType.zones,
     });
   });

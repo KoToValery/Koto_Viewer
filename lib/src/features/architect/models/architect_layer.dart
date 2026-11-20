@@ -61,6 +61,7 @@ class ArchitectLayer {
       'A-DOOR' => l.architectLayerDoors,
       'A-WINDOW' => l.architectLayerWindows,
       'A-SLAB' => l.architectLayerSlabs,
+      'A-CLNG' => l.architectLayerCeilings,
       'A-ROOF' => l.architectLayerRoofs,
       'S-COLS' => l.architectLayerColumns,
       'S-BEAM' => l.architectLayerBeams,
@@ -104,6 +105,7 @@ class ArchitectLayer {
   static const String doorLayerId = 'A-DOOR';
   static const String windowLayerId = 'A-WINDOW';
   static const String slabLayerId = 'A-SLAB';
+  static const String ceilingLayerId = 'A-CLNG';
   static const String roofLayerId = 'A-ROOF';
   static const String columnLayerId = 'S-COLS';
   static const String beamLayerId = 'S-BEAM';
@@ -130,6 +132,7 @@ class ArchitectLayer {
     ArchitectLayer(id: doorLayerId, name: 'A-DOOR', isStandard: true),
     ArchitectLayer(id: windowLayerId, name: 'A-WINDOW', isStandard: true),
     ArchitectLayer(id: slabLayerId, name: 'A-SLAB', isStandard: true),
+    ArchitectLayer(id: ceilingLayerId, name: 'A-CLNG', isStandard: true),
     ArchitectLayer(id: roofLayerId, name: 'A-ROOF', isStandard: true),
     ArchitectLayer(id: columnLayerId, name: 'S-COLS', isStandard: true),
     ArchitectLayer(id: beamLayerId, name: 'S-BEAM', isStandard: true),

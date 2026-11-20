@@ -7,6 +7,7 @@ import 'architect_mesh_section.dart';
 import 'architect_vertical_clip.dart';
 import 'architect_panel_roof_geometry.dart';
 import '../services/architect_slab_geometry.dart';
+import '../services/architect_ceiling_geometry.dart';
 import '../services/architect_roof_junctions.dart';
 import '../services/architect_roof_framing.dart';
 import '../services/architect_roof_ridge_beams.dart';
@@ -333,6 +334,12 @@ class Architect3dBuilder {
         final first = allTris.length;
         allTris.addAll(ArchitectSlabGeometry.mesh(project, storey, slab));
         mark(slab.id, first);
+      }
+
+      for (final ceiling in storey.ceilings) {
+        final first = allTris.length;
+        allTris.addAll(ArchitectCeilingGeometry.mesh(project, storey, ceiling));
+        mark(ceiling.id, first);
       }
 
       if (previewGeometry) {

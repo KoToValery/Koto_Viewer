@@ -1263,6 +1263,12 @@ class MoveArchitectElement extends ArchitectModelCommand {
               ? const ArchitectSlabEditingAdapter().translate(e, delta)
               : e,
       ],
+      ceilings: [
+        for (final e in s.ceilings)
+          matches(e.id)
+              ? const ArchitectCeilingEditingAdapter().translate(e, delta)
+              : e,
+      ],
       roofs: [
         for (final e in s.roofs)
           matches(e.id)
@@ -2137,6 +2143,9 @@ class CutArchitectContourOpening extends ArchitectModelCommand {
     for (final slab in s.slabs) {
       if (slab.id == id) return (slab.polygon, slab.holes);
     }
+    for (final ceiling in s.ceilings) {
+      if (ceiling.id == id) return (ceiling.polygon, ceiling.holes);
+    }
     for (final roof in s.roofs) {
       if (roof.id == id) return (roof.points, roof.holes);
     }
@@ -2165,6 +2174,10 @@ class CutArchitectContourOpening extends ArchitectModelCommand {
         ],
         slabs: [
           for (final p in s.slabs)
+            p.id == elementId ? p.copyWith(holes: holes) : p,
+        ],
+        ceilings: [
+          for (final p in s.ceilings)
             p.id == elementId ? p.copyWith(holes: holes) : p,
         ],
         roofs: [
@@ -2411,6 +2424,18 @@ class UpdateArchitectBulges extends ArchitectModelCommand {
         ),
       );
     }
+    final ceiling = floor.ceilings.where((c) => c.id == elementId).firstOrNull;
+    if (ceiling != null) {
+      return ArchitectModelCommand.replace(
+        project,
+        floor.copyWith(
+          ceilings: [
+            for (final c in floor.ceilings)
+              c.id == elementId ? c.copyWith(bulges: bulges) : c,
+          ],
+        ),
+      );
+    }
     final prim = floor.cadPrimitives.where((p) => p.id == elementId).firstOrNull;
     if (prim != null) {
       return ArchitectModelCommand.replace(
@@ -2641,6 +2666,10 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
             for (final p in floor.slabs)
               p.id == elementId ? p.copyWith(holes: holes) : p,
           ],
+          ceilings: [
+            for (final p in floor.ceilings)
+              p.id == elementId ? p.copyWith(holes: holes) : p,
+          ],
           roofs: [
             for (final p in floor.roofs)
               p.id == elementId ? p.copyWith(holes: holes) : p,
@@ -2656,6 +2685,7 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
       throw ArgumentError('Automatic zone boundaries are controlled by walls');
     }
     final slab = floor.slabs.any((s) => s.id == elementId);
+    final ceiling = floor.ceilings.any((c) => c.id == elementId);
     final roof = floor.roofs.any((r) => r.id == elementId);
     final rect = floor.cadPrimitives.any(
       (s) => s.id == elementId && s.isPolygon,
@@ -2663,7 +2693,7 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
     final zone = floor.zones.any((z) => z.id == elementId);
     final opening = floor.openings.any((o) => o.id == elementId);
     final drain = floor.floorDrains.any((d) => d.id == elementId);
-    if (!slab && !roof && !rect && !zone && !opening && !drain) {
+    if (!slab && !ceiling && !roof && !rect && !zone && !opening && !drain) {
       throw ArgumentError('Unknown polygon element');
     }
     final host = CutArchitectContourOpening.target(floor, elementId);
@@ -2682,6 +2712,12 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
         slabs: [
           for (final s in floor.slabs)
             s.id == elementId ? s.copyWith(polygon: points) : s,
+        ],
+        ceilings: [
+          for (final c in floor.ceilings)
+            c.id == elementId
+                ? c.copyWith(polygon: points, isAutoBoundary: false)
+                : c,
         ],
         roofs: [
           for (final r in floor.roofs)
@@ -2847,6 +2883,9 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     }
     for (final s in storey.slabs) {
       if (s.id == id) return (points: s.polygon, closed: true, width: 0);
+    }
+    for (final c in storey.ceilings) {
+      if (c.id == id) return (points: c.polygon, closed: true, width: 0);
     }
     for (final r in storey.roofs) {
       if (r.id == id) return (points: r.points, closed: true, width: 0);
@@ -3343,4 +3382,99 @@ class UpdateArchitectLandscapeProject extends ArchitectModelCommand {
 
   @override
   ArchitectProject apply(ArchitectProject project) => nextProject;
+}
+
+// --- SUBSECTION: [TAG:CMD_CEILING] Suspended Ceiling Commands ---
+class PutArchitectCeiling extends ArchitectModelCommand {
+  final String storeyId;
+  final ArchitectSuspendedCeiling ceiling;
+  const PutArchitectCeiling({required this.storeyId, required this.ceiling});
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    if (!ArchitectContour.valid(ceiling.polygon, ceiling.holes)) {
+      throw ArgumentError('Invalid ceiling contour');
+    }
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    final exists = floor.ceilings.any((c) => c.id == ceiling.id);
+    if (!exists) {
+      ArchitectModelCommand.newId(project, ceiling.id);
+    }
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(
+        hasCeilingPlan: true,
+        ceilings: exists
+            ? [
+                for (final c in floor.ceilings)
+                  c.id == ceiling.id ? ceiling : c,
+              ]
+            : [...floor.ceilings, ceiling],
+      ),
+    );
+  }
+}
+
+class UpdateArchitectCeiling extends ArchitectModelCommand {
+  final String storeyId;
+  final ArchitectSuspendedCeiling ceiling;
+  const UpdateArchitectCeiling({required this.storeyId, required this.ceiling});
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    if (!ArchitectContour.valid(ceiling.polygon, ceiling.holes)) {
+      throw ArgumentError('Invalid ceiling contour');
+    }
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    if (!floor.ceilings.any((c) => c.id == ceiling.id)) {
+      throw ArgumentError('Suspended ceiling not found');
+    }
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(
+        ceilings: [
+          for (final c in floor.ceilings) c.id == ceiling.id ? ceiling : c,
+        ],
+      ),
+    );
+  }
+}
+
+class DeleteArchitectCeiling extends ArchitectModelCommand {
+  final String storeyId;
+  final String ceilingId;
+  const DeleteArchitectCeiling({
+    required this.storeyId,
+    required this.ceilingId,
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(
+        ceilings: floor.ceilings.where((c) => c.id != ceilingId).toList(),
+      ),
+    );
+  }
+}
+
+class ToggleArchitectCeilingPlan extends ArchitectModelCommand {
+  final String storeyId;
+  final bool enabled;
+  const ToggleArchitectCeilingPlan({
+    required this.storeyId,
+    required this.enabled,
+  });
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    if (floor.isRoof || floor.hasCeilingPlan == enabled) return project;
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(hasCeilingPlan: enabled),
+    );
+  }
 }

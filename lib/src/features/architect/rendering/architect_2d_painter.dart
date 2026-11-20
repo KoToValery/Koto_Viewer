@@ -8,6 +8,8 @@ import '../services/architect_polyline_editing.dart';
 import '../models/architect_hatch_pattern.dart';
 import 'architect_clearance_badge_layout.dart';
 import 'architect_floor_drain_painter_helper.dart';
+import 'architect_ceiling_painter_helper.dart';
+import '../services/architect_workspace_view_controller.dart';
 import 'architect_vector_scene.dart';
 import '../models/architect_wall_type.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -87,6 +89,7 @@ enum ArchitectTool {
   column,
   beam,
   slab,
+  ceiling,
   roof,
   opening,
   stair,
@@ -288,6 +291,7 @@ class Architect2dPainter extends CustomPainter {
   final List<ArchitectOverhang>? upperOverhangs;
   final bool showUpperOverhangs;
   final bool showFurniture;
+  final ArchitectPlanMode planMode;
   final ArchitectComponentInstance? componentPreview;
   final List<Offset> marqueePoints;
   final List<Offset> marqueePolygon;
@@ -305,6 +309,7 @@ class Architect2dPainter extends CustomPainter {
     this.upperOverhangs,
     this.showUpperOverhangs = true,
     this.showFurniture = true,
+    this.planMode = ArchitectPlanMode.floor,
     this.dragController,
     this.localizeSnap,
     this.componentPreview,
@@ -442,6 +447,9 @@ class Architect2dPainter extends CustomPainter {
             zoomScale,
           )
         : null;
+    final isCeilingPlan =
+        planMode == ArchitectPlanMode.ceilingServices &&
+        !_project.activeStorey.isRoof;
     if (layer != ArchitectPaintLayer.interaction) {
       if (underlayDoc != null) {
         ArchitectElementsPainterHelper.drawUnderlay(
@@ -453,68 +461,90 @@ class Architect2dPainter extends CustomPainter {
         );
       }
       if (paintGrid) _drawDraftingGrid(canvas, size);
-      ArchitectLandscapePainterHelper.drawTerrain(
-        canvas: canvas,
-        project: _project,
-        zoomScale: zoomScale,
-        selectedIds: {...selectedElementIds, ?selectedElementId},
-        palette: palette,
-      );
-      ArchitectLandscapePainterHelper.drawPathways(
-        canvas: canvas,
-        project: _project,
-        storey: _elementLayerStorey,
-        zoomScale: zoomScale,
-        selectedIds: {...selectedElementIds, ?selectedElementId},
-        palette: palette,
-      );
-      ArchitectLandscapePainterHelper.drawStreets(
-        canvas: canvas,
-        project: _project,
-        storey: _elementLayerStorey,
-        zoomScale: zoomScale,
-        selectedIds: {...selectedElementIds, ?selectedElementId},
-        palette: palette,
-      );
+      if (!isCeilingPlan) {
+        ArchitectLandscapePainterHelper.drawTerrain(
+          canvas: canvas,
+          project: _project,
+          zoomScale: zoomScale,
+          selectedIds: {...selectedElementIds, ?selectedElementId},
+          palette: palette,
+        );
+        ArchitectLandscapePainterHelper.drawPathways(
+          canvas: canvas,
+          project: _project,
+          storey: _elementLayerStorey,
+          zoomScale: zoomScale,
+          selectedIds: {...selectedElementIds, ?selectedElementId},
+          palette: palette,
+        );
+        ArchitectLandscapePainterHelper.drawStreets(
+          canvas: canvas,
+          project: _project,
+          storey: _elementLayerStorey,
+          zoomScale: zoomScale,
+          selectedIds: {...selectedElementIds, ?selectedElementId},
+          palette: palette,
+        );
+      }
       ArchitectElementsPainterHelper.drawCadPrimitives(
         canvas: canvas, storey: _elementLayerStorey, zoomScale: zoomScale,
         palette: palette, dimensionScale: _project.dimensionScale,
         selectedElementId: null, hatchesOnly: true,
       );
       _drawGridAxes(canvas);
-      ArchitectElementsPainterHelper.drawSlabs(
-        project: _project,
-        palette: palette,
-        canvas: canvas,
-        storey: _elementLayerStorey,
-        zoomScale: zoomScale,
-        selectedElementId: selectedElementId,
-      );
-      _drawZones(canvas);
-      ArchitectFloorDrainPainterHelper.draw(
-        canvas: canvas,
-        storey: _elementLayerStorey,
-        walls: _project.activeStorey.walls,
-        zoomScale: zoomScale,
-        palette: palette,
-      );
-      _drawZoneSchedule(canvas);
-      ArchitectLandscapePainterHelper.drawSiteFences(
-        canvas: canvas,
-        project: _project,
-        storey: _elementLayerStorey,
-        zoomScale: zoomScale,
-        selectedIds: {...selectedElementIds, ?selectedElementId},
-        palette: palette,
-      );
-      ArchitectLandscapePainterHelper.drawVegetation(
-        canvas: canvas,
-        project: _project,
-        storey: _elementLayerStorey,
-        zoomScale: zoomScale,
-        selectedIds: {...selectedElementIds, ?selectedElementId},
-        palette: palette,
-      );
+      if (!isCeilingPlan) {
+        ArchitectElementsPainterHelper.drawSlabs(
+          project: _project,
+          palette: palette,
+          canvas: canvas,
+          storey: _elementLayerStorey,
+          zoomScale: zoomScale,
+          selectedElementId: selectedElementId,
+        );
+        _drawZones(canvas);
+        ArchitectFloorDrainPainterHelper.draw(
+          canvas: canvas,
+          storey: _elementLayerStorey,
+          walls: _project.activeStorey.walls,
+          zoomScale: zoomScale,
+          palette: palette,
+        );
+        _drawZoneSchedule(canvas);
+        ArchitectLandscapePainterHelper.drawSiteFences(
+          canvas: canvas,
+          project: _project,
+          storey: _elementLayerStorey,
+          zoomScale: zoomScale,
+          selectedIds: {...selectedElementIds, ?selectedElementId},
+          palette: palette,
+        );
+        ArchitectLandscapePainterHelper.drawVegetation(
+          canvas: canvas,
+          project: _project,
+          storey: _elementLayerStorey,
+          zoomScale: zoomScale,
+          selectedIds: {...selectedElementIds, ?selectedElementId},
+          palette: palette,
+        );
+      } else {
+        ArchitectCeilingPainterHelper.drawCeilings(
+          palette: palette,
+          canvas: canvas,
+          project: _project,
+          storey: _elementLayerStorey,
+          zoomScale: zoomScale,
+          selectedElementId: selectedElementId,
+          selectedElementIds: selectedElementIds,
+          l10n: l10n,
+        );
+        ArchitectCeilingPainterHelper.drawUpperBeamsOverlay(
+          palette: palette,
+          canvas: canvas,
+          project: _project,
+          storey: _elementLayerStorey,
+          zoomScale: zoomScale,
+        );
+      }
       if (showUpperOverhangs) {
         ArchitectOverhangPainterHelper.drawOverhangs(
           canvas: canvas,
@@ -620,6 +650,7 @@ class Architect2dPainter extends CustomPainter {
         selectedElementId: selectedElementId,
         selectedElementIds: selectedElementIds,
         layerVisible: showFurniture,
+        onlyServiceComponents: isCeilingPlan,
       );
       if (componentPreview != null) {
         ArchitectElementsPainterHelper.drawComponents(
@@ -636,8 +667,10 @@ class Architect2dPainter extends CustomPainter {
     if (layer != ArchitectPaintLayer.model) {
       if (layer == ArchitectPaintLayer.interaction) {
         _drawGridAxes(canvas);
-        _drawZones(canvas);
-        _drawZoneSchedule(canvas);
+        if (!isCeilingPlan) {
+          _drawZones(canvas);
+          _drawZoneSchedule(canvas);
+        }
         _drawSelectedElement(canvas);
       }
       if(marqueePoints.isEmpty) _drawPolygonEditing(canvas);
@@ -856,6 +889,9 @@ class Architect2dPainter extends CustomPainter {
       slabs: storey.slabs
           .where((e) => keep(e.id, ArchitectLayer.slabLayerId))
           .toList(),
+      ceilings: storey.ceilings
+          .where((e) => keep(e.id, ArchitectLayer.ceilingLayerId))
+          .toList(),
       roofs: storey.roofs
           .where((e) => keep(e.id, ArchitectLayer.roofLayerId))
           .toList(),
@@ -973,6 +1009,18 @@ class Architect2dPainter extends CustomPainter {
         storey: selected,
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
+      );
+      return;
+    }
+    if (selected.ceilings.isNotEmpty) {
+      ArchitectCeilingPainterHelper.drawCeilings(
+        palette: palette,
+        canvas: canvas,
+        project: _project,
+        storey: selected,
+        zoomScale: zoomScale,
+        selectedElementId: selectedElementId,
+        l10n: l10n,
       );
       return;
     }
@@ -1379,6 +1427,9 @@ class Architect2dPainter extends CustomPainter {
     for (final slab in _project.activeStorey.slabs) {
       if (slab.id == targetId) { polygon = slab.polygon; holes = slab.holes; }
     }
+    for (final ceiling in _project.activeStorey.ceilings) {
+      if (ceiling.id == targetId) { polygon = ceiling.polygon; holes = ceiling.holes; }
+    }
     for (final roof in _project.activeStorey.roofs) {
       if (roof.id == targetId) { polygon = roof.points; holes = roof.holes; }
     }
@@ -1692,6 +1743,9 @@ class Architect2dPainter extends CustomPainter {
         canvas.drawCircle(midPoint, 3.2 / draftingScale, midBorderPaint);
       }
 
+      final isCeilingPlan =
+          planMode == ArchitectPlanMode.ceilingServices &&
+          !_project.activeStorey.isRoof;
       for (final door in planWall.doors) {
         door.paint2D(
           cutPlaneHeight: project.activeStorey.cutPlaneHeight,
@@ -1707,6 +1761,8 @@ class Architect2dPainter extends CustomPainter {
           exteriorSign: planWall.exteriorSign.toDouble(),
           zoomScale: zoomScale,
           isSelected: door.id == selectedElementId,
+          showAnnotations: !isCeilingPlan,
+          showLeafAndSwing: !isCeilingPlan,
         );
       }
       for (final window in planWall.windows) {
@@ -2547,6 +2603,7 @@ class Architect2dPainter extends CustomPainter {
       activeOvershoot != oldDelegate.activeOvershoot ||
       showUpperOverhangs != oldDelegate.showUpperOverhangs ||
       showFurniture != oldDelegate.showFurniture ||
+      planMode != oldDelegate.planMode ||
       componentPreview != oldDelegate.componentPreview ||
       activeEllipsePreview != oldDelegate.activeEllipsePreview ||
       upperOverhangs != oldDelegate.upperOverhangs ||

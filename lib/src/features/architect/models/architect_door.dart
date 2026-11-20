@@ -290,6 +290,7 @@ class ArchitectDoor {
     bool isSelected = false,
     double cutPlaneHeight = 1.20,
     bool showAnnotations = true,
+    bool showLeafAndSwing = true,
     bool wallGeometryProvided = false,
     double coreThickness = 0.25,
     double insulationThickness = 0.0,
@@ -338,8 +339,8 @@ class ArchitectDoor {
         cutPlaneHeight: cutPlaneHeight,
         isHingeLeft: isHingeLeft,
         openInward: openInward,
-        openAngleDeg: openAngleDeg,
-        leafThickness: leafThickness,
+        openAngleDeg: showLeafAndSwing ? openAngleDeg : 0,
+        leafThickness: showLeafAndSwing ? leafThickness : 0,
       );
       if (showAnnotations) {
         ArchitectOpeningPlanPainter.paint(
@@ -461,49 +462,51 @@ class ArchitectDoor {
       isSelected: isSelected,
     );
 
-    // The hinge follows the selected opening face of the frame.
-    final leaf = _leafGeometry(pLeftBase, pRightBase, u, n, halfThick);
-    final hingePos = leaf.hinge;
-    final leafLen = clearWidth;
-    final leafU = leaf.direction;
-    final leafN = leaf.normal;
-    final angleRad = openAngleDeg * math.pi / 180.0;
-    final baseAngle = math.atan2(u.dy, u.dx);
+    if (showLeafAndSwing) {
+      // The hinge follows the selected opening face of the frame.
+      final leaf = _leafGeometry(pLeftBase, pRightBase, u, n, halfThick);
+      final hingePos = leaf.hinge;
+      final leafLen = clearWidth;
+      final leafU = leaf.direction;
+      final leafN = leaf.normal;
+      final angleRad = openAngleDeg * math.pi / 180.0;
+      final baseAngle = math.atan2(u.dy, u.dx);
 
-    final leafP1 = hingePos;
-    final leafP2 = hingePos + leafU * leafLen;
-    final leafP3 = leafP2 + leafN * leafThickness;
-    final leafP4 = leafP1 + leafN * leafThickness;
+      final leafP1 = hingePos;
+      final leafP2 = hingePos + leafU * leafLen;
+      final leafP3 = leafP2 + leafN * leafThickness;
+      final leafP4 = leafP1 + leafN * leafThickness;
 
-    final leafPath = Path()
-      ..moveTo(leafP1.dx, leafP1.dy)
-      ..lineTo(leafP2.dx, leafP2.dy)
-      ..lineTo(leafP3.dx, leafP3.dy)
-      ..lineTo(leafP4.dx, leafP4.dy)
-      ..close();
+      final leafPath = Path()
+        ..moveTo(leafP1.dx, leafP1.dy)
+        ..lineTo(leafP2.dx, leafP2.dy)
+        ..lineTo(leafP3.dx, leafP3.dy)
+        ..lineTo(leafP4.dx, leafP4.dy)
+        ..close();
 
-    canvas.drawPath(leafPath, leafStrokePaint);
+      canvas.drawPath(leafPath, leafStrokePaint);
 
-    // 6. Dashed Swing Arc (matching door.dxf New_otvarqemost)
-    final startAngle = isHingeLeft ? baseAngle : baseAngle + math.pi;
-    final sweepAngle =
-        (isHingeLeft ? 1.0 : -1.0) * (openInward ? angleRad : -angleRad);
-    final totalSweep = sweepAngle.abs();
-    if (totalSweep > 1e-4) {
-      const stepAngle = 0.08; // ~4.5 degrees
-      const dashRatio = 0.65; // 65% dash, 35% gap
-      var curA = 0.0;
-      final sign = sweepAngle.sign;
-      while (curA < totalSweep) {
-        final curSweep = math.min(stepAngle * dashRatio, totalSweep - curA);
-        canvas.drawArc(
-          Rect.fromCircle(center: hingePos, radius: leafLen),
-          startAngle + sign * curA,
-          sign * curSweep,
-          false,
-          swingArcPaint,
-        );
-        curA += stepAngle;
+      // 6. Dashed Swing Arc (matching door.dxf New_otvarqemost)
+      final startAngle = isHingeLeft ? baseAngle : baseAngle + math.pi;
+      final sweepAngle =
+          (isHingeLeft ? 1.0 : -1.0) * (openInward ? angleRad : -angleRad);
+      final totalSweep = sweepAngle.abs();
+      if (totalSweep > 1e-4) {
+        const stepAngle = 0.08; // ~4.5 degrees
+        const dashRatio = 0.65; // 65% dash, 35% gap
+        var curA = 0.0;
+        final sign = sweepAngle.sign;
+        while (curA < totalSweep) {
+          final curSweep = math.min(stepAngle * dashRatio, totalSweep - curA);
+          canvas.drawArc(
+            Rect.fromCircle(center: hingePos, radius: leafLen),
+            startAngle + sign * curA,
+            sign * curSweep,
+            false,
+            swingArcPaint,
+          );
+          curA += stepAngle;
+        }
       }
     }
 

@@ -5,6 +5,9 @@ import 'architect_command_controller.dart';
 
 enum ArchitectWorkspaceView { plan, elevation, section }
 
+/// Sub-mode for architectural plan views.
+enum ArchitectPlanMode { floor, ceilingServices }
+
 /// Adapts the existing 2D tools to a view's drawing, while publishing changes
 /// through the original project controller, history and autosave.
 class ArchitectWorkspaceViewController extends ChangeNotifier {
@@ -18,6 +21,7 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
   ArchitectProject? editPreview;
   bool Function(ArchitectProject next)? previewEdit;
   ArchitectWorkspaceView view = ArchitectWorkspaceView.plan;
+  ArchitectPlanMode planMode = ArchitectPlanMode.floor;
   String? viewId;
   ArchitectProject? _cachedSource, _cachedProjection;
 
@@ -26,6 +30,10 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
   }
 
   bool get isPlan => view == ArchitectWorkspaceView.plan;
+  bool get isCeilingPlan =>
+      isPlan &&
+      planMode == ArchitectPlanMode.ceilingServices &&
+      !source.project.activeStorey.isRoof;
   bool get hasView => isPlan || drawing != null;
   ArchitectViewDrawing? get drawing => switch (view) {
     ArchitectWorkspaceView.plan => null,
@@ -44,10 +52,28 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
     return cut?.drawing.reflectedHorizontally(cut.length);
   }
 
-  void select(ArchitectWorkspaceView type, String? id) {
+  void select(
+    ArchitectWorkspaceView type,
+    String? id, {
+    ArchitectPlanMode? mode,
+  }) {
     view = type;
     viewId = id;
+    if (mode != null) {
+      planMode = mode;
+    } else if (type != ArchitectWorkspaceView.plan) {
+      planMode = ArchitectPlanMode.floor;
+    }
     _cachedSource = null;
+    notifyListeners();
+  }
+
+  void setPlanMode(ArchitectPlanMode mode) {
+    final effective = source.project.activeStorey.isRoof
+        ? ArchitectPlanMode.floor
+        : mode;
+    if (planMode == effective) return;
+    planMode = effective;
     notifyListeners();
   }
 

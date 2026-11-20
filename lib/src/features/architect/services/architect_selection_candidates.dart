@@ -51,6 +51,7 @@ class ArchitectSelectionCandidates {
       for (final e in s.walls) e.id: ArchitectTool.wall,
       for (final e in s.roofs) e.id: ArchitectTool.roof,
       for (final e in s.floorDrains) e.id: ArchitectTool.floorDrain,
+      for (final e in s.ceilings) e.id: ArchitectTool.ceiling,
       for (final e in s.slabs) e.id: ArchitectTool.slab,
       for (final e in s.components.reversed)
         if (e.isVisible) e.id: e.isServiceComponent

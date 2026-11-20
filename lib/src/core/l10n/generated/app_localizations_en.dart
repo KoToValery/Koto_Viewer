@@ -13462,4 +13462,145 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportStructuralDwgHint => 'Columns, walls, beams, slabs and axes';
+
+  @override
+  String get architectToolCeiling => 'Ceiling';
+
+  @override
+  String get architectLayerCeilings => 'Ceilings';
+
+  @override
+  String get architectCategoryCeilings => 'Suspended ceilings';
+
+  @override
+  String get architectCeilingArmstrong => 'Armstrong (Grid)';
+
+  @override
+  String get architectCeilingGypsum => 'Gypsum board';
+
+  @override
+  String get architectCeilingProfileT24 => 'T24 exposed grid';
+
+  @override
+  String get architectCeilingProfileT15 => 'T15 slim grid';
+
+  @override
+  String get architectCeilingProfileConcealed => 'Concealed grid';
+
+  @override
+  String get architectCeilingGypsumStandard => 'Standard';
+
+  @override
+  String get architectCeilingGypsumMoisture => 'Moisture-resistant';
+
+  @override
+  String get architectCeilingGypsumFire => 'Fire-resistant';
+
+  @override
+  String get architectCeilingGypsumAcoustic => 'Acoustic';
+
+  @override
+  String get architectCeilingPlan => 'Ceilings & MEP';
+
+  @override
+  String get architectCeilingPlanShort => 'Ceilings';
+
+  @override
+  String get architectFloorPlanShort => 'Floor';
+
+  @override
+  String get architectAddCeilingPlan => 'Add ceilings & MEP plan';
+
+  @override
+  String get architectRemoveCeilingPlan => 'Remove ceilings & MEP plan';
+
+  @override
+  String get architectCeilingDropLabel => 'Drop from upper slab';
+
+  @override
+  String get architectCeilingClearHeight => 'Clear height';
+
+  @override
+  String get architectCeilingPlenum => 'Plenum';
+
+  @override
+  String get architectCeilingBeamConflict => 'Beam conflict';
+
+  @override
+  String get architectCeilingModeRoom => 'Room';
+
+  @override
+  String get architectCeilingModePolygon => 'Polygon';
+
+  @override
+  String get architectCeilingCenterGrid => 'Center grid';
+
+  @override
+  String get architectCeilingPickOrigin => 'Grid origin';
+
+  @override
+  String get architectCeilingPickOriginHint =>
+      'Tap to set the Armstrong grid origin';
+
+  @override
+  String get architectCeilingTileSize => 'Tile module';
+
+  @override
+  String get architectCeilingTileWidth => 'Tile width';
+
+  @override
+  String get architectCeilingTileLength => 'Tile length';
+
+  @override
+  String get architectCeilingGridAngle => 'Grid angle (°)';
+
+  @override
+  String get architectCeilingGridCentered => 'Symmetric centering';
+
+  @override
+  String get architectCeilingDoubleBoard => 'Double board (2×12.5 mm)';
+
+  @override
+  String get architectCeilingInsulation => 'Mineral wool above ceiling';
+
+  @override
+  String get architectCeilingInsulationThickness => 'Wool thickness';
+
+  @override
+  String get architectCeilingPanelThickness => 'Panel thickness';
+
+  @override
+  String get architectCeilingCarrierHeight => 'Carrier grid height';
+
+  @override
+  String get architectCeilingUpperSlab => 'Upper slab underside';
+
+  @override
+  String get architectCeilingUpperSlabEstimated =>
+      'Estimated from storey height';
+
+  @override
+  String get architectCeilingElevation => 'Ceiling elevation';
+
+  @override
+  String get architectCeilingLabel => 'Designation';
+
+  @override
+  String get architectCeilingShowLabel => 'Show designation';
+
+  @override
+  String get architectCeilingShowElevation => 'Show elevation';
+
+  @override
+  String get architectCeilingPickRoomFailed =>
+      'No enclosed room found. Check walls or switch to Polygon mode.';
+
+  @override
+  String get architectCeilingPlenumWarning =>
+      'Plenum is negative: drop is smaller than ceiling construction.';
+
+  @override
+  String architectCeilingBeamConflictDetails(Object count) {
+    return 'Clashes with $count overhead beam(s).';
+  }
 }

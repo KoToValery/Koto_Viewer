@@ -34,6 +34,7 @@ import '../rendering/architect_wall_solids.dart';
 import '../rendering/architect_railing_geometry.dart';
 import 'architect_roof_geometry.dart';
 import 'architect_slab_geometry.dart';
+import 'architect_ceiling_geometry.dart';
 import 'architect_stair_section.dart';
 import '../models/architect_wall.dart';
 import 'architect_building_elevation.dart';
@@ -1668,6 +1669,12 @@ class ArchitectBuildingSection {
       }
     }
 
+    _appendSuspendedCeilingRegions(
+      project: project,
+      cut: cut,
+      regions: regions,
+    );
+
     // 7. Compute Building Footprint Intervals & Slice Landscape / Terrain
     final buildingIntervals = <(double, double)>[];
     double minBuildingS = double.infinity;
@@ -1812,6 +1819,138 @@ class ArchitectBuildingSection {
       proposedTerrainLine: proposedTerrainPath,
       proposedTerrainHatchBand: proposedHatchBand,
     );
+  }
+
+  static void _appendSuspendedCeilingRegions({
+    required ArchitectProject project,
+    required ArchitectSection cut,
+    required List<ArchitectSectionRegion> regions,
+  }) {
+    final hasAny = project.storeys.any((s) => s.ceilings.isNotEmpty);
+    if (!hasAny) return;
+
+    final structuralSolids = [
+      for (final r in regions)
+        if (r.occludesProjection && !r.path.getBounds().isEmpty) r.path,
+    ];
+
+    Path clipAgainstSolids(Path path) {
+      final bounds = path.getBounds();
+      if (bounds.isEmpty) return path;
+      var clipped = path;
+      for (final solid in structuralSolids) {
+        if (!solid.getBounds().overlaps(bounds)) continue;
+        try {
+          clipped = Path.combine(PathOperation.difference, clipped, solid);
+        } catch (_) {}
+        if (clipped.getBounds().isEmpty) break;
+      }
+      return clipped;
+    }
+
+    for (final floor in project.storeys) {
+      if (floor.isRoof || floor.ceilings.isEmpty) continue;
+      for (final ceiling in floor.ceilings) {
+        final spans = ArchitectCeilingGeometry.sectionIntervals(ceiling, cut);
+        if (spans.isEmpty) continue;
+
+        final metrics = ArchitectCeilingGeometry.computeMetrics(
+          project,
+          floor,
+          ceiling,
+        );
+        final zBottom = metrics.ceilingElevation;
+        final zPanelTop = zBottom + ceiling.effectivePanelThickness;
+        final zCarrierTop = zPanelTop + ceiling.gridSystemHeight;
+        final zUpperSlab = metrics.upperSlabBottom;
+
+        final panelPath = Path();
+        final carrierPath = Path();
+        final woolPath = Path();
+        final hangerPath = Path();
+
+        for (final (a, b) in spans) {
+          if (b - a <= 1e-4) continue;
+          panelPath.addRect(Rect.fromLTRB(a, zBottom, b, zPanelTop));
+          carrierPath.addRect(Rect.fromLTRB(a, zPanelTop, b, zCarrierTop));
+          if (ceiling.hasInsulation && ceiling.insulationThickness > 1e-4) {
+            woolPath.addRect(
+              Rect.fromLTRB(
+                a,
+                zCarrierTop,
+                b,
+                zCarrierTop + ceiling.insulationThickness,
+              ),
+            );
+          }
+          if (zUpperSlab > zCarrierTop + 0.02) {
+            const step = 1.20;
+            final startX = a + math.min(0.30, (b - a) * 0.5);
+            final endX = b - 0.15;
+            if (startX <= endX + 1e-4) {
+              for (var x = startX; x <= endX + 1e-4; x += step) {
+                hangerPath.moveTo(x, zCarrierTop);
+                hangerPath.lineTo(x, zUpperSlab);
+              }
+            }
+          }
+        }
+
+        final clippedPanel = clipAgainstSolids(panelPath);
+        if (!clippedPanel.getBounds().isEmpty) {
+          regions.add(
+            ArchitectSectionRegion(
+              ceiling.id,
+              SlabMaterial.plasterboard,
+              clippedPanel,
+              drawHatch: true,
+              mergeOutline: false,
+            ),
+          );
+        }
+
+        final clippedCarrier = clipAgainstSolids(carrierPath);
+        if (!clippedCarrier.getBounds().isEmpty) {
+          regions.add(
+            ArchitectSectionRegion(
+              ceiling.id,
+              SlabMaterial.custom,
+              clippedCarrier,
+              drawHatch: false,
+              mergeOutline: false,
+            ),
+          );
+        }
+
+        if (ceiling.hasInsulation && ceiling.insulationThickness > 1e-4) {
+          final clippedWool = clipAgainstSolids(woolPath);
+          if (!clippedWool.getBounds().isEmpty) {
+            regions.add(
+              ArchitectSectionRegion(
+                ceiling.id,
+                SlabMaterial.mineralWool,
+                clippedWool,
+                drawHatch: true,
+                mergeOutline: false,
+              ),
+            );
+          }
+        }
+
+        if (!hangerPath.getBounds().isEmpty) {
+          regions.add(
+            ArchitectSectionRegion(
+              ceiling.id,
+              SlabMaterial.custom,
+              hangerPath,
+              drawHatch: false,
+              mergeOutline: false,
+              occludesProjection: false,
+            ),
+          );
+        }
+      }
+    }
   }
 
   static Future<ArchitectBuildingSection> buildAsync(

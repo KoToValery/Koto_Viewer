@@ -13,6 +13,7 @@ enum ArchitectStoreyElementType {
   columns,
   beams,
   slabs,
+  ceilings,
   zones,
   stairs,
   openings,
@@ -36,6 +37,8 @@ enum ArchitectStoreyElementType {
         return l.architectCategoryBeams;
       case ArchitectStoreyElementType.slabs:
         return l.architectCategorySlabs;
+      case ArchitectStoreyElementType.ceilings:
+        return l.architectCategoryCeilings;
       case ArchitectStoreyElementType.zones:
         return l.architectCategoryZones;
       case ArchitectStoreyElementType.stairs:
@@ -69,6 +72,8 @@ enum ArchitectStoreyElementType {
         return storey.beams.where((b) => include(b.id)).length;
       case ArchitectStoreyElementType.slabs:
         return storey.slabs.where((s) => include(s.id)).length;
+      case ArchitectStoreyElementType.ceilings:
+        return storey.ceilings.where((c) => include(c.id)).length;
       case ArchitectStoreyElementType.zones:
         return storey.zones.where((z) => include(z.id)).length;
       case ArchitectStoreyElementType.stairs:
@@ -100,6 +105,7 @@ enum ArchitectStoreyElementType {
     ArchitectStoreyElementType.columns,
     ArchitectStoreyElementType.beams,
     ArchitectStoreyElementType.slabs,
+    ArchitectStoreyElementType.ceilings,
     ArchitectStoreyElementType.zones,
     ArchitectStoreyElementType.stairs,
     ArchitectStoreyElementType.openings,

@@ -64,6 +64,7 @@ enum ArchitectToolCategory {
     ArchitectTool.wall ||
     ArchitectTool.door ||
     ArchitectTool.window ||
+    ArchitectTool.ceiling ||
     ArchitectTool.roof => build,
     ArchitectTool.stair => stairs,
     ArchitectTool.decorativeProfile ||
@@ -117,6 +118,7 @@ extension ArchitectToolCatalogLabel on ArchitectTool {
     ArchitectTool.column => (AppIconId.column, l.architectToolColumn),
     ArchitectTool.beam => (AppIconId.beam, l.architectToolBeam),
     ArchitectTool.slab => (AppIconId.slab, l.architectToolSlab),
+    ArchitectTool.ceiling => (AppIconId.layoutGrid, l.architectToolCeiling),
     ArchitectTool.floorDrain => (
       AppIconId.floorDrain,
       l.architectToolFloorDrain,

@@ -13513,4 +13513,145 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get exportStructuralDwgHint => 'Колони, стени, греди, плочи и оси';
+
+  @override
+  String get architectToolCeiling => 'Окачен таван';
+
+  @override
+  String get architectLayerCeilings => 'Окачени тавани';
+
+  @override
+  String get architectCategoryCeilings => 'Окачени тавани';
+
+  @override
+  String get architectCeilingArmstrong => 'Армстронг (Растерен)';
+
+  @override
+  String get architectCeilingGypsum => 'Гипсокартон';
+
+  @override
+  String get architectCeilingProfileT24 => 'T24 видим профил';
+
+  @override
+  String get architectCeilingProfileT15 => 'T15 тесен профил';
+
+  @override
+  String get architectCeilingProfileConcealed => 'Скрит профил';
+
+  @override
+  String get architectCeilingGypsumStandard => 'Стандартен (ГК)';
+
+  @override
+  String get architectCeilingGypsumMoisture => 'Влагоустойчив (ВГК)';
+
+  @override
+  String get architectCeilingGypsumFire => 'Пожароустойчив (ПГК)';
+
+  @override
+  String get architectCeilingGypsumAcoustic => 'Акустичен';
+
+  @override
+  String get architectCeilingPlan => 'Тавани и инсталации';
+
+  @override
+  String get architectCeilingPlanShort => 'Тавани';
+
+  @override
+  String get architectFloorPlanShort => 'Под';
+
+  @override
+  String get architectAddCeilingPlan => 'Добави план тавани и инсталации';
+
+  @override
+  String get architectRemoveCeilingPlan => 'Премахни план тавани и инсталации';
+
+  @override
+  String get architectCeilingDropLabel => 'Спускане от горна плоча';
+
+  @override
+  String get architectCeilingClearHeight => 'Светла височина';
+
+  @override
+  String get architectCeilingPlenum => 'Пленум';
+
+  @override
+  String get architectCeilingBeamConflict => 'Колизия с греда';
+
+  @override
+  String get architectCeilingModeRoom => 'По стая';
+
+  @override
+  String get architectCeilingModePolygon => 'Полигон';
+
+  @override
+  String get architectCeilingCenterGrid => 'Центрирай растера';
+
+  @override
+  String get architectCeilingPickOrigin => 'Начало растер';
+
+  @override
+  String get architectCeilingPickOriginHint =>
+      'Докосни точка за начало на Армстронг растера';
+
+  @override
+  String get architectCeilingTileSize => 'Модул пано';
+
+  @override
+  String get architectCeilingTileWidth => 'Ширина пано';
+
+  @override
+  String get architectCeilingTileLength => 'Дължина пано';
+
+  @override
+  String get architectCeilingGridAngle => 'Ъгъл на растера (°)';
+
+  @override
+  String get architectCeilingGridCentered => 'Симетрично центриране';
+
+  @override
+  String get architectCeilingDoubleBoard => 'Двоен гипсокартон (2×12.5 мм)';
+
+  @override
+  String get architectCeilingInsulation => 'Минерална вата над тавана';
+
+  @override
+  String get architectCeilingInsulationThickness => 'Дебелина на вата';
+
+  @override
+  String get architectCeilingPanelThickness => 'Дебелина на пано/лист';
+
+  @override
+  String get architectCeilingCarrierHeight => 'Височина на скара';
+
+  @override
+  String get architectCeilingUpperSlab => 'Долен ръб горна плоча';
+
+  @override
+  String get architectCeilingUpperSlabEstimated =>
+      'Оценка по височина на етажа';
+
+  @override
+  String get architectCeilingElevation => 'Кота окачен таван';
+
+  @override
+  String get architectCeilingLabel => 'Означение';
+
+  @override
+  String get architectCeilingShowLabel => 'Показвай означение';
+
+  @override
+  String get architectCeilingShowElevation => 'Показвай кота';
+
+  @override
+  String get architectCeilingPickRoomFailed =>
+      'Не е намерено затворено помещение. Проверете стените или изберете Полигон.';
+
+  @override
+  String get architectCeilingPlenumWarning =>
+      'Недостатъчен пленум: спускането е по-малко от дебелината на конструкцията.';
+
+  @override
+  String architectCeilingBeamConflictDetails(Object count) {
+    return 'Колизия с $count греда/греди отгоре.';
+  }
 }

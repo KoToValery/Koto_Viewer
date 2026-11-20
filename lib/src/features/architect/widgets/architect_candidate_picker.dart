@@ -25,6 +25,7 @@ List<ArchitectCandidateLabel> architectCandidateLabels(
     ArchitectTool.column => l.architectToolColumn,
     ArchitectTool.beam => l.architectToolBeam,
     ArchitectTool.slab => l.architectToolSlab,
+    ArchitectTool.ceiling => l.architectToolCeiling,
     ArchitectTool.roof => l.architectToolRoof,
     ArchitectTool.opening => l.architectToolOpening,
     ArchitectTool.stair => l.architectToolStair,
@@ -91,6 +92,9 @@ List<ArchitectCandidateLabel> architectCandidateLabels(
       add(e.id, e.toJson);
     }
     for (final e in storey.slabs) {
+      add(e.id, e.toJson);
+    }
+    for (final e in storey.ceilings) {
       add(e.id, e.toJson);
     }
     for (final e in storey.roofs) {

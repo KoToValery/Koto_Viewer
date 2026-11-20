@@ -24443,6 +24443,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Columns, walls, beams, slabs and axes'**
   String get exportStructuralDwgHint;
+
+  /// Suspended ceiling drafting tool
+  ///
+  /// In en, this message translates to:
+  /// **'Ceiling'**
+  String get architectToolCeiling;
+
+  /// Layer for suspended ceilings
+  ///
+  /// In en, this message translates to:
+  /// **'Ceilings'**
+  String get architectLayerCeilings;
+
+  /// Storey copy category for suspended ceilings
+  ///
+  /// In en, this message translates to:
+  /// **'Suspended ceilings'**
+  String get architectCategoryCeilings;
+
+  /// No description provided for @architectCeilingArmstrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Armstrong (Grid)'**
+  String get architectCeilingArmstrong;
+
+  /// No description provided for @architectCeilingGypsum.
+  ///
+  /// In en, this message translates to:
+  /// **'Gypsum board'**
+  String get architectCeilingGypsum;
+
+  /// No description provided for @architectCeilingProfileT24.
+  ///
+  /// In en, this message translates to:
+  /// **'T24 exposed grid'**
+  String get architectCeilingProfileT24;
+
+  /// No description provided for @architectCeilingProfileT15.
+  ///
+  /// In en, this message translates to:
+  /// **'T15 slim grid'**
+  String get architectCeilingProfileT15;
+
+  /// No description provided for @architectCeilingProfileConcealed.
+  ///
+  /// In en, this message translates to:
+  /// **'Concealed grid'**
+  String get architectCeilingProfileConcealed;
+
+  /// No description provided for @architectCeilingGypsumStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get architectCeilingGypsumStandard;
+
+  /// No description provided for @architectCeilingGypsumMoisture.
+  ///
+  /// In en, this message translates to:
+  /// **'Moisture-resistant'**
+  String get architectCeilingGypsumMoisture;
+
+  /// No description provided for @architectCeilingGypsumFire.
+  ///
+  /// In en, this message translates to:
+  /// **'Fire-resistant'**
+  String get architectCeilingGypsumFire;
+
+  /// No description provided for @architectCeilingGypsumAcoustic.
+  ///
+  /// In en, this message translates to:
+  /// **'Acoustic'**
+  String get architectCeilingGypsumAcoustic;
+
+  /// No description provided for @architectCeilingPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Ceilings & MEP'**
+  String get architectCeilingPlan;
+
+  /// No description provided for @architectCeilingPlanShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Ceilings'**
+  String get architectCeilingPlanShort;
+
+  /// No description provided for @architectFloorPlanShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Floor'**
+  String get architectFloorPlanShort;
+
+  /// No description provided for @architectAddCeilingPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Add ceilings & MEP plan'**
+  String get architectAddCeilingPlan;
+
+  /// No description provided for @architectRemoveCeilingPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove ceilings & MEP plan'**
+  String get architectRemoveCeilingPlan;
+
+  /// No description provided for @architectCeilingDropLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop from upper slab'**
+  String get architectCeilingDropLabel;
+
+  /// No description provided for @architectCeilingClearHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear height'**
+  String get architectCeilingClearHeight;
+
+  /// No description provided for @architectCeilingPlenum.
+  ///
+  /// In en, this message translates to:
+  /// **'Plenum'**
+  String get architectCeilingPlenum;
+
+  /// No description provided for @architectCeilingBeamConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Beam conflict'**
+  String get architectCeilingBeamConflict;
+
+  /// No description provided for @architectCeilingModeRoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Room'**
+  String get architectCeilingModeRoom;
+
+  /// No description provided for @architectCeilingModePolygon.
+  ///
+  /// In en, this message translates to:
+  /// **'Polygon'**
+  String get architectCeilingModePolygon;
+
+  /// No description provided for @architectCeilingCenterGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Center grid'**
+  String get architectCeilingCenterGrid;
+
+  /// No description provided for @architectCeilingPickOrigin.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid origin'**
+  String get architectCeilingPickOrigin;
+
+  /// No description provided for @architectCeilingPickOriginHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to set the Armstrong grid origin'**
+  String get architectCeilingPickOriginHint;
+
+  /// No description provided for @architectCeilingTileSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile module'**
+  String get architectCeilingTileSize;
+
+  /// No description provided for @architectCeilingTileWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile width'**
+  String get architectCeilingTileWidth;
+
+  /// No description provided for @architectCeilingTileLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile length'**
+  String get architectCeilingTileLength;
+
+  /// No description provided for @architectCeilingGridAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid angle (°)'**
+  String get architectCeilingGridAngle;
+
+  /// No description provided for @architectCeilingGridCentered.
+  ///
+  /// In en, this message translates to:
+  /// **'Symmetric centering'**
+  String get architectCeilingGridCentered;
+
+  /// No description provided for @architectCeilingDoubleBoard.
+  ///
+  /// In en, this message translates to:
+  /// **'Double board (2×12.5 mm)'**
+  String get architectCeilingDoubleBoard;
+
+  /// No description provided for @architectCeilingInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Mineral wool above ceiling'**
+  String get architectCeilingInsulation;
+
+  /// No description provided for @architectCeilingInsulationThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Wool thickness'**
+  String get architectCeilingInsulationThickness;
+
+  /// No description provided for @architectCeilingPanelThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Panel thickness'**
+  String get architectCeilingPanelThickness;
+
+  /// No description provided for @architectCeilingCarrierHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Carrier grid height'**
+  String get architectCeilingCarrierHeight;
+
+  /// No description provided for @architectCeilingUpperSlab.
+  ///
+  /// In en, this message translates to:
+  /// **'Upper slab underside'**
+  String get architectCeilingUpperSlab;
+
+  /// No description provided for @architectCeilingUpperSlabEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated from storey height'**
+  String get architectCeilingUpperSlabEstimated;
+
+  /// No description provided for @architectCeilingElevation.
+  ///
+  /// In en, this message translates to:
+  /// **'Ceiling elevation'**
+  String get architectCeilingElevation;
+
+  /// No description provided for @architectCeilingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Designation'**
+  String get architectCeilingLabel;
+
+  /// No description provided for @architectCeilingShowLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Show designation'**
+  String get architectCeilingShowLabel;
+
+  /// No description provided for @architectCeilingShowElevation.
+  ///
+  /// In en, this message translates to:
+  /// **'Show elevation'**
+  String get architectCeilingShowElevation;
+
+  /// No description provided for @architectCeilingPickRoomFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'No enclosed room found. Check walls or switch to Polygon mode.'**
+  String get architectCeilingPickRoomFailed;
+
+  /// No description provided for @architectCeilingPlenumWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Plenum is negative: drop is smaller than ceiling construction.'**
+  String get architectCeilingPlenumWarning;
+
+  /// No description provided for @architectCeilingBeamConflictDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Clashes with {count} overhead beam(s).'**
+  String architectCeilingBeamConflictDetails(Object count);
 }
 
 class _AppLocalizationsDelegate

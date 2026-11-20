@@ -7,6 +7,8 @@ import 'architect_hatch_pattern.dart';
 import 'architect_document.dart';
 export 'architect_document.dart';
 import 'architect_slab_assembly.dart';
+import 'architect_suspended_ceiling.dart';
+export 'architect_suspended_ceiling.dart';
 import 'architect_roof.dart';
 export 'architect_roof.dart';
 import 'architect_section.dart';
@@ -82,6 +84,7 @@ class ArchitectStorey {
     ...columns.map((e) => e.id),
     ...beams.map((e) => e.id),
     ...slabs.map((e) => e.id),
+    ...ceilings.map((e) => e.id),
     ...roofs.map((e) => e.id),
     ...openings.map((e) => e.id),
     ...stairs.map((e) => e.id),
@@ -126,6 +129,7 @@ class ArchitectStorey {
   final List<ArchitectColumn> columns;
   final List<ArchitectBeam> beams;
   final List<ArchitectSlab> slabs;
+  final List<ArchitectSuspendedCeiling> ceilings;
   final List<ArchitectRoofPlane> roofs;
   final List<ArchitectOpening> openings;
   final List<ArchitectStair> stairs;
@@ -142,6 +146,7 @@ class ArchitectStorey {
   final List<ArchitectStreet> streets;
   final Offset? zoneScheduleOrigin;
   final bool isRoof;
+  final bool hasCeilingPlan;
 
   const ArchitectStorey({
     List<ArchitectElementGroup> groups = const [],
@@ -152,11 +157,13 @@ class ArchitectStorey {
     this.cutPlaneHeight = 1.20,
     this.floorFinishThickness = 0.05,
     this.isRoof = false,
+    this.hasCeilingPlan = false,
     this.walls = const [],
     List<ArchitectZone> zones = const [],
     this.columns = const [],
     this.beams = const [],
     this.slabs = const [],
+    this.ceilings = const [],
     this.roofs = const [],
     this.openings = const [],
     this.stairs = const [],
@@ -190,11 +197,13 @@ class ArchitectStorey {
     double? cutPlaneHeight,
     double? floorFinishThickness,
     bool? isRoof,
+    bool? hasCeilingPlan,
     List<ArchitectWall>? walls,
     List<ArchitectZone>? zones,
     List<ArchitectColumn>? columns,
     List<ArchitectBeam>? beams,
     List<ArchitectSlab>? slabs,
+    List<ArchitectSuspendedCeiling>? ceilings,
     List<ArchitectRoofPlane>? roofs,
     List<ArchitectOpening>? openings,
     List<ArchitectStair>? stairs,
@@ -220,6 +229,7 @@ class ArchitectStorey {
     cutPlaneHeight: cutPlaneHeight ?? this.cutPlaneHeight,
     floorFinishThickness: floorFinishThickness ?? this.floorFinishThickness,
     isRoof: isRoof ?? this.isRoof,
+    hasCeilingPlan: hasCeilingPlan ?? this.hasCeilingPlan,
     walls: height == null
         ? (walls ?? this.walls)
         : [
@@ -230,6 +240,7 @@ class ArchitectStorey {
     columns: columns ?? this.columns,
     beams: beams ?? this.beams,
     slabs: slabs ?? this.slabs,
+    ceilings: ceilings ?? this.ceilings,
     roofs: roofs ?? this.roofs,
     openings: openings ?? this.openings,
     stairs: stairs ?? this.stairs,
@@ -258,6 +269,7 @@ class ArchitectStorey {
     'cutPlaneHeight': cutPlaneHeight,
     'floorFinishThickness': floorFinishThickness,
     if (isRoof) 'isRoof': true,
+    if (hasCeilingPlan) 'hasCeilingPlan': true,
     'walls': walls
         .map((w) => w.copyWith(height: w.effectiveHeight(height)).toJson())
         .toList(),
@@ -265,6 +277,8 @@ class ArchitectStorey {
     'columns': columns.map((c) => c.toJson()).toList(),
     'beams': beams.map((b) => b.toJson()).toList(),
     'slabs': slabs.map((s) => s.toJson()).toList(),
+    if (ceilings.isNotEmpty)
+      'ceilings': ceilings.map((c) => c.toJson()).toList(),
     'roofs': roofs.map((r) => r.toJson()).toList(),
     'openings': openings.map((o) => o.toJson()).toList(),
     'stairs': stairs.map((st) => st.toJson()).toList(),
@@ -308,6 +322,7 @@ class ArchitectStorey {
     floorFinishThickness:
         (json['floorFinishThickness'] as num?)?.toDouble() ?? 0.05,
     isRoof: json['isRoof'] as bool? ?? false,
+    hasCeilingPlan: json['hasCeilingPlan'] as bool? ?? false,
     walls:
         (json['walls'] as List<dynamic>?)
             ?.map(
@@ -341,6 +356,11 @@ class ArchitectStorey {
             ?.map((s) => ArchitectSlab.fromJson(s as Map<String, dynamic>))
             .toList() ??
         const [],
+    ceilings: [
+      for (final c in json['ceilings'] as List? ?? const [])
+        if (c is Map)
+          ArchitectSuspendedCeiling.fromJson(Map<String, dynamic>.from(c)),
+    ],
     roofs:
         (json['roofs'] as List<dynamic>?)
             ?.map((r) => ArchitectRoofPlane.fromJson(r as Map<String, dynamic>))

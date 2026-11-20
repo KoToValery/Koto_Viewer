@@ -191,6 +191,20 @@ class ArchitectStoreyCopyService {
             clonedSlabs.length;
       }
 
+      // 4b. Suspended Ceilings
+      final clonedCeilings = <ArchitectSuspendedCeiling>[];
+      if (options.elementTypes.contains(ArchitectStoreyElementType.ceilings)) {
+        for (final ceiling in sourceStorey.ceilings) {
+          if (!shouldInclude(ceiling.id)) continue;
+          final newCeilingId = ArchitectElementId.next('ceil');
+          idMap[ceiling.id] = newCeilingId;
+          clonedCeilings.add(ceiling.copyWith(id: newCeilingId));
+        }
+        breakdown[ArchitectStoreyElementType.ceilings] =
+            (breakdown[ArchitectStoreyElementType.ceilings] ?? 0) +
+            clonedCeilings.length;
+      }
+
       // 5. Zones (Rooms & Apartments)
       final clonedZones = <ArchitectZone>[];
       if (options.elementTypes.contains(ArchitectStoreyElementType.zones)) {
@@ -427,6 +441,7 @@ class ArchitectStoreyCopyService {
           clonedColumns.length +
           clonedBeams.length +
           clonedSlabs.length +
+          clonedCeilings.length +
           clonedZones.length +
           clonedStairs.length +
           clonedOpenings.length +
@@ -463,6 +478,12 @@ class ArchitectStoreyCopyService {
       final nextSlabs = isTypeSelected(ArchitectStoreyElementType.slabs)
           ? (isReplace ? clonedSlabs : [...targetStorey.slabs, ...clonedSlabs])
           : targetStorey.slabs;
+
+      final nextCeilings = isTypeSelected(ArchitectStoreyElementType.ceilings)
+          ? (isReplace
+                ? clonedCeilings
+                : [...targetStorey.ceilings, ...clonedCeilings])
+          : targetStorey.ceilings;
 
       final nextZones = isTypeSelected(ArchitectStoreyElementType.zones)
           ? (isReplace ? clonedZones : [...targetStorey.zones, ...clonedZones])
@@ -545,6 +566,7 @@ class ArchitectStoreyCopyService {
           columns: nextColumns,
           beams: nextBeams,
           slabs: nextSlabs,
+          ceilings: nextCeilings,
           zones: nextZones,
           stairs: nextStairs,
           openings: nextOpenings,

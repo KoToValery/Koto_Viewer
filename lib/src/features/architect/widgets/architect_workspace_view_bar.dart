@@ -15,6 +15,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
 
   final ArchitectProject project;
   final ArchitectWorkspaceView view;
+  final ArchitectPlanMode planMode;
   final String? viewId;
   final Map<ArchitectWorkspaceView, String> lastViewIds;
   final bool is3D;
@@ -29,6 +30,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
     super.key,
     required this.project,
     required this.view,
+    this.planMode = ArchitectPlanMode.floor,
     required this.viewId,
     required this.lastViewIds,
     this.is3D = false,
@@ -156,7 +158,9 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                     ArchitectWorkspaceView.plan =>
                       project.activeStorey.isRoof
                           ? l.architectRoofPlan
-                          : project.activeStorey.elevationLabel,
+                          : (planMode == ArchitectPlanMode.ceilingServices
+                                ? '${project.activeStorey.elevationLabel} · ${l.architectCeilingPlanShort}'
+                                : project.activeStorey.elevationLabel),
                     ArchitectWorkspaceView.elevation =>
                       elevation == null
                           ? '—'
@@ -211,6 +215,8 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                         'straight',
                         'visibility',
                         'copy_by_storey',
+                        'add_ceiling_plan',
+                        'remove_ceiling_plan',
                       ].contains(id)) {
                         onDraft?.call(
                           type,
@@ -229,10 +235,13 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                     },
                     itemBuilder: (_) => [
                   if (type == ArchitectWorkspaceView.plan) ...[
-                    for (final s in project.orderedPlanStoreys)
+                    for (final s in project.orderedPlanStoreys) ...[
                       CheckedPopupMenuItem(
                         value: s.id,
-                        checked: s.id == project.activeStoreyId,
+                        checked:
+                            s.id == project.activeStoreyId &&
+                            (s.isRoof ||
+                                planMode == ArchitectPlanMode.floor),
                         child: Row(
                           children: [
                             if (s.isRoof) ...[
@@ -262,6 +271,66 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                           ],
                         ),
                       ),
+                      if (!s.isRoof && s.hasCeilingPlan)
+                        CheckedPopupMenuItem(
+                          value: 'ceiling:${s.id}',
+                          checked:
+                              s.id == project.activeStoreyId &&
+                              planMode == ArchitectPlanMode.ceilingServices,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 14),
+                            child: Row(
+                              children: [
+                                const AppIcon(
+                                  AppIconId.layoutGrid,
+                                  size: 16,
+                                  color: Color(0xFF00E5FF),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    l.architectCeilingPlan,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                    if (!project.activeStorey.isRoof &&
+                        !project.activeStorey.hasCeilingPlan)
+                      PopupMenuItem(
+                        value: 'add_ceiling_plan',
+                        child: Row(
+                          children: [
+                            const AppIcon(
+                              AppIconId.layoutGrid,
+                              size: 18,
+                              color: Color(0xFF00E5FF),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(l.architectAddCeilingPlan)),
+                          ],
+                        ),
+                      ),
+                    if (!project.activeStorey.isRoof &&
+                        project.activeStorey.hasCeilingPlan &&
+                        project.activeStorey.ceilings.isEmpty)
+                      PopupMenuItem(
+                        value: 'remove_ceiling_plan',
+                        child: Row(
+                          children: [
+                            const AppIcon(
+                              AppIconId.layoutGrid,
+                              size: 18,
+                              color: Colors.white54,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(l.architectRemoveCeilingPlan)),
+                          ],
+                        ),
+                      ),
                     if (project.roofStorey == null)
                       PopupMenuItem(
                         value: 'add_roof_plan',
@@ -273,7 +342,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                               color: Color(0xFF00E5FF),
                             ),
                             const SizedBox(width: 8),
-                            Text(l.architectAddRoofPlan),
+                            Expanded(child: Text(l.architectAddRoofPlan)),
                           ],
                         ),
                       ),

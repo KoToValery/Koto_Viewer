@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:file_picker/file_picker.dart';
 import '../services/architect_underlay_service.dart';
 import '../services/architect_drag_controller.dart';
+import '../services/architect_ceiling_geometry.dart';
+import '../widgets/architect_ceiling_drafting_bar.dart';
+import '../widgets/architect_ceiling_properties_dialog.dart';
 import '../services/architect_wall_endpoint_snap.dart';
 import '../widgets/architect_wall_angle_control.dart';
 import '../widgets/architect_polygon_angle_control.dart';
@@ -553,6 +556,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     kind: ArchitectDrawingKind.values.byName(_commands.view.name),
 
+    ceilingPlan: _commands.isCeilingPlan,
+
     scale: _publicationScale,
 
   );
@@ -945,6 +950,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 view: _commands.view,
 
+                planMode: _commands.planMode,
+
                 viewId: _commands.viewId,
 
                 lastViewIds: _lastViewIds,
@@ -1081,6 +1088,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
+    if (mode == 'add_ceiling_plan') {
+      final activeId = _modelCommands.project.activeStoreyId;
+      _commands.execute(
+        ToggleArchitectCeilingPlan(storeyId: activeId, enabled: true),
+      );
+      _commands.setPlanMode(ArchitectPlanMode.ceilingServices);
+      _saveBiMProjectIfAttached();
+      return;
+    }
+
+    if (mode == 'remove_ceiling_plan') {
+      final activeId = _modelCommands.project.activeStoreyId;
+      _commands.execute(
+        ToggleArchitectCeilingPlan(storeyId: activeId, enabled: false),
+      );
+      _commands.setPlanMode(ArchitectPlanMode.floor);
+      _saveBiMProjectIfAttached();
+      return;
+    }
+
     if (mode == 'visibility' && type == ArchitectWorkspaceView.section) {
 
       showArchitectSectionVisibility(context, _modelCommands, sectionId: id);
@@ -1196,7 +1223,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   String get _workspaceViewKey => _commands.isPlan
 
-      ? 'plan:${_modelCommands.project.activeStoreyId}'
+      ? (_commands.isCeilingPlan
+            ? 'ceiling:${_modelCommands.project.activeStoreyId}'
+            : 'plan:${_modelCommands.project.activeStoreyId}')
 
       : '${_commands.view.name}:${_commands.viewId}';
 
@@ -1218,6 +1247,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     );
 
+    ArchitectPlanMode? nextPlanMode;
+
     if (id == 'add_roof_plan') {
 
       _modelCommands.commit(_modelCommands.project.ensureRoofStorey());
@@ -1225,7 +1256,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _saveBiMProjectIfAttached();
 
       id = _modelCommands.project.roofStorey?.id;
+      nextPlanMode = ArchitectPlanMode.floor;
 
+    } else if (id != null && id.startsWith('ceiling:')) {
+      id = id.substring('ceiling:'.length);
+      nextPlanMode = ArchitectPlanMode.ceilingServices;
+    } else if (type == ArchitectWorkspaceView.plan && id != null) {
+      nextPlanMode = ArchitectPlanMode.floor;
     }
 
     if (id != null) _lastViewIds[type] = id;
@@ -1233,7 +1270,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _sectionLoader.invalidate();
     _facadeLoader.invalidate();
     _projectionSource = null;
-    _commands.select(type, id);
+    _commands.select(type, id, mode: nextPlanMode);
 
     if (type == ArchitectWorkspaceView.plan && id != null) {
 
@@ -2008,6 +2045,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ArchitectTool.slab => storey.slabs.any((s) => s.id == id),
 
+      ArchitectTool.ceiling => storey.ceilings.any((c) => c.id == id),
+
       ArchitectTool.roof =>
 
         storey.roofs.any((r) => r.id == id) ||
@@ -2121,16 +2160,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  bool _isVisibleInPlanMode(String id) {
+    final s = _project.activeStorey;
+    if (_commands.isCeilingPlan) {
+      if (s.slabs.any((e) => e.id == id)) return false;
+      if (s.zones.any((e) => e.id == id)) return false;
+      if (s.floorDrains.any((e) => e.id == id)) return false;
+      if (s.components.any((e) => e.id == id && !e.isServiceComponent)) {
+        return false;
+      }
+      return true;
+    }
+    if (s.ceilings.any((e) => e.id == id)) return false;
+    return true;
+  }
+
   List<String> _touchHits(Offset point) {
     final hits = ArchitectSelectionCandidates.planHits(
       _project,
       _elementTool,
       point,
       _currentScale,
-      includeComponents: _showFurnitureLayer || _activeTool == ArchitectTool.services,
+      includeComponents: _showFurnitureLayer || _activeTool == ArchitectTool.services || _commands.isCeilingPlan,
       drawingViewKey: _workspaceViewKey,
       allowed: (id) =>
           (_editingGroup == null || _editingGroup!.elementIds.contains(id)) &&
+          _isVisibleInPlanMode(id) &&
           (_acceptsAnySelection || _isElementAllowedForTool(id, _activeTool)),
     );
     if (_acceptsAnySelection && _commands.isPlan) {
@@ -5935,9 +5990,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _explicitSelectionOperation = false;
       _selectionOperation = ArchitectSelectionOperation.replace;
 
+    _pickingCeilingOrigin = false;
     _moveSelection = false;
 
     _activeTool = nextTool;
+    if (nextTool == ArchitectTool.ceiling && !_project.activeStorey.isRoof) {
+      _commands.setPlanMode(ArchitectPlanMode.ceilingServices);
+    }
     if (nextTool.usesComponent) {
       final library = ComponentLibraryService.instance;
       final services = nextTool == ArchitectTool.services;
@@ -7817,6 +7876,284 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     onCancel: () => setState(_elementTool.cancelSlabDrafting),
     onProperties: _showSlabDraftProperties,
   );
+
+  SuspendedCeilingType _ceilingType = SuspendedCeilingType.armstrong;
+  bool _ceilingFromRoom = true;
+  ArchitectSuspendedCeiling? _ceilingDraftTemplate;
+  bool _pickingCeilingOrigin = false;
+
+  ArchitectSuspendedCeiling? get _selectedCeiling {
+    if (_effectiveSelection.length != 1) return null;
+    final id = _effectiveSelection.first;
+    return _project.activeStorey.ceilings
+        .where((c) => c.id == id)
+        .firstOrNull;
+  }
+
+  ArchitectSuspendedCeiling _baseCeilingTemplate() {
+    if (_ceilingDraftTemplate != null) return _ceilingDraftTemplate!;
+    if (_draftingSeed?.tool == ArchitectTool.ceiling) {
+      return ArchitectSuspendedCeiling.fromJson(_draftingSeed!.values);
+    }
+    return ArchitectSuspendedCeiling(id: '', polygon: const [], type: _ceilingType);
+  }
+
+  Widget _ceilingControl() {
+    final selected = _selectedCeiling;
+    final sample =
+        selected ??
+        _baseCeilingTemplate().copyWith(
+          type: _ceilingType,
+          polygon: const [
+            Offset.zero,
+            Offset(4, 0),
+            Offset(4, 4),
+            Offset(0, 4),
+          ],
+        );
+    final metrics = ArchitectCeilingGeometry.computeMetrics(
+      _project,
+      _project.activeStorey,
+      sample,
+    );
+    return ArchitectCeilingDraftingBar(
+      type: selected?.type ?? _ceilingType,
+      fromRoom: _ceilingFromRoom,
+      dropFromUpperSlab: sample.dropFromUpperSlab,
+      pointCount: _elementTool.slabDraftPoints.length,
+      canFinish: ArchitectPolygonGeometry.valid(_elementTool.slabDraftPoints),
+      selected: selected,
+      metrics: metrics,
+      pickingGridOrigin: _pickingCeilingOrigin,
+      onTypeChanged: (t) {
+        if (selected != null) {
+          final defaultThick = t == SuspendedCeilingType.armstrong
+              ? 0.015
+              : 0.0125;
+          _commands.execute(
+            UpdateArchitectCeiling(
+              storeyId: _project.activeStoreyId,
+              ceiling: selected.copyWith(type: t, panelThickness: defaultThick),
+            ),
+          );
+          _saveBiMProjectIfAttached();
+        } else {
+          setState(() {
+            _ceilingType = t;
+            _ceilingDraftTemplate = _baseCeilingTemplate().copyWith(type: t);
+          });
+        }
+      },
+      onFromRoomChanged: (r) => setState(() {
+        _ceilingFromRoom = r;
+        _elementTool.cancelSlabDrafting();
+      }),
+      onDropChanged: (drop) {
+        if (selected != null) {
+          _commands.execute(
+            UpdateArchitectCeiling(
+              storeyId: _project.activeStoreyId,
+              ceiling: selected.copyWith(dropFromUpperSlab: drop),
+            ),
+          );
+          _saveBiMProjectIfAttached();
+        } else {
+          setState(() {
+            _ceilingDraftTemplate = _baseCeilingTemplate().copyWith(
+              dropFromUpperSlab: drop,
+            );
+          });
+        }
+      },
+      onProperties: () => _showCeilingProperties(selected),
+      onCenterGrid: selected == null
+          ? null
+          : () {
+              _pickingCeilingOrigin = false;
+              _commands.execute(
+                UpdateArchitectCeiling(
+                  storeyId: _project.activeStoreyId,
+                  ceiling: selected.copyWith(
+                    gridCentered: true,
+                    clearGridOrigin: true,
+                  ),
+                ),
+              );
+              _saveBiMProjectIfAttached();
+            },
+      onTogglePickOrigin: selected == null
+          ? null
+          : () => setState(() => _pickingCeilingOrigin = !_pickingCeilingOrigin),
+      onUndo: () => setState(() {
+        if (_elementTool.slabDraftPoints.isNotEmpty) {
+          _elementTool.slabDraftPoints.removeLast();
+          _elementTool.slabCandidatePoint = null;
+        }
+      }),
+      onFinish: _commitCeilingDraft,
+      onCancel: () => setState(_cancelDrafting),
+    );
+  }
+
+  void _commitCeilingDraft({ArchitectClosedContour? contour, Offset? seed}) {
+    final points = List<Offset>.unmodifiable(
+      contour?.polygon ?? _elementTool.slabDraftPoints,
+    );
+    if (!ArchitectPolygonGeometry.valid(points)) {
+      _operationError();
+      return;
+    }
+    final tmpl = _baseCeilingTemplate();
+    final ceiling = tmpl.copyWith(
+      id: ArchitectElementId.next('ceil'),
+      type: _ceilingDraftTemplate != null ? tmpl.type : _ceilingType,
+      polygon: points,
+      holes: contour?.holes ?? const [],
+      clearBulges: true,
+      seedPoint: seed,
+      clearSeedPoint: seed == null,
+      isAutoBoundary: seed != null,
+    );
+    try {
+      _commands.execute(
+        PutArchitectCeiling(storeyId: _project.activeStoreyId, ceiling: ceiling),
+        applyDraftingDefaults: true,
+      );
+      setState(() {
+        _elementTool.cancelSlabDrafting();
+      });
+      _saveBiMProjectIfAttached();
+      HapticFeedback.mediumImpact();
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
+  void _showCeilingProperties([ArchitectSuspendedCeiling? ceiling]) {
+    final document = _modelCommands.project;
+    final original = _commands.documentProject;
+    final isDefaults = ceiling == null;
+    final initial =
+        ceiling ??
+        _baseCeilingTemplate().copyWith(
+          id: ArchitectElementId.next('ceiling-draft'),
+          type: _ceilingType,
+          polygon: const [
+            Offset.zero,
+            Offset(4, 0),
+            Offset(4, 4),
+            Offset(0, 4),
+          ],
+          holes: const [],
+          clearBulges: true,
+        );
+    showArchitectProperties<void>(
+      context: context,
+      onInsets: _insetProperties,
+      builder: (_) => ArchitectCeilingPropertiesDialog(
+        project: original,
+        ceiling: initial,
+        isCurrent: () => identical(document, _modelCommands.project),
+        onPreview: isDefaults
+            ? null
+            : (next) {
+                if (identical(document, _modelCommands.project)) {
+                  try {
+                    _setPropertiesPreview(
+                      _modelCommands.prepare(
+                        UpdateArchitectCeiling(
+                          storeyId: original.activeStoreyId,
+                          ceiling: next,
+                        ).apply(original),
+                      ),
+                    );
+                  } on ArgumentError {
+                    // Keep last valid preview.
+                  }
+                }
+              },
+        onApply: (next) {
+          if (!identical(document, _modelCommands.project)) return false;
+          _commands.editPreview = null;
+          if (isDefaults) {
+            setState(() {
+              _ceilingType = next.type;
+              _ceilingDraftTemplate = next;
+              _draftingSeed = null;
+            });
+            return true;
+          }
+          try {
+            _commands.execute(
+              UpdateArchitectCeiling(
+                storeyId: original.activeStoreyId,
+                ceiling: next,
+              ),
+            );
+            _saveBiMProjectIfAttached();
+            return true;
+          } on ArgumentError {
+            _operationError();
+            return false;
+          }
+        },
+      ),
+    ).whenComplete(() => _setPropertiesPreview(null));
+  }
+
+  Widget _buildPlanModeSwitchPill() {
+    final l = context.l10n;
+    final mode = _commands.planMode;
+    return Material(
+      key: const ValueKey('architect-plan-mode-switch'),
+      color: const Color(0xEE1E242C),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: Colors.white24),
+      ),
+      child: Theme(
+        data: ThemeData.dark(),
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: SegmentedButton<ArchitectPlanMode>(
+            showSelectedIcon: false,
+            style: const ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              padding: WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 10),
+              ),
+            ),
+            segments: [
+              ButtonSegment(
+                value: ArchitectPlanMode.floor,
+                label: Text(
+                  l.architectFloorPlanShort,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+              ButtonSegment(
+                value: ArchitectPlanMode.ceilingServices,
+                label: Text(
+                  l.architectCeilingPlanShort,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+            selected: {mode},
+            onSelectionChanged: (s) {
+              final nextMode = s.first;
+              _commands.setPlanMode(nextMode);
+              if (nextMode == ArchitectPlanMode.floor &&
+                  _activeTool == ArchitectTool.ceiling) {
+                _changeTool(ArchitectTool.pan, toggle: false);
+              }
+            },
+          ),
+        ),
+      ),
+    );
+  }
 
   void _commitSlabDraft() {
     final result = _elementTool.commitSlab(
@@ -12973,9 +13310,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    // 7. Slab, Mask, Spline or Roof drafting candidate
+    // 7. Slab, Ceiling, Mask, Spline or Roof drafting candidate
 
-    if ((_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain || _activeTool == ArchitectTool.mask || _activeTool == ArchitectTool.spline) &&
+    if ((_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.ceiling || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain || _activeTool == ArchitectTool.mask || _activeTool == ArchitectTool.spline) &&
 
         _elementTool.slabDraftPoints.isNotEmpty) {
       if (_wallDirectionLocked) return;
@@ -14236,6 +14573,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    if (_pickingCeilingOrigin && _selectedCeiling != null) {
+      final ceiling = _selectedCeiling!;
+      final snapped = _snapElement(rawModel).point;
+      _commands.execute(
+        UpdateArchitectCeiling(
+          storeyId: _project.activeStoreyId,
+          ceiling: ceiling.copyWith(gridOrigin: snapped, gridCentered: false),
+        ),
+      );
+      setState(() => _pickingCeilingOrigin = false);
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+      return;
+    }
+
     if (_cutOpeningTargetId != null) {
 
       final pt = _resolveSlabPoint(rawModel);
@@ -14256,6 +14608,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       return;
 
+    }
+
+    if (_activeTool == ArchitectTool.ceiling &&
+        _ceilingFromRoom &&
+        _effectiveSelection.isEmpty) {
+      if (_selectDraftingElement(rawModel)) {
+        return;
+      }
+      final contour = ArchitectClosedContour.detect(
+        _project.activeStorey,
+        rawModel,
+      );
+      if (contour == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.architectCeilingPickRoomFailed)),
+        );
+      } else {
+        _commitCeilingDraft(contour: contour, seed: rawModel);
+      }
+      return;
     }
 
     if (_activeTool == ArchitectTool.floorDrain && _drainFromRoom &&
@@ -15850,9 +16222,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    // 9. In Slab / Mask / Spline tool
+    // 9. In Slab / Ceiling / Mask / Spline tool
 
-    if (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain || _activeTool == ArchitectTool.mask || _activeTool == ArchitectTool.spline) {
+    if (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.ceiling || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain || _activeTool == ArchitectTool.mask || _activeTool == ArchitectTool.spline) {
       if (_wallDirectionLocked) return;
 
       final pt = _resolveSlabPoint(rawModel);
@@ -15872,6 +16244,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         if (_activeTool == ArchitectTool.hatch) { _commitHatch(); return; }
 
         if (_activeTool == ArchitectTool.floorDrain) { _commitFloorDrain(); return; }
+
+        if (_activeTool == ArchitectTool.ceiling) { _commitCeilingDraft(); return; }
 
         _commitSlabDraft();
       } else {
@@ -20356,9 +20730,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_activeTool == ArchitectTool.zone) return _findZoneAt(point)?.id;
 
+    final storey = _project.activeStorey;
+    final scopedStorey = _commands.isCeilingPlan
+        ? storey.copyWith(
+            slabs: const [],
+            zones: const [],
+            floorDrains: const [],
+            components: storey.components
+                .where((c) => c.isServiceComponent)
+                .toList(),
+          )
+        : storey.copyWith(ceilings: const []);
     return _elementTool.hitTestForTool(
 
-      _project.activeStorey,
+      scopedStorey,
 
       point,
 
@@ -25437,6 +25822,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _showSlabProperties(slab);
         return;
       }
+      final ceiling = _project.activeStorey.ceilings
+          .where((c) => ids.contains(c.id))
+          .firstOrNull;
+      if (ceiling != null) {
+        _showCeilingProperties(ceiling);
+        return;
+      }
     }
     final original = _commands.documentProject;
     final document = _modelCommands.project;
@@ -30208,10 +30600,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           }
         }
         final isSlabSelected = storey.slabs.any((s) => s.id == ids.single);
+        final isCeilingSelected = storey.ceilings.any((c) => c.id == ids.single);
         final polygonPrim = storey.cadPrimitives.where((p) =>
             p.id == ids.single &&
             (p.type == CadPrimitiveType.hatch || p.isPolygon)).firstOrNull;
-        if (isSlabSelected || polygonPrim != null) {
+        if (isSlabSelected || isCeilingSelected || polygonPrim != null) {
           actions.add(
             action(
               'architect-contour-curve',
@@ -33301,7 +33694,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool get _canConfirmContour =>
 
-      (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain) &&
+      (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.ceiling || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain) &&
 
       ArchitectPolygonGeometry.valid(_elementTool.slabDraftPoints);
 
@@ -33650,6 +34043,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_canConfirmContour) {
 
       if (_activeTool == ArchitectTool.hatch) { _commitHatch(); return; }
+
+      if (_activeTool == ArchitectTool.ceiling) { _commitCeilingDraft(); return; }
 
       _commitSlabDraft();
 
@@ -35010,6 +35405,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (_activeTool == ArchitectTool.slab && _effectiveSelection.isEmpty && _cutOpeningTargetId == null)
         Positioned(top: 8, left: 8, child: _slabControl()),
+
+      if ((_activeTool == ArchitectTool.ceiling || _selectedCeiling != null) &&
+          _effectiveSelection.length <= 1 &&
+          _cutOpeningTargetId == null)
+        Positioned(top: 8, left: 8, child: _ceilingControl()),
+
+      if (_pickingCeilingOrigin && _selectedCeiling != null)
+        Positioned(
+          top: 60,
+          left: 8,
+          child: IgnorePointer(
+            child: ArchitectCanvasHint(
+              message: context.l10n.architectCeilingPickOriginHint,
+            ),
+          ),
+        ),
+
+      if (_commands.isPlan &&
+          !_is3DView &&
+          !_printPreview &&
+          !_project.activeStorey.isRoof &&
+          _effectiveSelection.isEmpty &&
+          _cutOpeningTargetId == null &&
+          !_dragController.isActive &&
+          _activeTool != ArchitectTool.zoneTable &&
+          _stairDraft == null)
+        Positioned(bottom: 10, right: 10, child: _buildPlanModeSwitchPill()),
 
       if (_activeTool == ArchitectTool.hatch && _effectiveSelection.isEmpty)
 
@@ -36904,6 +37326,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     showUpperOverhangs: _showUpperOverhangs,
 
     showFurniture: _showFurnitureLayer,
+
+    planMode: _commands.planMode,
 
     activeOpeningType: _elementTool.openingType,
 

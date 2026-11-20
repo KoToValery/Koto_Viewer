@@ -1167,6 +1167,7 @@ class ArchitectElementsPainterHelper {
     String? selectedElementId,
     Set<String> selectedElementIds = const {},
     bool layerVisible = true,
+    bool onlyServiceComponents = false,
   }) {
     final ownedIds = project == null
         ? const <String>{}
@@ -1177,7 +1178,8 @@ class ArchitectElementsPainterHelper {
     final components = project == null
         ? storey.components
         : [
-            ...storey.components.where((c) => !c.isServiceComponent),
+            if (!onlyServiceComponents)
+              ...storey.components.where((c) => !c.isServiceComponent),
             ...ArchitectServiceGeometry.componentsOnLevel(
               project,
               storey,
@@ -1188,8 +1190,11 @@ class ArchitectElementsPainterHelper {
             ),
           ];
     for (final comp in components) {
-      if (!comp.isVisible || !layerVisible && !comp.isServiceComponent)
+      if (!comp.isVisible ||
+          (!layerVisible && !comp.isServiceComponent) ||
+          (onlyServiceComponents && !comp.isServiceComponent)) {
         continue;
+      }
       architectDrawingSources(canvas, {comp.id}, 'components');
       final def = ComponentLibraryService.instance.findDefinition(
         comp.definitionId,
