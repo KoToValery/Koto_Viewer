@@ -17,6 +17,9 @@
 | Painter core | `DxfPainter`, `_drawGrid`, `_renderEntity` | Main `CustomPainter` pipeline, culling, grid, and entity dispatch |
 | Specialized renderers | `_renderSinglePatternLineFamily`, `_renderInsert`, `_renderDimensionText`, `_drawSingleLeaderAnnotation`, `_drawBadge` | Hatch patterns, block inserts, dimensions, leaders, and measurement badges |
 
+`[TAG:PAINTER_TEXT_SCALE]` checks the selected text style before consulting the
+drawing-origin heuristics. Eligible styles share one origin result per paint.
+
 `[TAG:MODEL_PLACEMENT]` embeds `DxfModelPlacement` in the architectural plan,
 drag ghost and import preview. The caller supplies the CAD-to-canvas mapping,
 the viewport's CAD bounds and layer overrides. Embedded wipeouts clear an
@@ -31,6 +34,11 @@ and paper viewports use the same scene coordinates. Callers without
 `_renderSinglePatternLineFamily` batches dash/line contours into one stroke per
 family. Raster parity, holes, transformed blocks, paper views and bounded
 recording work are covered by `test/dxf_hatch_viewport_test.dart`.
+`[TAG:HATCH_INTERACTIVE_BUDGET]` preflights line families and dash cycles per
+hatch and per paint. `DxfViewerScreen` opts in through `interactiveHatches`.
+Expensive patterns use a light fill on their original even-odd boundary.
+Exact rendering callers retain the existing detail policy. Integer cycle
+iteration and batched dots also apply to the detailed path.
 Pan hysteresis uses `_paintedVisibleCadRect` to accumulate movement from the
 last recorded layer, including when several small pans skip repainting.
 

@@ -76,10 +76,13 @@ class DwgDocumentAdapter {
     }
     final blocks = <String, DxfBlock>{};
     final entities = <DxfEntity>[];
+    final attributes = _map(source['attributes']);
     for (final value in _list(source['blocks'])) {
-      final block = _map(value), name = block['name'] as String;
-      final model = name.toLowerCase() == '*model_space';
-      final paper = name.toLowerCase().startsWith('*paper_space');
+      final block = _map(value);
+      final name = block['name'] as String;
+      final lowerName = name.toLowerCase();
+      final model = lowerName == '*model_space';
+      final paper = lowerName.startsWith('*paper_space');
       final layout = model
           ? 'Model'
           : layoutNames['${block['handle']}'] ?? 'Layout1';
@@ -89,7 +92,7 @@ class DwgDocumentAdapter {
           _map(object),
           paper: paper,
           layout: layout,
-          attributes: _map(source['attributes']),
+          attributes: attributes,
         );
         if (entity != null) content.add(entity);
         if (entity is DxfInsert) {
@@ -123,6 +126,11 @@ class DwgDocumentAdapter {
       layers.putIfAbsent(layer, () => DxfLayer(name: layer));
     }
     final header = _map(source['header']);
+    final modelBounds = [
+      for (final entity in entities)
+        if (!entity.isPaperSpace)
+          (entity: entity, bounds: entity.getBoundingBox(blocks)),
+    ];
     final vars = <String, String>{
       r'$INSUNITS': '${header['insertion_units'] ?? 0}',
       r'$MEASUREMENT': '${header['measurement'] ?? 0}',
@@ -141,14 +149,10 @@ class DwgDocumentAdapter {
       textStyles: styles,
       dimStyles: dims,
       lineTypes: lineTypes,
-      bounds: _bounds(entities, blocks, header),
+      bounds: _bounds(modelBounds.map((entry) => entry.bounds), header),
       entityStats: stats,
     );
-    doc.spatialIndex = DxfQuadTree.build(
-      entities.where((e) => !e.isPaperSpace).toList(),
-      blocks,
-      doc.bounds,
-    );
+    doc.spatialIndex = DxfQuadTree.buildFromEntityBounds(modelBounds, doc.bounds);
     return doc;
   }
 
@@ -627,27 +631,20 @@ class DwgDocumentAdapter {
   }
 
   static Rect _bounds(
-    List<DxfEntity> entities,
-    Map<String, DxfBlock> blocks,
+    Iterable<Rect?> entityBounds,
     Map<String, dynamic> header,
   ) {
     var boxes = [
-      for (final entity in entities.where((e) => !e.isPaperSpace))
-        if (entity.getBoundingBox(blocks) case final Rect box when box.isFinite)
-          box,
+      for (final box in entityBounds)
+        if (box != null && box.isFinite) box,
     ];
     if (boxes.isEmpty) return const Rect.fromLTWH(0, 0, 100, 100);
     final min = _point(header['model_space_extents_min']),
         max = _point(header['model_space_extents_max']);
     final extents = Rect.fromPoints(min, max);
     if (extents.isFinite && !extents.isEmpty) {
-      final filtered = boxes
-          .where(
-            (b) => extents
-                .inflate(math.max(extents.longestSide * .1, 10))
-                .overlaps(b),
-          )
-          .toList();
+      final paddedExtents = extents.inflate(math.max(extents.longestSide * .1, 10));
+      final filtered = boxes.where(paddedExtents.overlaps).toList();
       if (filtered.length >= 3 && filtered.length * 4 >= boxes.length) {
         boxes = filtered;
       }
@@ -660,8 +657,11 @@ class DwgDocumentAdapter {
     );
   }
 
-  static Map<String, dynamic> _map(dynamic value) =>
-      value is Map ? Map<String, dynamic>.from(value) : {};
+  static Map<String, dynamic> _map(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return const {};
+  }
   static List<dynamic> _list(dynamic value) => value is List ? value : [];
   static double _number(dynamic value, [double fallback = 0]) =>
       value is num ? value.toDouble() : fallback;

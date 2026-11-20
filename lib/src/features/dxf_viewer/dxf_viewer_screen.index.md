@@ -23,3 +23,7 @@
 selection workflow with native DWG objects. DXF conversion remains only for
 explicit DXF export/share operations in `_filesForDxfExport`
 (`[TAG:DWG_EXPORT_BOUNDARY]`), outside opening or importing DWGs.
+
+The navigation canvas opts in to `DxfPainter.interactiveHatches` for bounded
+pattern work in the Model and Paper views. The viewport transform and input
+routing still use the same `InteractiveViewer` and pointer handlers.

@@ -2258,6 +2258,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                                     measurement: null, // Rendered crisply on screen-space overlay above InteractiveViewer
                                     annotations: const [], // Rendered crisply on screen-space overlay above InteractiveViewer
                                     visibleCadRect: _getVisibleCadRect(),
+                                    interactiveHatches: true,
                                     highlightedEntity: _selectedEntity,
                                     snapResult: _isMeasureMode && _snapEnabled ? (_hoveredSnap ?? _activeMeasureSnap) : null,
                                     showGrid: _showGrid,

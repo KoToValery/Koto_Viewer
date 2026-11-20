@@ -20,8 +20,10 @@ import 'dxf_snap_helper.dart';
 // [SEC-03-STROKES] [TAG:PAINTER_STROKES] Canvas & stroke drawing helpers, pen colors
 // [SEC-04-GEOMETRY] [TAG:PAINTER_GEOM] Lines, arcs, circles, polylines, splines
 // [SEC-05-TEXT] [TAG:PAINTER_TEXT] Single-line TEXT & multiline MTEXT rendering
+//   [TAG:PAINTER_TEXT_SCALE] Resolve drawing origin once for scaled styles
 // [SEC-06-HATCH] [TAG:PAINTER_HATCH] Solids, hatches & pattern fills
 //   [TAG:HATCH_VIEWPORT_WORK] Buffered scene bounds limit hatch pattern work
+//   [TAG:HATCH_INTERACTIVE_BUDGET] Bound pattern detail in the Viewer
 //   [TAG:PAINTER_WIPEOUT] Background masks retain source draw order
 // [SEC-07-BLOCKS] [TAG:PAINTER_BLOCKS] Blocks & INSERT entities expansion
 // [SEC-08-DIMS] [TAG:PAINTER_DIMS] Dimensions, leaders & arrowheads
@@ -71,6 +73,8 @@ class DxfPaintStats {
   final double polyMs;
   final int hatchCount;
   final double hatchMs;
+  /// Estimated definition and dash work for the patterns drawn with detail.
+  final double hatchPatternWork;
   final int textCount;
   final double textMs;
   final int dimCount;
@@ -90,6 +94,7 @@ class DxfPaintStats {
     required this.polyMs,
     required this.hatchCount,
     required this.hatchMs,
+    required this.hatchPatternWork,
     required this.textCount,
     required this.textMs,
     required this.dimCount,
@@ -106,6 +111,7 @@ class DxfPaintStats {
         'lines: ${lineMs.toStringAsFixed(1)}ms ($lineCount), '
         'polylines: ${polyMs.toStringAsFixed(1)}ms ($polyCount), '
         'hatches: ${hatchMs.toStringAsFixed(1)}ms ($hatchCount), '
+        'hatch work: ${hatchPatternWork.toStringAsFixed(0)}, '
         'texts: ${textMs.toStringAsFixed(1)}ms ($textCount), '
         'dims: ${dimMs.toStringAsFixed(1)}ms ($dimCount), '
         'other: ${otherMs.toStringAsFixed(1)}ms, '
@@ -158,9 +164,27 @@ class DxfModelPlacement {
   });
 }
 
+typedef _HatchPatternFamily = ({
+  DxfHatchPatternLine line,
+  Offset base,
+  Offset offset,
+  Offset direction,
+  double halfSpan,
+  int firstRow,
+  int lastRow,
+  int stride,
+  double dashPeriod,
+  bool useDashes,
+  bool dottedOnly,
+  bool dense,
+  double work,
+});
+
 // === SECTION: PAINTER DECLARATION & MAIN PAINT LOOP ===
 /// CustomPainter for rendering entire DXF drawing.
 class DxfPainter extends CustomPainter {
+  static const _maxHatchWorkPerPaint = 24000.0;
+  static const _maxHatchWorkPerEntity = 3200.0;
   static int _paintCallCount = 0;
   static int get paintCallCount => _paintCallCount;
   static bool debugLogRepaintReasons = false;
@@ -179,6 +203,8 @@ class DxfPainter extends CustomPainter {
   final bool showGrid;
   final DxfDisplaySettings settings;
   final Rect? visibleCadRect;
+  /// Allow a lightweight preview of costly hatch patterns in the Viewer.
+  final bool interactiveHatches;
   final bool Function(DxfEntity entity)? entityFilter;
   final int revision;
   /// Optional presentation overrides; source geometry and layer styles stay intact.
@@ -193,7 +219,10 @@ class DxfPainter extends CustomPainter {
   // and paper-viewport mappers also produce scene coordinates, so hatch clipping
   // must use this rectangle rather than compare local block points to WCS.
   Rect? _hatchPatternVisibleRect;
+  double _remainingHatchWork = _maxHatchWorkPerPaint;
+  double _hatchPatternWork = 0;
   Rect? _paintedVisibleCadRect;
+  bool? _archicadOriginForPaint;
   bool _preserveCadDrawOrder = false;
   Color _drawingBackground = const Color(0xFFFFFFFF);
 
@@ -209,6 +238,7 @@ class DxfPainter extends CustomPainter {
     this.showGrid = true,
     this.settings = const DxfDisplaySettings(),
     this.visibleCadRect,
+    this.interactiveHatches = false,
     this.entityFilter,
     this.revision = 0,
     this.drawingColorOverride,
@@ -221,6 +251,9 @@ class DxfPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty || size.width <= 0 || size.height <= 0) return;
+    _remainingHatchWork = _maxHatchWorkPerPaint;
+    _hatchPatternWork = 0;
+    _archicadOriginForPaint = null;
     _paintedVisibleCadRect = visibleCadRect;
     _preserveCadDrawOrder = hasWipeouts(document);
     _drawingBackground = activeLayout == 'Model' ? theme.bgColor : Colors.white;
@@ -717,6 +750,7 @@ class DxfPainter extends CustomPainter {
       polyMs: polyMs,
       hatchCount: hatchCount,
       hatchMs: hatchMs,
+      hatchPatternWork: _hatchPatternWork,
       textCount: textCount,
       textMs: textMs,
       dimCount: dimCount,
@@ -1476,6 +1510,7 @@ class DxfPainter extends CustomPainter {
   /// The active drawing unit for measurements (user override or document header unit).
   DxfUnit get effectiveUnit => settings.unitOverride ?? document.unit;
 
+  // --- SUBSECTION: [TAG:PAINTER_TEXT_SCALE] Resolve drawing origin once for scaled styles ---
   /// Calculates the effective text height for rendering, applying text style
   /// scale factors if specified in the style definition.
   ///
@@ -1485,38 +1520,38 @@ class DxfPainter extends CustomPainter {
     double entityHeight,
     String? styleName,
     DxfDocument document,
+  ) => _resolveTextHeight(
+    entityHeight,
+    document.textStyles[styleName],
+    () => document.isArchicadOrigin,
+  );
+
+  static double _resolveTextHeight(
+    double entityHeight,
+    DxfTextStyle? style,
+    bool Function() isArchicadOrigin,
   ) {
+    final styleHeight = style?.heightScale ?? 0.0;
     if (entityHeight <= 0) {
-      if (styleName != null && document.textStyles.containsKey(styleName)) {
-        final style = document.textStyles[styleName]!;
-        if (style.heightScale > 0 && (style.heightScale - 1.0).abs() > 0.05) {
-          return style.heightScale;
-        }
-      }
-      return 2.5;
+      return styleHeight > 0 && (styleHeight - 1).abs() > 0.05
+          ? styleHeight
+          : 2.5;
     }
-
-    double effectiveHeight = entityHeight;
-
-    // Apply Archicad text style scale factor (characteristic ~2.0x) ONLY for Archicad-originated drawings
-    if (document.isArchicadOrigin &&
-        styleName != null &&
-        document.textStyles.containsKey(styleName)) {
-      final style = document.textStyles[styleName]!;
-      if (style.heightScale >= 1.95 && style.heightScale <= 2.05) {
-        effectiveHeight *= style.heightScale;
-      }
+    if (styleHeight >= 1.95 && styleHeight <= 2.05 && isArchicadOrigin()) {
+      return entityHeight * styleHeight;
     }
-
-    return effectiveHeight;
+    return entityHeight;
   }
 
-  double _getEffectiveTextHeight(
-    double entityHeight,
-    String? styleName,
-    DxfDocument document,
-  ) =>
-      getEffectiveTextHeight(entityHeight, styleName, document);
+  bool _isArchicadOrigin() =>
+      _archicadOriginForPaint ??= document.isArchicadOrigin;
+
+  double _getEffectiveTextHeight(double entityHeight, String? styleName) =>
+      _resolveTextHeight(
+        entityHeight,
+        document.textStyles[styleName],
+        _isArchicadOrigin,
+      );
 
   /// Resolves the most appropriate font family from the CAD text style definition.
   String _resolveFontFamily(String? styleName) {
@@ -1566,11 +1601,7 @@ class DxfPainter extends CustomPainter {
     if (entity.text.trim().isEmpty || entity.isInvisible) return;
 
     // Apply effective text height calculation (includes text style scale)
-    final effectiveHeight = _getEffectiveTextHeight(
-      entity.height,
-      entity.style,
-      document,
-    );
+    final effectiveHeight = _getEffectiveTextHeight(entity.height, entity.style);
 
     if (effectiveHeight <= 0.0 || fitScale <= 0.0) return;
 
@@ -1714,11 +1745,7 @@ class DxfPainter extends CustomPainter {
     if (entity.cleanText.trim().isEmpty) return;
 
     // Apply effective text height calculation (includes text style scale)
-    final effectiveHeight = _getEffectiveTextHeight(
-      entity.height,
-      entity.style,
-      document,
-    );
+    final effectiveHeight = _getEffectiveTextHeight(entity.height, entity.style);
 
     if (effectiveHeight <= 0.0 || fitScale <= 0.0) return;
 
@@ -1989,22 +2016,20 @@ class DxfPainter extends CustomPainter {
     if (visible != null) {
       bounds = bounds.intersect(visible.inflate(strokePaint.strokeWidth));
     }
-    if (bounds.isEmpty || bounds.width <= 0 || bounds.height <= 0) return;
+    if (bounds.isEmpty || !bounds.isFinite) return;
 
     final double scale = currentScale.clamp(0.001, 10000.0);
 
-    // Adaptive Hatch LOD:
-    // When the drawing is zoomed out (scale < 1.25) or the hatch area on screen is small (< 8.0px),
-    // drawing dense pattern lines creates severe Moiré visual noise and wastes 100+ ms on Skia clipPath.
-    // Replace with a subtle elegant tint (AutoCAD adaptive hatch style) for 0.001ms instantaneous rendering!
+    void drawPreviewFill() {
+      if (hatch.isSolid || hatch.transparency != null) return;
+      canvas.drawPath(
+        clipPath,
+        Paint()..color = strokePaint.color.withValues(alpha: 0.12),
+      );
+    }
+
     if (scale < 1.25 || bounds.longestSide * scale < 8.0) {
-      if (hatch.isSolid || hatch.transparency != null) {
-        return;
-      }
-      final miniPaint = Paint()
-        ..color = strokePaint.color.withValues(alpha: 0.12)
-        ..style = PaintingStyle.fill;
-      canvas.drawPath(clipPath, miniPaint);
+      drawPreviewFill();
       return;
     }
 
@@ -2018,6 +2043,53 @@ class DxfPainter extends CustomPainter {
     );
     if (patternLines.isEmpty) return;
 
+    // --- SUBSECTION: [TAG:HATCH_INTERACTIVE_BUDGET] Bound pattern detail in the Viewer ---
+    // A per-row cap alone leaves the product of families, rows, and dash
+    // items unbounded. Preflight the hatch so it can fall back as a whole.
+    final budget = math.min(_remainingHatchWork, _maxHatchWorkPerEntity);
+    if (interactiveHatches && budget <= 0) {
+      drawPreviewFill();
+      return;
+    }
+    final families = <_HatchPatternFamily>[];
+    var work = 0.0;
+    var inspected = 0.0;
+    var hasDenseFamily = false;
+    for (final line in patternLines) {
+      // Include the cost of reading the definition even for subpixel families.
+      final definitionWork = 1 + line.dashes.length;
+      work += definitionWork;
+      if (interactiveHatches && work > budget) {
+        _remainingHatchWork -= inspected;
+        drawPreviewFill();
+        return;
+      }
+      inspected += definitionWork;
+      final family = _planHatchPatternLineFamily(
+        line: line,
+        bounds: bounds,
+        toCanvas: toCanvas,
+        fitScale: fitScale,
+        scale: scale,
+      );
+      if (family == null) continue;
+      work += family.work;
+      if (interactiveHatches && work > budget) {
+        _remainingHatchWork -= inspected;
+        drawPreviewFill();
+        return;
+      }
+      if (interactiveHatches && family.dense) {
+        hasDenseFamily = true;
+      } else {
+        families.add(family);
+      }
+    }
+    if (interactiveHatches) _remainingHatchWork -= work;
+    if (hasDenseFamily) drawPreviewFill();
+    if (families.isEmpty) return;
+    _hatchPatternWork += work;
+
     // Crisp CAD line thickness for hatch lines
     final double lineThickness = math.min(
       strokePaint.strokeWidth,
@@ -2030,147 +2102,128 @@ class DxfPainter extends CustomPainter {
       ..strokeCap = StrokeCap.butt
       ..isAntiAlias = true;
 
-    final center = bounds.center;
-    final double radius = math.sqrt(bounds.width * bounds.width + bounds.height * bounds.height) / 2.0 + 2.0;
-
     canvas.save();
     canvas.clipPath(clipPath);
 
-    for (final line in patternLines) {
+    for (final family in families) {
       _renderSinglePatternLineFamily(
         canvas: canvas,
-        line: line,
+        family: family,
         bounds: bounds,
-        center: center,
-        radius: radius,
         paint: patternStrokePaint,
-        toCanvas: toCanvas,
         fitScale: fitScale,
+        scale: scale,
       );
     }
 
     canvas.restore();
   }
 
-  void _renderSinglePatternLineFamily({
-    required Canvas canvas,
+  _HatchPatternFamily? _planHatchPatternLineFamily({
     required DxfHatchPatternLine line,
     required Rect bounds,
-    required Offset center,
-    required double radius,
-    required Paint paint,
     required Offset Function(Offset) toCanvas,
     required double fitScale,
+    required double scale,
   }) {
-    // 1. Line angle and unit direction in Canvas
-    final double radCad = line.angle * math.pi / 180.0;
-    // Canvas coordinate system has Y inverted relative to CAD (Y down vs Y up)
-    final double dirX = math.cos(radCad);
-    final double dirY = -math.sin(radCad);
-    final dirCanvas = Offset(dirX, dirY);
-
-    // Normal vector perpendicular to dirCanvas in Canvas coords (-dirY, dirX)
-    final normalCanvas = Offset(-dirY, dirX);
-
-    // 2. Base point in Canvas coords
-    final baseCanvas = toCanvas(line.basePoint);
-
-    // 3. Offset vector in Canvas coords (dx * fitScale, -dy * fitScale)
-    final offsetCanvas = Offset(
+    final angle = line.angle * math.pi / 180.0;
+    final direction = Offset(math.cos(angle), -math.sin(angle));
+    final normal = Offset(-direction.dy, direction.dx);
+    final base = toCanvas(line.basePoint);
+    final offset = Offset(
       line.offset.dx * fitScale,
       -line.offset.dy * fitScale,
     );
+    final step = offset.dx * normal.dx + offset.dy * normal.dy;
+    final screenStep = step.abs() * scale;
+    if (!base.isFinite || !screenStep.isFinite) return null;
+    final dense = screenStep > 0 && screenStep < 1.2;
 
-    final double scale = currentScale.clamp(0.001, 10000.0);
+    var firstRow = 0;
+    var lastRow = 0;
+    if (!dense && step.abs() >= 1e-6) {
+      final delta = bounds.center - base;
+      final centerRow = (delta.dx * normal.dx + delta.dy * normal.dy) / step;
+      final halfRows = (bounds.width * normal.dx.abs() +
+              bounds.height * normal.dy.abs()) /
+          (2 * step.abs());
+      if (!centerRow.isFinite || !halfRows.isFinite) return null;
+      firstRow = (centerRow - halfRows).floor();
+      lastRow = (centerRow + halfRows).ceil();
+    }
+    final rows = lastRow - firstRow + 1;
+    if (rows <= 0) return null;
+    final stride = rows > 2000 ? (rows / 1500).ceil() : 1;
 
-    // 4. Perpendicular step between successive lines in the family
-    final double step = offsetCanvas.dx * normalCanvas.dx + offsetCanvas.dy * normalCanvas.dy;
-    final double absStep = step.abs();
-    final double screenStep = absStep * scale;
+    var dashPeriod = 0.0;
+    var hasDrawnDashes = false;
+    var hasDots = false;
+    if (!dense) {
+      for (final dash in line.dashes) {
+        dashPeriod += dash.abs() * fitScale;
+        hasDrawnDashes |= dash > 0;
+        hasDots |= dash == 0;
+      }
+    }
+    if (!dashPeriod.isFinite) return null;
+    final dottedOnly = !hasDrawnDashes && hasDots;
+    if (dottedOnly && dashPeriod == 0) {
+      dashPeriod = math.max(1.0, 10.0 * fitScale);
+    }
+    final screenPeriod = dashPeriod * scale;
+    final useDashes = (hasDrawnDashes && screenPeriod >= 1.5) ||
+        (dottedOnly && screenPeriod >= 0.8);
 
-    // Dense line safeguard: if spacing on physical screen is less than 1.2 pixels,
-    // parallel lines visually merge into a tint. Avoid drawing thousands of overlapping
-    // sub-pixel lines by rendering a representative subtle tint.
-    if (screenStep > 0 && screenStep < 1.2) {
-      final denseFillPaint = Paint()
-        ..color = paint.color.withValues(alpha: 0.15)
-        ..style = PaintingStyle.fill;
-      canvas.drawRect(bounds, denseFillPaint);
+    final halfSpan = (bounds.width * direction.dx.abs() +
+            bounds.height * direction.dy.abs()) /
+        2 + 2;
+    final rowWork = useDashes
+        ? (2 * halfSpan / dashPeriod + 2) * line.dashes.length
+        : 1.0;
+    return (
+      line: line,
+      base: base,
+      offset: offset,
+      direction: direction,
+      halfSpan: halfSpan,
+      firstRow: firstRow,
+      lastRow: lastRow,
+      stride: stride,
+      dashPeriod: dashPeriod,
+      useDashes: useDashes,
+      dottedOnly: dottedOnly,
+      dense: dense,
+      work: (rows / stride).ceil() * rowWork,
+    );
+  }
+
+  void _renderSinglePatternLineFamily({
+    required Canvas canvas,
+    required _HatchPatternFamily family,
+    required Rect bounds,
+    required Paint paint,
+    required double fitScale,
+    required double scale,
+  }) {
+    if (family.dense) {
+      canvas.drawRect(
+        bounds,
+        Paint()..color = paint.color.withValues(alpha: 0.15),
+      );
       return;
     }
 
-    // 5. Calculate range of line indices [kMin, kMax] touching the bounding box
-    int kMin = 0;
-    int kMax = 0;
-
-    if (absStep < 1e-6) {
-      // Single line family (no offset perpendicular)
-      kMin = 0;
-      kMax = 0;
-    } else {
-      // Project the 4 corners of bounds onto normalCanvas
-      final c1 = bounds.topLeft;
-      final c2 = bounds.topRight;
-      final c3 = bounds.bottomRight;
-      final c4 = bounds.bottomLeft;
-
-      double dist(Offset p) =>
-          (p.dx - baseCanvas.dx) * normalCanvas.dx + (p.dy - baseCanvas.dy) * normalCanvas.dy;
-
-      final k1 = dist(c1) / step;
-      final k2 = dist(c2) / step;
-      final k3 = dist(c3) / step;
-      final k4 = dist(c4) / step;
-
-      final double rawMin = math.min(math.min(k1, k2), math.min(k3, k4));
-      final double rawMax = math.max(math.max(k1, k2), math.max(k3, k4));
-
-      kMin = rawMin.floor();
-      kMax = rawMax.ceil();
-    }
-
-    final int totalLines = kMax - kMin + 1;
-    if (totalLines <= 0) return;
-
-    // Safety stride to prevent locking UI if total lines exceeds 2000
-    final int stride = totalLines > 2000 ? (totalLines / 1500).ceil() : 1;
-
-    // Check dashes
-    final bool hasDashes = line.dashes.isNotEmpty;
-    final bool hasDrawnDashes = line.dashes.any((d) => d > 0);
-    final bool hasDots = line.dashes.any((d) => d == 0);
-    final bool isDottedOnly = hasDashes && !hasDrawnDashes && hasDots;
-
-    double dashPeriod = 0.0;
-    if (hasDashes) {
-      for (final d in line.dashes) {
-        dashPeriod += d.abs() * fitScale;
-      }
-    }
-    // Avoid divide-by-zero or infinite loops
-    if (hasDashes && dashPeriod < 1e-4) {
-      dashPeriod = math.max(1.0, 10.0 * fitScale);
-    }
-
-    final double screenDashPeriod = dashPeriod * scale;
-
-    final bool useDashes = hasDashes &&
-        ((hasDrawnDashes && screenDashPeriod >= 1.5) || (isDottedOnly && screenDashPeriod >= 0.8));
-
-    // Dedicated paint for solid CAD dots (filled circles)
-    final dotPaint = Paint()
-      ..color = paint.color
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
-    // CAD dots (d == 0) are dimensionless points — render as crisp ~1 screen-pixel circles.
-    // Do NOT scale with strokeWidth; use currentScale so dots stay visually consistent at any zoom.
-    final double dotRadius = (1.0 * settings.lineThicknessScale) / scale;
+    final line = family.line;
+    final direction = family.direction;
+    final center = bounds.center;
+    final dotRadius = settings.lineThicknessScale / scale;
 
     // One stroke per family instead of thousands of individual canvas calls.
     // Separate contours preserve dash caps and the phase of every CAD segment.
     final segments = Path();
+    Path? dots;
     var linePaint = paint;
-    if (!useDashes && hasDrawnDashes) {
+    if (!family.useDashes && line.dashes.any((dash) => dash > 0)) {
       final positive = line.dashes.fold<double>(0, (sum, d) => sum + math.max(0, d));
       final period = line.dashes.fold<double>(0, (sum, d) => sum + d.abs());
       final ratio = period > 0 ? (positive / period).clamp(0.1, 0.8) : 0.5;
@@ -2182,75 +2235,55 @@ class DxfPainter extends CustomPainter {
         ..isAntiAlias = true;
     }
 
-    // 6. Draw lines
-    for (int k = kMin; k <= kMax; k += stride) {
-      final lineBase = Offset(
-        baseCanvas.dx + offsetCanvas.dx * k,
-        baseCanvas.dy + offsetCanvas.dy * k,
-      );
+    final rowCount = (family.lastRow - family.firstRow) ~/ family.stride + 1;
+    for (var row = 0; row < rowCount; row++) {
+      final index = family.firstRow + row * family.stride;
+      final base = family.base + family.offset * index.toDouble();
+      final delta = center - base;
+      final tCenter = delta.dx * direction.dx + delta.dy * direction.dy;
+      final tStart = tCenter - family.halfSpan;
+      final tEnd = tCenter + family.halfSpan;
 
-      // Project center onto this line
-      final double tCenter = (center.dx - lineBase.dx) * dirCanvas.dx +
-          (center.dy - lineBase.dy) * dirCanvas.dy;
+      void addSegment(double start, double end) {
+        final from = base + direction * start;
+        final to = base + direction * end;
+        segments.moveTo(from.dx, from.dy);
+        segments.lineTo(to.dx, to.dy);
+      }
 
-      final double tStart = tCenter - radius;
-      final double tEnd = tCenter + radius;
+      if (!family.useDashes) {
+        if (!family.dottedOnly) addSegment(tStart, tEnd);
+        continue;
+      }
 
-      if (!useDashes) {
-        if (!isDottedOnly) {
-          // Continuous line (or dashed line zoomed far out where dashes blend together)
-          final pStart = Offset(
-            lineBase.dx + dirCanvas.dx * tStart,
-            lineBase.dy + dirCanvas.dy * tStart,
-          );
-          final pEnd = Offset(
-            lineBase.dx + dirCanvas.dx * tEnd,
-            lineBase.dy + dirCanvas.dy * tEnd,
-          );
-          segments.moveTo(pStart.dx, pStart.dy);
-          segments.lineTo(pEnd.dx, pEnd.dy);
-        }
-      } else {
-        // Dashed / dotted line
-        final int startCycle = (tStart / dashPeriod).floor();
-        double tCurr = startCycle * dashPeriod;
-
-        while (tCurr < tEnd) {
-          for (final d in line.dashes) {
-            final double itemLen = d.abs() * fitScale;
-            if (d > 0) {
-              // Dash
-              final double segStart = math.max(tCurr, tStart);
-              final double segEnd = math.min(tCurr + itemLen, tEnd);
-              if (segEnd > segStart) {
-                final pStart = Offset(
-                  lineBase.dx + dirCanvas.dx * segStart,
-                  lineBase.dy + dirCanvas.dy * segStart,
-                );
-                final pEnd = Offset(
-                  lineBase.dx + dirCanvas.dx * segEnd,
-                  lineBase.dy + dirCanvas.dy * segEnd,
-                );
-                segments.moveTo(pStart.dx, pStart.dy);
-                segments.lineTo(pEnd.dx, pEnd.dy);
-              }
-            } else if (d == 0) {
-              // Dot (rendered as crisp filled circle)
-              if (tCurr >= tStart && tCurr <= tEnd) {
-                final pDot = Offset(
-                  lineBase.dx + dirCanvas.dx * tCurr,
-                  lineBase.dy + dirCanvas.dy * tCurr,
-                );
-                canvas.drawCircle(pDot, dotRadius, dotPaint);
-              }
-            }
-            // If d < 0, it's a space (gap), do nothing
-            tCurr += itemLen;
+      // Derive each cycle from its index. A zero-length dash represents a
+      // dot and must not control whether the loop progresses.
+      final period = family.dashPeriod;
+      final firstCycle = (tStart / period).floorToDouble();
+      final cycles = tEnd / period - firstCycle;
+      if (!cycles.isFinite) continue;
+      final cycleCount = cycles.ceil();
+      for (var cycle = 0; cycle < cycleCount; cycle++) {
+        final origin = (firstCycle + cycle) * period;
+        var dashOffset = 0.0;
+        for (final dash in line.dashes) {
+          final start = origin + dashOffset;
+          dashOffset += dash.abs() * fitScale;
+          if (dash > 0) {
+            final from = math.max(start, tStart);
+            final to = math.min(origin + dashOffset, tEnd);
+            if (to > from) addSegment(from, to);
+          } else if (dash == 0 && start >= tStart && start <= tEnd) {
+            (dots ??= Path()).addOval(Rect.fromCircle(
+              center: base + direction * start,
+              radius: dotRadius,
+            ));
           }
         }
       }
     }
     canvas.drawPath(segments, linePaint);
+    if (dots != null) canvas.drawPath(dots, Paint()..color = paint.color);
   }
 
   // === SECTION: BLOCKS & INSERT ENTITIES ===
@@ -3928,6 +3961,7 @@ class DxfPainter extends CustomPainter {
         oldDelegate.highlightedEntity != highlightedEntity ||
         oldDelegate.snapResult != snapResult ||
         oldDelegate.showGrid != showGrid ||
+        oldDelegate.interactiveHatches != interactiveHatches ||
         oldDelegate.settings != settings) {
       return true;
     }

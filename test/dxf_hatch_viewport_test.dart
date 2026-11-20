@@ -16,7 +16,11 @@ final _visible = Rect.fromCenter(
   height: 400 / (_fit * _zoom),
 );
 
-DxfHatch _hatch({double extent = 1000, bool hole = true}) => DxfHatch(
+DxfHatch _hatch({
+  double extent = 1000,
+  bool hole = true,
+  List<DxfHatchPatternLine>? patternLines,
+}) => DxfHatch(
   isSolid: false,
   patternName: 'CUSTOM',
   boundaryPaths: [
@@ -29,20 +33,22 @@ DxfHatch _hatch({double extent = 1000, bool hole = true}) => DxfHatch(
         Offset(485, 515),
       ],
   ],
-  patternLines: const [
-    DxfHatchPatternLine(
-      angle: 30,
-      basePoint: Offset(13, 19),
-      offset: Offset(-10, 17.320508),
-      dashes: [8, -12],
-    ),
-    DxfHatchPatternLine(
-      angle: 90,
-      basePoint: Offset(7, 11),
-      offset: Offset(-20, 3),
-      dashes: [0, -12],
-    ),
-  ],
+  patternLines:
+      patternLines ??
+      const [
+        DxfHatchPatternLine(
+          angle: 30,
+          basePoint: Offset(13, 19),
+          offset: Offset(-10, 17.320508),
+          dashes: [8, -12],
+        ),
+        DxfHatchPatternLine(
+          angle: 90,
+          basePoint: Offset(7, 11),
+          offset: Offset(-20, 3),
+          dashes: [0, -12],
+        ),
+      ],
 );
 
 DxfDocument _document(
@@ -57,7 +63,12 @@ DxfDocument _document(
   entityStats: {},
 );
 
-Picture _record(DxfDocument doc, {Rect? visible, String layout = 'Model'}) {
+Picture _record(
+  DxfDocument doc, {
+  Rect? visible,
+  String layout = 'Model',
+  bool interactiveHatches = false,
+}) {
   final recorder = PictureRecorder();
   final canvas = Canvas(recorder)..clipRect(Offset.zero & _size);
   canvas.drawColor(const Color(0xFFFFFFFF), BlendMode.src);
@@ -71,6 +82,7 @@ Picture _record(DxfDocument doc, {Rect? visible, String layout = 'Model'}) {
     visibleCadRect: visible,
     activeLayout: layout,
     showGrid: false,
+    interactiveHatches: interactiveHatches,
   ).paint(canvas, _size);
   return recorder.endRecording();
 }
@@ -120,7 +132,9 @@ void main() {
     () async {
       final doc = _document([_hatch()]);
       final full = await _pixels(_record(doc));
-      final clipped = await _pixels(_record(doc, visible: _visible));
+      final clipped = await _pixels(
+        _record(doc, visible: _visible, interactiveHatches: true),
+      );
       _expectSameVisibleDrawing(clipped, full);
       final center = (200 * 400 + 200) * 4;
       expect(
@@ -153,7 +167,9 @@ void main() {
         },
       );
       _expectSameVisibleDrawing(
-        await _pixels(_record(doc, visible: _visible)),
+        await _pixels(
+          _record(doc, visible: _visible, interactiveHatches: true),
+        ),
         await _pixels(_record(doc)),
       );
     },
@@ -175,7 +191,14 @@ void main() {
     ]);
     doc.layoutBounds['Sheet'] = _bounds;
     _expectSameVisibleDrawing(
-      await _pixels(_record(doc, visible: _visible, layout: 'Sheet')),
+      await _pixels(
+        _record(
+          doc,
+          visible: _visible,
+          layout: 'Sheet',
+          interactiveHatches: true,
+        ),
+      ),
       await _pixels(_record(doc, layout: 'Sheet')),
     );
   });
@@ -198,6 +221,106 @@ void main() {
     final small = bytes(1000);
     final large = bytes(1000000);
     expect(large, lessThan(math.max(small * 2, 10000)));
+  });
+
+  test('dense interactive hatch bounds pattern work and keeps holes', () async {
+    final doc = _document([
+      _hatch(
+        patternLines: [
+          DxfHatchPatternLine(
+            angle: 0,
+            basePoint: Offset.zero,
+            offset: const Offset(0, .75),
+            dashes: [
+              for (var index = 0; index < 16; index++) ...[.2, -.2],
+            ],
+          ),
+          const DxfHatchPatternLine(
+            angle: 90,
+            basePoint: Offset.zero,
+            offset: Offset(.75, 0),
+            dashes: [0, -.5],
+          ),
+        ],
+      ),
+    ]);
+
+    _record(doc, visible: _visible).dispose();
+    expect(DxfPainter.lastStats!.hatchPatternWork, greaterThan(10000));
+
+    final interactive = _record(
+      doc,
+      visible: _visible,
+      interactiveHatches: true,
+    );
+    expect(DxfPainter.lastStats!.hatchPatternWork, 0);
+    final pixels = await _pixels(interactive);
+    final hole = (200 * 400 + 200) * 4;
+    final fill = (200 * 400 + 100) * 4;
+    expect(pixels[hole], 255);
+    expect(pixels[fill], inExclusiveRange(180, 250));
+  });
+
+  test('interactive hatch budget is shared across visible entities', () {
+    final hatch = _hatch(
+      hole: false,
+      patternLines: const [
+        DxfHatchPatternLine(
+          angle: 0,
+          basePoint: Offset.zero,
+          offset: Offset(0, 5),
+          dashes: [8, -4],
+        ),
+      ],
+    );
+    _record(
+      _document([hatch]),
+      visible: _visible,
+      interactiveHatches: true,
+    ).dispose();
+    final singleWork = DxfPainter.lastStats!.hatchPatternWork;
+    expect(singleWork, greaterThan(1000));
+
+    const hatchCount = 24;
+    final doc = _document(List<DxfHatch>.filled(hatchCount, hatch));
+    _record(doc, visible: _visible).dispose();
+    expect(
+      DxfPainter.lastStats!.hatchPatternWork,
+      closeTo(singleWork * hatchCount, .01),
+    );
+
+    _record(doc, visible: _visible, interactiveHatches: true).dispose();
+    final interactiveWork = DxfPainter.lastStats!.hatchPatternWork;
+    expect(interactiveWork, greaterThan(singleWork));
+    expect(interactiveWork, lessThan(singleWork * hatchCount));
+  });
+
+  test('zero-length-only pattern produces separate repeated dots', () async {
+    final doc = _document([
+      _hatch(
+        hole: false,
+        patternLines: const [
+          DxfHatchPatternLine(
+            angle: 0,
+            basePoint: Offset(500, 500),
+            offset: Offset.zero,
+            dashes: [0],
+          ),
+        ],
+      ),
+    ]);
+    final pixels = await _pixels(_record(doc, visible: _visible));
+
+    var dotRuns = 0;
+    var previousInk = false;
+    for (var x = 0; x < 400; x++) {
+      final ink =
+          pixels[(199 * 400 + x) * 4] < 220 ||
+          pixels[(200 * 400 + x) * 4] < 220;
+      if (ink && !previousInk) dotRuns++;
+      previousInk = ink;
+    }
+    expect(dotRuns, greaterThan(1));
   });
 
   test('successive small pans refresh the layer before leaving its buffer', () {

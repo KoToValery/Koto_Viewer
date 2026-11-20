@@ -24,6 +24,21 @@ class DxfQuadTree {
     Rect docBounds, {
     int maxDepth = 8,
     int maxItemsPerNode = 32,
+  }) => buildFromEntityBounds(
+    entities.map(
+      (entity) => (entity: entity, bounds: entity.getBoundingBox(blocks)),
+    ),
+    docBounds,
+    maxDepth: maxDepth,
+    maxItemsPerNode: maxItemsPerNode,
+  );
+
+  /// Builds the index from bounds already computed by a file reader.
+  static DxfQuadTree buildFromEntityBounds(
+    Iterable<({DxfEntity entity, Rect? bounds})> entityBounds,
+    Rect docBounds, {
+    int maxDepth = 8,
+    int maxItemsPerNode = 32,
   }) {
     // Ensure bounds are non-empty
     Rect validBounds = docBounds;
@@ -39,8 +54,7 @@ class DxfQuadTree {
       maxItemsPerNode: maxItemsPerNode,
     );
 
-    for (final entity in entities) {
-      final rawBox = entity.getBoundingBox(blocks);
+    for (final (entity: entity, bounds: rawBox) in entityBounds) {
       if (rawBox != null && rawBox.isFinite) {
         final double minX = math.min(rawBox.left, rawBox.right) - 1.0;
         final double maxX = math.max(rawBox.left, rawBox.right) + 1.0;

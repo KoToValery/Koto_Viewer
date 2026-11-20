@@ -1,4 +1,4 @@
-use std::{env, path::Path, process::ExitCode};
+use std::{env, io::BufWriter, path::Path, process::ExitCode};
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();
@@ -9,7 +9,9 @@ fn main() -> ExitCode {
         };
     }
     if args.len() == 2 && args[0] == "--read" {
-        return match koto_acadrust::read_to_writer(Path::new(&args[1]), std::io::stdout().lock()) {
+        let stdout = std::io::stdout();
+        let output = BufWriter::with_capacity(64 * 1024, stdout.lock());
+        return match koto_acadrust::read_to_writer(Path::new(&args[1]), output) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => { eprintln!("DWG read failed: {error}"); ExitCode::FAILURE }
         };

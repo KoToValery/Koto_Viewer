@@ -3,7 +3,87 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_painter.dart';
 
+class _CountingDxfDocument extends DxfDocument {
+  _CountingDxfDocument(List<DxfEntity> entities)
+    : super(
+        entities: entities,
+        layers: {'0': DxfLayer(name: '0')},
+        blocks: {},
+        headerVars: {},
+        textStyles: const {
+          'Fixed12': DxfTextStyle(name: 'Fixed12', heightScale: 12),
+          'Near2': DxfTextStyle(name: 'Near2', heightScale: 1.98),
+          'Double': DxfTextStyle(name: 'Double', heightScale: 2),
+        },
+        bounds: const Rect.fromLTWH(0, 0, 100, 100),
+        entityStats: {},
+      );
+
+  int originReads = 0;
+
+  @override
+  bool get isArchicadOrigin {
+    originReads++;
+    return false;
+  }
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('paint checks text document origin at most once and only as needed', () {
+    const normalText = [
+      DxfText(text: 'Unstyled', insertPoint: Offset(10, 60), height: 5),
+      DxfText(
+        text: 'Fixed-style',
+        insertPoint: Offset(10, 45),
+        height: 5,
+        style: 'Fixed12',
+      ),
+      DxfText(
+        text: 'Fixed height',
+        insertPoint: Offset(10, 30),
+        height: 0,
+        style: 'Double',
+      ),
+    ];
+
+    void paint(DxfPainter painter) {
+      final recorder = PictureRecorder();
+      painter.paint(Canvas(recorder), const Size(400, 400));
+      recorder.endRecording().dispose();
+    }
+
+    final ordinary = _CountingDxfDocument(normalText);
+    paint(DxfPainter(document: ordinary, theme: DxfCanvasTheme.paperWhite));
+    expect(ordinary.originReads, 0);
+
+    final styled = _CountingDxfDocument(const [
+      ...normalText,
+      DxfText(
+        text: 'Styled text',
+        insertPoint: Offset(10, 90),
+        height: 5,
+        style: 'Near2',
+      ),
+      DxfMText(
+        rawText: 'Styled paragraph',
+        cleanText: 'Styled paragraph',
+        insertPoint: Offset(10, 75),
+        height: 5,
+        style: 'Double',
+      ),
+    ]);
+    final painter = DxfPainter(
+      document: styled,
+      theme: DxfCanvasTheme.paperWhite,
+    );
+    paint(painter);
+    expect(styled.originReads, 1);
+    paint(painter);
+    expect(styled.originReads, 2);
+  });
+
   group('DXF Text Fixed Height & Scaling Tests', () {
     test('AutoCAD file with fixed height style (12.0) does NOT scale text by 12x', () {
       final doc = DxfDocument(

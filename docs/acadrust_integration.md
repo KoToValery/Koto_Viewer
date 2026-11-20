@@ -148,11 +148,21 @@ Pattern origins, dash phases, boundary holes and full-drawing exports remain
 intact. Native LTYPE gaps/dots are adapted to the same positive-length convention
 as the existing DXF parser. No new conversion or drawing mutation is involved.
 
+The Viewer gives hatch patterns a work budget per hatch and per paint. Patterns
+that exceed it appear as a light fill following the original boundaries and
+holes.
+
 `test/dxf_hatch_viewport_test.dart` checks raster parity and bounded work.
-For an opt-in local drawing benchmark (not a device FPS measurement):
+The opt-in Windows benchmark measures file opening, paint recording and offscreen
+rasterization separately.
 
 ```powershell
 flutter test --no-pub --dart-define="DWG_ZOOM_INPUT=<original.dwg>" tool/qa/dwg_zoom_benchmark_test.dart
 ```
 
 `DWG_ZOOM_OUTPUT=<directory>` optionally saves the rendered zoom levels as PNGs.
+Use `DWG_ZOOM_COMPARE_HATCHES=true` to compare detailed and interactive hatch
+rendering in separate cases within the same process. Each case reopens the file
+and writes any requested PNGs to its own subdirectory. Use
+`DWG_ZOOM_INTERACTIVE_HATCHES=true` to run only the interactive case or
+`DWG_ZOOM_REPEATS` to set the number of samples per zoom (2–12, default 4).

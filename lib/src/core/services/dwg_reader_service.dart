@@ -20,50 +20,52 @@ class DwgReaderService {
     if (!await File(path).exists()) {
       throw FileSystemException('DWG does not exist', path);
     }
-    final Uint8List data;
+    final absolutePath = File(path).absolute.path;
     if (Platform.isAndroid) {
-      data = await readAndroidObjectStream(File(path).absolute.path);
-    } else if (Platform.isWindows) {
-      final executable = AcadrustConverterService.findExecutable();
-      if (executable == null) {
-        throw const FormatException('The native DWG reader is not installed');
-      }
-      final process = await Process.start(executable, [
-        '--read',
-        File(path).absolute.path,
-      ]);
-      final stdout = _collect(process.stdout, process);
-      final stderr = process.stderr
-          .transform(const Utf8Decoder(allowMalformed: true))
-          .fold<String>(
-            '',
-            (text, chunk) => text.length < 8192
-                ? text +
-                      chunk.substring(
-                        0,
-                        chunk.length.clamp(0, 8192 - text.length),
-                      )
-                : text,
-          );
-      try {
-        final results = await Future.wait<Object>([
-          process.exitCode,
-          stdout,
-          stderr,
-        ]).timeout(AcadrustConverterService.conversionTimeout);
-        if (results[0] != 0) {
-          throw FormatException('DWG read failed: ${results[2]}');
-        }
-        data = results[1] as Uint8List;
-      } finally {
-        process.kill();
-      }
-    } else {
-      throw const FormatException(
-        'Direct DWG reading is not available on this platform',
-      );
+      final data = await readAndroidObjectStream(absolutePath);
+      return compute(_decodeObjects, data);
     }
-    return compute(_decodeObjects, data);
+    if (Platform.isWindows) {
+      // Keep the large native stream in the same isolate that decodes it.
+      return compute(_readWindows, absolutePath);
+    }
+    throw const FormatException(
+      'Direct DWG reading is not available on this platform',
+    );
+  }
+
+  static Future<DxfDocument> _readWindows(String absolutePath) async {
+    final executable = AcadrustConverterService.findExecutable();
+    if (executable == null) {
+      throw const FormatException('The native DWG reader is not installed');
+    }
+    final process = await Process.start(executable, ['--read', absolutePath]);
+    final stdout = _collect(process.stdout, process);
+    final stderr = process.stderr
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .fold<String>(
+          '',
+          (text, chunk) => text.length < 8192
+              ? text +
+                    chunk.substring(
+                      0,
+                      chunk.length.clamp(0, 8192 - text.length),
+                    )
+              : text,
+        );
+    try {
+      final results = await Future.wait<Object>([
+        process.exitCode,
+        stdout,
+        stderr,
+      ]).timeout(AcadrustConverterService.conversionTimeout);
+      if (results[0] != 0) {
+        throw FormatException('DWG read failed: ${results[2]}');
+      }
+      return _decodeObjects(results[1] as Uint8List);
+    } finally {
+      process.kill();
+    }
   }
 
   /// Android transport seam; preserves native diagnostics without converting
@@ -123,7 +125,8 @@ class _AndroidDwgReadException extends FormatException {
 DxfDocument _decodeObjects(Uint8List bytes) {
   try {
     return DwgDocumentAdapter.decode(
-      jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>,
+      const Utf8Decoder().fuse(const JsonDecoder()).convert(bytes)
+          as Map<String, dynamic>,
     );
   } on Error catch (error) {
     throw FormatException('Unsupported native DWG object structure: $error');
