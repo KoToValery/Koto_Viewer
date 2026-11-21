@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import '../../bim_editing/geometry/bim_coordinate_frame.dart';
+import '../../bim_editing/geometry/bim_transform_2d.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 
 /// Alignment / deskew mode for 2-point raster calibration.
@@ -23,6 +24,7 @@ class ArchitectCadUnderlayConfig {
   final double? lockedCadOriginY;
   final double? unitsPerMeter;
   final bool cadOrientation;
+  final double rotationRad;
   final Set<String> hiddenDxfLayers;
   final Set<String> shownDxfLayers;
   final bool isGeodetic;
@@ -47,6 +49,7 @@ class ArchitectCadUnderlayConfig {
     this.lockedCadOriginY,
     this.unitsPerMeter,
     this.cadOrientation = false,
+    this.rotationRad = 0,
     this.hiddenDxfLayers = const {},
     this.shownDxfLayers = const {},
     this.isGeodetic = false,
@@ -75,6 +78,7 @@ class ArchitectCadUnderlayConfig {
         : (_validScale ? Offset.zero : fallback.origin),
     unitsPerMeter: _validScale ? unitsPerMeter! : fallback.unitsPerMeter,
     invertY: cadOrientation,
+    rotationRadians: rotationRad,
   );
 
   Map<String, bool> get layerOverrides => {
@@ -90,13 +94,15 @@ class ArchitectCadUnderlayConfig {
   ArchitectCadUnderlayConfig withFrame(
     BimCoordinateFrame next, {
     bool transformMask = false,
+    BimCoordinateFrame fallback = const BimCoordinateFrame(),
   }) {
-    final previous = frame(const BimCoordinateFrame());
+    final previous = frame(fallback);
     return copyWith(
       lockedCadOriginX: next.origin.dx,
       lockedCadOriginY: next.origin.dy,
       unitsPerMeter: next.unitsPerMeter,
       cadOrientation: next.invertY,
+      rotationRad: next.rotationRadians,
       maskPolygon: transformMask && previous != next && maskPolygon != null
           ? [
               for (final point in maskPolygon!)
@@ -123,6 +129,7 @@ class ArchitectCadUnderlayConfig {
     double? lockedCadOriginY,
     double? unitsPerMeter,
     bool? cadOrientation,
+    double? rotationRad,
     Set<String>? hiddenDxfLayers,
     Set<String>? shownDxfLayers,
     bool? isGeodetic,
@@ -149,6 +156,7 @@ class ArchitectCadUnderlayConfig {
     lockedCadOriginY: lockedCadOriginY ?? this.lockedCadOriginY,
     unitsPerMeter: unitsPerMeter ?? this.unitsPerMeter,
     cadOrientation: cadOrientation ?? this.cadOrientation,
+    rotationRad: rotationRad ?? this.rotationRad,
     hiddenDxfLayers: hiddenDxfLayers ?? this.hiddenDxfLayers,
     shownDxfLayers: shownDxfLayers ?? this.shownDxfLayers,
     isGeodetic: isGeodetic ?? this.isGeodetic,
@@ -175,6 +183,7 @@ class ArchitectCadUnderlayConfig {
     if (lockedCadOriginY != null) 'lockedCadOriginY': lockedCadOriginY,
     if (unitsPerMeter != null) 'unitsPerMeter': unitsPerMeter,
     if (cadOrientation) 'cadOrientation': true,
+    if (rotationRad != 0) 'rotationRad': rotationRad,
     if (hiddenDxfLayers.isNotEmpty) 'hiddenDxfLayers': hiddenDxfLayers.toList(),
     if (shownDxfLayers.isNotEmpty) 'shownDxfLayers': shownDxfLayers.toList(),
     if (isGeodetic) 'isGeodetic': true,
@@ -206,6 +215,10 @@ class ArchitectCadUnderlayConfig {
         lockedCadOriginY: (json['lockedCadOriginY'] as num?)?.toDouble(),
         unitsPerMeter: (json['unitsPerMeter'] as num?)?.toDouble(),
         cadOrientation: json['cadOrientation'] == true,
+        rotationRad: switch (json['rotationRad']) {
+          final num value when value.isFinite => value.toDouble(),
+          _ => (((json['quarterTurns'] as num?)?.toInt() ?? 0) % 4) * math.pi / 2,
+        },
         hiddenDxfLayers: {
           for (final l in json['hiddenDxfLayers'] as List? ?? const [])
             if (l is String) l,
@@ -278,6 +291,16 @@ class ArchitectRasterUnderlay {
 
   double get widthMeters => imageWidthPx * metersPerPixel;
   double get heightMeters => imageHeightPx * metersPerPixel;
+
+  ArchitectRasterUnderlay rotatingAround(Offset pivot, double radians) {
+    Offset rotate(Offset p) => BimTransform2D.rotate(p, pivot, radians);
+    final mask = maskPolygon;
+    return copyWith(
+      position: rotate(position),
+      rotationRad: BimTransform2D.angle(rotationRad, radians),
+      maskPolygon: mask == null ? null : [for (final p in mask) rotate(p)],
+    );
+  }
 
   /// Converts image pixel coordinates `(px, py)` into Architect local meters.
   Offset pixelToLocal(Offset pixel) {

@@ -3,6 +3,7 @@ import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.d
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -361,38 +362,52 @@ void main() {
     }
   });
   test(
-    'CAD source units and origin are preserved, and hidden layers stay hidden',
+    'CAD publication preserves the saved rotation, source units and hidden layers',
     () {
+      const origin = Offset(4250000, 4780000);
+      const cadLength = 100.125;
       final cad = DxfDocument(
         layers: {},
         blocks: {},
-        entities: const [
+        entities: [
           DxfLine(
-            p1: Offset(1000, 2000),
-            p2: Offset(1100, 2000),
+            p1: origin,
+            p2: origin + const Offset(cadLength, 0),
             layer: 'survey',
           ),
         ],
         headerVars: {},
-        bounds: const Rect.fromLTWH(1000, 2000, 100, 1),
+        bounds: Rect.fromLTWH(origin.dx, origin.dy, cadLength, 1),
         entityStats: {},
       );
       final sources = ArchitectPublicationSources(
         underlays: {'s': cad},
         frame: const BimCoordinateFrame(
-          origin: Offset(1000, 2000),
+          origin: origin,
           unitsPerMeter: 100,
         ),
       );
+      const angle = .22;
+      final project = fixture().copyWith(cadUnderlays: {
+        's': ArchitectCadUnderlayConfig(
+          storeyId: 's',
+          fileName: 'survey.dxf',
+          internalCopyPath: 'survey.dxf',
+          lockedCadOriginX: origin.dx,
+          lockedCadOriginY: origin.dy,
+          unitsPerMeter: 100,
+          rotationRad: angle,
+        ),
+      });
       final visible = ArchitectDrawingPublisher.build(
-        fixture(),
+        project,
         drawing,
         50,
         l,
         sources: sources,
       );
       final hidden = ArchitectDrawingPublisher.build(
-        fixture(),
+        project,
         drawing.copyWith(visibility: {'cad:survey': false}),
         50,
         l,
@@ -401,7 +416,8 @@ void main() {
       expect(visible.operations.length, hidden.operations.length + 1);
       final line = visible.operations.whereType<ArchitectVectorPath>().first;
       expect(line.path.getBounds().left, closeTo(0, 1e-8));
-      expect(line.path.getBounds().right, closeTo(20, 1e-8));
+      expect(line.path.getBounds().right, closeTo(cadLength / 5 * math.cos(angle), 1e-5));
+      expect(line.path.getBounds().bottom, closeTo(cadLength / 5 * math.sin(angle), 1e-5));
     },
   );
   test(

@@ -5,15 +5,38 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
-/// Helper utility to safely pick DXF or DWG CAD files on all platforms,
-/// handling Android's lack of CAD MIME types without throwing PlatformException.
+/// Picks underlays and validates the selected file when Android cannot filter CAD MIME types.
 class BimUnderlayPickerHelper {
+  static const _cadExtensions = ['dwg', 'dxf', 'kcad'];
+  static const _rasterExtensions = ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'bmp'];
+
+  static bool isCadFile(File file) =>
+      _cadExtensions.contains(fileExtension(file));
+
+  static String fileExtension(File file) {
+    final name = file.uri.pathSegments.last;
+    final dot = name.lastIndexOf('.');
+    return dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
+  }
+
+  static Future<File?> pickArchitectUnderlayFile(BuildContext context) =>
+      _pick(context, includeRaster: true);
+
   /// Prompts the user to pick a CAD (.dxf or .dwg) file.
   ///
   /// On Android, [FileType.custom] throws a PlatformException when given 'dxf'/'dwg'
   /// because the Android system MimeTypeMap does not have registered MIME types for CAD extensions.
   /// We handle this by using [FileType.any] on Android (or fallback) and validating the chosen extension.
-  static Future<File?> pickCadUnderlayFile(BuildContext context) async {
+  static Future<File?> pickCadUnderlayFile(BuildContext context) =>
+      _pick(context, includeRaster: false);
+
+  static Future<File?> _pick(
+    BuildContext context, {
+    required bool includeRaster,
+  }) async {
+    final extensions = includeRaster
+        ? const [..._cadExtensions, ..._rasterExtensions]
+        : _cadExtensions;
     try {
       FilePickerResult? result;
 
@@ -25,7 +48,7 @@ class BimUnderlayPickerHelper {
         try {
           result = await FilePicker.platform.pickFiles(
             type: FileType.custom,
-            allowedExtensions: const ['dxf', 'dwg', 'kcad'],
+            allowedExtensions: extensions,
           );
         } on PlatformException catch (e) {
           debugPrint(
@@ -52,17 +75,16 @@ class BimUnderlayPickerHelper {
         return null;
       }
 
-      final lowerPath = filePath.toLowerCase();
-      final isCad =
-          lowerPath.endsWith('.dxf') ||
-          lowerPath.endsWith('.dwg') ||
-          lowerPath.endsWith('.kcad');
-
-      if (!isCad) {
+      final file = File(filePath);
+      if (!extensions.contains(fileExtension(file))) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(context.l10n.bimProjectUnderlayFormatError),
+              content: Text(
+                includeRaster
+                    ? context.l10n.architectUnderlayUnsupportedFormat
+                    : context.l10n.bimProjectUnderlayFormatError,
+              ),
               backgroundColor: Colors.orange,
             ),
           );
@@ -70,7 +92,7 @@ class BimUnderlayPickerHelper {
         return null;
       }
 
-      return File(filePath);
+      return file;
     } on PlatformException catch (e, stack) {
       debugPrint('PlatformException picking underlay file: $e\n$stack');
       if (context.mounted) {

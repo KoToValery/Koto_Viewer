@@ -43,6 +43,7 @@ class ArchitectDragController extends ChangeNotifier {
   String _storeyId = '';
   double _unitsPerMeter = 1.0;
   bool _invertCadY = false;
+  double _cadRotationRadians = 0;
 
   Offset? _originalCadOrigin;
   Offset? _originalRasterPosition;
@@ -116,6 +117,7 @@ class ArchitectDragController extends ChangeNotifier {
   BimCoordinateFrame _frameAt(Offset target) => BimCoordinateFrame(
     unitsPerMeter: _unitsPerMeter,
     invertY: _invertCadY,
+    rotationRadians: _cadRotationRadians,
   ).placing(_basePointCad ?? _originalCadOrigin ?? Offset.zero, target);
 
   /// Ghost top-left position for raster underlay during drag.
@@ -140,6 +142,7 @@ class ArchitectDragController extends ChangeNotifier {
     String storeyId = '',
     double unitsPerMeter = 1.0,
     bool invertCadY = false,
+    double cadRotationRadians = 0,
     Offset? originalCadOrigin,
     Offset? originalRasterPosition,
     Offset? defaultAnchor,
@@ -155,6 +158,7 @@ class ArchitectDragController extends ChangeNotifier {
     _storeyId = storeyId;
     _unitsPerMeter = unitsPerMeter.isFinite && unitsPerMeter > 0 ? unitsPerMeter : 1.0;
     _invertCadY = invertCadY;
+    _cadRotationRadians = cadRotationRadians;
     _originalCadOrigin = originalCadOrigin;
     _originalRasterPosition = originalRasterPosition;
 
@@ -393,6 +397,7 @@ class ArchitectDragController extends ChangeNotifier {
     if (_isUnderlay && _isCadUnderlay && frame != null) {
       _basePointCad = frame.toCad(basePoint);
       _invertCadY = frame.invertY;
+      _cadRotationRadians = frame.rotationRadians;
       _unitsPerMeter = frame.unitsPerMeter;
     }
     _currentPointModel = basePoint;

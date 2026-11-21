@@ -12,6 +12,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
   final ArchitectTool activeTool;
   final ArchitectLandscapeTool landscapeTool;
   final VoidCallback onChanged;
+  final ValueChanged<ArchitectTerrainState> onTerrainStateChanged;
   final VoidCallback? onCommitDraft;
   final VoidCallback? onUndoPoint;
   final VoidCallback? onCancelDraft;
@@ -24,6 +25,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
     required this.activeTool,
     required this.landscapeTool,
     required this.onChanged,
+    required this.onTerrainStateChanged,
     this.onCommitDraft,
     this.onUndoPoint,
     this.onCancelDraft,
@@ -167,20 +169,14 @@ class ArchitectLandscapeBar extends StatelessWidget {
         colors: colors,
         selected: controller.terrainState == ArchitectTerrainState.existing,
         label: l.architectTerrainStateExisting,
-        onTap: () {
-          controller.terrainState = ArchitectTerrainState.existing;
-          _notifyChanged();
-        },
+        onTap: () => onTerrainStateChanged(ArchitectTerrainState.existing),
       ),
       const SizedBox(width: 4),
       _chip(
         colors: colors,
         selected: controller.terrainState == ArchitectTerrainState.proposed,
         label: l.architectTerrainStateProposed,
-        onTap: () {
-          controller.terrainState = ArchitectTerrainState.proposed;
-          _notifyChanged();
-        },
+        onTap: () => onTerrainStateChanged(ArchitectTerrainState.proposed),
       ),
       const SizedBox(width: 8),
       _divider(colors),

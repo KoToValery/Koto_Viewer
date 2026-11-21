@@ -616,16 +616,85 @@ class ArchitectLandscapeTool extends ChangeNotifier {
         return true;
       }
     }
-    if (project.activeStorey.isSite) {
-      for (final surface in [project.existingTerrain, project.proposedTerrain]) {
-        if (surface.boundaries.any((b) => b.id == id) ||
-            surface.contours.any((c) => c.id == id) ||
-            surface.spots.any((s) => s.id == id)) {
-          return true;
-        }
-      }
+    return project.activeStorey.isSite && terrainStateOf(project, id) != null;
+  }
+
+  static bool _containsTerrainElement(ArchitectTerrainSurface surface, String id) =>
+      surface.boundaries.any((b) => b.id == id) ||
+      surface.contours.any((c) => c.id == id) ||
+      surface.spots.any((s) => s.id == id);
+
+  static ArchitectTerrainState? terrainStateOf(
+    ArchitectProject project,
+    String id,
+  ) {
+    final proposed = _containsTerrainElement(project.proposedTerrain, id);
+    final existing = _containsTerrainElement(project.existingTerrain, id);
+    if (proposed &&
+        (!existing || project.isLayerVisible(ArchitectLayer.terrainProposedLayerId))) {
+      return ArchitectTerrainState.proposed;
     }
-    return false;
+    return existing ? ArchitectTerrainState.existing : null;
+  }
+
+  static ({ArchitectProject project, String elementId})? changeTerrainState(
+    ArchitectProject project,
+    String id,
+    ArchitectTerrainState state,
+  ) {
+    final current = terrainStateOf(project, id);
+    if (current == null || current == state) return null;
+    final toExisting = state == ArchitectTerrainState.existing;
+    final source = toExisting ? project.proposedTerrain : project.existingTerrain;
+    final target = toExisting ? project.existingTerrain : project.proposedTerrain;
+    // Older projects can have matching IDs on both surfaces after survey sync.
+    var targetId = id;
+    for (var suffix = 1;
+        _containsTerrainElement(target, targetId) ||
+            (targetId != id && _containsTerrainElement(source, targetId));
+        suffix++) {
+      targetId = '$id-${state.name}-$suffix';
+    }
+    final nextSource = _deleteFromSurface(source, {id});
+    final nextTarget = target.copyWith(
+      boundaries: [
+        ...target.boundaries,
+        for (final boundary in source.boundaries)
+          if (boundary.id == id) boundary.copyWith(id: targetId),
+      ],
+      contours: [
+        ...target.contours,
+        for (final contour in source.contours)
+          if (contour.id == id)
+            contour.copyWith(
+              id: targetId,
+              elevation: contour.effectiveRelative(source.datumElevation),
+              rawAbsoluteElevation: contour.rawAbsoluteElevation == null
+                  ? null
+                  : target.toAbsoluteElevation(contour.effectiveRelative(source.datumElevation)),
+            ),
+      ],
+      spots: [
+        ...target.spots,
+        for (final spot in source.spots)
+          if (spot.id == id)
+            spot.copyWith(
+              id: targetId,
+              elevation: spot.effectiveRelative(source.datumElevation),
+              rawAbsoluteElevation: spot.rawAbsoluteElevation == null
+                  ? null
+                  : target.toAbsoluteElevation(spot.effectiveRelative(source.datumElevation)),
+            ),
+      ],
+    );
+    return (
+      project: project.copyWith(
+        existingTerrain: toExisting ? nextTarget : nextSource,
+        proposedTerrain: toExisting ? nextSource : nextTarget,
+        updatedAt: DateTime.now(),
+      ),
+      elementId: targetId,
+    );
   }
 
   static ArchitectProject translateSelected({

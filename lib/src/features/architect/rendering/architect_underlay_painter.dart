@@ -666,7 +666,6 @@ class ArchitectUnderlayPainter extends CustomPainter {
     canvas.translate(viewport.translation.dx, viewport.translation.dy);
     canvas.scale(viewport.scale);
 
-    final modelBounds = frame.rectToModel(document!.bounds);
     final borderPaint = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.stroke
@@ -675,7 +674,17 @@ class ArchitectUnderlayPainter extends CustomPainter {
     final double dashWidth = 6.0 / viewport.scale;
     final double dashSpace = 4.0 / viewport.scale;
     if (cadConfig?.hasActiveMask != true) {
-      _drawDashedRect(canvas, modelBounds, borderPaint, dashWidth, dashSpace);
+      final corners = frame.cornersToModel(document!.bounds);
+      for (var i = 0; i < corners.length; i++) {
+        _drawDashedLine(
+          canvas,
+          corners[i],
+          corners[(i + 1) % corners.length],
+          borderPaint,
+          dashWidth,
+          dashSpace,
+        );
+      }
     }
     // The crop overlay owns the actual edge grips. Do not draw inert source
     // corners or a full-source frame outside the visible crop.
@@ -843,47 +852,6 @@ class ArchitectUnderlayPainter extends CustomPainter {
     }
 
     canvas.restore();
-  }
-
-  void _drawDashedRect(
-    Canvas canvas,
-    Rect rect,
-    Paint paint,
-    double dashWidth,
-    double dashSpace,
-  ) {
-    _drawDashedLine(
-      canvas,
-      rect.topLeft,
-      rect.topRight,
-      paint,
-      dashWidth,
-      dashSpace,
-    );
-    _drawDashedLine(
-      canvas,
-      rect.topRight,
-      rect.bottomRight,
-      paint,
-      dashWidth,
-      dashSpace,
-    );
-    _drawDashedLine(
-      canvas,
-      rect.bottomRight,
-      rect.bottomLeft,
-      paint,
-      dashWidth,
-      dashSpace,
-    );
-    _drawDashedLine(
-      canvas,
-      rect.bottomLeft,
-      rect.topLeft,
-      paint,
-      dashWidth,
-      dashSpace,
-    );
   }
 
   void _drawDashedLine(

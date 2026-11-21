@@ -12393,7 +12393,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectToolCadUnderlayTooltip =>
-      'Import or link external DWG/DXF underlay with live auto-reload and geodetic contour detection';
+      'Add a DWG, DXF, PDF, KCAD, or image underlay';
 
   @override
   String get architectToolRasterUnderlay => 'Raster Underlay';
@@ -12442,9 +12442,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectCadUnderlayLayersFilter => 'DXF Layers';
 
   @override
-  String get architectCadUnderlayDetectGeodesy => 'Extract Contours';
-
-  @override
   String get architectCadUnderlayRemove => 'Remove Underlay';
 
   @override
@@ -12456,15 +12453,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String architectCadUnderlayLoadedSuccess(String fileName) {
     return 'CAD underlay loaded ($fileName)';
   }
-
-  @override
-  String architectGeodesyDetectedNotice(String crs, int contours, int points) {
-    return 'Detected $crs: extracted $contours contours and $points elevation points to layer G-TOPO';
-  }
-
-  @override
-  String get architectGeodesyNoContoursFound =>
-      'No geodetic contours or spot elevations detected in this file';
 
   @override
   String architectGeodesyBadge(int contours) {
@@ -12754,6 +12742,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectToolSiteFence => 'Site fence';
+
+  @override
+  String get architectTerrainPropertiesTitle => 'Terrain properties';
 
   @override
   String get architectTerrainStateExisting => 'Existing';
@@ -13239,6 +13230,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectUnderlayAdd => 'Add';
 
   @override
+  String get architectUnderlayAddTooltip =>
+      'Add a DWG, DXF, PDF, KCAD, or image underlay';
+
+  @override
   String get architectRasterChooseUnderlay => 'Select underlay';
 
   @override
@@ -13249,9 +13244,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectUnderlayCrop => 'Crop';
-
-  @override
-  String get architectUnderlayGeodesy => 'Survey';
 
   @override
   String get architectCadImportTitle => 'Import CAD underlay';
@@ -13312,10 +13304,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectUnderlayOriginalLineweights => 'Original lineweights';
 
   @override
-  String get architectUnderlayRotateLeft => '90° left';
+  String get architectUnderlayRotationStart =>
+      'Pick the first end of the edge or enter an angle';
 
   @override
-  String get architectUnderlayRotateRight => '90° right';
+  String get architectUnderlayRotationEnd => 'Pick the other end of the edge';
+
+  @override
+  String get architectUnderlayAlignHorizontal => 'Horizontal';
+
+  @override
+  String get architectUnderlayAlignVertical => 'Vertical';
 
   @override
   String get architectStoreyManagerTitle => 'Storeys';

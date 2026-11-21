@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -131,6 +132,7 @@ class ArchitectUnderlayService {
       lockedCadOriginY: frame.origin.dy,
       unitsPerMeter: frame.unitsPerMeter,
       cadOrientation: frame.invertY,
+      rotationRad: frame.rotationRadians,
       autoReload: false,
     );
   }
@@ -245,6 +247,7 @@ class ArchitectUnderlayService {
           : prepared.document.bounds.center,
       unitsPerMeter: units,
       invertY: selection.cadOrientation,
+      rotationRadians: previousFrame?.rotationRadians ?? 0,
     );
 
     final cadDir = await getCadUnderlayDir(projectId);
@@ -279,6 +282,7 @@ class ArchitectUnderlayService {
         lockedCadOriginY: frame.origin.dy,
         unitsPerMeter: units,
         cadOrientation: frame.invertY,
+        rotationRad: frame.rotationRadians,
         hiddenDxfLayers: existingConfig?.hiddenDxfLayers ?? const {},
         shownDxfLayers: existingConfig?.shownDxfLayers ?? const {},
         opacity: existingConfig?.opacity ?? 0.42,
@@ -443,9 +447,10 @@ class ArchitectUnderlayService {
     final fileName = pdfFile.uri.pathSegments.isNotEmpty
         ? pdfFile.uri.pathSegments.last
         : pdfFile.path.split(RegExp(r'[/\\]')).last;
+    final safeName = _sanitizeFileName(fileName);
 
     final ownedPdf = File(
-      '${rasterDir.path}/pdf_${DateTime.now().microsecondsSinceEpoch}_$fileName',
+      '${rasterDir.path}/pdf_${DateTime.now().microsecondsSinceEpoch}_$safeName',
     );
     await pdfFile.copy(ownedPdf.path);
     final doc = await PdfDocument.openFile(ownedPdf.path);
@@ -456,12 +461,15 @@ class ArchitectUnderlayService {
       final clampedIndex = (pageNumber - 1).clamp(0, doc.pages.length - 1);
       final page = doc.pages[clampedIndex];
 
-      const renderScale = 2.5;
-      final targetWidth = (page.width * renderScale).toInt().clamp(1000, 2600);
-      final targetHeight = (page.height * renderScale).toInt().clamp(
-        1000,
-        3400,
+      // Fit the render budget with one scale so calibration stays uniform.
+      final preferredScale = math.max(
+        2.5,
+        1000 / math.min(page.width, page.height),
       );
+      final maxScale = math.min(2600 / page.width, 3400 / page.height);
+      final renderScale = math.min(preferredScale, maxScale);
+      final targetWidth = math.max(1, (page.width * renderScale).round());
+      final targetHeight = math.max(1, (page.height * renderScale).round());
 
       final pdfImage = await page.render(
         fullWidth: targetWidth.toDouble(),
@@ -482,7 +490,6 @@ class ArchitectUnderlayService {
         final pngBytes = Uint8List.fromList(img.encodePng(convertedImage));
 
         final id = 'rast_pdf_${DateTime.now().millisecondsSinceEpoch}';
-        final safeName = _sanitizeFileName(fileName);
         final internalPng = File(
           '${rasterDir.path}/${id}_p${clampedIndex + 1}_$safeName.png',
         );
@@ -502,7 +509,7 @@ class ArchitectUnderlayService {
         final model = ArchitectRasterUnderlay(
           id: id,
           storeyId: storeyId,
-          fileName: '$fileName (p.${clampedIndex + 1})',
+          fileName: '$fileName · ${clampedIndex + 1}',
           internalImagePath: await projectRelativePath(projectId, internalPng),
           sourcePdfPath: await projectRelativePath(projectId, ownedPdf),
           pdfPageNumber: clampedIndex + 1,

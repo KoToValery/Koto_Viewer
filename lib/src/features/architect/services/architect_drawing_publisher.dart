@@ -244,15 +244,17 @@ class ArchitectDrawingPublisher {
           if (cad?.hasActiveMask == true) {
             canvas.clipPath(Path()..addPolygon(cad!.maskPolygon!, true));
           }
+          canvas.rotate(frame.rotationRadians);
           canvas.scale(
             1 / frame.unitsPerMeter,
             (frame.invertY ? -1 : 1) / frame.unitsPerMeter,
           );
-          canvas.translate(-frame.origin.dx, -frame.origin.dy);
           ArchitectElementsPainterHelper.drawUnderlay(
             canvas: canvas,
             underlayDoc: sources.underlays[drawing.sourceId],
             zoomScale: scope.renderScale / frame.unitsPerMeter,
+            // Subtract geodetic offsets before constructing float32 paths.
+            sourceOrigin: frame.origin,
             layerVisibility: {
               ...sources.visibility,
               ...?cad?.layerOverrides,

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -22,6 +23,8 @@ import 'package:kotoview/src/features/bim_projects/services/bim_project_library_
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_painter.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:shared_preferences/shared_preferences.dart';
 
 String _dxf(int width, {int? units = 4, bool allOff = false}) => <Object>[
@@ -170,7 +173,7 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() ready) async {
       () => Future<void>.delayed(const Duration(milliseconds: 15)),
     );
   }
-  fail('CAD import did not reach the expected state.');
+  fail('Underlay import did not reach the expected state.');
 }
 
 void main() {
@@ -270,7 +273,7 @@ void main() {
   );
 
   test(
-    'drag uses the same Y-up transform for the ghost and the committed origin',
+    'drag keeps the rotated Y-up transform in the ghost and committed origin',
     () {
       final drag = ArchitectDragController();
       addTearDown(drag.dispose);
@@ -278,6 +281,7 @@ void main() {
         origin: Offset(4000, 5000),
         unitsPerMeter: 1000,
         invertY: true,
+        rotationRadians: .37,
       );
       drag.startDrag(isUnderlay: true, isCadUnderlay: true);
       const base = Offset(2, 3);
@@ -289,7 +293,8 @@ void main() {
         targetPointModel: target,
         existingMask: [base],
       );
-      expect(ghost.toModel(frame.toCad(base)), target);
+      expect((ghost.toModel(frame.toCad(base)) - target).distance, closeTo(0, 1e-9));
+      expect(ghost.rotationRadians, frame.rotationRadians);
       expect(ghost.origin, Offset(committed.newOriginX, committed.newOriginY));
       expect(committed.translatedMask, [target]);
     },
@@ -429,6 +434,30 @@ void main() {
             .whereType<ArchitectUnderlayPainter>()
             .first;
 
+        Future<void> rotateFrom(Finder toolbar) async {
+          await tester.tap(
+            find.descendant(of: toolbar, matching: find.byTooltip(l.contextMenuMore)),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(l.rotate));
+          await tester.pumpAndSettle();
+        }
+
+        Future<void> enterAngle(String degrees, {bool negative = false}) async {
+          await tester.tap(find.byKey(const ValueKey('architect-rotation-exact')));
+          await tester.pumpAndSettle();
+          for (final key in degrees.split('')) {
+            await tester.tap(find.byKey(ValueKey('architect-rotation-key-$key')));
+            await tester.pump();
+          }
+          if (negative) {
+            await tester.tap(find.text('±'));
+            await tester.pump();
+          }
+          await tester.tap(find.byKey(const ValueKey('architect-rotation-angle-apply')));
+          await tester.pumpAndSettle();
+        }
+
         await tester.tap(
           find.descendant(of: bar, matching: find.text(l.architectUnderlayAdd)),
         );
@@ -555,6 +584,148 @@ void main() {
         await tester.pumpAndSettle();
         expect(painter().frame.unitsPerMeter, 100);
         expect(painter().frame.origin.dx, original.lockedCadOriginX);
+
+        final bounds = painter().document!.bounds;
+        final centre = painter().frame.toModel(bounds.center);
+        final mask = [
+          painter().frame.toModel(bounds.topLeft),
+          painter().frame.toModel(bounds.topRight),
+          painter().frame.toModel(bounds.bottomLeft),
+        ];
+        model.commit(
+          model.project.copyWith(
+            cadUnderlays: {'ground': cfg()!.copyWith(maskPolygon: mask)},
+          ),
+        );
+        await tester.pump();
+        await rotateFrom(bar);
+        await enterAngle('12.5');
+        final angled = painter().frame;
+        expect(angled.rotationRadians, closeTo(12.5 * math.pi / 180, 1e-9));
+        expect((angled.toModel(bounds.center) - centre).distance, closeTo(0, 1e-9));
+        expect(
+          (angled.toCad(cfg()!.maskPolygon!.first) - bounds.topLeft).distance,
+          closeTo(0, 1e-8),
+        );
+        final extent = angled.rectToModel(bounds);
+        expect(extent.width, greaterThan(bounds.width / 100));
+        final reopenedCad = ArchitectCadUnderlayConfig.fromJson(cfg()!.toJson());
+        expect(reopenedCad.frame(const BimCoordinateFrame()), angled);
+        final legacy = ArchitectCadUnderlayConfig.fromJson(
+          cfg()!.toJson()..remove('rotationRad')..['quarterTurns'] = 1,
+        );
+        expect(legacy.rotationRad, math.pi / 2);
+
+        if (!phone) {
+          painter().viewport.fit(extent, padding: 90);
+          await tester.pumpAndSettle();
+          await rotateFrom(bar);
+          final input = find.byKey(const ValueKey('architect-rotation-input'));
+          final overlayOrigin = tester.getTopLeft(input);
+          final edge = [
+            Offset(bounds.left + bounds.width * .2, bounds.top),
+            Offset(bounds.left + bounds.width * .8, bounds.top),
+          ];
+          for (final point in edge) {
+            await tester.tapAt(overlayOrigin + painter().viewport.toScreen(angled.toModel(point)));
+            await tester.pump();
+          }
+          final horizontal = find.byKey(const ValueKey('architect-rotation-horizontal'));
+          expect(horizontal, findsOneWidget);
+          await tester.tap(horizontal);
+          await tester.pumpAndSettle();
+          final aligned = painter().frame;
+          expect(
+            aligned.toModel(edge.first).dy,
+            closeTo(aligned.toModel(edge.last).dy, 1e-8),
+          );
+          expect((aligned.toModel(edge.first) - angled.toModel(edge.first)).distance, closeTo(0, 1e-8));
+          model.undo();
+          await tester.pump();
+          expect(painter().frame, angled);
+        }
+        model.undo();
+        await tester.pump();
+        expect(cfg()!.maskPolygon, mask);
+        expect(painter().frame.rotationRadians, 0);
+
+        if (!phone) {
+          final pdf = pw.Document();
+          for (final format in [
+            PdfPageFormat.a4,
+            const PdfPageFormat(1400, 460),
+          ]) {
+            pdf.addPage(
+              pw.Page(
+                pageFormat: format,
+                build: (_) =>
+                    pw.Container(width: 30, height: 30, color: PdfColors.black),
+              ),
+            );
+          }
+          picker.source = File('${temp.path}/survey.PDF');
+          await tester.runAsync(() async {
+            await picker.source.writeAsBytes(await pdf.save());
+          });
+          final beforePdf = cfg();
+          await tester.tap(
+            find.descendant(of: bar, matching: find.text(l.architectUnderlayAdd)),
+          );
+          final pagePicker = find.widgetWithText(
+            AlertDialog,
+            l.architectRasterSelectPdfPageTitle,
+          );
+          await _pumpUntil(tester, () => pagePicker.evaluate().isNotEmpty);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find
+                .descendant(of: pagePicker, matching: find.byType(IconButton))
+                .last,
+          );
+          await tester.pumpAndSettle();
+          expect(find.text(l.architectRasterPdfPageLabel(2, 2)), findsOneWidget);
+          await tester.tap(
+            find.widgetWithText(FilledButton, l.architectRasterImportPdfButton),
+          );
+          await _pumpUntil(tester, () => model.project.rasterUnderlays.isNotEmpty);
+          await tester.pumpAndSettle();
+          final raster = model.project.rasterUnderlays.single;
+          expect(raster.storeyId, 'ground');
+          expect(raster.pdfPageNumber, 2);
+          expect(raster.sourcePdfPath, isNotNull);
+          expect(
+            raster.widthMeters / raster.heightMeters,
+            closeTo(1400 / 460, .01),
+          );
+          await tester.runAsync(() async {
+            final assets = ArchitectUnderlayService.instance;
+            final originalPdf = await assets.resolveOwnedAsset(
+              model.project.id,
+              raster.sourcePdfPath!,
+            );
+            expect(originalPdf?.existsSync(), isTrue);
+            final reopened = await assets.loadSavedRasterImage(
+              raster,
+              projectId: model.project.id,
+            );
+            expect(reopened?.width, raster.imageWidthPx);
+            reopened?.dispose();
+          });
+          expect(cfg(), same(beforePdf));
+          expect(find.byType(ArchitectRasterUnderlayBar), findsOneWidget);
+          model.undo();
+          await tester.pump();
+          expect(model.project.rasterUnderlays, isEmpty);
+          model.redo();
+          await tester.pump();
+          expect(model.project.rasterUnderlays.single.id, raster.id);
+          expect(painter().rasterImages[raster.id], isNotNull);
+          await rotateFrom(find.byType(ArchitectRasterUnderlayBar));
+          await enterAngle('7.5', negative: true);
+          final turned = model.project.rasterUnderlays.single;
+          expect(turned.rotationRad, closeTo(2 * math.pi - 7.5 * math.pi / 180, 1e-9));
+          expect((turned.localBounds.center - raster.localBounds.center).distance, closeTo(0, 1e-6));
+        }
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       },

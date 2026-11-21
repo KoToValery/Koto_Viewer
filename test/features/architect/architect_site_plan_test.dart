@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/material.dart' show FilledButton, Icons, ValueKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_door.dart';
@@ -8,13 +9,76 @@ import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/models/architect_zone.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_snap_geometry.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_vector_scene.dart';
+import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_drawing_publisher.dart';
 import 'package:kotoview/src/features/architect/services/architect_landscape_tool.dart';
 import 'package:kotoview/src/features/architect/services/architect_selection_candidates.dart';
 import 'package:kotoview/src/features/architect/services/architect_sheet_layout.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'architect_tool_test_helper.dart' as tools;
+import 'architect_workspace_interaction_test.dart' as workspace;
 
 void main() {
   group('Dedicated Terrain / Site Plan (План Терен)', () {
+    testWidgets('terrain properties move the contour to the other surface', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final starter = ArchitectProject.starterWithCatalog(
+        name: 'Terrain classification',
+        storeyCount: 1,
+        groundHeight: 3,
+        typicalHeight: 3,
+      );
+      const contour = ArchitectTerrainContour(
+        id: 'classified-contour',
+        points: [Offset(-4, 0), Offset(4, 0)],
+        elevation: 2,
+        rawAbsoluteElevation: 102,
+      );
+      final model = ArchitectCommandController(
+        starter.copyWith(
+          activeStoreyId: starter.siteStorey!.id,
+          existingTerrain: const ArchitectTerrainSurface(
+            datumElevation: 100,
+            contours: [contour],
+          ),
+          proposedTerrain: const ArchitectTerrainSurface(
+            datumElevation: 200,
+            state: ArchitectTerrainState.proposed,
+          ),
+        ),
+      );
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      await tools.choose(tester, Icons.near_me_outlined);
+      await tester.pumpAndSettle();
+      await workspace.wallTap(tester, Offset.zero);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-selection-properties')));
+      await tester.pumpAndSettle();
+
+      final l = lookupAppLocalizations(const Locale('en'));
+      final dialog = find.byKey(const ValueKey('architect-terrain-properties'));
+      expect(find.descendant(of: dialog, matching: find.text(l.architectTerrainPropertiesTitle)), findsOneWidget);
+      await tester.tap(find.descendant(of: dialog, matching: find.text(l.architectTerrainStateProposed)));
+      await tester.pumpAndSettle();
+      expect(model.project.existingTerrain.contours, hasLength(1));
+      await tester.tap(find.descendant(of: dialog, matching: find.widgetWithText(FilledButton, l.applyAction)));
+      await tester.pumpAndSettle();
+      expect(model.project.existingTerrain.contours, isEmpty);
+      final proposed = model.project.proposedTerrain;
+      expect(proposed.contours.single.id, contour.id);
+      expect(proposed.contours.single.points, contour.points);
+      expect(proposed.contours.single.effectiveRelative(proposed.datumElevation), contour.elevation);
+      model.undo();
+      await tester.pumpAndSettle();
+      expect(model.project.proposedTerrain.contours, isEmpty);
+      expect(model.project.existingTerrain.contours.single.id, contour.id);
+      expect(tester.takeException(), isNull);
+    });
+
     test(
       'starter factories and ensureSiteStorey create storey_site automatically and protect it from floor math/deletion',
       () {

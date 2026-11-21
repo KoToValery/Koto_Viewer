@@ -1,41 +1,73 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'bim_transform_2d.dart';
+
 /// Coordinates in the persisted CAD frame, expressed as local model metres.
-/// Optionally maps CAD's Y-up axis to a Y-down drawing plane.
+/// Optionally maps CAD's Y-up axis to a Y-down drawing plane and rotates it.
 class BimCoordinateFrame {
   final Offset origin;
   final double unitsPerMeter;
   final bool invertY;
+  final double rotationRadians;
 
   const BimCoordinateFrame({
     this.origin = Offset.zero,
     this.unitsPerMeter = 1,
     this.invertY = false,
+    this.rotationRadians = 0,
   }) : assert(unitsPerMeter > 0 && unitsPerMeter < double.infinity);
 
   Offset _orient(Offset point) => invertY ? Offset(point.dx, -point.dy) : point;
-  Offset toModel(Offset cad) => _orient(cad - origin) / unitsPerMeter;
-  Offset toCad(Offset model) => origin + _orient(model) * unitsPerMeter;
+  Offset toUnrotatedModel(Offset cad) => _orient(cad - origin) / unitsPerMeter;
+  Offset toModel(Offset cad) =>
+      BimTransform2D.rotate(toUnrotatedModel(cad), Offset.zero, rotationRadians);
+  Offset _cadDelta(Offset model) =>
+      _orient(BimTransform2D.rotate(model, Offset.zero, -rotationRadians)) *
+      unitsPerMeter;
+  Offset toCad(Offset model) => origin + _cadDelta(model);
 
   BimCoordinateFrame placing(Offset cad, Offset model) => BimCoordinateFrame(
-    origin: cad - _orient(model) * unitsPerMeter,
+    origin: cad - _cadDelta(model),
     unitsPerMeter: unitsPerMeter,
     invertY: invertY,
+    rotationRadians: rotationRadians,
   );
-  Rect rectToModel(Rect rect) =>
-      Rect.fromPoints(toModel(rect.topLeft), toModel(rect.bottomRight));
-  Rect rectToCad(Rect rect) =>
-      Rect.fromPoints(toCad(rect.topLeft), toCad(rect.bottomRight));
+
+  BimCoordinateFrame rotatingAround(Offset pivot, double radians) =>
+      BimCoordinateFrame(
+        unitsPerMeter: unitsPerMeter,
+        invertY: invertY,
+        rotationRadians: BimTransform2D.angle(rotationRadians, radians),
+      ).placing(toCad(pivot), pivot);
+
+  List<Offset> cornersToModel(Rect rect) => [
+    toModel(rect.topLeft),
+    toModel(rect.topRight),
+    toModel(rect.bottomRight),
+    toModel(rect.bottomLeft),
+  ];
+
+  Rect rectToModel(Rect rect) => _rectBounds(rect, toModel);
+  Rect rectToCad(Rect rect) => _rectBounds(rect, toCad);
+
+  Rect _rectBounds(Rect rect, Offset Function(Offset) map) {
+    final diagonal = Rect.fromPoints(map(rect.topLeft), map(rect.bottomRight));
+    if (rotationRadians == 0) return diagonal;
+    return diagonal.expandToInclude(
+      Rect.fromPoints(map(rect.topRight), map(rect.bottomLeft)),
+    );
+  }
 
   @override
   bool operator ==(Object other) =>
       other is BimCoordinateFrame &&
       other.origin == origin &&
       other.unitsPerMeter == unitsPerMeter &&
-      other.invertY == invertY;
+      other.invertY == invertY &&
+      other.rotationRadians == rotationRadians;
   @override
-  int get hashCode => Object.hash(origin, unitsPerMeter, invertY);
+  int get hashCode => Object.hash(origin, unitsPerMeter, invertY, rotationRadians);
 }
 
 /// Input increments are independent from solver precision and capture radii.

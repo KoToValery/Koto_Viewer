@@ -18,6 +18,7 @@ class ArchitectRotationOverlay extends StatefulWidget {
   final void Function(Offset pivot, double radians) onPreview, onApply;
   final void Function(Offset delta, double factor, Offset focal) onNavigate;
   final VoidCallback onCancel;
+  final bool alignReferenceToAxes;
   const ArchitectRotationOverlay({
     super.key,
     required this.initialPivot,
@@ -29,6 +30,7 @@ class ArchitectRotationOverlay extends StatefulWidget {
     required this.onApply,
     required this.onNavigate,
     required this.onCancel,
+    this.alignReferenceToAxes = false,
   });
   @override
   State<ArchitectRotationOverlay> createState() => _RotationState();
@@ -40,21 +42,23 @@ class _RotationState extends State<ArchitectRotationOverlay> {
   double angle = 0;
   int stage = 0;
 
+  static double _angleBetween(Offset start, Offset end) => math.atan2(
+    start.dx * end.dy - start.dy * end.dx,
+    start.dx * end.dx + start.dy * end.dy,
+  );
+
   void aim(ArchitectSnapResult snap) {
     final point = snap.point;
     setState(() {
       target = point;
       if (stage == 2 && (point - pivot).distance > 1e-8) {
         final start = reference! - pivot, end = point - pivot;
-        final raw = math.atan2(
-          start.dx * end.dy - start.dy * end.dx,
-          start.dx * end.dx + start.dy * end.dy,
-        );
+        final raw = _angleBetween(start, end);
         // A small screen-space tolerance avoids a large magnetic capture area
         // on a long reference ray, while remaining usable near the pivot.
         final radius =
             (widget.toScreen(point) - widget.toScreen(pivot)).distance;
-        angle = snap.isSnapped
+        angle = snap.isSnapped || widget.alignReferenceToAxes
             ? raw
             : ArchitectRotation.snapAngle(
                 raw,
@@ -76,7 +80,10 @@ class _RotationState extends State<ArchitectRotationOverlay> {
         stage = 1;
       });
     } else if (stage == 1) {
-      if (!snap.isSnapped || (target! - pivot).distance < 1e-8) return;
+      if ((!snap.isSnapped && !widget.alignReferenceToAxes) ||
+          (target! - pivot).distance < 1e-8) {
+        return;
+      }
       setState(() {
         reference = target;
         stage = 2;
@@ -92,14 +99,27 @@ class _RotationState extends State<ArchitectRotationOverlay> {
       builder: (_) => const _RotationAngleDialog(),
     );
     if (!mounted || degrees == null) return;
-    setDegrees(degrees);
+    applyAngle(degrees * math.pi / 180);
   }
 
-  void setDegrees(double degrees) {
+  void alignToAxis({required bool vertical}) {
+    final ray = reference! - pivot;
+    final axis = vertical
+        ? Offset(0, ray.dy < 0 ? -1 : 1)
+        : Offset(ray.dx < 0 ? -1 : 1, 0);
+    final radians = _angleBetween(ray, axis);
+    if (radians.abs() <= 1e-8) {
+      widget.onCancel();
+    } else {
+      applyAngle(radians);
+    }
+  }
+
+  void applyAngle(double radians) {
     setState(() {
       reference ??= pivot + const Offset(1, 0);
       stage = 2;
-      angle = degrees * math.pi / 180;
+      angle = radians;
     });
     widget.onPreview(pivot, angle);
     if (angle.abs() > 1e-8) widget.onApply(pivot, angle);
@@ -131,7 +151,11 @@ class _RotationState extends State<ArchitectRotationOverlay> {
             key: const ValueKey('architect-rotation-input'),
             toModel: widget.toModel,
             toScreen: widget.toScreen,
-            snap: (raw, touch) => widget.snap(raw, touch, stage == 1),
+            snap: (raw, touch) => widget.snap(
+              raw,
+              touch,
+              widget.alignReferenceToAxes ? stage < 2 : stage == 1,
+            ),
             localizeSnap: widget.localizeSnap,
             onAim: aim,
             onPick: accept,
@@ -139,7 +163,8 @@ class _RotationState extends State<ArchitectRotationOverlay> {
           ),
         ),
         Positioned(
-          bottom: 8,
+          top: widget.alignReferenceToAxes ? 8 : null,
+          bottom: widget.alignReferenceToAxes ? null : 8,
           left: 8,
           right: 8,
           child: Material(
@@ -155,8 +180,12 @@ class _RotationState extends State<ArchitectRotationOverlay> {
                     children: [
                       Expanded(
                         child: Text(switch (stage) {
-                          0 => l.architectRotationPivot,
-                          1 => l.architectRotationReference,
+                          0 => widget.alignReferenceToAxes
+                              ? l.architectUnderlayRotationStart
+                              : l.architectRotationPivot,
+                          1 => widget.alignReferenceToAxes
+                              ? l.architectUnderlayRotationEnd
+                              : l.architectRotationReference,
                           _ => l.architectRotationTarget,
                         }, maxLines: 2),
                       ),
@@ -174,24 +203,52 @@ class _RotationState extends State<ArchitectRotationOverlay> {
                         },
                         icon: const AppIcon(AppIconId.fitView),
                       ),
+                      if (widget.alignReferenceToAxes)
+                        IconButton(
+                          tooltip: l.cancel,
+                          onPressed: widget.onCancel,
+                          icon: const AppIcon(AppIconId.close),
+                        ),
                     ],
                   ),
+                  if (widget.alignReferenceToAxes && reference != null)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            key: const ValueKey('architect-rotation-horizontal'),
+                            onPressed: () => alignToAxis(vertical: false),
+                            child: Text(l.architectUnderlayAlignHorizontal),
+                          ),
+                        ),
+                        Expanded(
+                          child: TextButton(
+                            key: const ValueKey('architect-rotation-vertical'),
+                            onPressed: () => alignToAxis(vertical: true),
+                            child: Text(l.architectUnderlayAlignVertical),
+                          ),
+                        ),
+                      ],
+                    ),
                   Row(
                     children: [
                       for (final d in [30, 45, 90])
                         Expanded(
                           child: TextButton(
                             key: ValueKey('architect-rotation-preset-$d'),
-                            onPressed: () => setDegrees(d.toDouble()),
+                            onPressed: () => applyAngle(d * math.pi / 180),
                             child: Text('$d°'),
                           ),
                         ),
                       Expanded(
-                        child: TextButton(
-                          key: const ValueKey('architect-rotation-exact'),
-                          onPressed: exact,
-                          child: Text(
-                            '${(angle * 180 / math.pi).toStringAsFixed(1)}°',
+                        child: Tooltip(
+                          message: l.architectPropertyAngle,
+                          child: TextButton(
+                            key: const ValueKey('architect-rotation-exact'),
+                            onPressed: exact,
+                            child: Text(widget.alignReferenceToAxes && stage < 2
+                                ? l.architectPropertyAngle
+                                : '${(angle * 180 / math.pi).toStringAsFixed(1)}°'),
                           ),
                         ),
                       ),

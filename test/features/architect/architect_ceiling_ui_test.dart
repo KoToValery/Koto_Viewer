@@ -57,7 +57,7 @@ void main() {
 
   for (final locale in const [Locale('bg'), Locale('en')]) {
     testWidgets(
-      'quick plan mode switch & Plan menu sub-plan work on phone (${locale.languageCode})',
+      'Plan menu switches floor and ceiling on phone (${locale.languageCode})',
       (tester) async {
         tester.view.physicalSize = const Size(360, 640);
         tester.view.devicePixelRatio = 1.0;
@@ -76,28 +76,33 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Option 1: Quick switch pill is visible and toggles to Ceilings & MEP.
-        final switchPill = find.byKey(
-          const ValueKey('architect-plan-mode-switch'),
-        );
-        expect(switchPill, findsOneWidget);
-
         final l = await AppLocalizations.delegate.load(locale);
-        await tester.tap(
-          find.descendant(
-            of: switchPill,
-            matching: find.text(l.architectCeilingPlanShort),
-          ),
+        final plan = find.byKey(const ValueKey('architect-view-plan'));
+        Finder entry(String id) => find.byWidgetPredicate(
+          (widget) => widget is CheckedPopupMenuItem<String> && widget.value == id,
         );
+        expect(
+          find.byKey(const ValueKey('architect-plan-mode-switch')),
+          findsNothing,
+        );
+        await tester.tap(plan);
+        await tester.pumpAndSettle();
+        await tester.tap(entry('ceiling:s0'));
         await tester.pumpAndSettle();
 
         expect(
           find.text('±0.00 · ${l.architectCeilingPlanShort}'),
           findsOneWidget,
         );
+        expect(controller.project.activeStorey.hasCeilingPlan, isFalse);
 
-        // Option 2: Plan dropdown menu allows adding explicit ceiling sub-plan.
-        await tester.tap(find.byKey(const ValueKey('architect-view-plan')));
+        await tester.tap(plan);
+        await tester.pumpAndSettle();
+        await tester.tap(entry('s0'));
+        await tester.pumpAndSettle();
+        expect(find.text('±0.00 · ${l.architectCeilingPlanShort}'), findsNothing);
+
+        await tester.tap(plan);
         await tester.pumpAndSettle();
         expect(find.text(l.architectAddCeilingPlan), findsOneWidget);
         await tester.tap(find.text(l.architectAddCeilingPlan));

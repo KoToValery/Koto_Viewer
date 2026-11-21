@@ -12438,7 +12438,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectToolCadUnderlayTooltip =>
-      'Импорт на външна DWG/DXF подложка с автоматично обновяване и откриване на геодезически хоризонтали';
+      'Добави подложка от DWG, DXF, PDF, KCAD или изображение';
 
   @override
   String get architectToolRasterUnderlay => 'Растерна подложка';
@@ -12487,9 +12487,6 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectCadUnderlayLayersFilter => 'DXF Слоеве';
 
   @override
-  String get architectCadUnderlayDetectGeodesy => 'Извлечи хоризонтали';
-
-  @override
   String get architectCadUnderlayRemove => 'Премахни подложка';
 
   @override
@@ -12501,15 +12498,6 @@ class AppLocalizationsBg extends AppLocalizations {
   String architectCadUnderlayLoadedSuccess(String fileName) {
     return 'CAD подложката е заредена ($fileName)';
   }
-
-  @override
-  String architectGeodesyDetectedNotice(String crs, int contours, int points) {
-    return 'Открита $crs: извлечени $contours хоризонтала и $points коти в слой G-TOPO';
-  }
-
-  @override
-  String get architectGeodesyNoContoursFound =>
-      'Не са открити геодезически хоризонтали или коти в този файл';
 
   @override
   String architectGeodesyBadge(int contours) {
@@ -12803,6 +12791,9 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectToolSiteFence => 'Ограда';
+
+  @override
+  String get architectTerrainPropertiesTitle => 'Свойства на терена';
 
   @override
   String get architectTerrainStateExisting => 'Съществуващ';
@@ -13288,6 +13279,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectUnderlayAdd => 'Добави';
 
   @override
+  String get architectUnderlayAddTooltip =>
+      'Добави подложка от DWG, DXF, PDF, KCAD или изображение';
+
+  @override
   String get architectRasterChooseUnderlay => 'Избери подложка';
 
   @override
@@ -13298,9 +13293,6 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectUnderlayCrop => 'Изрязване';
-
-  @override
-  String get architectUnderlayGeodesy => 'Геодезия';
 
   @override
   String get architectCadImportTitle => 'Импорт на CAD подложка';
@@ -13362,10 +13354,17 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectUnderlayOriginalLineweights => 'Оригинални дебелини';
 
   @override
-  String get architectUnderlayRotateLeft => '90° наляво';
+  String get architectUnderlayRotationStart =>
+      'Посочи начало на ръба или въведи ъгъл';
 
   @override
-  String get architectUnderlayRotateRight => '90° надясно';
+  String get architectUnderlayRotationEnd => 'Посочи другия край на ръба';
+
+  @override
+  String get architectUnderlayAlignHorizontal => 'Хоризонтално';
+
+  @override
+  String get architectUnderlayAlignVertical => 'Вертикално';
 
   @override
   String get architectStoreyManagerTitle => 'Етажи';

@@ -29,6 +29,11 @@ void paintArchitectCadUnderlay({
       Paint()..color = Colors.white.withValues(alpha: opacity),
     );
   }
+  final rotation = frame.rotationRadians;
+  if (rotation != 0) {
+    canvas.save();
+    canvas.rotate(rotation);
+  }
   try {
     DxfPainter(
       document: document,
@@ -46,13 +51,14 @@ void paintArchitectCadUnderlay({
           ? null
           : .8,
       modelPlacement: DxfModelPlacement(
-        toCanvas: frame.toModel,
+        toCanvas: frame.toUnrotatedModel,
         scale: 1 / frame.unitsPerMeter,
         invertY: frame.invertY,
       ),
       modelLayerOverrides: visibility,
     ).paint(canvas, size);
   } finally {
+    if (rotation != 0) canvas.restore();
     if (isolated) canvas.restore();
   }
 }

@@ -50,7 +50,7 @@ editor. Tests: `architect_stair_custom_test.dart` and
 | [TAG:STATE_FIELDS] | Tool flags, drafting state, caches, and preview state |
 | [TAG:UNDERLAY_TOOLS] | CAD/raster underlay handlers and related state |
 | [TAG:UNDERLAY_CROP] | Selected CAD/raster clipping grips, isolated preview and one-release commit |
-| [TAG:CAD_UNDERLAY_IMPORT] | Preview CAD units and orientation, then publish an owned revision |
+| [TAG:CAD_UNDERLAY_IMPORT] | Choose an underlay file, review CAD units or choose a PDF page, then publish |
 | [TAG:UNDERLAY_DRAG] | Underlay snap and repositioning |
 | [TAG:DRAG_TOOL] | Two-point drag and element relocation |
 | [TAG:STATE_LIFECYCLE] | Initialization, listeners, and disposal |
@@ -96,7 +96,7 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Selected roof direction | [TAG:ROOF_DIRECTION_ACTIONS]; _buildRadialMenuItems, ArchitectRoofBar | Existing edge-cycle and flip commands update the roof plane through UpdateArchitectRoofPlane; the bar and automatic plan arrow read drainageDirection. |
 | Two-point drag of elements or underlays | [TAG:DRAG_TOOL], [TAG:UNDERLAY_DRAG], [TAG:TOUCH_DOWN], [TAG:TOUCH_MOVE], [TAG:TOUCH_UP]; _startDragSession, _startUnderlaySnapDrag, _updateDragTarget, _cancelDragGesture, _confirmDragPlacement, _cancelDragPlacement, ArchitectDragController | Dormant touch input allows pan/pinch before either pick; taps or precision holds choose points. Navigation preserves the session and placed target; Apply commits once. Both element and underlay drag use the same controller and lifecycle, with no generic geometry-command preview. |
 | Multi-step geometry modification | Wall split: [TAG:WALL_SPLIT]. Chamfer/fillet and edge-curving: [TAG:FLOATING_HUD]; _startChamferFilletSession, _buildChamferFilletFloatingOverlay | Session state, preview/rubber band, pan and gesture arbitration, confirm/cancel controls, model command and history |
-| CAD/raster underlay placement or repositioning | [TAG:CAD_UNDERLAY_IMPORT], [TAG:UNDERLAY_DRAG], [TAG:DRAG_TOOL]; _loadExternalCadFileForStorey, _startUnderlaySnapDrag, _confirmDragPlacement | CAD preview and snapshot, raster calibration, and shared drag lifecycle |
+| CAD/raster underlay placement or repositioning | [TAG:CAD_UNDERLAY_IMPORT], [TAG:UNDERLAY_DRAG], [TAG:DRAG_TOOL]; _addUnderlay, _loadExternalUnderlayForStorey, _startUnderlaySnapDrag, _confirmDragPlacement | Shared file picker, CAD preview and snapshot, PDF page selection, raster calibration, and shared drag lifecycle |
 
 ### CAD underlay display settings
 
@@ -110,7 +110,20 @@ images retain their existing image-opacity controls; CAD-specific style toggles
 are omitted for raster inputs. Underlay masks, hit testing and snap geometry
 are unchanged by these display settings.
 
+CAD and raster rotation start in `_startUnderlayRotation` and use the same
+`ArchitectRotationOverlay` as walls. Numeric angles rotate around the centre
+by default. An edge pick sets the pivot and reference, with horizontal and
+vertical alignment available after the second pick. CAD references snap on
+the original drawing through `_snapTransformPoint`. `_rotateUnderlay` moves
+the crop with the source and previews the result before applying one command.
+The saved CAD frame supplies the angle for paint, snapping, drag and publication.
+Stored survey data remains available to the terrain tools.
+
 ### Storey management and return to drawing
+
+`ArchitectWorkspaceViewBar` switches floor and ceiling via the Plan menu. The
+active building storey exposes its ceiling view even before adding a saved
+ceiling sub-plan. Both entries use `_selectWorkspaceView`.
 
 `_manageWorkspaceViews(plan)` opens `ArchitectStoreysScreen` with the shared
 model controller. The manager returns its selected storey ID through the route;
@@ -120,6 +133,12 @@ existing command history and the workspace model listener's save debounce.
 The manager's copy action opens `ArchitectCopyStoreyDialog` and executes
 `CopyArchitectElementsAcrossStoreys`; no separate copy controls or category
 state are maintained in the manager.
+
+### Terrain properties
+
+Site Plan selection uses `ArchitectLandscapeTool.terrainStateOf`. Properties
+and the landscape bar call `_setTerrainState`, which moves the selected terrain
+element between surfaces through a single project history entry.
 
 ### Layer visibility menu
 
@@ -406,9 +425,12 @@ geometry command, history and autosave when confirmed.
 ### Project snapshots and editable underlay crops
 
 `_underlayOwnerId` is the attached manifest ID or standalone model ID.
-`_loadExternalCadFileForStorey` prepares a private original for review before
-publishing. `_syncCadRevisionHistory` switches cached documents when Undo/Redo
-selects an older revision. A CAD config carries units, orientation and layer
+`_addUnderlay` is called by both underlay bars. `_loadExternalUnderlayForStorey`
+routes DWG/DXF/KCAD to CAD preview and revision publishing. It routes PDF and
+images to `_importRasterUnderlay`, which uses the existing PDF page selector and
+stores the selected page as a project-owned raster alongside the source PDF.
+CAD Replace and Refresh use the CAD path. `_syncCadRevisionHistory` switches
+cached documents when Undo/Redo selects an older revision. A CAD config carries units, orientation and layer
 overrides. `BimCoordinateFrame.placing` supplies both drag ghost and commit.
 `_restorePersistedUnderlays` prefers saved architectural snapshots over supplied
 fallback documents. Architectural opening uses

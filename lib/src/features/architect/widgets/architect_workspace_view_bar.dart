@@ -288,7 +288,8 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (s.isBuildingStorey && s.hasCeilingPlan)
+                      if (s.isBuildingStorey &&
+                          (s.hasCeilingPlan || s.id == project.activeStoreyId))
                         CheckedPopupMenuItem(
                           value: 'ceiling:${s.id}',
                           checked:

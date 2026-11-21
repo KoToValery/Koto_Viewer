@@ -22545,7 +22545,7 @@ abstract class AppLocalizations {
   /// Tooltip for CAD Underlay tool
   ///
   /// In en, this message translates to:
-  /// **'Import or link external DWG/DXF underlay with live auto-reload and geodetic contour detection'**
+  /// **'Add a DWG, DXF, PDF, KCAD, or image underlay'**
   String get architectToolCadUnderlayTooltip;
 
   /// Tool label for Raster Image/PDF underlay
@@ -22632,12 +22632,6 @@ abstract class AppLocalizations {
   /// **'DXF Layers'**
   String get architectCadUnderlayLayersFilter;
 
-  /// Button to run geodetic contour detection
-  ///
-  /// In en, this message translates to:
-  /// **'Extract Contours'**
-  String get architectCadUnderlayDetectGeodesy;
-
   /// Button to remove underlay from current storey
   ///
   /// In en, this message translates to:
@@ -22655,18 +22649,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'CAD underlay loaded ({fileName})'**
   String architectCadUnderlayLoadedSuccess(String fileName);
-
-  /// Snackbar notice when geodetic contours and points are extracted
-  ///
-  /// In en, this message translates to:
-  /// **'Detected {crs}: extracted {contours} contours and {points} elevation points to layer G-TOPO'**
-  String architectGeodesyDetectedNotice(String crs, int contours, int points);
-
-  /// Snackbar notice when no contours are found
-  ///
-  /// In en, this message translates to:
-  /// **'No geodetic contours or spot elevations detected in this file'**
-  String get architectGeodesyNoContoursFound;
 
   /// Badge showing count of detected contours
   ///
@@ -23177,6 +23159,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Site fence'**
   String get architectToolSiteFence;
+
+  /// No description provided for @architectTerrainPropertiesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terrain properties'**
+  String get architectTerrainPropertiesTitle;
 
   /// No description provided for @architectTerrainStateExisting.
   ///
@@ -24036,6 +24024,12 @@ abstract class AppLocalizations {
   /// **'Add'**
   String get architectUnderlayAdd;
 
+  /// Formats accepted by the architectural underlay file picker
+  ///
+  /// In en, this message translates to:
+  /// **'Add a DWG, DXF, PDF, KCAD, or image underlay'**
+  String get architectUnderlayAddTooltip;
+
   /// No description provided for @architectRasterChooseUnderlay.
   ///
   /// In en, this message translates to:
@@ -24059,12 +24053,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Crop'**
   String get architectUnderlayCrop;
-
-  /// No description provided for @architectUnderlayGeodesy.
-  ///
-  /// In en, this message translates to:
-  /// **'Survey'**
-  String get architectUnderlayGeodesy;
 
   /// No description provided for @architectCadImportTitle.
   ///
@@ -24180,17 +24168,29 @@ abstract class AppLocalizations {
   /// **'Original lineweights'**
   String get architectUnderlayOriginalLineweights;
 
-  /// Rotate the underlay counterclockwise by 90 degrees
+  /// No description provided for @architectUnderlayRotationStart.
   ///
   /// In en, this message translates to:
-  /// **'90° left'**
-  String get architectUnderlayRotateLeft;
+  /// **'Pick the first end of the edge or enter an angle'**
+  String get architectUnderlayRotationStart;
 
-  /// Rotate the underlay clockwise by 90 degrees
+  /// No description provided for @architectUnderlayRotationEnd.
   ///
   /// In en, this message translates to:
-  /// **'90° right'**
-  String get architectUnderlayRotateRight;
+  /// **'Pick the other end of the edge'**
+  String get architectUnderlayRotationEnd;
+
+  /// No description provided for @architectUnderlayAlignHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal'**
+  String get architectUnderlayAlignHorizontal;
+
+  /// No description provided for @architectUnderlayAlignVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical'**
+  String get architectUnderlayAlignVertical;
 
   /// Short title of the storey manager
   ///

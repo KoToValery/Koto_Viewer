@@ -11,7 +11,7 @@ import 'architect_numeric_keypad.dart';
 class ArchitectCadUnderlayBar extends StatelessWidget {
   final ArchitectCadUnderlayConfig? config;
   final bool isBusy;
-  final VoidCallback onImportCad;
+  final VoidCallback onAddUnderlay;
   final VoidCallback onMove;
   final VoidCallback onOpenScale;
   final void Function(Offset globalPosition)? onOpenContextMenu;
@@ -20,7 +20,7 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
     super.key,
     required this.config,
     required this.isBusy,
-    required this.onImportCad,
+    required this.onAddUnderlay,
     required this.onMove,
     required this.onOpenScale,
     this.onOpenContextMenu,
@@ -29,18 +29,14 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final add = isBusy ? null : onAddUnderlay;
     final cad = config;
     return _UnderlayToolbar(
       children: cad == null
-          ? [
-              TextButton.icon(
-                onPressed: isBusy ? null : onImportCad,
-                icon: const AppIcon(AppIconId.openFile, size: 18),
-                label: Text(l.architectUnderlayAdd),
-              ),
-            ]
+          ? [_addUnderlayButton(context, add)]
           : [
               Flexible(child: _UnderlayName(cad.fileName)),
+              _addUnderlayButton(context, add, compact: true),
               _action(
                 context,
                 l.architectSelectionMove,
@@ -64,7 +60,7 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
   final ArchitectRasterUnderlay? selectedUnderlay;
   final int calibrationStep;
   final bool isBusy;
-  final VoidCallback onImportRaster;
+  final VoidCallback onAddUnderlay;
   final ValueChanged<String> onSelectUnderlay;
   final VoidCallback onMove;
   final VoidCallback onStartCalibration;
@@ -77,7 +73,7 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
     required this.selectedUnderlay,
     required this.calibrationStep,
     required this.isBusy,
-    required this.onImportRaster,
+    required this.onAddUnderlay,
     required this.onSelectUnderlay,
     required this.onMove,
     required this.onStartCalibration,
@@ -104,16 +100,10 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
       );
     }
 
-    final add = isBusy ? null : onImportRaster;
+    final add = isBusy ? null : onAddUnderlay;
     return _UnderlayToolbar(
       children: raster == null
-          ? [
-              TextButton.icon(
-                onPressed: add,
-                icon: const AppIcon(AppIconId.imageAdd, size: 18),
-                label: Text(l.architectUnderlayAdd),
-              ),
-            ]
+          ? [_addUnderlayButton(context, add)]
           : [
               Flexible(
                 child: underlays.length == 1
@@ -142,7 +132,7 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
                         ),
                       ),
               ),
-              _action(context, l.architectUnderlayAdd, AppIconId.imageAdd, add),
+              _addUnderlayButton(context, add, compact: true),
               _action(
                 context,
                 l.architectSelectionMove,
@@ -161,6 +151,30 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
             ],
     );
   }
+}
+
+Widget _addUnderlayButton(
+  BuildContext context,
+  VoidCallback? onPressed, {
+  bool compact = false,
+}) {
+  final l = context.l10n;
+  const icon = AppIcon(AppIconId.openFile, size: 18);
+  if (compact && MediaQuery.sizeOf(context).width < 650) {
+    return IconButton(
+      tooltip: l.architectUnderlayAddTooltip,
+      onPressed: onPressed,
+      icon: icon,
+    );
+  }
+  return Tooltip(
+    message: l.architectUnderlayAddTooltip,
+    child: TextButton.icon(
+      onPressed: onPressed,
+      icon: icon,
+      label: Text(l.architectUnderlayAdd),
+    ),
+  );
 }
 
 class _UnderlayName extends StatelessWidget {
@@ -282,7 +296,8 @@ Widget _more(BuildContext context, void Function(Offset)? open) {
       }
 
       final action = open == null ? null : openMenu;
-      if (_showCompactLabels(context)) {
+      if (MediaQuery.sizeOf(context).width >= 650 &&
+          _showCompactLabels(context)) {
         return Tooltip(
           message: label,
           excludeFromSemantics: true,
@@ -513,6 +528,12 @@ Future<String?> showArchitectUnderlayContextMenu({
       enabled: canEditGeometry && visible,
     ),
     _entry(
+      'rotate',
+      AppIconId.rotate,
+      l.rotate,
+      enabled: canEditGeometry && visible && (!isCad || hasDocument),
+    ),
+    _entry(
       'visibility',
       visible ? AppIconId.hidden : AppIconId.visible,
       visible ? l.architectUnderlayHide : l.architectUnderlayShow,
@@ -521,39 +542,12 @@ Future<String?> showArchitectUnderlayContextMenu({
       const PopupMenuDivider(),
       _entry('replace', AppIconId.openFile, l.architectCadReplaceAccept),
       _entry('reload', AppIconId.refresh, l.architectCadUnderlayReloadNow),
-      _entry(
-        'survey',
-        AppIconId.terrain,
-        l.architectUnderlayGeodesy,
-        enabled: hasDocument || hasSurvey,
-      ),
+      if (hasSurvey)
+        _entry('terrain', AppIconId.terrain, l.architectGeodesyApplyToTerrain),
     ] else
       _entry('add', AppIconId.imageAdd, l.architectUnderlayAdd),
     const PopupMenuDivider(),
     _entry('remove', AppIconId.delete, l.delete),
-  ]);
-}
-
-Future<String?> showArchitectUnderlaySurveyMenu({
-  required BuildContext context,
-  required Offset globalPosition,
-  required bool canExtract,
-  required bool hasSurvey,
-}) {
-  final l = context.l10n;
-  return _showUnderlayMenu(context, globalPosition, [
-    _entry(
-      'extract',
-      AppIconId.terrain,
-      l.architectCadUnderlayDetectGeodesy,
-      enabled: canExtract,
-    ),
-    _entry(
-      'terrain',
-      AppIconId.terrain,
-      l.architectGeodesyApplyToTerrain,
-      enabled: hasSurvey,
-    ),
   ]);
 }
 
@@ -626,8 +620,7 @@ Future<void> showArchitectUnderlayEditDialog({
   ValueChanged<bool>? onToggleLockOrigin,
   bool? isLocked,
   VoidCallback? onToggleLock,
-  VoidCallback? onRotateCcw,
-  VoidCallback? onRotateCw,
+  VoidCallback? onRotate,
   VoidCallback? onResetTransform,
 }) {
   final l = context.l10n;
@@ -707,29 +700,14 @@ Future<void> showArchitectUnderlayEditDialog({
                   },
                 ),
               ],
-              if (onRotateCcw != null && onRotateCw != null) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          onRotateCcw();
-                        },
-                        icon: const AppIcon(AppIconId.rotateLeft, size: 16),
-                        label: Text(l.architectUnderlayRotateLeft),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          onRotateCw();
-                        },
-                        icon: const AppIcon(AppIconId.rotate, size: 16),
-                        label: Text(l.architectUnderlayRotateRight),
-                      ),
-                    ),
-                  ],
+              if (onRotate != null) ...[
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(dialogCtx).pop();
+                    onRotate();
+                  },
+                  icon: const AppIcon(AppIconId.rotate, size: 16),
+                  label: Text(l.rotate),
                 ),
                 const SizedBox(height: 12),
               ],

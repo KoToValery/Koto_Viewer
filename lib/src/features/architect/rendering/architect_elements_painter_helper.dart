@@ -45,6 +45,7 @@ class ArchitectElementsPainterHelper {
     required DxfDocument? underlayDoc,
     required double zoomScale,
     required Map<String, bool> layerVisibility,
+    Offset sourceOrigin = Offset.zero,
     Rect? visibleRect,
     double? opacity,
     bool useOriginalColors = false,
@@ -79,40 +80,40 @@ class ArchitectElementsPainterHelper {
       final underlayPaint = presentation.pen(entity, layer);
 
       if (entity is DxfLine) {
-        canvas.drawLine(entity.p1, entity.p2, underlayPaint);
-      } else if (entity is DxfLwPolyline) {
-        if (entity.vertices.length >= 2) {
-          final path =
-              _paths[entity] ??
-              (Path()..moveTo(entity.vertices[0].x, entity.vertices[0].y));
-          if (_paths[entity] == null) {
-            for (int i = 1; i < entity.vertices.length; i++) {
-              path.lineTo(entity.vertices[i].x, entity.vertices[i].y);
-            }
-            if (entity.isClosed) path.close();
-            _paths[entity] = path;
+        canvas.drawLine(
+          entity.p1 - sourceOrigin,
+          entity.p2 - sourceOrigin,
+          underlayPaint,
+        );
+      } else if (entity case DxfLwPolyline(:final vertices, :final isClosed) ||
+          DxfPolyline(:final vertices, :final isClosed)) {
+        if (vertices.length < 2) continue;
+        final canCache = sourceOrigin == Offset.zero;
+        var path = canCache ? _paths[entity] : null;
+        if (path == null) {
+          path = Path()..moveTo(
+            vertices.first.x - sourceOrigin.dx,
+            vertices.first.y - sourceOrigin.dy,
+          );
+          for (var i = 1; i < vertices.length; i++) {
+            path.lineTo(
+              vertices[i].x - sourceOrigin.dx,
+              vertices[i].y - sourceOrigin.dy,
+            );
           }
-          canvas.drawPath(path, underlayPaint);
+          if (isClosed) path.close();
+          if (canCache) _paths[entity] = path;
         }
-      } else if (entity is DxfPolyline) {
-        if (entity.vertices.length >= 2) {
-          final path =
-              _paths[entity] ??
-              (Path()..moveTo(entity.vertices[0].x, entity.vertices[0].y));
-          if (_paths[entity] == null) {
-            for (int i = 1; i < entity.vertices.length; i++) {
-              path.lineTo(entity.vertices[i].x, entity.vertices[i].y);
-            }
-            if (entity.isClosed) path.close();
-            _paths[entity] = path;
-          }
-          canvas.drawPath(path, underlayPaint);
-        }
+        canvas.drawPath(path, underlayPaint);
       } else if (entity is DxfCircle) {
-        canvas.drawCircle(entity.center, entity.radius, underlayPaint);
+        canvas.drawCircle(
+          entity.center - sourceOrigin,
+          entity.radius,
+          underlayPaint,
+        );
       } else if (entity is DxfArc) {
         final rect = Rect.fromCircle(
-          center: entity.center,
+          center: entity.center - sourceOrigin,
           radius: entity.radius,
         );
         final startAngle = entity.startAngleDeg * math.pi / 180.0;

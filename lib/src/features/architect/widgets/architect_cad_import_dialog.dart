@@ -187,7 +187,9 @@ class _CadImportDialogState extends State<_CadImportDialog> {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final theme = Theme.of(context);
-    final bounds = widget.prepared.document.bounds;
+    final bounds = BimCoordinateFrame(
+      rotationRadians: widget.existing?.rotationRad ?? 0,
+    ).rectToModel(widget.prepared.document.bounds);
     final factor = _factor;
     final valid =
         factor != null &&
@@ -357,14 +359,18 @@ class _CadImportPreview extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.width < 32 || size.height < 32) return;
     final bounds = document.bounds;
+    final rotation = existing?.rotationRad ?? 0;
+    final extent = BimCoordinateFrame(rotationRadians: rotation)
+        .rectToModel(bounds);
     final scale = math.min(
-      (size.width - 24) / bounds.width,
-      (size.height - 24) / bounds.height,
+      (size.width - 24) / extent.width,
+      (size.height - 24) / extent.height,
     );
     if (!scale.isFinite || scale <= 0) return;
     final frame = BimCoordinateFrame(
       unitsPerMeter: 1 / scale,
       invertY: invertY,
+      rotationRadians: rotation,
     ).placing(bounds.center, size.center(Offset.zero));
     paintArchitectCadUnderlay(
       canvas: canvas,
