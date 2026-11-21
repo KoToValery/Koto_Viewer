@@ -156,8 +156,7 @@ class ArchitectRoofPainterHelper {
     );
 
     if (!publication) {
-      final guides = _supportGuides[wallStorey.walls] ??=
-          buildSupportingWallGuides(wallStorey);
+      final guides = supportingWallGuidesOf(wallStorey);
       _paintSupportingWallGuides(
         canvas: canvas,
         guides: guides,
@@ -166,6 +165,11 @@ class ArchitectRoofPainterHelper {
       );
     }
   }
+
+  /// Cached supporting-wall roof construction guides (45° corner bisectors,
+  /// mid-wall perpendiculars, and interior bisector intersections).
+  static RoofSupportGuides supportingWallGuidesOf(ArchitectStorey storey) =>
+      _supportGuides[storey.walls] ??= buildSupportingWallGuides(storey);
 
   /// Computes unobtrusive roof drafting construction guides from the exterior
   /// wall perimeter: 45° / corner angle bisectors, mid-wall perpendiculars, and

@@ -2,6 +2,7 @@ import '../services/architect_ellipse_geometry.dart';
 import '../services/architect_roof_junctions.dart';
 import 'architect_panel_roof_geometry.dart';
 import 'architect_path_solid.dart';
+import 'architect_roof_painter_helper.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../bim_editing/scene/bim_point_index.dart';
@@ -364,6 +365,23 @@ class ArchitectSnapGeometry {
           if (knuckle != null) {
             edge(knuckle.$1, knuckle.$2, roof.id);
           }
+        }
+      }
+    }
+    if (floor.isRoof) {
+      final wallStorey = project.highestWallStorey;
+      if (wallStorey != null && wallStorey.walls.isNotEmpty) {
+        final guides = ArchitectRoofPainterHelper.supportingWallGuidesOf(
+          wallStorey,
+        );
+        for (final (a, b) in guides.bisectors) {
+          edge(a, b, '@roof-guide', includeMidpoint: false);
+        }
+        for (final (a, b) in guides.midPerpendiculars) {
+          edge(a, b, '@roof-guide', includeMidpoint: false);
+        }
+        for (final pt in guides.intersections) {
+          point(pt, 'Intersection', '@roof-guide');
         }
       }
     }

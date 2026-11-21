@@ -2395,6 +2395,7 @@ class ArchitectRoofGeometry {
     required ArchitectRoofPlane roof,
     required ArchitectProject project,
     required double snapTolerance,
+    List<(Offset, Offset)> roofGuideSegments = const [],
     required String Function() hip45Label,
     required String Function(String deg) hipAngleLabel,
     required String Function() hipIntersectionLabel,
@@ -2681,6 +2682,57 @@ class ArchitectRoofGeometry {
       );
     }
 
+    // D: Intersections of the active ray with segments of other roofs
+    void addSegmentIntersection({
+      required Offset segA,
+      required Offset segB,
+      required String label,
+      required int priority,
+    }) {
+      final seg = segB - segA;
+      if (seg.distance < 0.05) return;
+      final cross = activeDir.dx * seg.dy - activeDir.dy * seg.dx;
+      if (cross.abs() < 1e-4) return;
+      final dOrigin = segA - activeAnchor;
+      final tAnchor = (dOrigin.dx * seg.dy - dOrigin.dy * seg.dx) / cross;
+      final tSeg =
+          (dOrigin.dx * activeDir.dy - dOrigin.dy * activeDir.dx) / cross;
+      if (tAnchor > 0.10 && tSeg >= -1e-4 && tSeg <= 1.0 + 1e-4) {
+        final interPt = activeAnchor + activeDir * tAnchor;
+        candidates.add(
+          _RoofGuideCandidate(
+            point: interPt,
+            label: label,
+            guideLine: (segA, segB),
+            distanceToCursor: (interPt - activeProjPt).distance,
+            priority: priority,
+          ),
+        );
+      }
+    }
+
+    for (final other in activeStorey.roofs) {
+      if (other.id == roof.id || other.points.length < 2) continue;
+      for (var k = 0; k < other.points.length; k++) {
+        addSegmentIntersection(
+          segA: other.points[k],
+          segB: other.points[(k + 1) % other.points.length],
+          label: hipIntersectionLabel(),
+          priority: 9,
+        );
+      }
+    }
+
+    // E: Intersections of the active ray with roof construction guide segments
+    for (final (gA, gB) in roofGuideSegments) {
+      addSegmentIntersection(
+        segA: gA,
+        segB: gB,
+        label: cornerHipIntersectionLabel(),
+        priority: 8,
+      );
+    }
+
     final bestCandidate = _selectBestRoofCandidate(candidates, snapTolerance);
     if (bestCandidate != null) {
       return RoofSnapGuideResult(
@@ -2705,6 +2757,156 @@ class ArchitectRoofGeometry {
       magneticGuides: [(activeAnchor, activeAnchor + activeDir * guideSpan)],
       isIntersectionSnap: false,
     );
+  }
+
+  /// Resolves snaps when pulling or moving an edge of an existing roof plane:
+  /// - Parallel/collinear alignment with segments of other roofs (even across gaps)
+  /// - Snapping to other roofs' segments, vertices, and roof construction guide lines
+  static RoofSnapGuideResult? resolveRoofEdgeDragSnap({
+    required Offset raw,
+    required List<Offset> originalPolygon,
+    required int edgeIndex,
+    required ArchitectRoofPlane roof,
+    required ArchitectProject project,
+    required double snapTolerance,
+    List<(Offset, Offset)> roofGuideSegments = const [],
+    required String Function() ridgeAlignmentLabel,
+    required String Function() edgeLabel,
+  }) {
+    final n = originalPolygon.length;
+    if (n < 3 || edgeIndex < 0 || edgeIndex >= n) return null;
+    final edgeA = originalPolygon[edgeIndex];
+    final edgeB = originalPolygon[(edgeIndex + 1) % n];
+    final edgeDelta = edgeB - edgeA;
+    if (edgeDelta.distance < 1e-4) return null;
+    final edgeUnit = edgeDelta / edgeDelta.distance;
+
+    final activeStorey = project.activeStorey;
+    RoofSnapGuideResult? best;
+    var bestScore = double.infinity;
+
+    void consider(
+      Offset pt,
+      String label,
+      List<(Offset, Offset)> guides, {
+      double penalty = 0.0,
+      bool intersection = false,
+    }) {
+      final d = (pt - raw).distance;
+      if (d > snapTolerance) return;
+      final score = d + penalty;
+      if (score < bestScore) {
+        bestScore = score;
+        best = RoofSnapGuideResult(
+          point: pt,
+          snapLabel: label,
+          magneticGuides: guides,
+          isIntersectionSnap: intersection,
+        );
+      }
+    }
+
+    // 1. Direct snap to other roof segments + parallel collinear alignment
+    for (final other in activeStorey.roofs) {
+      if (other.id == roof.id || other.points.length < 2) continue;
+      for (var k = 0; k < other.points.length; k++) {
+        final sA = other.points[k];
+        final sB = other.points[(k + 1) % other.points.length];
+        final seg = sB - sA;
+        final len = seg.distance;
+        if (len < 1e-4) continue;
+        final segUnit = seg / len;
+
+        // Collinear / parallel alignment across the plan
+        final cross = (edgeUnit.dx * segUnit.dy - edgeUnit.dy * segUnit.dx).abs();
+        if (cross < 0.02) {
+          final projLen =
+              (raw.dx - sA.dx) * segUnit.dx + (raw.dy - sA.dy) * segUnit.dy;
+          final projPt = sA + segUnit * projLen;
+          final guideFrom = (sA - projPt).distance <= (sB - projPt).distance
+              ? sA
+              : sB;
+          consider(
+            projPt,
+            ridgeAlignmentLabel(),
+            [(sA, sB), (guideFrom, projPt)],
+            penalty: 0.005,
+            intersection: true,
+          );
+        }
+
+        // Direct segment closest point
+        final t = (((raw.dx - sA.dx) * seg.dx + (raw.dy - sA.dy) * seg.dy) /
+                (len * len))
+            .clamp(0.0, 1.0);
+        consider(sA + seg * t, edgeLabel(), [(sA, sB)], penalty: 0.02);
+      }
+    }
+
+    // 2. Direct snap & parallel alignment to roof construction guide segments
+    for (final (gA, gB) in roofGuideSegments) {
+      final seg = gB - gA;
+      final len = seg.distance;
+      if (len < 1e-4) continue;
+      final segUnit = seg / len;
+
+      final cross = (edgeUnit.dx * segUnit.dy - edgeUnit.dy * segUnit.dx).abs();
+      if (cross < 0.02) {
+        final projLen =
+            (raw.dx - gA.dx) * segUnit.dx + (raw.dy - gA.dy) * segUnit.dy;
+        if (projLen >= -snapTolerance && projLen <= len + snapTolerance) {
+          final projPt = gA + segUnit * projLen;
+          consider(
+            projPt,
+            ridgeAlignmentLabel(),
+            [(gA, gB)],
+            penalty: 0.008,
+          );
+        }
+      }
+
+      final t = (((raw.dx - gA.dx) * seg.dx + (raw.dy - gA.dy) * seg.dy) /
+              (len * len))
+          .clamp(0.0, 1.0);
+      consider(gA + seg * t, edgeLabel(), [(gA, gB)], penalty: 0.025);
+    }
+
+    return best;
+  }
+
+  /// Finds matching segments from other roofs or roof guide lines passing through
+  /// [point] so interactive editing can highlight them as magnetic guides.
+  static List<(Offset, Offset)> findRoofOrGuideSegmentsAt({
+    required Offset point,
+    required ArchitectRoofPlane roof,
+    required ArchitectStorey activeStorey,
+    List<(Offset, Offset)> roofGuideSegments = const [],
+    double tolerance = 0.02,
+  }) {
+    final matches = <(Offset, Offset)>[];
+    void testSeg(Offset a, Offset b) {
+      final ab = b - a;
+      final lenSq = ab.distanceSquared;
+      if (lenSq < 1e-8) return;
+      final t = (((point.dx - a.dx) * ab.dx + (point.dy - a.dy) * ab.dy) /
+              lenSq)
+          .clamp(0.0, 1.0);
+      final closest = a + ab * t;
+      if ((closest - point).distance <= tolerance) {
+        matches.add((a, b));
+      }
+    }
+
+    for (final other in activeStorey.roofs) {
+      if (other.id == roof.id || other.points.length < 2) continue;
+      for (var k = 0; k < other.points.length; k++) {
+        testSeg(other.points[k], other.points[(k + 1) % other.points.length]);
+      }
+    }
+    for (final (gA, gB) in roofGuideSegments) {
+      testSeg(gA, gB);
+    }
+    return matches;
   }
 
   static Set<double> _buildRoofRayAngles(

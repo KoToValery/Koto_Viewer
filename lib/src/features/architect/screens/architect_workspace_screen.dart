@@ -12187,6 +12187,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_polygonEditor.active) {
+      final baseProject = _elementMoveOriginal!;
+      final editingRoof = baseProject.activeStorey.roofs
+          .where((r) => r.id == _polygonEditor.elementId)
+          .firstOrNull;
+      final roofGuideSegments = <(Offset, Offset)>[
+        if (editingRoof != null && baseProject.activeStorey.isRoof) ...() {
+          final wallStorey = baseProject.highestWallStorey;
+          if (wallStorey == null || wallStorey.walls.isEmpty) {
+            return const <(Offset, Offset)>[];
+          }
+          final guides = ArchitectRoofPainterHelper.supportingWallGuidesOf(
+            wallStorey,
+          );
+          return [...guides.bisectors, ...guides.midPerpendiculars];
+        }(),
+      ];
+      final snapTol = (_touchInput ? 16 : 10) / _currentScale;
+      final mergeRadius = editingRoof != null && _polygonEditor.edge
+          ? math.min(14 / _currentScale, .35)
+          : math.min(12 / _currentScale, .20);
 
       _polygonEditor.update(
 
@@ -12205,9 +12225,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             rawPoint: point,
 
-            project: _elementMoveOriginal!,
+            project: baseProject,
 
-            tolerance: 12 / _currentScale,
+            tolerance: editingRoof != null && _polygonEditor.edge
+                ? snapTol
+                : 12 / _currentScale,
 
             magnetic: _magnetEnabled,
 
@@ -12223,24 +12245,51 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           );
 
-          if (!_polygonEditor.edge && _magnetEnabled) {
-            final editingRoof = _elementMoveOriginal!.activeStorey.roofs
-                .where((r) => r.id == _polygonEditor.elementId)
-                .firstOrNull;
-            final objectSnap = freeSnap.isSnapped && const {
-              'Endpoint', 'Vertex', 'Intersection', 'Apparent intersection',
-              'Axis endpoint', 'Axis intersection', 'Center', 'Midpoint',
+          if (editingRoof != null && _magnetEnabled) {
+            const hardSnapLabels = {
+              'Endpoint',
+              'Vertex',
+              'Intersection',
+              'Apparent intersection',
+              'Axis endpoint',
+              'Axis intersection',
+              'Center',
+              'Midpoint',
               'Quadrant',
-            }.contains(freeSnap.snapLabel);
-            if (editingRoof != null && !objectSnap) {
-              final l10n = context.l10n;
+            };
+            final objectSnap =
+                freeSnap.isSnapped && hardSnapLabels.contains(freeSnap.snapLabel);
+            final l10n = context.l10n;
+
+            ArchitectSnapResult enrichGuides(ArchitectSnapResult res) {
+              if (!res.isSnapped || res.magneticGuides.isNotEmpty) return res;
+              final segGuides = ArchitectRoofGeometry.findRoofOrGuideSegmentsAt(
+                point: res.point,
+                roof: editingRoof,
+                activeStorey: baseProject.activeStorey,
+                roofGuideSegments: roofGuideSegments,
+              );
+              if (segGuides.isEmpty) return res;
+              return ArchitectSnapResult(
+                point: res.point,
+                isSnapped: true,
+                snapLabel: res.snapLabel,
+                angleDeg: res.angleDeg,
+                wallAttachment: res.wallAttachment,
+                magneticGuides: segGuides,
+              );
+            }
+
+            if (!_polygonEditor.edge) {
+              if (objectSnap) return enrichGuides(freeSnap);
               final roofGuide = ArchitectRoofGeometry.resolveRoofVertexDragSnap(
                 raw: point,
                 originalPolygon: _polygonEditor.original!,
                 vertexIndex: _polygonEditor.index!,
                 roof: editingRoof,
-                project: _elementMoveOriginal!,
-                snapTolerance: (_touchInput ? 16 : 10) / _currentScale,
+                project: baseProject,
+                snapTolerance: snapTol,
+                roofGuideSegments: roofGuideSegments,
                 hip45Label: () => l10n.architectRoofSnap45Degrees,
                 hipAngleLabel: (deg) => l10n.architectRoofSnapHipAngle(deg),
                 hipIntersectionLabel: () =>
@@ -12258,6 +12307,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   magneticGuides: roofGuide.magneticGuides,
                 );
               }
+              return enrichGuides(freeSnap);
+            } else {
+              if (objectSnap) return enrichGuides(freeSnap);
+              final edgeGuide = ArchitectRoofGeometry.resolveRoofEdgeDragSnap(
+                raw: point,
+                originalPolygon: _polygonEditor.original!,
+                edgeIndex: _polygonEditor.index!,
+                roof: editingRoof,
+                project: baseProject,
+                snapTolerance: snapTol,
+                roofGuideSegments: roofGuideSegments,
+                ridgeAlignmentLabel: () => l10n.architectRoofSnapRidgeAlignment,
+                edgeLabel: () => 'Edge',
+              );
+              if (edgeGuide != null) {
+                return ArchitectSnapResult(
+                  point: edgeGuide.point,
+                  isSnapped: true,
+                  snapLabel: edgeGuide.snapLabel,
+                  magneticGuides: edgeGuide.magneticGuides,
+                );
+              }
+              return enrichGuides(freeSnap);
             }
           }
 
@@ -12265,13 +12337,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         },
 
-        math.min(12 / _currentScale, .20));
+        mergeRadius);
 
       final snap = _polygonEditor.activeSnap;
 
-      _activeSnapLabel = (_selectedRoof != null && _polygonEditor.edge)
-          ? null
-          : snap?.snapLabel;
+      _activeSnapLabel = snap?.snapLabel;
 
       _activeMagneticGuides = snap?.magneticGuides ?? [];
 

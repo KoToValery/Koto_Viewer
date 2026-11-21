@@ -2,7 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_roof_painter_helper.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_snap_helper.dart';
 import 'package:kotoview/src/features/architect/services/architect_roof_geometry.dart';
+import 'package:kotoview/src/features/bim_editing/geometry/bim_polygon_geometry.dart';
+import 'package:kotoview/src/features/bim_editing/interaction/bim_polygon_editor.dart';
 
 void main() {
   group('ArchitectRoofGeometry.resolveRoofGuideSnap', () {
@@ -405,6 +408,207 @@ void main() {
       expect(guides.bisectors.length, 6);
       expect(guides.midPerpendiculars.length, greaterThanOrEqualTo(4));
       expect(guides.intersections, isNotEmpty);
+    });
+  });
+
+  group('Roof segment & guide line snapping during editing', () {
+    ArchitectProject makeRoofProject({
+      required List<ArchitectWall> walls,
+      required List<ArchitectRoofPlane> roofs,
+    }) {
+      final ground = ArchitectStorey(
+        id: 'ground',
+        name: 'Ground',
+        elevation: 0,
+        height: 2.8,
+        walls: walls,
+      );
+      final roofPlan = ArchitectStorey(
+        id: 'roof-plan',
+        name: 'Roof',
+        elevation: 2.8,
+        height: 2.8,
+        isRoof: true,
+        roofs: roofs,
+      );
+      return ArchitectProject(
+        id: 'p-edit',
+        name: 'Edit Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: [ground, roofPlan],
+        activeStoreyId: roofPlan.id,
+      );
+    }
+
+    test('1. Vertex drag ray snaps onto another roof plane mid-edge segment', () {
+      final r1 = ArchitectRoofPlane(
+        id: 'r1',
+        storeyId: 'roof-plan',
+        points: const [Offset(0, 0), Offset(6, 0), Offset(4, 2)],
+        eavesEdgeIndex: 0,
+        slopeDegrees: 30,
+      );
+      // Horizontal ridge segment from (0, 3) to (10, 3) on another roof
+      final r2 = ArchitectRoofPlane(
+        id: 'r2',
+        storeyId: 'roof-plan',
+        points: const [Offset(0, 3), Offset(10, 3), Offset(10, 6), Offset(0, 6)],
+        eavesEdgeIndex: 2,
+        slopeDegrees: 30,
+      );
+      final project = makeRoofProject(walls: const [], roofs: [r1, r2]);
+
+      final result = ArchitectRoofGeometry.resolveRoofVertexDragSnap(
+        raw: const Offset(3.05, 2.95),
+        originalPolygon: r1.points,
+        vertexIndex: 2,
+        roof: r1,
+        project: project,
+        snapTolerance: 0.30,
+        hip45Label: () => '45° Hip / Ridge',
+        hipAngleLabel: (deg) => '$deg° Hip / Valley',
+        hipIntersectionLabel: () => 'Hip intersection (45°)',
+        cornerHipIntersectionLabel: () => 'Corner hip intersection (45°)',
+        ridgeAlignmentLabel: () => 'Ridge / edge alignment',
+        perpToCornerLabel: () => 'Perpendicular to inner corner',
+      );
+
+      expect(result, isNotNull);
+      expect(result!.isIntersectionSnap, isTrue);
+      expect((result.point - const Offset(3, 3)).distance, lessThan(0.01));
+      expect(result.magneticGuides.length, 2);
+    });
+
+    test('2. Vertex drag ray snaps onto supporting wall roof guide line', () {
+      final r1 = ArchitectRoofPlane(
+        id: 'r1',
+        storeyId: 'roof-plan',
+        points: const [Offset(0, 0), Offset(6, 0), Offset(4, 2)],
+        eavesEdgeIndex: 0,
+        slopeDegrees: 30,
+      );
+      final project = makeRoofProject(walls: const [], roofs: [r1]);
+      // Simulated guide line y = 3.5 across the plan
+      const guideSegments = [(Offset(0, 3.5), Offset(10, 3.5))];
+
+      final result = ArchitectRoofGeometry.resolveRoofVertexDragSnap(
+        raw: const Offset(3.48, 3.45),
+        originalPolygon: r1.points,
+        vertexIndex: 2,
+        roof: r1,
+        project: project,
+        snapTolerance: 0.30,
+        roofGuideSegments: guideSegments,
+        hip45Label: () => '45° Hip / Ridge',
+        hipAngleLabel: (deg) => '$deg° Hip / Valley',
+        hipIntersectionLabel: () => 'Hip intersection (45°)',
+        cornerHipIntersectionLabel: () => 'Corner hip intersection (45°)',
+        ridgeAlignmentLabel: () => 'Ridge / edge alignment',
+        perpToCornerLabel: () => 'Perpendicular to inner corner',
+      );
+
+      expect(result, isNotNull);
+      expect(result!.isIntersectionSnap, isTrue);
+      expect((result.point - const Offset(3.5, 3.5)).distance, lessThan(0.01));
+      expect(result.magneticGuides.length, 2);
+    });
+
+    test('3. Edge drag snaps collinear to another roof segment across a gap and emits alignment guide', () {
+      final edited = ArchitectRoofPlane(
+        id: 'r1',
+        storeyId: 'roof-plan',
+        points: const [Offset(0, 0), Offset(8, 0), Offset(6, 2), Offset(2, 2)],
+        eavesEdgeIndex: 0,
+        slopeDegrees: 30,
+      );
+      // Neighboring roof to the right has a parallel ridge edge at y = 3.0
+      final neighbor = ArchitectRoofPlane(
+        id: 'r2',
+        storeyId: 'roof-plan',
+        points: const [Offset(12, 0), Offset(18, 0), Offset(15, 3), Offset(14, 3)],
+        eavesEdgeIndex: 0,
+        slopeDegrees: 30,
+      );
+      final project = makeRoofProject(walls: const [], roofs: [edited, neighbor]);
+
+      final editor = BimPolygonEditor<ArchitectSnapResult>(
+        pointOf: (s) => s.point,
+        isSnapped: (s) => s.isSnapped,
+      );
+      expect(
+        editor.startEdge(
+          edited.id,
+          edited.points,
+          2, // top ridge edge (6,2) -> (2,2)
+          const Offset(4, 2),
+          1.0,
+          mode: BimPolygonEdgeMode.extendCatheti,
+        ),
+        isTrue,
+      );
+
+      // Drag edge 2 up near y = 2.94 (within snap tolerance to neighbor's y = 3.0)
+      editor.update(
+        const Offset(4, 2.94),
+        (moving) {
+          final snap = ArchitectRoofGeometry.resolveRoofEdgeDragSnap(
+            raw: moving,
+            originalPolygon: edited.points,
+            edgeIndex: 2,
+            roof: edited,
+            project: project,
+            snapTolerance: 0.25,
+            ridgeAlignmentLabel: () => 'Ridge / edge alignment',
+            edgeLabel: () => 'Edge',
+          );
+          if (snap == null) return ArchitectSnapResult(point: moving);
+          return ArchitectSnapResult(
+            point: snap.point,
+            isSnapped: true,
+            snapLabel: snap.snapLabel,
+            magneticGuides: snap.magneticGuides,
+          );
+        },
+        0.25,
+      );
+
+      expect(editor.preview, isNotNull);
+      expect(editor.preview!.length, 4);
+      expect(editor.preview![2].dy, closeTo(3.0, 1e-4));
+      expect(editor.preview![3].dy, closeTo(3.0, 1e-4));
+      // Preserves 45° hip angles via extendCatheti
+      expect(editor.preview![2].dx, closeTo(5.0, 1e-4));
+      expect(editor.preview![3].dx, closeTo(3.0, 1e-4));
+      expect(editor.activeSnap?.magneticGuides, isNotEmpty);
+    });
+
+    test('4. ArchitectSnapHelper.snapFree snaps to roof guide lines and intersections on isRoof storey', () {
+      final walls = const [
+        ArchitectWall(id: 'w1', startPoint: Offset(0, 0), endPoint: Offset(10, 0)),
+        ArchitectWall(id: 'w2', startPoint: Offset(10, 0), endPoint: Offset(10, 6)),
+        ArchitectWall(id: 'w3', startPoint: Offset(10, 6), endPoint: Offset(0, 6)),
+        ArchitectWall(id: 'w4', startPoint: Offset(0, 6), endPoint: Offset(0, 0)),
+      ];
+      final project = makeRoofProject(walls: walls, roofs: const []);
+
+      // Near left hip-ridge apex intersection (3, 3) on roof guide lines
+      final apexSnap = ArchitectSnapHelper.snapFree(
+        rawPoint: const Offset(3.05, 2.96),
+        project: project,
+        tolerance: 0.20,
+      );
+      expect(apexSnap.isSnapped, isTrue);
+      expect((apexSnap.point - const Offset(3, 3)).distance, lessThan(0.05));
+
+      // Near mid-wall ridge guide line y = 3 at x = 5.5
+      final guideEdgeSnap = ArchitectSnapHelper.snapFree(
+        rawPoint: const Offset(5.5, 3.06),
+        project: project,
+        tolerance: 0.20,
+      );
+      expect(guideEdgeSnap.isSnapped, isTrue);
+      expect(guideEdgeSnap.point.dy, closeTo(3.0, 0.05));
     });
   });
 }

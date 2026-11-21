@@ -216,15 +216,27 @@ class BimPolygonEditor<TSnap> {
       final n = BimPolygonGeometry.normal(polygon, i);
       final midpoint = (polygon[i] + polygon[(i + 1) % polygon.length]) / 2;
       final distance = BimPolygonGeometry.dot(target - midpoint, n);
+      final moved = BimPolygonGeometry.offsetEdge(
+        polygon,
+        i,
+        distance,
+        mode: edgeMode,
+      );
+      final samples = (moved != null && moved.length == polygon.length)
+          ? [
+              moved[i],
+              moved[(i + 1) % moved.length],
+              (moved[i] + moved[(i + 1) % moved.length]) / 2,
+            ]
+          : [
+              polygon[i] + n * distance,
+              polygon[(i + 1) % polygon.length] + n * distance,
+              midpoint + n * distance,
+            ];
       var correctionDistance = 0.0;
       activeSnap = null;
       var best = double.infinity;
-      for (final p in [
-        polygon[i],
-        polygon[(i + 1) % polygon.length],
-        midpoint,
-      ]) {
-        final moving = p + n * distance;
+      for (final moving in samples) {
         final result = snap(moving);
         if (!isSnapped(result)) continue;
         final correction = pointOf(result) - moving;

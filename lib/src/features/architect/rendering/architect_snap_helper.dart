@@ -318,7 +318,8 @@ class ArchitectSnapHelper {
     for (final edge in geometry.nearbyEdges(raw, maxExtension)) {
       if (excluded(edge.owner) ||
           edge.owner == '@wall-joints' ||
-          edge.owner == '@wall-face-joints') {
+          edge.owner == '@wall-face-joints' ||
+          edge.owner == '@roof-guide') {
         continue;
       }
       final u = edge.b - edge.a;
