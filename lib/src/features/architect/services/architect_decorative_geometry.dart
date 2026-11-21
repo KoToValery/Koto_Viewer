@@ -312,7 +312,7 @@ class ArchitectDecorativeGeometry {
     ArchitectProject project,
     double z,
   ) {
-    final normalStoreys = project.storeys.where((s) => !s.isRoof).toList()
+    final normalStoreys = project.storeys.where((s) => s.isBuildingStorey).toList()
       ..sort((a, b) => a.elevation.compareTo(b.elevation));
     if (normalStoreys.isEmpty) return project.activeStorey;
     for (var i = normalStoreys.length - 1; i >= 0; i--) {

@@ -135,7 +135,7 @@ class ArchitectSectionJunctions {
             .where(
               (s) =>
                   s.id != storey.id &&
-                  !s.isRoof &&
+                  s.isBuildingStorey &&
                   s.elevation < storey.elevation - 1e-4,
             )
             .toList()
@@ -209,7 +209,7 @@ class ArchitectSectionJunctions {
     final hasLowerStorey = project.storeys.any(
       (s) =>
           s.id != storey.id &&
-          !s.isRoof &&
+          s.isBuildingStorey &&
           s.elevation < storey.elevation - 1e-4,
     );
     return !hasLowerStorey;

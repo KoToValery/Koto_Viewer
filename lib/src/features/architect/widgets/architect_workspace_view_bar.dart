@@ -158,9 +158,11 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                     ArchitectWorkspaceView.plan =>
                       project.activeStorey.isRoof
                           ? l.architectRoofPlan
-                          : (planMode == ArchitectPlanMode.ceilingServices
-                                ? '${project.activeStorey.elevationLabel} · ${l.architectCeilingPlanShort}'
-                                : project.activeStorey.elevationLabel),
+                          : (project.activeStorey.isSite
+                                ? l.architectSitePlan
+                                : (planMode == ArchitectPlanMode.ceilingServices
+                                      ? '${project.activeStorey.elevationLabel} · ${l.architectCeilingPlanShort}'
+                                      : project.activeStorey.elevationLabel)),
                     ArchitectWorkspaceView.elevation =>
                       elevation == null
                           ? '—'
@@ -240,7 +242,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                         value: s.id,
                         checked:
                             s.id == project.activeStoreyId &&
-                            (s.isRoof ||
+                            (!s.isBuildingStorey ||
                                 planMode == ArchitectPlanMode.floor),
                         child: Row(
                           children: [
@@ -259,6 +261,21 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                                   ),
                                 ),
                               ),
+                            ] else if (s.isSite) ...[
+                              const AppIcon(
+                                AppIconId.terrain,
+                                size: 18,
+                                color: Color(0xFF00E5FF),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  l.architectSitePlan,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                             ] else ...[
                               Expanded(
                                 child: Text(
@@ -271,7 +288,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (!s.isRoof && s.hasCeilingPlan)
+                      if (s.isBuildingStorey && s.hasCeilingPlan)
                         CheckedPopupMenuItem(
                           value: 'ceiling:${s.id}',
                           checked:
@@ -298,7 +315,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                           ),
                         ),
                     ],
-                    if (!project.activeStorey.isRoof &&
+                    if (project.activeStorey.isBuildingStorey &&
                         !project.activeStorey.hasCeilingPlan)
                       PopupMenuItem(
                         value: 'add_ceiling_plan',
@@ -314,7 +331,7 @@ class ArchitectWorkspaceViewBar extends StatelessWidget {
                           ],
                         ),
                       ),
-                    if (!project.activeStorey.isRoof &&
+                    if (project.activeStorey.isBuildingStorey &&
                         project.activeStorey.hasCeilingPlan &&
                         project.activeStorey.ceilings.isEmpty)
                       PopupMenuItem(

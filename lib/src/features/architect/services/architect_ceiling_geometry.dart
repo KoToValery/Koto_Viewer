@@ -68,7 +68,7 @@ class ArchitectCeilingGeometry {
     ArchitectStorey storey,
   ) {
     final above = project.storeys
-        .where((s) => !s.isRoof && s.elevation > storey.elevation + 1e-4)
+        .where((s) => s.isBuildingStorey && s.elevation > storey.elevation + 1e-4)
         .toList()
       ..sort((a, b) => a.elevation.compareTo(b.elevation));
     return above.firstOrNull;

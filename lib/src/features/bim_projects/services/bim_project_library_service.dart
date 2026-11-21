@@ -185,7 +185,7 @@ class BimProjectLibraryService {
                 activeStoreyId: initialArchitectStoreys.isNotEmpty
                     ? initialArchitectStoreys.first.id
                     : 'storey_1',
-              );
+              ).ensureSiteStorey();
             }();
 
       if (!await saveArchitectProject(id, initialArchitect)) {
@@ -398,7 +398,7 @@ class BimProjectLibraryService {
                   ),
                 ],
           activeStoreyId: storeys.isNotEmpty ? storeys.first.id : 'storey_1',
-        );
+        ).ensureSiteStorey();
         await saveArchitectProject(projectId, created);
         return created;
       }
@@ -413,7 +413,9 @@ class BimProjectLibraryService {
       if (jsonEncode(arch.toJson()) != jsonEncode(jsonMap)) {
         await saveArchitectProject(projectId, arch);
       }
-      if (manifest == null || manifest.storeys.isEmpty) return arch;
+      if (manifest == null || manifest.storeys.isEmpty) {
+        return arch.ensureSiteStorey();
+      }
 
       // Sync storeys with manifest elevations
       final existingStoreys = {for (final s in arch.storeys) s.id: s};
@@ -434,11 +436,13 @@ class BimProjectLibraryService {
         );
       }).toList();
 
-      // Roof plans belong to the architectural model and have no underlay
+      // Roof and site plans belong to the architectural model and have no underlay
       // entry in the shared storey manifest.
       final manifestIds = {for (final s in manifest.storeys) s.storeyId};
       syncedStoreys.addAll(
-        arch.storeys.where((s) => s.isRoof && !manifestIds.contains(s.id)),
+        arch.storeys.where(
+          (s) => (s.isRoof || s.isSite) && !manifestIds.contains(s.id),
+        ),
       );
 
       final activeExists = syncedStoreys.any(
@@ -450,7 +454,8 @@ class BimProjectLibraryService {
 
       return arch
           .copyWith(storeys: syncedStoreys, activeStoreyId: activeId)
-          .syncRoofElevation();
+          .syncRoofElevation()
+          .ensureSiteStorey();
     } catch (e) {
       debugPrint('Error loading architectural project for $projectId: $e');
       return null;

@@ -449,7 +449,8 @@ class Architect2dPainter extends CustomPainter {
         : null;
     final isCeilingPlan =
         planMode == ArchitectPlanMode.ceilingServices &&
-        !_project.activeStorey.isRoof;
+        _project.activeStorey.isBuildingStorey;
+    final isSitePlan = _project.activeStorey.isSite;
     if (layer != ArchitectPaintLayer.interaction) {
       if (underlayDoc != null) {
         ArchitectElementsPainterHelper.drawUnderlay(
@@ -461,7 +462,7 @@ class Architect2dPainter extends CustomPainter {
         );
       }
       if (paintGrid) _drawDraftingGrid(canvas, size);
-      if (!isCeilingPlan) {
+      if (!isCeilingPlan && isSitePlan) {
         ArchitectLandscapePainterHelper.drawTerrain(
           canvas: canvas,
           project: _project,
@@ -510,22 +511,30 @@ class Architect2dPainter extends CustomPainter {
           palette: palette,
         );
         _drawZoneSchedule(canvas);
-        ArchitectLandscapePainterHelper.drawSiteFences(
-          canvas: canvas,
-          project: _project,
-          storey: _elementLayerStorey,
-          zoomScale: zoomScale,
-          selectedIds: {...selectedElementIds, ?selectedElementId},
-          palette: palette,
-        );
-        ArchitectLandscapePainterHelper.drawVegetation(
-          canvas: canvas,
-          project: _project,
-          storey: _elementLayerStorey,
-          zoomScale: zoomScale,
-          selectedIds: {...selectedElementIds, ?selectedElementId},
-          palette: palette,
-        );
+        if (isSitePlan) {
+          ArchitectLandscapePainterHelper.drawBuildingSiteUnderlay(
+            canvas: canvas,
+            project: _project,
+            zoomScale: zoomScale,
+            palette: palette,
+          );
+          ArchitectLandscapePainterHelper.drawSiteFences(
+            canvas: canvas,
+            project: _project,
+            storey: _elementLayerStorey,
+            zoomScale: zoomScale,
+            selectedIds: {...selectedElementIds, ?selectedElementId},
+            palette: palette,
+          );
+          ArchitectLandscapePainterHelper.drawVegetation(
+            canvas: canvas,
+            project: _project,
+            storey: _elementLayerStorey,
+            zoomScale: zoomScale,
+            selectedIds: {...selectedElementIds, ?selectedElementId},
+            palette: palette,
+          );
+        }
       } else {
         ArchitectCeilingPainterHelper.drawCeilings(
           palette: palette,
@@ -545,7 +554,7 @@ class Architect2dPainter extends CustomPainter {
           zoomScale: zoomScale,
         );
       }
-      if (showUpperOverhangs) {
+      if (showUpperOverhangs && _project.activeStorey.isBuildingStorey) {
         ArchitectOverhangPainterHelper.drawOverhangs(
           canvas: canvas,
           palette: palette,
@@ -606,7 +615,7 @@ class Architect2dPainter extends CustomPainter {
           );
         }
       }
-      if (!_project.activeStorey.isRoof) {
+      if (_project.activeStorey.isBuildingStorey) {
         ArchitectRoofPainterHelper.paintOverhead(canvas: canvas, project: _project,
           scale: zoomScale, color: palette.foreground(Colors.black));
         ArchitectRoofDrainagePainter.paintStoreyPenetrations(
@@ -616,16 +625,18 @@ class Architect2dPainter extends CustomPainter {
           zoomScale,
         );
       }
-      ArchitectRoofPainterHelper.paintRoofs(
-        canvas: canvas,
-        storey: _elementLayerStorey,
-        project: _project,
-        scale: zoomScale,
-        selectedIds: {
-          ...selectedElementIds,
-          ?selectedElementId,
-        },
-      );
+      if (!isSitePlan) {
+        ArchitectRoofPainterHelper.paintRoofs(
+          canvas: canvas,
+          storey: _elementLayerStorey,
+          project: _project,
+          scale: zoomScale,
+          selectedIds: {
+            ...selectedElementIds,
+            ?selectedElementId,
+          },
+        );
+      }
       ArchitectElementsPainterHelper.drawCadPrimitives(
         hatchesOnly: false,
         dimensionScale: _project.dimensionScale,
@@ -635,7 +646,7 @@ class Architect2dPainter extends CustomPainter {
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
-      if (showServiceProjections) {
+      if (showServiceProjections && !isSitePlan) {
         ArchitectServicePlanPainter.roofOpenings(
           canvas: canvas, project: _project, storey: _elementLayerStorey,
           scale: zoomScale, palette: palette,
@@ -1745,7 +1756,7 @@ class Architect2dPainter extends CustomPainter {
 
       final isCeilingPlan =
           planMode == ArchitectPlanMode.ceilingServices &&
-          !_project.activeStorey.isRoof;
+          _project.activeStorey.isBuildingStorey;
       for (final door in planWall.doors) {
         door.paint2D(
           cutPlaneHeight: project.activeStorey.cutPlaneHeight,

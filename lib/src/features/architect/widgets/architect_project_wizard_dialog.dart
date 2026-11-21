@@ -231,7 +231,7 @@ class _ArchitectProjectWizardDialogState
             distanceDecimals: _decimals,
             lineStyles: customLines,
             hatchPatterns: customHatches,
-          );
+          ).ensureRoofStorey().ensureSiteStorey();
       final project = ArchitectWallLibrary.mergeCustomTypes(baseProject);
       final onCreate = widget.onCreate;
       final created = onCreate == null

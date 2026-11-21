@@ -2201,6 +2201,9 @@
   "architectAddRoofPlan": "Добави Покривни линии",
   "architectRoofPlanUnderlay": "Пунктир на ограждащите стени",
   "architectRoofPlanSubtitle": "Генерален покривен план с пунктир на фасадните стени",
+  "architectSitePlan": "Терен",
+  "architectSitePlanSubtitle": "Терен, хоризонтали, озеленяване и контур на сградата",
+  "architectStoreySiteAuto": "Служебен чертеж за терен, хоризонтали и ситуация.",
   "architectRoofLowerLevelBadge": "Кота {level}",
   "@architectRoofLowerLevelBadge": {
     "placeholders": {

@@ -1,9 +1,14 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../bim_editing/geometry/bim_polygon_geometry.dart';
 import '../models/architect_hatch_pattern.dart';
+import '../models/architect_material_layer.dart';
 import '../models/architect_project.dart';
+import '../services/architect_overhang_detector.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_hatch_geometry.dart';
+import 'architect_overhang_painter_helper.dart';
+import 'architect_roof_painter_helper.dart';
 import 'architect_vector_scene.dart';
 
 /// Vector paths for a single vegetation item projected into 2D Section or Elevation view.
@@ -1672,5 +1677,206 @@ class ArchitectLandscapePainterHelper {
     } catch (_) {
       return a;
     }
+  }
+
+  // ===========================================================================
+  // BUILDING SITE UNDERLAY (EXTERIOR CONTOUR, ENTRANCES & OVERHANGS)
+  // ===========================================================================
+
+  /// Draws the ground-contact building exterior perimeter, entrance door markers,
+  /// and light dashed upper-storey erkers/balconies for the Terrain / Site plan.
+  static void drawBuildingSiteUnderlay({
+    required Canvas canvas,
+    required ArchitectProject project,
+    required double zoomScale,
+    required ArchitectCanvasPalette palette,
+  }) {
+    final groundStorey = project.groundBuildingStorey;
+    if (groundStorey == null) return;
+    final walls = groundStorey.walls.where((w) => !w.isParapet).toList();
+    if (walls.isEmpty) return;
+
+    final outerLoops = ArchitectRoofPainterHelper.outerPerimeterLoops(walls);
+    if (outerLoops.isEmpty) return;
+
+    final scope = ArchitectTextScope.current;
+    final publication = scope?.publication == true;
+    final paperColor = publication ? ArchitectPaperStyle.paper : palette.background;
+    final inkColor = palette.foreground(ArchitectPaperStyle.ink);
+    final outlineWidth = publication
+        ? 0.25 * (scope!.denominator / 1000)
+        : (1.7 / zoomScale);
+
+    final footprintPath = Path();
+    for (final loop in outerLoops) {
+      if (loop.length >= 3) {
+        footprintPath.addPolygon(loop, true);
+      }
+    }
+
+    architectDrawingSources(
+      canvas,
+      walls.map((w) => w.id),
+      'siteBuildingOutline',
+    );
+    canvas.drawPath(
+      footprintPath,
+      Paint()
+        ..color = paperColor.withValues(alpha: 0.88)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(
+      footprintPath,
+      Paint()
+        ..color = inkColor
+        ..strokeWidth = outlineWidth
+        ..strokeJoin = StrokeJoin.miter
+        ..style = PaintingStyle.stroke,
+    );
+
+    // Mark exterior doors / building entrances along the outer perimeter
+    for (final wall in walls) {
+      if (wall.doors.isEmpty || wall.location == ArchitectWallLocation.interior) {
+        continue;
+      }
+      final threshold = wall.thickness * 0.65 + 0.12;
+      for (final door in wall.doors) {
+        final center = wall.centerPointAt(door.offsetRatio);
+        if (!_isNearOuterLoops(center, outerLoops, threshold)) continue;
+
+        final tangent = wall.tangentAt(door.offsetRatio);
+        final rawNormal = wall.normalAt(door.offsetRatio);
+        final probeDist = wall.thickness * 0.5 + 0.20;
+        final plusIn = outerLoops.any(
+          (l) => BimPolygonGeometry.contains(l, center + rawNormal * probeDist),
+        );
+        final minusIn = outerLoops.any(
+          (l) => BimPolygonGeometry.contains(l, center - rawNormal * probeDist),
+        );
+        final outwardNormal = (!plusIn && minusIn)
+            ? rawNormal
+            : ((plusIn && !minusIn) ? -rawNormal : wall.exteriorNormal);
+
+        _drawSiteEntranceMarker(
+          canvas: canvas,
+          center: center,
+          tangent: tangent,
+          outwardNormal: outwardNormal,
+          doorWidth: door.width,
+          wallThickness: wall.thickness,
+          zoomScale: zoomScale,
+          publication: publication,
+          denominator: scope?.denominator ?? 200,
+          inkColor: inkColor,
+          paperColor: paperColor,
+          doorId: door.id,
+        );
+      }
+    }
+
+    // Light dashed projection for upper-storey erkers and balconies (no roof lines)
+    final overhangs = ArchitectOverhangDetector.detectSiteOverhangs(
+      project,
+      groundStorey,
+    );
+    if (overhangs.isNotEmpty) {
+      ArchitectOverhangPainterHelper.drawOverhangs(
+        canvas: canvas,
+        palette: palette,
+        overhangs: overhangs,
+        zoomScale: zoomScale,
+        l10n: null,
+        isSiteContext: true,
+      );
+    }
+  }
+
+  static void _drawSiteEntranceMarker({
+    required Canvas canvas,
+    required Offset center,
+    required Offset tangent,
+    required Offset outwardNormal,
+    required double doorWidth,
+    required double wallThickness,
+    required double zoomScale,
+    required bool publication,
+    required int denominator,
+    required Color inkColor,
+    required Color paperColor,
+    required String doorId,
+  }) {
+    architectDrawingSources(canvas, {doorId}, 'siteEntrance');
+    final halfW = math.max(0.25, doorWidth * 0.5);
+    final outerFaceCenter = center + outwardNormal * (wallThickness * 0.5);
+    final jambA = outerFaceCenter - tangent * halfW;
+    final jambB = outerFaceCenter + tangent * halfW;
+    final tickDepth = math.min(wallThickness * 0.45, 0.14);
+
+    // Clear opening break + jamb ticks on the outer perimeter
+    final breakPaint = Paint()
+      ..color = paperColor
+      ..strokeWidth = publication
+          ? 0.45 * (denominator / 1000)
+          : (2.8 / zoomScale)
+      ..strokeCap = StrokeCap.butt
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(jambA, jambB, breakPaint);
+
+    final tickPaint = Paint()
+      ..color = inkColor
+      ..strokeWidth = publication
+          ? 0.22 * (denominator / 1000)
+          : (1.4 / zoomScale)
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(jambA - outwardNormal * tickDepth, jambA, tickPaint);
+    canvas.drawLine(jambB - outwardNormal * tickDepth, jambB, tickPaint);
+
+    // Architectural entrance pointer outside the door pointing toward the entrance
+    final tip = outerFaceCenter + outwardNormal * 0.08;
+    final baseCenter = tip + outwardNormal * 0.44;
+    const halfBase = 0.20;
+    final arrowPath = Path()
+      ..moveTo(tip.dx, tip.dy)
+      ..lineTo(
+        baseCenter.dx + tangent.dx * halfBase,
+        baseCenter.dy + tangent.dy * halfBase,
+      )
+      ..lineTo(
+        baseCenter.dx - tangent.dx * halfBase,
+        baseCenter.dy - tangent.dy * halfBase,
+      )
+      ..close();
+    canvas.drawPath(
+      arrowPath,
+      Paint()
+        ..color = inkColor
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  static bool _isNearOuterLoops(
+    Offset pt,
+    List<List<Offset>> loops,
+    double maxDist,
+  ) {
+    for (final loop in loops) {
+      if (loop.length < 2) continue;
+      for (var i = 0; i < loop.length; i++) {
+        final a = loop[i];
+        final b = loop[(i + 1) % loop.length];
+        if (_pointToSegmentDistance(pt, a, b) <= maxDist) return true;
+      }
+    }
+    return false;
+  }
+
+  static double _pointToSegmentDistance(Offset p, Offset a, Offset b) {
+    final ab = b - a;
+    final lenSq = ab.distanceSquared;
+    if (lenSq < 1e-12) return (p - a).distance;
+    final t = (((p.dx - a.dx) * ab.dx + (p.dy - a.dy) * ab.dy) / lenSq)
+        .clamp(0.0, 1.0);
+    final proj = Offset(a.dx + ab.dx * t, a.dy + ab.dy * t);
+    return (p - proj).distance;
   }
 }

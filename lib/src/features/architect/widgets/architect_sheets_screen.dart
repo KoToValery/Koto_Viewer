@@ -284,13 +284,14 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
           id: 'plan:${s.id}',
           sourceId: s.id,
           kind: ArchitectDrawingKind.plan,
-          name: s.isRoof ? '' : s.name,
+          name: (s.isRoof || s.isSite) ? '' : s.name,
           roof: s.isRoof,
+          sitePlan: s.isSite,
           scale:
               document.viewScales['plan:${s.id}'] ??
-              project.dimensionScale.denominator,
+              (s.isSite ? 200 : project.dimensionScale.denominator),
         ),
-        if (!s.isRoof && (s.hasCeilingPlan || s.ceilings.isNotEmpty))
+        if (s.isBuildingStorey && (s.hasCeilingPlan || s.ceilings.isNotEmpty))
           ArchitectSavedDrawing(
             id: 'ceiling:${s.id}',
             sourceId: s.id,

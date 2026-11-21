@@ -57,14 +57,16 @@ class ArchitectSelectionCandidates {
         if (e.isVisible) e.id: e.isServiceComponent
             ? ArchitectTool.services : ArchitectTool.component,
       for (final e in s.zones) e.id: ArchitectTool.zone,
-      for (final e in s.pathways) e.id: ArchitectTool.pathway,
-      for (final e in s.streets) e.id: ArchitectTool.street,
-      for (final e in s.vegetation) e.id: ArchitectTool.vegetation,
-      for (final e in s.siteFences) e.id: ArchitectTool.siteFence,
-      for (final surface in [project.existingTerrain, project.proposedTerrain]) ...{
-        for (final b in surface.boundaries) b.id: ArchitectTool.terrain,
-        for (final c in surface.contours) c.id: ArchitectTool.terrain,
-        for (final sp in surface.spots) sp.id: ArchitectTool.terrain,
+      if (s.isSite) ...{
+        for (final e in s.pathways) e.id: ArchitectTool.pathway,
+        for (final e in s.streets) e.id: ArchitectTool.street,
+        for (final e in s.vegetation) e.id: ArchitectTool.vegetation,
+        for (final e in s.siteFences) e.id: ArchitectTool.siteFence,
+        for (final surface in [project.existingTerrain, project.proposedTerrain]) ...{
+          for (final b in surface.boundaries) b.id: ArchitectTool.terrain,
+          for (final c in surface.contours) c.id: ArchitectTool.terrain,
+          for (final sp in surface.spots) sp.id: ArchitectTool.terrain,
+        },
       },
       for (final e in project.gridAxes) e.id: ArchitectTool.axis,
       for (final e in project.sections) e.id: ArchitectTool.section,

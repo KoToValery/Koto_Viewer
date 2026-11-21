@@ -24,13 +24,14 @@ class ArchitectOverhangDetector {
     // Expando naturally clears with garbage collection or project replacement.
   }
 
-  /// Finds the storey immediately above the active storey in elevation.
+  /// Finds the building storey immediately above the active storey in elevation.
   static ArchitectStorey? findUpperStorey(ArchitectProject project) {
     final activeElevation = project.activeStorey.elevation;
-    final sorted = [...project.storeys]
-      ..sort((a, b) => a.elevation == b.elevation
-          ? a.id.compareTo(b.id)
-          : a.elevation.compareTo(b.elevation));
+    final sorted =
+        project.storeys.where((s) => s.isBuildingStorey).toList()
+          ..sort((a, b) => a.elevation == b.elevation
+              ? a.id.compareTo(b.id)
+              : a.elevation.compareTo(b.elevation));
 
     for (final s in sorted) {
       if (s.elevation > activeElevation + 1e-4) {
@@ -40,10 +41,56 @@ class ArchitectOverhangDetector {
     return null;
   }
 
+  /// Scans all upper building storeys above [groundStorey] for cantilevered
+  /// erkers and balconies projecting outside the ground building footprint.
+  static List<ArchitectOverhang> detectSiteOverhangs(
+    ArchitectProject project,
+    ArchitectStorey groundStorey,
+  ) {
+    final upperStoreys =
+        project.storeys
+            .where(
+              (s) =>
+                  s.isBuildingStorey &&
+                  s.elevation > groundStorey.elevation + 1e-4,
+            )
+            .toList()
+          ..sort((a, b) => a.elevation.compareTo(b.elevation));
+    if (upperStoreys.isEmpty) return const [];
+
+    final groundFootprint = buildStoreyFootprint(groundStorey);
+    final overhangs = <ArchitectOverhang>[];
+    for (final upper in upperStoreys) {
+      overhangs.addAll(
+        _detectBalconies(
+          upperStorey: upper,
+          lowerFootprint: groundFootprint,
+          lowerWalls: groundStorey.walls,
+          wallTypes: project.wallTypes,
+        ),
+      );
+      overhangs.addAll(
+        _detectErkers(
+          upperStorey: upper,
+          lowerFootprint: groundFootprint,
+          lowerWalls: groundStorey.walls,
+          existingOverhangs: overhangs,
+          wallTypes: project.wallTypes,
+        ),
+      );
+    }
+    return overhangs;
+  }
+
   /// Scans the project and detects all upper floor erkers and balconies
   /// that project over the active storey.
   static List<ArchitectOverhang> detectOverhangs(ArchitectProject project) {
     final activeStorey = project.activeStorey;
+    if (activeStorey.isSite) {
+      final ground = project.groundBuildingStorey;
+      return ground == null ? const [] : detectSiteOverhangs(project, ground);
+    }
+    if (!activeStorey.isBuildingStorey) return const [];
     final upperStorey = findUpperStorey(project);
     if (upperStorey == null) return const [];
 

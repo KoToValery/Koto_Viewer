@@ -270,6 +270,9 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                 );
                             if (layer.customLineweight != null && layer.customLineweight != selectedLineweight) {
                               layer.customLineweight = selectedLineweight;
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) widget.onLayersChanged();
+                              });
                             }
 
                             return Padding(

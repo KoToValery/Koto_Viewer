@@ -19,9 +19,11 @@ class ArchitectSheetLayout {
           ArchitectDrawingKind.plan =>
             drawing.roof
                 ? l.architectRoofPlan
-                : (drawing.ceilingPlan
-                      ? l.architectCeilingPlan
-                      : l.architectSheetPlan),
+                : (drawing.sitePlan
+                      ? l.architectSitePlan
+                      : (drawing.ceilingPlan
+                            ? l.architectCeilingPlan
+                            : l.architectSheetPlan)),
           ArchitectDrawingKind.section => l.architectSectionNumber(
             drawing.sourceNumber,
           ),

@@ -28,6 +28,11 @@ class ArchitectSceneGeometry {
   static Rect projectBounds(ArchitectProject project) => boundsOf([
     for (final e in project.elevations) ...[e.start, e.end],
     if (project.northSymbol != null) project.northSymbol!.position,
+    for (final surface in [project.existingTerrain, project.proposedTerrain]) ...[
+      for (final b in surface.boundaries) ...b.polygon,
+      for (final c in surface.contours) ...c.points,
+      for (final s in surface.spots) s.position,
+    ],
     for (final a in project.gridAxes) ...[a.start, a.end],
     for (final s in project.storeys) ...[
       for (final w in s.walls) ...w.polygonCorners,
@@ -61,6 +66,7 @@ class ArchitectSceneGeometry {
         ...v.points,
       ],
       for (final f in s.siteFences) ...f.points,
+      for (final st in s.streets) ...st.points,
       for (final e in s.cadPrimitives) ...[
         if (e.type == CadPrimitiveType.ellipse) ...[
           ArchitectEllipseGeometry.fromPrimitive(e).bounds.topLeft,

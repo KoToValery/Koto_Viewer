@@ -86,6 +86,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   final TransformationController _transformController = TransformationController();
   // --- SUBSECTION: [TAG:VIEWPORT_PICTURE_CACHE] Retained CAD layer and layer revision ---
   final _viewportPictures = DxfViewportPictureCache();
+  final _motionPreview = ValueNotifier(DxfViewportMotion.idle);
   int _layerRevision = 0;
 
   DxfDocument? _document;
@@ -223,6 +224,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   @override
   void dispose() {
     _viewportPictures.dispose();
+    _motionPreview.dispose();
     _focusNode.dispose();
     _transformSettleTimer?.cancel();
     _wheelSettleTimer?.cancel();
@@ -263,6 +265,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     // While actively zooming via wheel, dragging, or middle-mouse panning,
     // skip scheduling CPU repaints so InteractiveViewer transforms the texture layer at 144 FPS.
     if (_isGestureActive || _isWheelScrolling || _middlePanStart != null) {
+      _updateMotionPreview();
       return;
     }
 
@@ -276,9 +279,18 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   void _syncCanvasAfterTransform() {
     if (!mounted || _isGestureActive || _isWheelScrolling || _middlePanStart != null) return;
+    _motionPreview.value = DxfViewportMotion.idle;
     setState(() {
       _renderScale = _currentScale;
     });
+  }
+
+  void _updateMotionPreview() {
+    if (_activeLayout != 'Model' || (_document?.entities.length ?? 0) <
+        DxfViewportPictureCache.minOverviewEntities) return;
+    _motionPreview.value = _currentScale <= 2
+        ? DxfViewportMotion.overview
+        : DxfViewportMotion.detail;
   }
 
   void _updateHudCadCoord(Offset coord) {
@@ -1173,6 +1185,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if (event is PointerScrollEvent) {
       _isGestureActive = false;
       _isWheelScrolling = true;
+      _updateMotionPreview();
       _transformSettleTimer?.cancel();
       _wheelSettleTimer?.cancel();
       _wheelSettleTimer = Timer(const Duration(milliseconds: 100), () {
@@ -1238,6 +1251,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   void _handleGeneralPointerCancel(PointerCancelEvent event) {
     _middlePanStart = null;
     _middlePanMatrix = null;
+    _motionPreview.value = DxfViewportMotion.idle;
     if (_isMeasureMode) {
       _handleMeasurePointerCancel(event);
     }
@@ -2269,6 +2283,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                                     visibleCadRect: _getVisibleCadRect(),
                                     interactiveHatches: true,
                                     viewportPictures: _viewportPictures,
+                                    motionPreview: _motionPreview,
                                     revision: _layerRevision,
                                     showGrid: _showGrid,
                                     settings: _displaySettings,

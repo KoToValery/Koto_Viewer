@@ -4427,6 +4427,9 @@
   "architectAddRoofPlan": "Add Roof Lines",
   "architectRoofPlanUnderlay": "Perimeter wall underlay",
   "architectRoofPlanSubtitle": "Top-level roof plan with dashed perimeter wall lines",
+  "architectSitePlan": "Site Plan",
+  "architectSitePlanSubtitle": "Terrain, contours, landscaping and building footprint",
+  "architectStoreySiteAuto": "System-managed plan for terrain, site contours and landscaping.",
   "architectRoofLowerLevelBadge": "Level {level}",
   "@architectRoofLowerLevelBadge": {
     "placeholders": {

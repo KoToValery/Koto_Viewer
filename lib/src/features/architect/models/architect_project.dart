@@ -146,7 +146,10 @@ class ArchitectStorey {
   final List<ArchitectStreet> streets;
   final Offset? zoneScheduleOrigin;
   final bool isRoof;
+  final bool isSite;
   final bool hasCeilingPlan;
+
+  bool get isBuildingStorey => !isRoof && !isSite;
 
   const ArchitectStorey({
     List<ArchitectElementGroup> groups = const [],
@@ -157,6 +160,7 @@ class ArchitectStorey {
     this.cutPlaneHeight = 1.20,
     this.floorFinishThickness = 0.05,
     this.isRoof = false,
+    this.isSite = false,
     this.hasCeilingPlan = false,
     this.walls = const [],
     List<ArchitectZone> zones = const [],
@@ -197,6 +201,7 @@ class ArchitectStorey {
     double? cutPlaneHeight,
     double? floorFinishThickness,
     bool? isRoof,
+    bool? isSite,
     bool? hasCeilingPlan,
     List<ArchitectWall>? walls,
     List<ArchitectZone>? zones,
@@ -229,6 +234,7 @@ class ArchitectStorey {
     cutPlaneHeight: cutPlaneHeight ?? this.cutPlaneHeight,
     floorFinishThickness: floorFinishThickness ?? this.floorFinishThickness,
     isRoof: isRoof ?? this.isRoof,
+    isSite: isSite ?? this.isSite,
     hasCeilingPlan: hasCeilingPlan ?? this.hasCeilingPlan,
     walls: height == null
         ? (walls ?? this.walls)
@@ -269,6 +275,7 @@ class ArchitectStorey {
     'cutPlaneHeight': cutPlaneHeight,
     'floorFinishThickness': floorFinishThickness,
     if (isRoof) 'isRoof': true,
+    if (isSite) 'isSite': true,
     if (hasCeilingPlan) 'hasCeilingPlan': true,
     'walls': walls
         .map((w) => w.copyWith(height: w.effectiveHeight(height)).toJson())
@@ -322,6 +329,7 @@ class ArchitectStorey {
     floorFinishThickness:
         (json['floorFinishThickness'] as num?)?.toDouble() ?? 0.05,
     isRoof: json['isRoof'] as bool? ?? false,
+    isSite: json['isSite'] as bool? ?? false,
     hasCeilingPlan: json['hasCeilingPlan'] as bool? ?? false,
     walls:
         (json['walls'] as List<dynamic>?)
@@ -597,16 +605,35 @@ class ArchitectProject {
   /// The dedicated roof lines plan storey, if present.
   ArchitectStorey? get roofStorey => storeys.where((s) => s.isRoof).firstOrNull;
 
-  /// The highest non-roof storey with walls (or highest non-roof storey).
+  /// The dedicated system-managed terrain / site plan storey, if present.
+  ArchitectStorey? get siteStorey => storeys.where((s) => s.isSite).firstOrNull;
+
+  /// Target storey for landscape mutations (prefers dedicated site plan).
+  ArchitectStorey get landscapeTargetStorey => siteStorey ?? activeStorey;
+
+  /// Ground-contact building storey used for site footprint & entrance markers.
+  ArchitectStorey? get groundBuildingStorey {
+    final withWalls = storeys
+        .where((s) => s.isBuildingStorey && s.walls.isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.elevation.compareTo(b.elevation));
+    if (withWalls.isEmpty) return null;
+    for (final s in withWalls) {
+      if (s.elevation >= -0.5 - 1e-4) return s;
+    }
+    return withWalls.last;
+  }
+
+  /// The highest non-roof, non-site building storey with walls.
   ArchitectStorey? get highestWallStorey {
     final withWalls = storeys
-        .where((s) => !s.isRoof && s.walls.isNotEmpty)
+        .where((s) => s.isBuildingStorey && s.walls.isNotEmpty)
         .toList();
     if (withWalls.isNotEmpty) {
       withWalls.sort((a, b) => a.elevation.compareTo(b.elevation));
       return withWalls.last;
     }
-    final normal = storeys.where((s) => !s.isRoof).toList();
+    final normal = storeys.where((s) => s.isBuildingStorey).toList();
     if (normal.isNotEmpty) {
       normal.sort((a, b) => a.elevation.compareTo(b.elevation));
       return normal.last;
@@ -615,14 +642,31 @@ class ArchitectProject {
   }
 
   /// Storeys ordered for the plan menu / tabs:
-  /// The roof lines plan always sits at the very top (index 0),
-  /// followed by storeys sorted from highest elevation down to lowest.
+  /// Roof lines at the very top, building storeys descending by elevation,
+  /// and the dedicated site/terrain plan at the bottom.
   List<ArchitectStorey> get orderedPlanStoreys {
-    final normal = storeys.where((s) => !s.isRoof).toList()
+    final normal = storeys.where((s) => s.isBuildingStorey).toList()
       ..sort((a, b) => b.elevation.compareTo(a.elevation));
     final roof = roofStorey;
-    if (roof == null) return normal;
-    return [roof, ...normal];
+    final site = siteStorey;
+    return [
+      ?roof,
+      ...normal,
+      ?site,
+    ];
+  }
+
+  /// Ensures the dedicated system-managed site/terrain plan storey exists.
+  ArchitectProject ensureSiteStorey() {
+    if (siteStorey != null) return this;
+    final site = ArchitectStorey(
+      id: 'storey_site',
+      name: 'Терен',
+      elevation: existingTerrain.datumElevation,
+      height: 2.80,
+      isSite: true,
+    );
+    return copyWith(storeys: [...storeys, site]);
   }
 
   /// Ensures a dedicated roof plan storey exists on top of all storeys.
@@ -644,7 +688,7 @@ class ArchitectProject {
   ArchitectProject syncRoofElevation() {
     final roof = roofStorey;
     if (roof == null) return this;
-    final normal = storeys.where((s) => !s.isRoof).toList();
+    final normal = storeys.where((s) => s.isBuildingStorey).toList();
     if (normal.isEmpty) return this;
     normal.sort((a, b) => a.elevation.compareTo(b.elevation));
     final top = normal.last;
@@ -662,7 +706,7 @@ class ArchitectProject {
     String? name,
     double height = 2.80,
   }) {
-    final normal = storeys.where((s) => !s.isRoof).toList()
+    final normal = storeys.where((s) => s.isBuildingStorey).toList()
       ..sort((a, b) => a.elevation.compareTo(b.elevation));
     final top = normal.isNotEmpty ? normal.last : null;
     final elev = top != null ? (top.elevation + top.height) : 0.0;
@@ -681,7 +725,12 @@ class ArchitectProject {
     );
     final nextNormal = [...normal, newStorey];
     final roof = roofStorey;
-    final updatedStoreys = roof != null ? [...nextNormal, roof] : nextNormal;
+    final site = siteStorey;
+    final updatedStoreys = [
+      ...nextNormal,
+      ?roof,
+      ?site,
+    ];
     return copyWith(storeys: updatedStoreys).syncRoofElevation();
   }
 
@@ -694,7 +743,7 @@ class ArchitectProject {
     if (count <= 0) return this;
     var current = this;
     for (var i = 0; i < count; i++) {
-      final normal = current.storeys.where((s) => !s.isRoof).toList()
+      final normal = current.storeys.where((s) => s.isBuildingStorey).toList()
         ..sort((a, b) => a.elevation.compareTo(b.elevation));
       final top = normal.isNotEmpty ? normal.last : null;
       final elev = top != null ? (top.elevation + top.height) : 0.0;
@@ -710,7 +759,7 @@ class ArchitectProject {
 
   /// Recalculates consecutive floor elevations based on heights, from lowest to highest.
   ArchitectProject recalculateStoreyElevations() {
-    final normal = storeys.where((s) => !s.isRoof).toList()
+    final normal = storeys.where((s) => s.isBuildingStorey).toList()
       ..sort((a, b) => a.elevation.compareTo(b.elevation));
     if (normal.isEmpty) return this;
 
@@ -727,7 +776,12 @@ class ArchitectProject {
       }
     }
     final roof = roofStorey;
-    final all = roof != null ? [...updated, roof] : updated;
+    final site = siteStorey;
+    final all = [
+      ...updated,
+      ?roof,
+      ?site,
+    ];
     return copyWith(storeys: all).syncRoofElevation();
   }
 
@@ -741,16 +795,19 @@ class ArchitectProject {
         : p.syncRoofElevation();
   }
 
-  /// Deletes a storey. Disallows deleting the last remaining normal storey.
+  /// Deletes a storey. Disallows deleting the system site plan or the last normal storey.
   ArchitectProject deleteStorey(String storeyId) {
-    final normal = storeys.where((s) => !s.isRoof).toList();
+    final target = storeys.where((s) => s.id == storeyId).firstOrNull;
+    if (target == null || target.isSite) return this;
+    final normal = storeys.where((s) => s.isBuildingStorey).toList();
     if (normal.length <= 1 && normal.any((s) => s.id == storeyId)) {
       return this;
     }
     final remaining = storeys.where((s) => s.id != storeyId).toList();
     var nextActiveId = activeStoreyId;
     if (activeStoreyId == storeyId) {
-      final remainingNormal = remaining.where((s) => !s.isRoof).toList();
+      final remainingNormal =
+          remaining.where((s) => s.isBuildingStorey).toList();
       nextActiveId = remainingNormal.isNotEmpty
           ? remainingNormal.first.id
           : (remaining.firstOrNull?.id ?? 'default');
@@ -1118,7 +1175,7 @@ class ArchitectProject {
       activeStoreyId: storeys.isNotEmpty ? storeys.first.id : 'default',
       gridAxes: axes,
       wallTypes: finalWallTypes,
-    );
+    ).ensureSiteStorey();
   }
 
   /// Factory creating a quick starter template project.
@@ -1212,6 +1269,6 @@ class ArchitectProject {
       activeStoreyId: storeys.isNotEmpty ? storeys.first.id : 'default',
       gridAxes: axes,
       wallTypes: wallTypes ?? ArchitectWallType.standardCatalog(),
-    );
+    ).ensureSiteStorey();
   }
 }

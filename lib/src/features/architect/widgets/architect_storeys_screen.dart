@@ -29,11 +29,10 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
   ArchitectProject get project => widget.controller.project;
   late String? _selectedId;
 
-  List<ArchitectStorey> get _storeys =>
-      [...project.storeys]..sort((a, b) => b.elevation.compareTo(a.elevation));
+  List<ArchitectStorey> get _storeys => project.orderedPlanStoreys;
 
   List<ArchitectStorey> get _normalStoreys =>
-      _storeys.where((s) => !s.isRoof).toList();
+      _storeys.where((s) => s.isBuildingStorey).toList();
 
   ArchitectStorey? get _selected =>
       project.storeys.where((s) => s.id == _selectedId).firstOrNull;
@@ -266,7 +265,7 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
     final before = project.storeys.map((s) => s.id).toSet();
     var next = project;
     for (var i = 0; i < count; i++) {
-      final number = next.storeys.where((s) => !s.isRoof).length + 1;
+      final number = next.storeys.where((s) => s.isBuildingStorey).length + 1;
       next = next.addStoreyAbove(
         name: l.architectCopyStoreyName(number),
         height: height,
@@ -278,7 +277,7 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
 
   Future<void> _copyElements() async {
     final source = _selected;
-    if (source == null || source.isRoof) return;
+    if (source == null || !source.isBuildingStorey) return;
     final options = await ArchitectCopyStoreyDialog.show(
       context,
       project: project,
@@ -303,7 +302,7 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
   }
 
   Future<void> _deleteStorey(ArchitectStorey storey) async {
-    if (storey.isRoof || _normalStoreys.length <= 1) return;
+    if (!storey.isBuildingStorey || _normalStoreys.length <= 1) return;
     final l = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -477,7 +476,7 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
                 key: const ValueKey('architect-storeys-copy'),
                 icon: const AppIcon(AppIconId.duplicate, size: 18),
                 label: Text(l.architectCopyStoreyTab),
-                onPressed: _selected == null || _selected!.isRoof
+                onPressed: _selected == null || !_selected!.isBuildingStorey
                     ? null
                     : _copyElements,
               ),
@@ -573,6 +572,8 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
                     child: AppIcon(
                       storey.isRoof
                           ? AppIconId.roof
+                          : storey.isSite
+                          ? AppIconId.terrain
                           : selected
                           ? AppIconId.checkCircle
                           : AppIconId.layers,
@@ -590,6 +591,8 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
                         Text(
                           storey.isRoof
                               ? context.l10n.architectRoofPlan
+                              : storey.isSite
+                              ? context.l10n.architectSitePlan
                               : storey.name,
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
@@ -614,7 +617,7 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
                       ],
                     ),
                   ),
-                  if (!storey.isRoof)
+                  if (storey.isBuildingStorey)
                     IconButton(
                       key: ValueKey('architect-storeys-edit-${storey.id}'),
                       tooltip: context.l10n.architectStoreyEdit,
@@ -645,16 +648,20 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
         children: [
           if (!compact) ...[
             Text(
-              storey.isRoof ? l.architectRoofPlan : storey.name,
+              storey.isRoof
+                  ? l.architectRoofPlan
+                  : (storey.isSite ? l.architectSitePlan : storey.name),
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 16),
           ],
-          if (storey.isRoof)
+          if (storey.isRoof || storey.isSite)
             Text(
-              l.architectStoreyRoofAuto,
+              storey.isRoof
+                  ? l.architectStoreyRoofAuto
+                  : l.architectStoreySiteAuto,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -685,7 +692,7 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
             storey: storey,
             height: compact ? 170 : 340,
           ),
-          if (!storey.isRoof) ...[
+          if (storey.isBuildingStorey) ...[
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
@@ -768,7 +775,9 @@ class _ArchitectStoreysScreenState extends State<ArchitectStoreysScreen> {
                     child: Text(
                       _selected!.isRoof
                           ? context.l10n.architectRoofPlan
-                          : _selected!.name,
+                          : (_selected!.isSite
+                                ? context.l10n.architectSitePlan
+                                : _selected!.name),
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                   ),

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import '../models/dxf_color_table.dart';
 import '../models/dxf_display_settings.dart';
@@ -208,6 +209,7 @@ class DxfPainter extends CustomPainter {
   /// Allow a lightweight preview of costly hatch patterns in the Viewer.
   final bool interactiveHatches;
   final DxfViewportPictureCache? viewportPictures;
+  final ValueListenable<DxfViewportMotion>? motionPreview;
   final bool overlaysOnly;
   final bool Function(DxfEntity entity)? entityFilter;
   final int revision;
@@ -245,6 +247,7 @@ class DxfPainter extends CustomPainter {
     this.visibleCadRect,
     this.interactiveHatches = false,
     this.viewportPictures,
+    this.motionPreview,
     this.overlaysOnly = false,
     this.entityFilter,
     this.revision = 0,
@@ -253,7 +256,7 @@ class DxfPainter extends CustomPainter {
     this.drawingStrokeWidthOverride,
     this.modelPlacement,
     this.modelLayerOverrides,
-  });
+  }) : super(repaint: motionPreview);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -261,37 +264,67 @@ class DxfPainter extends CustomPainter {
     // --- SUBSECTION: [TAG:VIEWPORT_PICTURES] Reuse drawing geometry across camera changes ---
     final cache = viewportPictures;
     final viewport = visibleCadRect;
-    final reuseDrawing = !overlaysOnly && cache != null && viewport != null &&
-        viewport.isFinite && !viewport.isEmpty && currentScale.isFinite;
+    final reuseDrawing = !overlaysOnly &&
+        cache != null &&
+        viewport != null &&
+        viewport.isFinite &&
+        !viewport.isEmpty &&
+        currentScale.isFinite;
     if (reuseDrawing) {
-      final picture = cache.obtain(
-        content: (document, revision, theme, activeLayout, size, settings,
-            showGrid, interactiveHatches, entityFilter, originalStyleLayers,
-            drawingColorOverride, drawingStrokeWidthOverride, modelPlacement,
-            modelLayerOverrides),
-        viewport: viewport,
-        drawingBounds: document.layoutBounds[activeLayout] ?? document.bounds,
-        scale: currentScale,
-        record: (target, region, scale) => DxfPainter(
-          document: document,
-          theme: theme,
-          activeLayout: activeLayout,
-          currentScale: scale,
-          visibleCadRect: region,
-          interactiveHatches: interactiveHatches,
-          settings: settings,
-          showGrid: showGrid,
-          entityFilter: entityFilter,
-          revision: revision,
-          originalStyleLayers: originalStyleLayers,
-          drawingColorOverride: drawingColorOverride,
-          drawingStrokeWidthOverride: drawingStrokeWidthOverride,
-          modelPlacement: modelPlacement,
-          modelLayerOverrides: modelLayerOverrides,
-        ).paint(target, size),
+      final content = (
+        document, revision, theme, activeLayout, size, settings, showGrid,
+        interactiveHatches, entityFilter, originalStyleLayers,
+        drawingColorOverride, drawingStrokeWidthOverride, modelPlacement,
+        modelLayerOverrides,
       );
-      _paintedPicture = picture;
-      canvas.drawPicture(picture.picture);
+      final preview = motionPreview?.value == DxfViewportMotion.overview
+          ? cache.overviewFor(content)
+          : null;
+      if (preview != null) {
+        canvas.drawImageRect(
+          preview,
+          Rect.fromLTWH(0, 0, preview.width.toDouble(), preview.height.toDouble()),
+          Offset.zero & size,
+          Paint()..filterQuality = FilterQuality.low,
+        );
+      } else {
+        final picture = cache.obtain(
+          content: content,
+          viewport: viewport,
+          drawingBounds: document.layoutBounds[activeLayout] ?? document.bounds,
+          scale: currentScale,
+          record: (target, region, scale) => DxfPainter(
+            document: document,
+            theme: theme,
+            activeLayout: activeLayout,
+            currentScale: scale,
+            visibleCadRect: region,
+            interactiveHatches: interactiveHatches,
+            settings: settings,
+            showGrid: showGrid,
+            entityFilter: entityFilter,
+            revision: revision,
+            originalStyleLayers: originalStyleLayers,
+            drawingColorOverride: drawingColorOverride,
+            drawingStrokeWidthOverride: drawingStrokeWidthOverride,
+            modelPlacement: modelPlacement,
+            modelLayerOverrides: modelLayerOverrides,
+          ).paint(target, size),
+        );
+        _paintedPicture = picture;
+        canvas.drawPicture(picture.picture);
+        final moving = motionPreview;
+        if (moving != null && activeLayout == 'Model' &&
+            document.entities.length >= DxfViewportPictureCache.minOverviewEntities &&
+            picture.scale <= 1.04 &&
+            picture.region.intersect(document.bounds) == document.bounds) {
+          cache.prepareOverview(
+            drawing: picture,
+            size: size,
+            isMoving: () => moving.value != DxfViewportMotion.idle,
+          );
+        }
+      }
       if (highlightedEntity == null && snapResult == null &&
           annotations.isEmpty && measurement == null) return;
     } else {
@@ -4075,6 +4108,7 @@ class DxfPainter extends CustomPainter {
         oldDelegate.showGrid != showGrid ||
         oldDelegate.interactiveHatches != interactiveHatches ||
         oldDelegate.viewportPictures != viewportPictures ||
+        oldDelegate.motionPreview != motionPreview ||
         oldDelegate.overlaysOnly != overlaysOnly ||
         oldDelegate.settings != settings) {
       return true;

@@ -373,9 +373,12 @@ class ArchitectRoofPainterHelper {
     }
   }
 
+  static List<List<Offset>> outerPerimeterLoops(List<ArchitectWall> walls) =>
+      _outerContours(ArchitectWallNetwork.body(walls));
+
   static List<List<Offset>> _exteriorPerimeterLoops(
     List<ArchitectWall> walls,
-  ) => _outerContours(ArchitectWallNetwork.body(walls));
+  ) => outerPerimeterLoops(walls);
 
   static List<List<Offset>> _outerContours(Path footprint) {
     final loops = ArchitectPathSolid.contours(footprint);

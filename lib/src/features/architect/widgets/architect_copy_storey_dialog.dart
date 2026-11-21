@@ -80,7 +80,7 @@ class _ArchitectCopyStoreyDialogState extends State<ArchitectCopyStoreyDialog> {
   late bool _copyOnlySelection;
 
   List<ArchitectStorey> get _normalStoreys =>
-      _workingProject.storeys.where((s) => !s.isRoof).toList()
+      _workingProject.storeys.where((s) => s.isBuildingStorey).toList()
         ..sort((a, b) => b.elevation.compareTo(a.elevation));
 
   ArchitectStorey? get _sourceStorey =>

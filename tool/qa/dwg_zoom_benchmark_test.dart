@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/services/dwg_reader_service.dart';
@@ -20,6 +21,7 @@ void main() {
   );
   const compareHatches = bool.fromEnvironment('DWG_ZOOM_COMPARE_HATCHES');
   const retainPictures = bool.fromEnvironment('DWG_ZOOM_RETAIN_PICTURES');
+  const testMotionPreview = bool.fromEnvironment('DWG_ZOOM_MOTION_PREVIEW');
   const requestedRepeats = int.fromEnvironment(
     'DWG_ZOOM_REPEATS',
     defaultValue: 4,
@@ -40,12 +42,19 @@ void main() {
       () async {
         final cache = retainPictures ? DxfViewportPictureCache() : null;
         if (cache != null) addTearDown(cache.dispose);
+        final motion = testMotionPreview && cache != null
+            ? ValueNotifier(DxfViewportMotion.idle)
+            : null;
+        if (motion != null) addTearDown(motion.dispose);
         final openClock = Stopwatch()..start();
         final doc = await DwgReaderService.read(input);
         openClock.stop();
         // Optional CAD x,y,width gives a repeatable, close-up drawing comparison.
-        final crop = region.isEmpty ? null : region.split(',').map(double.parse).toList();
-        if (crop != null && outputDirectory.isNotEmpty) await _loadWindowsFonts();
+        final crop = region.isEmpty
+            ? null
+            : region.split(',').map(double.parse).toList();
+        if (crop != null && outputDirectory.isNotEmpty)
+          await _loadWindowsFonts();
         final size = crop == null ? const Size(390, 800) : const Size(960, 520);
         final fit = math.min(
           (size.width - 64) / doc.bounds.width,
@@ -58,12 +67,28 @@ void main() {
         );
         // ignore: avoid_print
         print('DWG_ZOOM bounds=${doc.bounds} stats=${doc.entityStats}');
-        final center = crop == null ? doc.bounds.center : Offset(crop[0], crop[1]);
+        final center = crop == null
+            ? doc.bounds.center
+            : Offset(crop[0], crop[1]);
         final zooms = crop == null
             ? [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, if (retainPictures) 1.0]
             : [size.width / (fit * crop[2])];
         final delta = center - doc.bounds.center;
-        for (final zoom in zooms) {
+        for (var step = 0; step < zooms.length; step++) {
+          final zoom = zooms[step];
+          if (motion != null && cache != null && step > 0 && zoom == 1.0) {
+            final wait = Stopwatch()..start();
+            while (!cache.hasOverview &&
+                wait.elapsed < const Duration(seconds: 10)) {
+              await Future<void>.delayed(const Duration(milliseconds: 25));
+            }
+            expect(
+              cache.hasOverview,
+              isTrue,
+              reason: 'Overview must be ready for the motion test',
+            );
+            motion.value = DxfViewportMotion.overview;
+          }
           final recordingsBefore = cache?.recordings ?? 0;
           final visible = Rect.fromCenter(
             center: center,
@@ -78,7 +103,10 @@ void main() {
             final canvas = Canvas(rec)..clipRect(Offset.zero & size);
             canvas.translate(size.width / 2, size.height / 2);
             canvas.scale(zoom);
-            canvas.translate(-size.width / 2 - delta.dx * fit, -size.height / 2 + delta.dy * fit);
+            canvas.translate(
+              -size.width / 2 - delta.dx * fit,
+              -size.height / 2 + delta.dy * fit,
+            );
             final painter = DxfPainter(
               document: doc,
               theme: DxfCanvasTheme.darkCad,
@@ -87,6 +115,7 @@ void main() {
               showGrid: false,
               interactiveHatches: interactiveHatches,
               viewportPictures: cache,
+              motionPreview: motion,
             );
             final clock = Stopwatch()..start();
             painter.paint(canvas, size);
@@ -123,6 +152,7 @@ void main() {
             'DWG_ZOOM zoom=$zoom paintMs=${_median(paints)} rasterMs=${_median(rasters)} '
             'firstPaintMs=$firstPaintMs firstRasterMs=$firstRasterMs '
             'recordings=${(cache?.recordings ?? 0) - recordingsBefore} retained=$retainPictures '
+            'motionPreview=${motion?.value == DxfViewportMotion.overview} '
             'peakPictureBytes=$peakPictureBytes hatchMode=$mode ${DxfPainter.lastStats}',
           );
         }
@@ -140,9 +170,9 @@ Future<void> _loadWindowsFonts() async {
   for (final entry in fonts.entries) {
     final file = File('$windows/Fonts/${entry.value}');
     if (!await file.exists()) continue;
-    await (FontLoader(entry.key)
-          ..addFont(file.readAsBytes().then(ByteData.sublistView)))
-        .load();
+    await (FontLoader(
+      entry.key,
+    )..addFont(file.readAsBytes().then(ByteData.sublistView))).load();
   }
 }
 

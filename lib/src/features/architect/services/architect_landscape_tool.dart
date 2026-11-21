@@ -247,9 +247,10 @@ class ArchitectLandscapeTool extends ChangeNotifier {
             crownDiameter: plantCrownDiameter,
             height: plantHeight,
           );
-          final storey = project.activeStorey;
-          return project.updateActiveStorey(
+          final storey = project.landscapeTargetStorey;
+          return project.updateStorey(
             storey.copyWith(vegetation: [...storey.vegetation, item]),
+            recalculateAbove: false,
           );
         }
         draftPoints.add(worldPoint);
@@ -364,13 +365,14 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           material: pathwayMaterial,
           closed: pathwayClosed,
         );
-        final storey = project.activeStorey;
-        return project.updateActiveStorey(
+        final storey = project.landscapeTargetStorey;
+        return project.updateStorey(
           storey.copyWith(pathways: [...storey.pathways, pathway]),
+          recalculateAbove: false,
         );
 
       case 'vegetation':
-        final storey = project.activeStorey;
+        final storey = project.landscapeTargetStorey;
         if (plantSpecies == ArchitectPlantSpecies.trimmedHedge ||
             plantPlacementMode == ArchitectVegetationPlacementMode.hedge) {
           final hedge = ArchitectVegetationItem(
@@ -382,8 +384,9 @@ class ArchitectLandscapeTool extends ChangeNotifier {
             points: pts,
             hedgeWidth: hedgeWidth,
           );
-          return project.updateActiveStorey(
+          return project.updateStorey(
             storey.copyWith(vegetation: [...storey.vegetation, hedge]),
+            recalculateAbove: false,
           );
         }
         // Row placement along chain
@@ -411,8 +414,9 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           }
         }
         if (rowItems.isEmpty) return null;
-        return project.updateActiveStorey(
+        return project.updateStorey(
           storey.copyWith(vegetation: [...storey.vegetation, ...rowItems]),
+          recalculateAbove: false,
         );
 
       case 'siteFence':
@@ -424,9 +428,10 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           thickness: fenceThickness,
           pierSpacing: fencePierSpacing,
         );
-        final storey = project.activeStorey;
-        return project.updateActiveStorey(
+        final storey = project.landscapeTargetStorey;
+        return project.updateStorey(
           storey.copyWith(siteFences: [...storey.siteFences, fence]),
+          recalculateAbove: false,
         );
 
       case 'street':
@@ -446,9 +451,10 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           roadMaterial: streetRoadMaterial,
           sidewalkMaterial: streetSidewalkMaterial,
         );
-        final storey = project.activeStorey;
-        return project.updateActiveStorey(
+        final storey = project.landscapeTargetStorey;
+        return project.updateStorey(
           storey.copyWith(streets: [...storey.streets, street]),
+          recalculateAbove: false,
         );
 
       default:
@@ -568,30 +574,32 @@ class ArchitectLandscapeTool extends ChangeNotifier {
       }
     }
 
-    // 4. Proposed & Existing terrain elements
-    for (final (surface, layerId) in [
-      (project.proposedTerrain, ArchitectLayer.terrainProposedLayerId),
-      (project.existingTerrain, ArchitectLayer.terrainExistingLayerId),
-    ]) {
-      if (!project.isLayerVisible(layerId) || surface.isEmpty) continue;
-      for (final spot in surface.spots.reversed) {
-        if ((spot.position - worldPoint).distance <= hitTolerance * 1.4) {
-          return spot.id;
+    // 4. Proposed & Existing terrain elements (visible & interactive only on Site Plan)
+    if (storey.isSite) {
+      for (final (surface, layerId) in [
+        (project.proposedTerrain, ArchitectLayer.terrainProposedLayerId),
+        (project.existingTerrain, ArchitectLayer.terrainExistingLayerId),
+      ]) {
+        if (!project.isLayerVisible(layerId) || surface.isEmpty) continue;
+        for (final spot in surface.spots.reversed) {
+          if ((spot.position - worldPoint).distance <= hitTolerance * 1.4) {
+            return spot.id;
+          }
         }
-      }
-      for (final contour in surface.contours.reversed) {
-        if (_hitPolyline(contour.points, worldPoint, hitTolerance)) {
-          return contour.id;
+        for (final contour in surface.contours.reversed) {
+          if (_hitPolyline(contour.points, worldPoint, hitTolerance)) {
+            return contour.id;
+          }
         }
-      }
-      for (final boundary in surface.boundaries.reversed) {
-        if (_hitPolyline(
-          boundary.polygon,
-          worldPoint,
-          hitTolerance,
-          closed: true,
-        )) {
-          return boundary.id;
+        for (final boundary in surface.boundaries.reversed) {
+          if (_hitPolyline(
+            boundary.polygon,
+            worldPoint,
+            hitTolerance,
+            closed: true,
+          )) {
+            return boundary.id;
+          }
         }
       }
     }
@@ -600,18 +608,21 @@ class ArchitectLandscapeTool extends ChangeNotifier {
   }
 
   static bool isLandscapeElementId(ArchitectProject project, String id) {
-    final storey = project.activeStorey;
-    if (storey.streets.any((s) => s.id == id) ||
-        storey.pathways.any((p) => p.id == id) ||
-        storey.vegetation.any((v) => v.id == id) ||
-        storey.siteFences.any((f) => f.id == id)) {
-      return true;
-    }
-    for (final surface in [project.existingTerrain, project.proposedTerrain]) {
-      if (surface.boundaries.any((b) => b.id == id) ||
-          surface.contours.any((c) => c.id == id) ||
-          surface.spots.any((s) => s.id == id)) {
+    for (final storey in [project.activeStorey, ?project.siteStorey]) {
+      if (storey.streets.any((s) => s.id == id) ||
+          storey.pathways.any((p) => p.id == id) ||
+          storey.vegetation.any((v) => v.id == id) ||
+          storey.siteFences.any((f) => f.id == id)) {
         return true;
+      }
+    }
+    if (project.activeStorey.isSite) {
+      for (final surface in [project.existingTerrain, project.proposedTerrain]) {
+        if (surface.boundaries.any((b) => b.id == id) ||
+            surface.contours.any((c) => c.id == id) ||
+            surface.spots.any((s) => s.id == id)) {
+          return true;
+        }
       }
     }
     return false;
@@ -623,7 +634,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     required Offset delta,
   }) {
     if (selectedIds.isEmpty || delta == Offset.zero) return project;
-    final storey = project.activeStorey;
+    final storey = project.landscapeTargetStorey;
     bool storeyChanged = false;
 
     final nextPathways = [
@@ -680,13 +691,14 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     ];
 
     var updated = storeyChanged
-        ? project.updateActiveStorey(
+        ? project.updateStorey(
             storey.copyWith(
               pathways: nextPathways,
               vegetation: nextVegetation,
               siteFences: nextFences,
               streets: nextStreets,
             ),
+            recalculateAbove: false,
           )
         : project;
 
@@ -710,7 +722,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     required Set<String> selectedIds,
   }) {
     if (selectedIds.isEmpty) return project;
-    final storey = project.activeStorey;
+    final storey = project.landscapeTargetStorey;
     final nextStorey = storey.copyWith(
       pathways: storey.pathways
           .where((p) => !selectedIds.contains(p.id))
@@ -726,7 +738,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           .toList(),
     );
     return project
-        .updateActiveStorey(nextStorey)
+        .updateStorey(nextStorey, recalculateAbove: false)
         .copyWith(
           existingTerrain: _deleteFromSurface(
             project.existingTerrain,

@@ -31,3 +31,5 @@ routing still use the same `InteractiveViewer` and pointer handlers.
 `[TAG:VIEWPORT_PICTURE_CACHE]` owns the retained vector drawings and advances the
 layer revision after visibility and lineweight mutations. Selection and snap
 markers paint above the retained drawing in an independent repaint boundary.
+Broad Model-space gestures can display a single scene texture prepared while
+idle. The settled canvas uses the vector recording at the current zoom band.

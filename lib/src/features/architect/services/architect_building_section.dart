@@ -1849,7 +1849,7 @@ class ArchitectBuildingSection {
     }
 
     for (final floor in project.storeys) {
-      if (floor.isRoof || floor.ceilings.isEmpty) continue;
+      if (!floor.isBuildingStorey || floor.ceilings.isEmpty) continue;
       for (final ceiling in floor.ceilings) {
         final spans = ArchitectCeilingGeometry.sectionIntervals(ceiling, cut);
         if (spans.isEmpty) continue;

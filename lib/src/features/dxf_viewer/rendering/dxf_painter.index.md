@@ -21,6 +21,8 @@
 buffered CAD region covers the new viewport at the same scale band. The
 Viewer supplies the cache and layer revision. Other painter callers use the
 direct path. `_paintOverlays` also supports the Viewer overlay boundary.
+The cache can prepare one bounded raster image for motion at overview scales.
+It belongs to the same content key and is discarded when that content changes.
 
 `[TAG:PAINTER_TEXT_SCALE]` checks the selected text style before consulting the
 drawing-origin heuristics. Eligible styles share one origin result per paint.

@@ -3928,7 +3928,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     return _project.activeStorey.isRoof
         ? l.architectRoofPlan
-        : _project.activeStorey.name;
+        : (_project.activeStorey.isSite
+              ? l.architectSitePlan
+              : _project.activeStorey.name);
   }
 
   void _returnToPlan() {
@@ -5992,8 +5994,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _moveSelection = false;
 
     _activeTool = nextTool;
-    if (nextTool == ArchitectTool.ceiling && !_project.activeStorey.isRoof) {
+    if (nextTool == ArchitectTool.ceiling &&
+        _project.activeStorey.isBuildingStorey) {
       _commands.setPlanMode(ArchitectPlanMode.ceilingServices);
+    }
+    if (nextTool.isLandscapeTool &&
+        _commands.isPlan &&
+        !_project.activeStorey.isSite) {
+      final ensured = _modelCommands.project.ensureSiteStorey();
+      final siteId = ensured.siteStorey!.id;
+      if (!identical(ensured, _modelCommands.project)) {
+        _modelCommands.commit(ensured);
+      }
+      _lastViewIds[ArchitectWorkspaceView.plan] = siteId;
+      _commands.setPlanMode(ArchitectPlanMode.floor);
+      _commands.activateStorey(siteId);
     }
     if (nextTool.usesComponent) {
       final library = ComponentLibraryService.instance;
@@ -33854,9 +33869,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final survey = _project.geodeticSurvey;
     final count =
         (survey?.contours.length ?? 0) + (survey?.spotElevations.length ?? 0);
-    final nextProject = _landscapeTool.syncTerrainFromGeodesy(_project);
+    final nextProject = _landscapeTool.syncTerrainFromGeodesy(_project).ensureSiteStorey();
+    final siteId = nextProject.siteStorey?.id;
     setState(() {
       _commands.commit(nextProject);
+      if (_commands.isPlan && siteId != null && !_project.activeStorey.isSite) {
+        _lastViewIds[ArchitectWorkspaceView.plan] = siteId;
+        _commands.setPlanMode(ArchitectPlanMode.floor);
+        _commands.activateStorey(siteId);
+      }
     });
     _saveBiMProjectIfAttached();
     HapticFeedback.mediumImpact();
@@ -35446,7 +35467,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_commands.isPlan &&
           !_is3DView &&
           !_printPreview &&
-          !_project.activeStorey.isRoof &&
+          _project.activeStorey.isBuildingStorey &&
           _effectiveSelection.isEmpty &&
           _cutOpeningTargetId == null &&
           !_dragController.isActive &&

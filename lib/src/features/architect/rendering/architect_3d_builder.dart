@@ -1551,7 +1551,7 @@ class Architect3dBuilder {
 
       // Cut out ground-floor slabs so terrain does not poke into building interior
       for (final s in project.storeys) {
-        if (s.isRoof || s.elevation.abs() > 0.6) continue;
+        if (!s.isBuildingStorey || s.elevation.abs() > 0.6) continue;
         for (final slab in s.slabs) {
           if (slab.polygon.length >= 3) {
             try {

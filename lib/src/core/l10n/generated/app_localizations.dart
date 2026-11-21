@@ -12053,6 +12053,24 @@ abstract class AppLocalizations {
   /// **'Top-level roof plan with dashed perimeter wall lines'**
   String get architectRoofPlanSubtitle;
 
+  /// No description provided for @architectSitePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Site Plan'**
+  String get architectSitePlan;
+
+  /// No description provided for @architectSitePlanSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terrain, contours, landscaping and building footprint'**
+  String get architectSitePlanSubtitle;
+
+  /// No description provided for @architectStoreySiteAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'System-managed plan for terrain, site contours and landscaping.'**
+  String get architectStoreySiteAuto;
+
   /// No description provided for @architectRoofLowerLevelBadge.
   ///
   /// In en, this message translates to:

@@ -3471,7 +3471,7 @@ class ToggleArchitectCeilingPlan extends ArchitectModelCommand {
   @override
   ArchitectProject apply(ArchitectProject project) {
     final floor = ArchitectModelCommand.storey(project, storeyId);
-    if (floor.isRoof || floor.hasCeilingPlan == enabled) return project;
+    if (!floor.isBuildingStorey || floor.hasCeilingPlan == enabled) return project;
     return ArchitectModelCommand.replace(
       project,
       floor.copyWith(hasCeilingPlan: enabled),

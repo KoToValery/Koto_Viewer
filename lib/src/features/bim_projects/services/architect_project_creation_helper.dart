@@ -18,12 +18,13 @@ Future<(BimWorkProject, ArchitectProject)> createArchitectWorkProject({
     location: location,
     storeys: [
       for (final storey in archProject.storeys)
-        BimStoreyUnderlay(
-          storeyId: storey.id,
-          name: storey.name,
-          elevation: storey.elevation,
-          height: storey.height,
-        ),
+        if (storey.isBuildingStorey)
+          BimStoreyUnderlay(
+            storeyId: storey.id,
+            name: storey.name,
+            elevation: storey.elevation,
+            height: storey.height,
+          ),
     ],
     projectType: BimProjectType.architectural,
     initialArchitectProject: archProject,

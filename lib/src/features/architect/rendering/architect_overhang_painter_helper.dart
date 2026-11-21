@@ -19,15 +19,22 @@ class ArchitectOverhangPainterHelper {
     required double zoomScale,
     required AppLocalizations? l10n,
     String? selectedElementId,
+    bool isSiteContext = false,
   }) {
     if (overhangs.isEmpty) return;
 
     // Standard architectural lineweight for overhead projections (ISO 128)
-    final strokeWidth = ArchitectLineWeights.overhead / zoomScale;
+    final strokeWidth =
+        (isSiteContext
+            ? ArchitectLineWeights.overhead * 0.85
+            : ArchitectLineWeights.overhead) /
+        zoomScale;
 
     // View-independent paper-space dashed line pattern: 6px dash, 3.5px gap
-    final dashLength = 6.0 / zoomScale;
-    final gapLength = 3.5 / zoomScale;
+    final dashLength = (isSiteContext ? 4.5 : 6.0) / zoomScale;
+    final gapLength = (isSiteContext ? 3.5 : 3.5) / zoomScale;
+
+    final siteColor = palette.foreground(const Color(0xFF455A64));
 
     final erkerColor = palette.isDark
         ? const Color(0xFF80DEEA) // Light Cyan
@@ -40,10 +47,12 @@ class ArchitectOverhangPainterHelper {
     for (final overhang in overhangs) {
       architectDrawingSources(canvas, {overhang.id}, 'overhang');
       final isBalcony = overhang.kind == ArchitectOverhangKind.balcony;
-      final baseColor = isBalcony ? balconyColor : erkerColor;
+      final baseColor = isSiteContext
+          ? siteColor
+          : (isBalcony ? balconyColor : erkerColor);
 
       final paint = Paint()
-        ..color = baseColor.withValues(alpha: 0.85)
+        ..color = baseColor.withValues(alpha: isSiteContext ? 0.55 : 0.85)
         ..strokeWidth = strokeWidth
         ..style = PaintingStyle.stroke;
 

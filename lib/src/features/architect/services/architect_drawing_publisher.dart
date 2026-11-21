@@ -132,6 +132,7 @@ class ArchitectDrawingPublisher {
     drawing.id,
     drawing.sourceKey,
     drawing.roof,
+    drawing.sitePlan,
     drawing.ceilingPlan,
     denominator,
     l.localeName,

@@ -58,9 +58,9 @@ class ArchitectStoreyCopyService {
         : project
               .copyWith(
                 storeys: [
-                  ...project.storeys.where((storey) => !storey.isRoof),
+                  ...project.storeys.where((storey) => storey.isBuildingStorey),
                   ...additionalStoreys,
-                  ...project.storeys.where((storey) => storey.isRoof),
+                  ...project.storeys.where((storey) => !storey.isBuildingStorey),
                 ],
               )
               .syncRoofElevation();

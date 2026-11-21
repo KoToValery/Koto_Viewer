@@ -42,7 +42,7 @@ class ArchitectServiceGeometry {
     var datum = owner.elevation;
     if (ServiceComponentDefinition.continuousIds.contains(c.definitionId) &&
         _native(c)['allStoreys'] != false) {
-      for (final floor in project.storeys.where((s) => !s.isRoof)) {
+      for (final floor in project.storeys.where((s) => s.isBuildingStorey)) {
         datum = math.min(datum, floor.elevation);
       }
     }
@@ -83,7 +83,7 @@ class ArchitectServiceGeometry {
     }
     // Before a roof is drawn, continue through the highest occupied floor.
     final fallback = project.storeys
-        .where((s) => !s.isRoof)
+        .where((s) => s.isBuildingStorey)
         .fold<double>(
           owner.elevation + owner.height,
           (top, floor) => math.max(top, floor.elevation + floor.height),

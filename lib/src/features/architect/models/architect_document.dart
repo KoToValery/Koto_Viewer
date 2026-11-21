@@ -222,6 +222,7 @@ class ArchitectSavedDrawing {
   final int scale;
   final int sourceNumber;
   final bool roof;
+  final bool sitePlan;
   final bool ceilingPlan;
   final Map<String, bool> visibility;
   const ArchitectSavedDrawing({
@@ -232,6 +233,7 @@ class ArchitectSavedDrawing {
     this.scale = 100,
     this.sourceNumber = 1,
     this.roof = false,
+    this.sitePlan = false,
     this.ceilingPlan = false,
     this.visibility = const {},
   });
@@ -248,6 +250,7 @@ class ArchitectSavedDrawing {
     scale: scale ?? this.scale,
     sourceNumber: sourceNumber,
     roof: roof,
+    sitePlan: sitePlan,
     ceilingPlan: ceilingPlan ?? this.ceilingPlan,
     visibility: visibility ?? this.visibility,
   );
@@ -263,6 +266,7 @@ class ArchitectSavedDrawing {
     'scale': scale,
     'sourceNumber': sourceNumber,
     'roof': roof,
+    if (sitePlan) 'sitePlan': true,
     if (ceilingPlan) 'ceilingPlan': true,
     'visibility': visibility,
   };
@@ -274,6 +278,7 @@ class ArchitectSavedDrawing {
     scale: (j['scale'] as num?)?.toInt() ?? 100,
     sourceNumber: (j['sourceNumber'] as num?)?.toInt() ?? 1,
     roof: j['roof'] == true,
+    sitePlan: j['sitePlan'] == true,
     ceilingPlan: j['ceilingPlan'] == true,
     visibility: Map<String, bool>.from(j['visibility'] as Map? ?? {}),
   );

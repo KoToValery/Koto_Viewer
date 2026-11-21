@@ -6819,6 +6819,17 @@ class AppLocalizationsBg extends AppLocalizations {
       'Генерален покривен план с пунктир на фасадните стени';
 
   @override
+  String get architectSitePlan => 'Терен';
+
+  @override
+  String get architectSitePlanSubtitle =>
+      'Терен, хоризонтали, озеленяване и контур на сградата';
+
+  @override
+  String get architectStoreySiteAuto =>
+      'Служебен чертеж за терен, хоризонтали и ситуация.';
+
+  @override
   String architectRoofLowerLevelBadge(String level) {
     return 'Кота $level';
   }

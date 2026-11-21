@@ -6792,6 +6792,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Top-level roof plan with dashed perimeter wall lines';
 
   @override
+  String get architectSitePlan => 'Site Plan';
+
+  @override
+  String get architectSitePlanSubtitle =>
+      'Terrain, contours, landscaping and building footprint';
+
+  @override
+  String get architectStoreySiteAuto =>
+      'System-managed plan for terrain, site contours and landscaping.';
+
+  @override
   String architectRoofLowerLevelBadge(String level) {
     return 'Level $level';
   }

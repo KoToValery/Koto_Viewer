@@ -122,9 +122,11 @@ class ArchitectSnapGeometry {
         ? floor.walls
         : (floor.isRoof
               ? (project.highestWallStorey?.walls ?? const [])
-              : (activeIdx > 0
-                    ? project.storeys[activeIdx - 1].walls
-                    : floor.walls));
+              : (floor.isSite
+                    ? (project.groundBuildingStorey?.walls ?? const [])
+                    : (activeIdx > 0
+                          ? project.storeys[activeIdx - 1].walls
+                          : floor.walls)));
     if (wallCoresOnly) {
       referenceWalls = ArchitectWallGeometry.coreWalls(referenceWalls);
     } else {
@@ -300,12 +302,12 @@ class ArchitectSnapGeometry {
       }
     }
     final roofStoreys = <ArchitectStorey>[
-      if (floor.roofs.isNotEmpty) floor,
+      if (!floor.isSite && floor.roofs.isNotEmpty) floor,
       if (floor.isRoof)
         ...project.storeys.where(
           (s) => s.id != floor.id && s.roofs.isNotEmpty,
         )
-      else ...() {
+      else if (floor.isBuildingStorey) ...() {
         final overheadElevations = project.storeys
             .where((s) => s.elevation > floor.elevation && s.roofs.isNotEmpty)
             .map((s) => s.elevation)
@@ -321,6 +323,26 @@ class ArchitectSnapGeometry {
             .toList();
       }(),
     ];
+    if (floor.isSite) {
+      for (final surface in [project.existingTerrain, project.proposedTerrain]) {
+        for (final b in surface.boundaries) {
+          polygon(b.polygon, b.id);
+        }
+        for (final c in surface.contours) {
+          if (c.closed) {
+            polygon(c.points, c.id);
+          } else {
+            for (var i = 0; i < c.points.length; i++) {
+              point(c.points[i], 'Vertex', c.id);
+              if (i > 0) edge(c.points[i - 1], c.points[i], c.id);
+            }
+          }
+        }
+        for (final sp in surface.spots) {
+          point(sp.position, 'Point', sp.id);
+        }
+      }
+    }
     for (final roofStorey in roofStoreys) {
       final junctions = ArchitectRoofJunctions.of(roofStorey, project: project);
       for (final roof in roofStorey.roofs) {

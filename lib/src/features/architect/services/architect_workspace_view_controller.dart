@@ -33,7 +33,7 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
   bool get isCeilingPlan =>
       isPlan &&
       planMode == ArchitectPlanMode.ceilingServices &&
-      !source.project.activeStorey.isRoof;
+      source.project.activeStorey.isBuildingStorey;
   bool get hasView => isPlan || drawing != null;
   ArchitectViewDrawing? get drawing => switch (view) {
     ArchitectWorkspaceView.plan => null,
@@ -69,9 +69,9 @@ class ArchitectWorkspaceViewController extends ChangeNotifier {
   }
 
   void setPlanMode(ArchitectPlanMode mode) {
-    final effective = source.project.activeStorey.isRoof
-        ? ArchitectPlanMode.floor
-        : mode;
+    final effective = source.project.activeStorey.isBuildingStorey
+        ? mode
+        : ArchitectPlanMode.floor;
     if (planMode == effective) return;
     planMode = effective;
     notifyListeners();

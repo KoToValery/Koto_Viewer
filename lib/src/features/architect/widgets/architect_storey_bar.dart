@@ -36,10 +36,16 @@ class ArchitectStoreyBar extends StatelessWidget {
         itemBuilder: (context, index) {
           final storey = planStoreys[index];
           final active = storey.id == project.activeStoreyId;
-          final label = storey.isRoof ? l.architectRoofPlan : storey.elevationLabel;
+          final label = storey.isRoof
+              ? l.architectRoofPlan
+              : (storey.isSite ? l.architectSitePlan : storey.elevationLabel);
           final description = storey.isRoof
               ? l.architectRoofPlanSubtitle
-              : (storey.name.contains(label) ? storey.name : '${storey.name} · $label');
+              : (storey.isSite
+                    ? l.architectSitePlanSubtitle
+                    : (storey.name.contains(label)
+                          ? storey.name
+                          : '${storey.name} · $label'));
           return Tooltip(
             message: description,
             child: Material(
