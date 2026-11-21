@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import '../../../core/l10n/generated/app_localizations.dart';
+import '../services/architect_spline_geometry.dart';
+import '../services/architect_terrain_tin.dart';
 import 'architect_underlay_models.dart';
 
 /// State of the terrain surface: natural existing grade vs. graded proposed design.
@@ -25,17 +27,21 @@ enum ArchitectTerrainState {
 /// Sub-mode when drafting or editing terrain in 2D Plan.
 enum ArchitectTerrainDraftMode {
   boundary,
-  hole,
+  boundaryRect,
+  pickContour,
   contour,
   spot,
-  pad;
+  pad,
+  hole;
 
   String label(AppLocalizations l) => switch (this) {
     boundary => l.architectTerrainModeBoundary,
-    hole => l.architectTerrainModeHole,
+    boundaryRect => l.architectTerrainModeBoundaryRect,
+    pickContour => l.architectTerrainModePickContour,
     contour => l.architectTerrainModeContour,
     spot => l.architectTerrainModeSpot,
     pad => l.architectTerrainModePad,
+    hole => l.architectTerrainModeHole,
   };
 }
 
@@ -47,6 +53,7 @@ class ArchitectTerrainBoundary {
   final List<double>? vertexElevations;
   final bool isFlatPad;
   final bool isHole;
+  final bool autoInterpolateElevation;
 
   const ArchitectTerrainBoundary({
     required this.id,
@@ -56,6 +63,7 @@ class ArchitectTerrainBoundary {
     bool isFlatPad = false,
     bool? isCutoutPad,
     this.isHole = false,
+    this.autoInterpolateElevation = false,
   }) : isFlatPad = isCutoutPad ?? isFlatPad;
 
   bool get isCutoutPad => isHole || isFlatPad;
@@ -106,6 +114,7 @@ class ArchitectTerrainBoundary {
     List<double>? vertexElevations,
     bool? isFlatPad,
     bool? isHole,
+    bool? autoInterpolateElevation,
   }) => ArchitectTerrainBoundary(
     id: id ?? this.id,
     polygon: polygon ?? this.polygon,
@@ -113,6 +122,8 @@ class ArchitectTerrainBoundary {
     vertexElevations: vertexElevations ?? this.vertexElevations,
     isFlatPad: isFlatPad ?? this.isFlatPad,
     isHole: isHole ?? this.isHole,
+    autoInterpolateElevation:
+        autoInterpolateElevation ?? this.autoInterpolateElevation,
   );
 
   Map<String, dynamic> toJson() => {
@@ -124,6 +135,7 @@ class ArchitectTerrainBoundary {
     if (vertexElevations != null) 'vertexElevations': vertexElevations,
     if (isFlatPad) 'isFlatPad': true,
     if (isHole) 'isHole': true,
+    if (autoInterpolateElevation) 'autoInterpolateElevation': true,
   };
 
   factory ArchitectTerrainBoundary.fromJson(Map<String, dynamic> json) =>
@@ -143,6 +155,7 @@ class ArchitectTerrainBoundary {
             .toList(),
         isFlatPad: json['isFlatPad'] == true,
         isHole: json['isHole'] == true,
+        autoInterpolateElevation: json['autoInterpolateElevation'] == true,
       );
 }
 
@@ -154,6 +167,7 @@ class ArchitectTerrainContour {
   final double? rawAbsoluteElevation;
   final bool closed;
   final bool isMajor;
+  final bool isSpline;
 
   const ArchitectTerrainContour({
     required this.id,
@@ -162,7 +176,19 @@ class ArchitectTerrainContour {
     this.rawAbsoluteElevation,
     this.closed = false,
     this.isMajor = false,
+    this.isSpline = false,
   });
+
+  /// Returns exact 1:1 points for CAD-extracted contours, or sampled Catmull-Rom
+  /// spline points for manually drafted contours.
+  List<Offset> resolvedPolyline({int samplesPerSpan = 10}) =>
+      isSpline && points.length >= 3
+      ? ArchitectSplineGeometry.samplePoints(
+          points,
+          closed: closed,
+          samplesPerSpan: samplesPerSpan,
+        )
+      : points;
 
   double effectiveAbsolute(double datum) =>
       rawAbsoluteElevation ?? (elevation + datum);
@@ -177,6 +203,7 @@ class ArchitectTerrainContour {
     double? rawAbsoluteElevation,
     bool? closed,
     bool? isMajor,
+    bool? isSpline,
   }) => ArchitectTerrainContour(
     id: id ?? this.id,
     points: points ?? this.points,
@@ -184,6 +211,7 @@ class ArchitectTerrainContour {
     rawAbsoluteElevation: rawAbsoluteElevation ?? this.rawAbsoluteElevation,
     closed: closed ?? this.closed,
     isMajor: isMajor ?? this.isMajor,
+    isSpline: isSpline ?? this.isSpline,
   );
 
   Map<String, dynamic> toJson() => {
@@ -196,6 +224,7 @@ class ArchitectTerrainContour {
       'rawAbsoluteElevation': rawAbsoluteElevation,
     if (closed) 'closed': true,
     if (isMajor) 'isMajor': true,
+    if (isSpline) 'isSpline': true,
   };
 
   factory ArchitectTerrainContour.fromJson(Map<String, dynamic> json) =>
@@ -214,6 +243,7 @@ class ArchitectTerrainContour {
             (json['rawAbsoluteElevation'] as num?)?.toDouble(),
         closed: json['closed'] == true,
         isMajor: json['isMajor'] == true,
+        isSpline: json['isSpline'] == true,
       );
 }
 
@@ -303,6 +333,60 @@ class ArchitectTerrainSurface {
       boundaries.isEmpty && contours.isEmpty && spots.isEmpty;
 
   bool get isNotEmpty => !isEmpty;
+
+  bool get hasOuterBoundary => boundaries.any(
+    (b) => b.polygon.length >= 3 && !b.isFlatPad && !b.isHole,
+  );
+
+  /// Updates the building ±0.00 datum (in absolute survey meters) and
+  /// recalculates relative elevations of all contours and spots.
+  ArchitectTerrainSurface withDatumElevation(double newDatum) {
+    return copyWith(
+      datumElevation: newDatum,
+      contours: [
+        for (final c in contours)
+          () {
+            final absZ = c.effectiveAbsolute(datumElevation);
+            return c.copyWith(
+              rawAbsoluteElevation: absZ,
+              elevation: double.parse((absZ - newDatum).toStringAsFixed(4)),
+            );
+          }(),
+      ],
+      spots: [
+        for (final s in spots)
+          () {
+            final absZ = s.effectiveAbsolute(datumElevation);
+            return s.copyWith(
+              rawAbsoluteElevation: absZ,
+              elevation: double.parse((absZ - newDatum).toStringAsFixed(4)),
+            );
+          }(),
+      ],
+    );
+  }
+
+  /// Clones this surface as a Proposed terrain with independent element IDs.
+  ArchitectTerrainSurface cloneAsProposed() {
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    return ArchitectTerrainSurface(
+      id: 'terrain_proposed',
+      state: ArchitectTerrainState.proposed,
+      datumElevation: datumElevation,
+      boundaries: [
+        for (var i = 0; i < boundaries.length; i++)
+          boundaries[i].copyWith(id: 'prop_bnd_${stamp}_$i'),
+      ],
+      contours: [
+        for (var i = 0; i < contours.length; i++)
+          contours[i].copyWith(id: 'prop_cnt_${stamp}_$i'),
+      ],
+      spots: [
+        for (var i = 0; i < spots.length; i++)
+          spots[i].copyWith(id: 'prop_spot_${stamp}_$i'),
+      ],
+    );
+  }
 
   Rect? get bounds {
     Rect? result;
@@ -406,7 +490,14 @@ class ArchitectTerrainSurface {
       }
     }
 
-    // 2. Inverse-distance weighted interpolation over spots, contour segments, and boundary edges
+    // 2. Constrained TIN barycentric interpolation (exact contours, spots & slopes)
+    final tin = ArchitectTerrainTin.of(effective);
+    final tinElevation = tin?.evaluateElevationAt(point);
+    if (tinElevation != null) {
+      return tinElevation;
+    }
+
+    // 3. Fallback IDW interpolation outside TIN or when surface has < 3 non-collinear points
     var weightedSum = 0.0;
     var weightTotal = 0.0;
 
@@ -428,23 +519,32 @@ class ArchitectTerrainSurface {
     }
 
     for (final c in effective.contours) {
-      if (c.points.isEmpty) continue;
-      if (c.points.length == 1) {
-        addSample(c.points.first, c.elevation, weightBoost: 1.5);
+      final pts = c.resolvedPolyline(samplesPerSpan: 8);
+      if (pts.isEmpty) continue;
+      if (pts.length == 1) {
+        addSample(pts.first, c.elevation, weightBoost: 1.5);
         continue;
       }
-      final count = c.closed ? c.points.length : c.points.length - 1;
+      final count = c.closed ? pts.length : pts.length - 1;
       for (var i = 0; i < count; i++) {
-        final a = c.points[i];
-        final b = c.points[(i + 1) % c.points.length];
+        final a = pts[i];
+        final b = pts[(i + 1) % pts.length];
         final closest = _closestPointOnSegment(point, a, b);
         addSample(closest, c.elevation, weightBoost: 2.5);
         if (weightTotal >= 1e8) return weightedSum / weightTotal;
       }
     }
 
+    final hasTopography =
+        effective.contours.isNotEmpty || effective.spots.isNotEmpty;
     for (final bnd in effective.boundaries) {
       if (bnd.polygon.isEmpty) continue;
+      if (hasTopography &&
+          !bnd.isFlatPad &&
+          !bnd.isHole &&
+          bnd.autoInterpolateElevation) {
+        continue;
+      }
       for (var i = 0; i < bnd.polygon.length; i++) {
         final j = (i + 1) % bnd.polygon.length;
         final a = bnd.polygon[i];
@@ -508,14 +608,28 @@ class ArchitectTerrainSurface {
     }
 
     for (final c in effective.contours) {
-      final count = c.closed ? c.points.length : c.points.length - 1;
+      final pts = c.resolvedPolyline(samplesPerSpan: 6);
+      final count = c.closed ? pts.length : pts.length - 1;
       for (var i = 0; i < count; i++) {
-        intersectSegment(c.points[i], c.points[(i + 1) % c.points.length]);
+        intersectSegment(pts[i], pts[(i + 1) % pts.length]);
       }
     }
     for (final b in effective.boundaries) {
       for (var i = 0; i < b.polygon.length; i++) {
         intersectSegment(b.polygon[i], b.polygon[(i + 1) % b.polygon.length]);
+      }
+    }
+    final tinHits = ArchitectTerrainTin.of(effective)?.intersectionStations(
+      start,
+      end,
+    );
+    if (tinHits != null) {
+      for (final hitPt in tinHits) {
+        final s =
+            (hitPt.dx - start.dx) * dir.dx + (hitPt.dy - start.dy) * dir.dy;
+        if (s >= 0.0 && s <= totalLen) {
+          stations.add(s);
+        }
       }
     }
 

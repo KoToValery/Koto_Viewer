@@ -28,6 +28,7 @@ import '../rendering/dxf_quadtree.dart';
 class DxfPolylineVertex {
   final double x;
   final double y;
+  final double z;
   final double bulge;
   final double startWidth;
   final double endWidth;
@@ -36,6 +37,7 @@ class DxfPolylineVertex {
   const DxfPolylineVertex({
     required this.x,
     required this.y,
+    this.z = 0.0,
     this.bulge = 0.0,
     this.startWidth = 0.0,
     this.endWidth = 0.0,
@@ -727,12 +729,14 @@ class DxfPolyline extends DxfEntity {
   final bool isClosed;
   final bool is3D;
   final int flags;
+  final double elevation;
 
   const DxfPolyline({
     required this.vertices,
     this.isClosed = false,
     this.is3D = false,
     this.flags = 0,
+    this.elevation = 0.0,
     super.layer,
     super.colorIndex,
     super.trueColor,
@@ -773,6 +777,7 @@ class DxfSpline extends DxfEntity {
   final List<double> weights;
   final bool isClosed;
   final bool isRational;
+  final double? elevation;
 
   const DxfSpline({
     required this.degree,
@@ -782,6 +787,7 @@ class DxfSpline extends DxfEntity {
     this.weights = const [],
     this.isClosed = false,
     this.isRational = false,
+    this.elevation,
     super.layer,
     super.colorIndex,
     super.trueColor,

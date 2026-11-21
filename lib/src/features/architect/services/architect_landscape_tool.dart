@@ -4,18 +4,36 @@ import 'package:flutter/foundation.dart';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_project.dart';
 
+/// Candidate contour curve detected under the lifted pointer on a CAD underlay.
+class ArchitectPickedContourCandidate {
+  final List<Offset> points;
+  final bool closed;
+  final double? suggestedElevation;
+  final String? sourceLayer;
+  final Offset? anchorPoint;
+
+  const ArchitectPickedContourCandidate({
+    required this.points,
+    this.closed = false,
+    this.suggestedElevation,
+    this.sourceLayer,
+    this.anchorPoint,
+  });
+}
+
 /// Unified controller and geometry helper for the Landscape tool category:
 /// Terrain (`terrain`), Pathway with Automatic Curb (`pathway`),
 /// Vegetation (`vegetation`), and Site Fence / Gabion / Retaining Wall (`siteFence`).
 class ArchitectLandscapeTool extends ChangeNotifier {
   // --- Terrain State ---
-  ArchitectTerrainState terrainState = ArchitectTerrainState.proposed;
+  ArchitectTerrainState terrainState = ArchitectTerrainState.existing;
   ArchitectTerrainDraftMode terrainMode = ArchitectTerrainDraftMode.boundary;
-  double terrainElevation = -0.15;
+  double terrainElevation = 0.0;
   double terrainDatumElevation = 0.0;
   double contourAbsoluteElevation = 0.0;
   bool contourClosed = false;
   bool contourMajor = false;
+  ArchitectPickedContourCandidate? pickedContourPreview;
 
   // --- Pathway State ---
   double pathwayWidth = 1.50;
@@ -77,6 +95,12 @@ class ArchitectLandscapeTool extends ChangeNotifier {
 
   void clearDraft() {
     draftPoints.clear();
+    pickedContourPreview = null;
+    notifyListeners();
+  }
+
+  void setPickedContourPreview(ArchitectPickedContourCandidate? candidate) {
+    pickedContourPreview = candidate;
     notifyListeners();
   }
 
@@ -180,7 +204,9 @@ class ArchitectLandscapeTool extends ChangeNotifier {
         ArchitectTerrainDraftMode.hole ||
         ArchitectTerrainDraftMode.pad =>
           draftPoints.length >= 3,
+        ArchitectTerrainDraftMode.boundaryRect => draftPoints.length >= 2,
         ArchitectTerrainDraftMode.contour => draftPoints.length >= 2,
+        ArchitectTerrainDraftMode.pickContour ||
         ArchitectTerrainDraftMode.spot => false,
       },
       'contour' => draftPoints.length >= 2,
@@ -219,11 +245,27 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           );
           return _updateSurface(project, nextSurface);
         }
+        if (terrainMode == ArchitectTerrainDraftMode.boundaryRect) {
+          if (draftPoints.isEmpty) {
+            draftPoints.add(worldPoint);
+            return null;
+          }
+          final a = draftPoints.first;
+          final b = worldPoint;
+          if ((a.dx - b.dx).abs() < 0.1 || (a.dy - b.dy).abs() < 0.1) {
+            return null;
+          }
+          draftPoints.add(b);
+          return commitDraft(toolName: toolName, project: project);
+        }
         if ((terrainMode == ArchitectTerrainDraftMode.boundary ||
                 terrainMode == ArchitectTerrainDraftMode.pad) &&
             draftPoints.length >= 3 &&
             (worldPoint - draftPoints.first).distance <= closeThresholdWorld) {
           return commitDraft(toolName: toolName, project: project);
+        }
+        if (terrainMode == ArchitectTerrainDraftMode.pickContour) {
+          return null;
         }
         draftPoints.add(worldPoint);
         return null;
@@ -287,19 +329,52 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     switch (toolName) {
       case 'terrain':
         final surface = _targetSurface(project);
-        if (terrainMode == ArchitectTerrainDraftMode.boundary ||
-            terrainMode == ArchitectTerrainDraftMode.hole ||
-            terrainMode == ArchitectTerrainDraftMode.pad) {
+        if (terrainMode == ArchitectTerrainDraftMode.boundaryRect &&
+            pts.length >= 2) {
+          final a = pts.first;
+          final b = pts.last;
+          final minX = math.min(a.dx, b.dx);
+          final maxX = math.max(a.dx, b.dx);
+          final minY = math.min(a.dy, b.dy);
+          final maxY = math.max(a.dy, b.dy);
+          final rectPoly = [
+            Offset(minX, minY),
+            Offset(maxX, minY),
+            Offset(maxX, maxY),
+            Offset(minX, maxY),
+          ];
           final boundary = ArchitectTerrainBoundary(
             id: 'terr_bnd_$nowMicros',
-            polygon: pts,
-            elevation: terrainElevation,
-            isCutoutPad: terrainMode == ArchitectTerrainDraftMode.pad,
-            isHole: terrainMode == ArchitectTerrainDraftMode.hole,
+            polygon: rectPoly,
+            elevation: 0.0,
+            autoInterpolateElevation: true,
           );
           return _updateSurface(
             project,
-            surface.copyWith(boundaries: [...surface.boundaries, boundary]),
+            surface.copyWith(
+              datumElevation: terrainDatumElevation,
+              boundaries: [...surface.boundaries, boundary],
+            ),
+          );
+        }
+        if (terrainMode == ArchitectTerrainDraftMode.boundary ||
+            terrainMode == ArchitectTerrainDraftMode.hole ||
+            terrainMode == ArchitectTerrainDraftMode.pad) {
+          final isOuter = terrainMode == ArchitectTerrainDraftMode.boundary;
+          final boundary = ArchitectTerrainBoundary(
+            id: 'terr_bnd_$nowMicros',
+            polygon: pts,
+            elevation: isOuter ? 0.0 : terrainElevation,
+            isCutoutPad: terrainMode == ArchitectTerrainDraftMode.pad,
+            isHole: terrainMode == ArchitectTerrainDraftMode.hole,
+            autoInterpolateElevation: isOuter,
+          );
+          return _updateSurface(
+            project,
+            surface.copyWith(
+              datumElevation: isOuter ? terrainDatumElevation : surface.datumElevation,
+              boundaries: [...surface.boundaries, boundary],
+            ),
           );
         } else if (terrainMode == ArchitectTerrainDraftMode.contour) {
           final datum = surface.datumElevation.abs() > 1e-4
@@ -317,6 +392,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
                 : (effectiveElevation + datum),
             closed: contourClosed,
             isMajor: contourMajor,
+            isSpline: true,
           );
           return _updateSurface(
             project,
@@ -506,6 +582,35 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           );
   }
 
+  /// Clones `existingTerrain` into `proposedTerrain` (1-click Proposed from Existing).
+  static ArchitectProject cloneExistingToProposed(ArchitectProject project) {
+    if (project.existingTerrain.isEmpty) return project;
+    return project.copyWith(
+      proposedTerrain: project.existingTerrain.cloneAsProposed(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  /// Updates the building ±0.00 datum elevation on [state] (and both surfaces if synced)
+  /// while preserving all contours' and spots' absolute geodetic elevations.
+  static ArchitectProject updateSurfaceDatum(
+    ArchitectProject project, {
+    required ArchitectTerrainState state,
+    required double newDatum,
+  }) {
+    final nextExisting = state == ArchitectTerrainState.existing
+        ? project.existingTerrain.withDatumElevation(newDatum)
+        : project.existingTerrain;
+    final nextProposed = state == ArchitectTerrainState.proposed
+        ? project.proposedTerrain.withDatumElevation(newDatum)
+        : project.proposedTerrain;
+    return project.copyWith(
+      existingTerrain: nextExisting,
+      proposedTerrain: nextProposed,
+      updatedAt: DateTime.now(),
+    );
+  }
+
   // ===========================================================================
   // HIT-TESTING, SELECTION MOVE & DELETION HELPERS
   // ===========================================================================
@@ -587,7 +692,12 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           }
         }
         for (final contour in surface.contours.reversed) {
-          if (_hitPolyline(contour.points, worldPoint, hitTolerance)) {
+          if (_hitPolyline(
+            contour.resolvedPolyline(samplesPerSpan: 8),
+            worldPoint,
+            hitTolerance,
+            closed: contour.closed,
+          )) {
             return contour.id;
           }
         }

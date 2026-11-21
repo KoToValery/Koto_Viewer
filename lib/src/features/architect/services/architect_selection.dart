@@ -387,7 +387,7 @@ class ArchitectSelection {
       }
       for (final c in surface.contours) {
         if (c.id == id && c.points.length >= 2) {
-          return path..addPolygon(c.points, c.closed);
+          return path..addPolygon(c.resolvedPolyline(samplesPerSpan: 8), c.closed);
         }
       }
       for (final sp in surface.spots) {

@@ -4675,5 +4675,16 @@
   "architectCeilingShowElevation": "Показвай кота",
   "architectCeilingPickRoomFailed": "Не е намерено затворено помещение. Проверете стените или изберете Полигон.",
   "architectCeilingPlenumWarning": "Недостатъчен пленум: спускането е по-малко от дебелината на конструкцията.",
-  "architectCeilingBeamConflictDetails": "Колизия с {count} греда/греди отгоре."
+  "architectCeilingBeamConflictDetails": "Колизия с {count} греда/греди отгоре.",
+  "architectTerrainModeBoundaryRect": "Правоъгълник",
+  "architectTerrainModePickContour": "Извлечи хоризонтал",
+  "architectTerrainCreateProposed": "Създай проектен",
+  "architectTerrainEditElevation": "Кота Z",
+  "architectTerrainPickContourHint": "Задръж и насочи точката върху хоризонтал от подложката",
+  "architectTerrainNoUnderlayHint": "Първо импортирайте CAD подложка (DXF/DWG), за да извличате хоризонтали",
+  "architectTerrainCreateBoundaryFirst": "Първо очертайте външната граница на терена",
+  "architectTerrainContourElevationTitle": "Кота на хоризонтал",
+  "architectTerrainSpotElevationTitle": "Височинна кота",
+  "architectTerrainNoContourAtPoint": "Не е открит хоризонтал под точката",
+  "architectTerrainProposedCloned": "Проектният терен е създаден от съществуващия"
 }

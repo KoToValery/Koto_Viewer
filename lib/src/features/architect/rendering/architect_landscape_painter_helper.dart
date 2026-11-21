@@ -4,7 +4,9 @@ import '../../bim_editing/geometry/bim_polygon_geometry.dart';
 import '../models/architect_hatch_pattern.dart';
 import '../models/architect_material_layer.dart';
 import '../models/architect_project.dart';
+import '../services/architect_landscape_tool.dart';
 import '../services/architect_overhang_detector.dart';
+import '../services/architect_spline_geometry.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_hatch_geometry.dart';
 import 'architect_overhang_painter_helper.dart';
@@ -147,7 +149,12 @@ class ArchitectLandscapePainterHelper {
     for (final contour in surface.contours) {
       if (contour.points.length < 2) continue;
       final isSelected = selectedIds.contains(contour.id);
-      final path = _smoothContourPath(contour.points, closed: contour.closed);
+      final path = contour.isSpline && contour.points.length >= 3
+          ? ArchitectSplineGeometry.generatePath(
+              contour.points,
+              closed: contour.closed,
+            )
+          : _polygonPath(contour.points, closed: contour.closed);
       final strokePaint = Paint()
         ..color = isSelected ? const Color(0xFF2563EB) : primaryColor
         ..strokeWidth = (isSelected ? 2.0 : (isProposed ? 1.25 : 1.0)) / zoomScale
@@ -1453,6 +1460,9 @@ class ArchitectLandscapePainterHelper {
     bool showCurbs = false,
     double curbWidth = 0.15,
     double? previewRadius,
+    bool isRectangleDraft = false,
+    bool isSplineDraft = false,
+    bool isClosedSpline = false,
   }) {
     final pts = <Offset>[
       ...draftPoints,
@@ -1478,6 +1488,28 @@ class ArchitectLandscapePainterHelper {
 
     if (pts.isEmpty) return;
 
+    if (isRectangleDraft && pts.length >= 2) {
+      final a = pts.first;
+      final b = pts.last;
+      final rect = Rect.fromPoints(a, b);
+      final rectPath = Path()..addRect(rect);
+      canvas.drawPath(rectPath, fillPaint);
+      _drawDashedPath(
+        canvas,
+        rectPath,
+        strokePaint,
+        dashLength: 0.30,
+        gapLength: 0.15,
+      );
+      final handleRadius = 4.0 / zoomScale;
+      final dotPaint = Paint()
+        ..color = accentColor
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(a, handleRadius, dotPaint);
+      canvas.drawCircle(b, handleRadius, dotPaint);
+      return;
+    }
+
     if (pts.length >= 2 && previewWidth > 0.05) {
       final halfW = previewWidth * 0.5;
       final left = ArchitectPathway.offsetChain(pts, halfW);
@@ -1501,7 +1533,9 @@ class ArchitectLandscapePainterHelper {
         canvas.drawPath(_polygonPath(rightOuter, closed: false), curbPaint);
       }
     } else if (pts.length >= 2) {
-      final path = _polygonPath(pts, closed: false);
+      final path = (isSplineDraft && pts.length >= 3)
+          ? ArchitectSplineGeometry.generatePath(pts, closed: isClosedSpline)
+          : _polygonPath(pts, closed: false);
       _drawDashedPath(
         canvas,
         path,
@@ -1520,6 +1554,43 @@ class ArchitectLandscapePainterHelper {
     }
   }
 
+  /// Draws the live highlight for a CAD underlay contour detected under the lifted pointer.
+  static void drawPickedContourPreview({
+    required Canvas canvas,
+    required ArchitectPickedContourCandidate candidate,
+    required double zoomScale,
+  }) {
+    if (candidate.points.length < 2) return;
+    final path = _polygonPath(candidate.points, closed: candidate.closed);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0x5500E5FF)
+        ..strokeWidth = 6.0 / zoomScale
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke,
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xFF00E5FF)
+        ..strokeWidth = 2.4 / zoomScale
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke,
+    );
+    if (candidate.anchorPoint != null) {
+      canvas.drawCircle(
+        candidate.anchorPoint!,
+        5.0 / zoomScale,
+        Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..style = PaintingStyle.fill,
+      );
+    }
+  }
+
   // ===========================================================================
   // INTERNAL GEOMETRY & VECTOR HELPERS
   // ===========================================================================
@@ -1532,24 +1603,6 @@ class ArchitectLandscapePainterHelper {
       path.lineTo(pts[i].dx, pts[i].dy);
     }
     if (closed && pts.length >= 3) path.close();
-    return path;
-  }
-
-  static Path _smoothContourPath(List<Offset> pts, {required bool closed}) {
-    if (pts.length < 3) return _polygonPath(pts, closed: closed);
-    final path = Path()..moveTo(pts.first.dx, pts.first.dy);
-    for (int i = 0; i < pts.length - 1; i++) {
-      final p0 = pts[i];
-      final p1 = pts[i + 1];
-      final mid = Offset((p0.dx + p1.dx) * 0.5, (p0.dy + p1.dy) * 0.5);
-      if (i == 0) {
-        path.lineTo(mid.dx, mid.dy);
-      } else {
-        path.quadraticBezierTo(p0.dx, p0.dy, mid.dx, mid.dy);
-      }
-    }
-    path.lineTo(pts.last.dx, pts.last.dy);
-    if (closed) path.close();
     return path;
   }
 

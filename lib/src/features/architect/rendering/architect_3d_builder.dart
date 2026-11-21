@@ -29,6 +29,7 @@ import '../services/component_geometry_cache.dart';
 import '../services/component_library_service.dart';
 import '../services/architect_service_geometry.dart';
 import '../services/architect_decorative_geometry.dart';
+import '../services/architect_terrain_tin.dart';
 import 'architect_fence_3d_mesh.dart';
 
 // TOC: buildProjectMesh, [TAG:ROOF_DIAGONAL_TIMBER], buildRoofBody,
@@ -1511,15 +1512,18 @@ class Architect3dBuilder {
         project.existingTerrain.evaluateElevationAt(p) ??
         fallback;
 
-    // 1. Proposed Terrain 2.5D Surface (with automatic contour recognition & cutouts)
+    // 1. Proposed (or Existing fallback) Terrain 2.5D Surface
+    final activeTerrain = project.proposedTerrain.isNotEmpty
+        ? project.proposedTerrain
+        : project.existingTerrain;
     if (project.isLayerVisible(ArchitectLayer.terrainProposedLayerId) &&
-        (project.proposedTerrain.isNotEmpty || project.existingTerrain.isNotEmpty)) {
+        activeTerrain.isNotEmpty) {
       var terrainFootprint = Path();
-      final hasOuterBoundaries = project.proposedTerrain.boundaries
+      final hasOuterBoundaries = activeTerrain.boundaries
           .any((b) => b.polygon.length >= 3 && !b.isCutoutPad && !b.isHole);
 
       if (hasOuterBoundaries) {
-        for (final b in project.proposedTerrain.boundaries) {
+        for (final b in activeTerrain.boundaries) {
           if (b.polygon.length < 3 || b.isCutoutPad || b.isHole) continue;
           terrainFootprint = Path.combine(
             PathOperation.union,
@@ -1529,8 +1533,7 @@ class Architect3dBuilder {
         }
       } else {
         // Automatic domain recognition from contours and spot elevations
-        final rawBounds = project.proposedTerrain.bounds ??
-            project.existingTerrain.bounds;
+        final rawBounds = activeTerrain.bounds;
         if (rawBounds != null && !rawBounds.isEmpty) {
           final domainRect = rawBounds.inflate(3.5);
           terrainFootprint = Path()..addRect(domainRect);
@@ -1538,7 +1541,7 @@ class Architect3dBuilder {
       }
 
       // Cut out holes and flat cutout pads
-      for (final b in project.proposedTerrain.boundaries) {
+      for (final b in activeTerrain.boundaries) {
         if (b.polygon.length < 3 || (!b.isCutoutPad && !b.isHole)) continue;
         try {
           terrainFootprint = Path.combine(
@@ -1550,10 +1553,12 @@ class Architect3dBuilder {
       }
 
       // Cut out ground-floor slabs so terrain does not poke into building interior
+      final buildingCutouts = <List<Offset>>[];
       for (final s in project.storeys) {
         if (!s.isBuildingStorey || s.elevation.abs() > 0.6) continue;
         for (final slab in s.slabs) {
           if (slab.polygon.length >= 3) {
+            buildingCutouts.add(slab.polygon);
             try {
               terrainFootprint = Path.combine(
                 PathOperation.difference,
@@ -1567,15 +1572,26 @@ class Architect3dBuilder {
 
       if (!terrainFootprint.getBounds().isEmpty) {
         final first = allTris.length;
-        allTris.addAll(
-          _buildTopographicTerrainMesh3D(
-            terrainFootprint: terrainFootprint,
-            groundZ: (p) => groundZ(p, -0.15),
-            topColor: const Color(0xFF7FA66C),
-            sideColor: const Color(0xFF8B6F4E),
-            bottomColor: const Color(0xFF6E553A),
-          ),
+        final tinTris = ArchitectTerrainTin.buildMesh3D(
+          activeTerrain,
+          buildingCutouts: buildingCutouts,
+          topColor: const Color(0xFF7FA66C),
+          sideColor: const Color(0xFF8B6F4E),
+          bottomColor: const Color(0xFF6E553A),
         );
+        if (tinTris.isNotEmpty) {
+          allTris.addAll(tinTris);
+        } else {
+          allTris.addAll(
+            _buildTopographicTerrainMesh3D(
+              terrainFootprint: terrainFootprint,
+              groundZ: (p) => groundZ(p, -0.15),
+              topColor: const Color(0xFF7FA66C),
+              sideColor: const Color(0xFF8B6F4E),
+              bottomColor: const Color(0xFF6E553A),
+            ),
+          );
+        }
         mark('terrain_proposed', first);
       }
     }

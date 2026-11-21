@@ -7478,5 +7478,16 @@
   "architectCeilingShowElevation": "Show elevation",
   "architectCeilingPickRoomFailed": "No enclosed room found. Check walls or switch to Polygon mode.",
   "architectCeilingPlenumWarning": "Plenum is negative: drop is smaller than ceiling construction.",
-  "architectCeilingBeamConflictDetails": "Clashes with {count} overhead beam(s)."
+  "architectCeilingBeamConflictDetails": "Clashes with {count} overhead beam(s).",
+  "architectTerrainModeBoundaryRect": "Rectangle",
+  "architectTerrainModePickContour": "Pick Contour",
+  "architectTerrainCreateProposed": "Create Proposed",
+  "architectTerrainEditElevation": "Edit Z",
+  "architectTerrainPickContourHint": "Hold & aim with the pointer over a CAD underlay contour",
+  "architectTerrainNoUnderlayHint": "Import a CAD underlay (DXF/DWG) first to pick contours",
+  "architectTerrainCreateBoundaryFirst": "Draw the Terrain outer boundary first",
+  "architectTerrainContourElevationTitle": "Contour Elevation",
+  "architectTerrainSpotElevationTitle": "Spot Elevation",
+  "architectTerrainNoContourAtPoint": "No contour curve found under pointer",
+  "architectTerrainProposedCloned": "Proposed terrain created from Existing"
 }

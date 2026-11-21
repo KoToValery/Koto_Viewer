@@ -13613,4 +13613,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String architectCeilingBeamConflictDetails(Object count) {
     return 'Clashes with $count overhead beam(s).';
   }
+
+  @override
+  String get architectTerrainModeBoundaryRect => 'Rectangle';
+
+  @override
+  String get architectTerrainModePickContour => 'Pick Contour';
+
+  @override
+  String get architectTerrainCreateProposed => 'Create Proposed';
+
+  @override
+  String get architectTerrainEditElevation => 'Edit Z';
+
+  @override
+  String get architectTerrainPickContourHint =>
+      'Hold & aim with the pointer over a CAD underlay contour';
+
+  @override
+  String get architectTerrainNoUnderlayHint =>
+      'Import a CAD underlay (DXF/DWG) first to pick contours';
+
+  @override
+  String get architectTerrainCreateBoundaryFirst =>
+      'Draw the Terrain outer boundary first';
+
+  @override
+  String get architectTerrainContourElevationTitle => 'Contour Elevation';
+
+  @override
+  String get architectTerrainSpotElevationTitle => 'Spot Elevation';
+
+  @override
+  String get architectTerrainNoContourAtPoint =>
+      'No contour curve found under pointer';
+
+  @override
+  String get architectTerrainProposedCloned =>
+      'Proposed terrain created from Existing';
 }

@@ -13664,4 +13664,42 @@ class AppLocalizationsBg extends AppLocalizations {
   String architectCeilingBeamConflictDetails(Object count) {
     return 'Колизия с $count греда/греди отгоре.';
   }
+
+  @override
+  String get architectTerrainModeBoundaryRect => 'Правоъгълник';
+
+  @override
+  String get architectTerrainModePickContour => 'Извлечи хоризонтал';
+
+  @override
+  String get architectTerrainCreateProposed => 'Създай проектен';
+
+  @override
+  String get architectTerrainEditElevation => 'Кота Z';
+
+  @override
+  String get architectTerrainPickContourHint =>
+      'Задръж и насочи точката върху хоризонтал от подложката';
+
+  @override
+  String get architectTerrainNoUnderlayHint =>
+      'Първо импортирайте CAD подложка (DXF/DWG), за да извличате хоризонтали';
+
+  @override
+  String get architectTerrainCreateBoundaryFirst =>
+      'Първо очертайте външната граница на терена';
+
+  @override
+  String get architectTerrainContourElevationTitle => 'Кота на хоризонтал';
+
+  @override
+  String get architectTerrainSpotElevationTitle => 'Височинна кота';
+
+  @override
+  String get architectTerrainNoContourAtPoint =>
+      'Не е открит хоризонтал под точката';
+
+  @override
+  String get architectTerrainProposedCloned =>
+      'Проектният терен е създаден от съществуващия';
 }

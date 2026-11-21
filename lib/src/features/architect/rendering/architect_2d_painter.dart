@@ -2235,6 +2235,14 @@ class Architect2dPainter extends CustomPainter {
     }
     if (activeTool.isLandscapeTool && landscapeTool != null) {
       final lt = landscapeTool!;
+      if (lt.pickedContourPreview != null &&
+          lt.terrainMode == ArchitectTerrainDraftMode.pickContour) {
+        ArchitectLandscapePainterHelper.drawPickedContourPreview(
+          canvas: canvas,
+          candidate: lt.pickedContourPreview!,
+          zoomScale: zoomScale,
+        );
+      }
       ArchitectLandscapePainterHelper.drawActiveLandscapeDraft(
         canvas: canvas,
         draftPoints: lt.draftPoints,
@@ -2274,6 +2282,14 @@ class Architect2dPainter extends CustomPainter {
                 lt.plantSpecies != ArchitectPlantSpecies.trimmedHedge
             ? lt.plantCrownDiameter * 0.5
             : null,
+        isRectangleDraft:
+            activeTool == ArchitectTool.terrain &&
+            lt.terrainMode == ArchitectTerrainDraftMode.boundaryRect,
+        isSplineDraft:
+            (activeTool == ArchitectTool.terrain &&
+                lt.terrainMode == ArchitectTerrainDraftMode.contour) ||
+            activeTool == ArchitectTool.contour,
+        isClosedSpline: lt.contourClosed,
       );
     }
     if (activeTool == ArchitectTool.column && columnPreview != null) {

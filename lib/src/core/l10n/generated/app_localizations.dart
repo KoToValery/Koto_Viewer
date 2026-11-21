@@ -24731,6 +24731,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clashes with {count} overhead beam(s).'**
   String architectCeilingBeamConflictDetails(Object count);
+
+  /// No description provided for @architectTerrainModeBoundaryRect.
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangle'**
+  String get architectTerrainModeBoundaryRect;
+
+  /// No description provided for @architectTerrainModePickContour.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick Contour'**
+  String get architectTerrainModePickContour;
+
+  /// No description provided for @architectTerrainCreateProposed.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Proposed'**
+  String get architectTerrainCreateProposed;
+
+  /// No description provided for @architectTerrainEditElevation.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Z'**
+  String get architectTerrainEditElevation;
+
+  /// No description provided for @architectTerrainPickContourHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold & aim with the pointer over a CAD underlay contour'**
+  String get architectTerrainPickContourHint;
+
+  /// No description provided for @architectTerrainNoUnderlayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a CAD underlay (DXF/DWG) first to pick contours'**
+  String get architectTerrainNoUnderlayHint;
+
+  /// No description provided for @architectTerrainCreateBoundaryFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw the Terrain outer boundary first'**
+  String get architectTerrainCreateBoundaryFirst;
+
+  /// No description provided for @architectTerrainContourElevationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Contour Elevation'**
+  String get architectTerrainContourElevationTitle;
+
+  /// No description provided for @architectTerrainSpotElevationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Spot Elevation'**
+  String get architectTerrainSpotElevationTitle;
+
+  /// No description provided for @architectTerrainNoContourAtPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'No contour curve found under pointer'**
+  String get architectTerrainNoContourAtPoint;
+
+  /// No description provided for @architectTerrainProposedCloned.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed terrain created from Existing'**
+  String get architectTerrainProposedCloned;
 }
 
 class _AppLocalizationsDelegate

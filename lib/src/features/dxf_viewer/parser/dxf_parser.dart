@@ -1227,8 +1227,10 @@ class DxfParser {
 
       case 'POLYLINE':
         int flags = 0;
+        double polyElevation = 0.0;
         for (final p in entityPairs) {
           if (p.code == 70) flags = p.intValue;
+          if (p.code == 30 || p.code == 38) polyElevation = p.doubleValue;
         }
         final bool isClosed = (flags & 1) != 0;
         final bool is3D = (flags & 8) != 0;
@@ -1247,7 +1249,7 @@ class DxfParser {
               break;
             } else if (nextType == 'VERTEX') {
               idx++;
-              double vx = 0, vy = 0, vBulge = 0;
+              double vx = 0, vy = 0, vz = polyElevation, vBulge = 0;
               int vFlags = 0;
               while (idx < total && pairs[idx].code != 0) {
                 final vp = pairs[idx];
@@ -1257,6 +1259,9 @@ class DxfParser {
                     break;
                   case 20:
                     vy = vp.doubleValue;
+                    break;
+                  case 30:
+                    vz = vp.doubleValue;
                     break;
                   case 42:
                     vBulge = vp.doubleValue;
@@ -1270,6 +1275,7 @@ class DxfParser {
               rawVertices.add(DxfPolylineVertex(
                 x: vx,
                 y: vy,
+                z: vz,
                 bulge: vBulge,
                 flags: vFlags,
               ));
@@ -1301,6 +1307,7 @@ class DxfParser {
           isClosed: isClosed,
           is3D: is3D,
           flags: flags,
+          elevation: polyElevation,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,
@@ -1319,9 +1326,11 @@ class DxfParser {
         final List<Offset> fitPoints = [];
         final List<double> knots = [];
         final List<double> weights = [];
+        final List<double> zSamples = [];
 
         double tempCx = 0, tempCy = 0;
         double tempFx = 0, tempFy = 0;
+        double? splineElev;
 
         for (final p in entityPairs) {
           switch (p.code) {
@@ -1331,12 +1340,19 @@ class DxfParser {
             case 70:
               flags = p.intValue;
               break;
+            case 38:
+              splineElev = p.doubleValue;
+              break;
             case 10:
               tempCx = p.doubleValue;
               break;
             case 20:
               tempCy = p.doubleValue;
               controlPoints.add(Offset(tempCx, tempCy));
+              break;
+            case 30:
+            case 31:
+              zSamples.add(p.doubleValue);
               break;
             case 11:
               tempFx = p.doubleValue;
@@ -1354,6 +1370,14 @@ class DxfParser {
           }
         }
 
+        if (splineElev == null && zSamples.isNotEmpty) {
+          final firstZ = zSamples.first;
+          if (firstZ.abs() > 1e-4 &&
+              zSamples.every((z) => (z - firstZ).abs() < 1e-3)) {
+            splineElev = firstZ;
+          }
+        }
+
         entity = DxfSpline(
           degree: degree,
           controlPoints: controlPoints,
@@ -1362,6 +1386,7 @@ class DxfParser {
           weights: weights,
           isClosed: (flags & 1) != 0,
           isRational: (flags & 4) != 0,
+          elevation: splineElev,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,

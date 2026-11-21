@@ -502,7 +502,8 @@ void main() {
       expect(contour.effectiveRelative(541.00), closeTo(1.50, 1e-4));
 
       // 3. Landscape Tool commitDraft with 'contour' tool
-      final tool = ArchitectLandscapeTool();
+      final tool = ArchitectLandscapeTool()
+        ..terrainState = ArchitectTerrainState.proposed;
       tool.terrainDatumElevation = 540.00;
       tool.contourAbsoluteElevation = 543.20;
       tool.draftPoints.addAll([const Offset(0, 5), const Offset(15, 5)]);

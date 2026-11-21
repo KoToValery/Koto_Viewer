@@ -11,12 +11,17 @@ import 'architect_numeric_keypad.dart';
 class ArchitectLandscapeBar extends StatelessWidget {
   final ArchitectTool activeTool;
   final ArchitectLandscapeTool landscapeTool;
+  final ArchitectProject? project;
   final VoidCallback onChanged;
   final ValueChanged<ArchitectTerrainState> onTerrainStateChanged;
   final VoidCallback? onCommitDraft;
   final VoidCallback? onUndoPoint;
   final VoidCallback? onCancelDraft;
   final VoidCallback? onSyncTerrainFromGeodesy;
+  final VoidCallback? onCreateProposedFromExisting;
+  final ValueChanged<double>? onDatumUpdated;
+  final VoidCallback? onEditSelectedElevation;
+  final bool hasSelectedContourOrSpot;
   final VoidCallback? onTriggerChamfer;
   final VoidCallback? onTriggerFillet;
 
@@ -24,12 +29,17 @@ class ArchitectLandscapeBar extends StatelessWidget {
     super.key,
     required this.activeTool,
     required this.landscapeTool,
+    this.project,
     required this.onChanged,
     required this.onTerrainStateChanged,
     this.onCommitDraft,
     this.onUndoPoint,
     this.onCancelDraft,
     this.onSyncTerrainFromGeodesy,
+    this.onCreateProposedFromExisting,
+    this.onDatumUpdated,
+    this.onEditSelectedElevation,
+    this.hasSelectedContourOrSpot = false,
     this.onTriggerChamfer,
     this.onTriggerFillet,
   });
@@ -287,6 +297,39 @@ class ArchitectLandscapeBar extends StatelessWidget {
           },
         ),
       ],
+      if (onCreateProposedFromExisting != null &&
+          project != null &&
+          project!.existingTerrain.hasOuterBoundary &&
+          project!.proposedTerrain.isEmpty) ...[
+        ActionChip(
+          key: const ValueKey('architect-terrain-create-proposed'),
+          visualDensity: VisualDensity.compact,
+          avatar: AppIcon(
+            AppIconId.duplicate,
+            size: 15,
+            color: colors.primary,
+          ),
+          label: Text(
+            l.architectTerrainCreateProposed,
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+          ),
+          onPressed: onCreateProposedFromExisting,
+        ),
+        const SizedBox(width: 6),
+      ],
+      if (hasSelectedContourOrSpot && onEditSelectedElevation != null) ...[
+        ActionChip(
+          key: const ValueKey('architect-terrain-edit-elevation'),
+          visualDensity: VisualDensity.compact,
+          avatar: Icon(Icons.edit_rounded, size: 15, color: colors.primary),
+          label: Text(
+            l.architectTerrainEditElevation,
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+          ),
+          onPressed: onEditSelectedElevation,
+        ),
+        const SizedBox(width: 6),
+      ],
       if (onSyncFromGeodesy != null) ...[
         const SizedBox(width: 8),
         ActionChip(
@@ -361,6 +404,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
         controller.contourAbsoluteElevation =
             controller.terrainElevation + res;
       }
+      onDatumUpdated?.call(res);
       _notifyChanged();
     }
   }
@@ -929,10 +973,13 @@ class ArchitectLandscapeBar extends StatelessWidget {
     ArchitectTerrainDraftMode mode,
   ) => switch (mode) {
     ArchitectTerrainDraftMode.boundary => l.architectTerrainModeBoundary,
-    ArchitectTerrainDraftMode.hole => l.architectTerrainModeHole,
+    ArchitectTerrainDraftMode.boundaryRect =>
+      l.architectTerrainModeBoundaryRect,
+    ArchitectTerrainDraftMode.pickContour => l.architectTerrainModePickContour,
     ArchitectTerrainDraftMode.contour => l.architectTerrainModeContour,
     ArchitectTerrainDraftMode.spot => l.architectTerrainModeSpot,
     ArchitectTerrainDraftMode.pad => l.architectTerrainModePad,
+    ArchitectTerrainDraftMode.hole => l.architectTerrainModeHole,
   };
 
   static String _curbModeLabel(

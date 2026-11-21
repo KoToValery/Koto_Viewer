@@ -409,12 +409,12 @@ void main() {
         await _selectLandscapeTool(tester, ArchitectTool.terrain);
         _expectChipSelected(
           tester,
-          ArchitectTerrainState.proposed.label(l10n),
+          ArchitectTerrainState.existing.label(l10n),
           selected: true,
         );
         _expectChipSelected(
           tester,
-          ArchitectTerrainState.existing.label(l10n),
+          ArchitectTerrainState.proposed.label(l10n),
           selected: false,
         );
         _expectChipSelected(
@@ -423,22 +423,42 @@ void main() {
           selected: true,
         );
 
-        await _tapChip(tester, ArchitectTerrainState.existing.label(l10n));
+        await _tapChip(tester, ArchitectTerrainState.proposed.label(l10n));
         _expectChipSelected(
           tester,
-          ArchitectTerrainState.proposed.label(l10n),
+          ArchitectTerrainState.existing.label(l10n),
           selected: false,
         );
         _expectChipSelected(
           tester,
-          ArchitectTerrainState.existing.label(l10n),
+          ArchitectTerrainState.proposed.label(l10n),
+          selected: true,
+        );
+
+        await _tapChip(
+          tester,
+          ArchitectTerrainDraftMode.boundaryRect.label(l10n),
+        );
+        _expectChipSelected(
+          tester,
+          ArchitectTerrainDraftMode.boundaryRect.label(l10n),
+          selected: true,
+        );
+
+        await _tapChip(
+          tester,
+          ArchitectTerrainDraftMode.pickContour.label(l10n),
+        );
+        _expectChipSelected(
+          tester,
+          ArchitectTerrainDraftMode.pickContour.label(l10n),
           selected: true,
         );
 
         await _tapChip(tester, ArchitectTerrainDraftMode.contour.label(l10n));
         _expectChipSelected(
           tester,
-          ArchitectTerrainDraftMode.boundary.label(l10n),
+          ArchitectTerrainDraftMode.pickContour.label(l10n),
           selected: false,
         );
         _expectChipSelected(
