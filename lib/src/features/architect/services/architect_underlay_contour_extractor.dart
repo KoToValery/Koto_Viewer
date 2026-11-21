@@ -247,6 +247,21 @@ class ArchitectUnderlayContourExtractor {
           elevation: null,
           mapPoint: mapPoint,
         );
+      } else if (entity is DxfCircle) {
+        final pts = [
+          for (var i = 0; i < 24; i++)
+            Offset(
+              entity.center.dx + entity.radius * math.cos(i * math.pi / 12.0),
+              entity.center.dy + entity.radius * math.sin(i * math.pi / 12.0),
+            ),
+        ];
+        addCurve(
+          pts,
+          closed: true,
+          layer: effectiveLayer,
+          elevation: null,
+          mapPoint: mapPoint,
+        );
       } else if (entity is DxfText) {
         final parsed = _parseNumericElevation(entity.text);
         if (parsed != null) {
@@ -447,6 +462,42 @@ class ArchitectUnderlayContourExtractor {
     return result;
   }
 
+  /// Stitches connected open [pool] polylines onto [initialChain] by matching
+  /// touching endpoints and tangent continuity within [joinTol].
+  static ({List<Offset> points, bool closed}) stitchOpenCurves({
+    required List<Offset> initialChain,
+    required List<List<Offset>> pool,
+    required Set<int> usedIndices,
+    double joinTol = 0.08,
+  }) {
+    final curves = [
+      for (var i = 0; i < pool.length; i++)
+        _ExtractedCurve(
+          id: i,
+          points: pool[i],
+          closed: false,
+          layer: '',
+          elevation: null,
+          bounds: pool[i].isEmpty ? Rect.zero : _boundsOf(pool[i]),
+        ),
+    ];
+    final result = _stitchChain(
+      initialChain: initialChain,
+      layer: '',
+      index: _FlattenedUnderlayIndex(
+        frame: BimCoordinateFrame(origin: Offset.zero, unitsPerMeter: 1.0),
+        visibilityHash: 0,
+        curves: curves,
+        texts: const [],
+      ),
+      used: usedIndices,
+      initialElev: null,
+      joinTol: joinTol,
+      allowSharpCorners: true,
+    );
+    return (points: result.points, closed: result.closed);
+  }
+
   static ({
     List<Offset> points,
     bool closed,
@@ -459,11 +510,12 @@ class ArchitectUnderlayContourExtractor {
     required _FlattenedUnderlayIndex index,
     required Set<int> used,
     required double? initialElev,
+    double joinTol = 0.08,
+    bool allowSharpCorners = false,
   }) {
     final chain = List<Offset>.from(initialChain);
     var elev = initialElev;
     double? gapElev;
-    const joinTol = 0.08;
     const maxSteps = 256;
 
     for (var step = 0; step < maxSteps; step++) {
@@ -488,6 +540,7 @@ class ArchitectUnderlayContourExtractor {
           index: index,
           used: used,
           joinTol: joinTol,
+          allowSharpCorners: allowSharpCorners,
         );
         if (match != null) {
           used.add(match.curve.id);
@@ -541,11 +594,13 @@ class ArchitectUnderlayContourExtractor {
     required _FlattenedUnderlayIndex index,
     required Set<int> used,
     required double joinTol,
+    bool allowSharpCorners = false,
   }) {
     // 1. Direct endpoint connection within joinTol
     _ExtractedCurve? bestCurve;
     var bestReverse = false;
     var bestScore = double.infinity;
+    final minDot = allowSharpCorners ? -0.45 : 0.25;
 
     for (final c in index.curves) {
       if (used.contains(c.id) || c.closed || c.points.length < 2) continue;
@@ -557,7 +612,7 @@ class ArchitectUnderlayContourExtractor {
         final candDir = _startTangent(c.points, reverse: reverse);
         if (dir != null && candDir != null) {
           final dot = dir.dx * candDir.dx + dir.dy * candDir.dy;
-          if (dot < 0.25) continue; // Reject sharp >75° turns at forks
+          if (dot < minDot) continue;
           final score = d + (1.0 - dot) * 0.25;
           if (score < bestScore) {
             bestScore = score;
@@ -743,6 +798,14 @@ class ArchitectUnderlayContourExtractor {
     }
     return bestVal;
   }
+
+  /// Returns the minimum distance and closest point on [pts] to [query].
+  static ({double distance, Offset point}) closestOnCurve(
+    List<Offset> pts,
+    Offset query, {
+    required bool closed,
+  }) =>
+      _closestOnCurve(pts, query, closed: closed);
 
   static ({double distance, Offset point}) _closestOnCurve(
     List<Offset> pts,

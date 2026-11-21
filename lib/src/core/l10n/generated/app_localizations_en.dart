@@ -13651,4 +13651,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectTerrainProposedCloned =>
       'Proposed terrain created from Existing';
+
+  @override
+  String get architectSplineTraceContour => 'Auto-trace';
+
+  @override
+  String get architectSplineTraceContourHint =>
+      'Hold & aim over a CAD underlay contour, curve, or enclosed room';
+
+  @override
+  String get architectSplineNoContourAtPoint =>
+      'No contour found under pointer';
+
+  @override
+  String get architectSplineTraceReady => 'Trace contour';
 }

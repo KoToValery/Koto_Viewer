@@ -7489,5 +7489,9 @@
   "architectTerrainContourElevationTitle": "Contour Elevation",
   "architectTerrainSpotElevationTitle": "Spot Elevation",
   "architectTerrainNoContourAtPoint": "No contour curve found under pointer",
-  "architectTerrainProposedCloned": "Proposed terrain created from Existing"
+  "architectTerrainProposedCloned": "Proposed terrain created from Existing",
+  "architectSplineTraceContour": "Auto-trace",
+  "architectSplineTraceContourHint": "Hold & aim over a CAD underlay contour, curve, or enclosed room",
+  "architectSplineNoContourAtPoint": "No contour found under pointer",
+  "architectSplineTraceReady": "Trace contour"
 }

@@ -4686,5 +4686,9 @@
   "architectTerrainContourElevationTitle": "Кота на хоризонтал",
   "architectTerrainSpotElevationTitle": "Височинна кота",
   "architectTerrainNoContourAtPoint": "Не е открит хоризонтал под точката",
-  "architectTerrainProposedCloned": "Проектният терен е създаден от съществуващия"
+  "architectTerrainProposedCloned": "Проектният терен е създаден от съществуващия",
+  "architectSplineTraceContour": "Авто-контур",
+  "architectSplineTraceContourHint": "Задръжте и насочете върху хоризонтал от подложката, крива или помещение",
+  "architectSplineNoContourAtPoint": "Не е открит контур под точката",
+  "architectSplineTraceReady": "Проследи контур"
 }

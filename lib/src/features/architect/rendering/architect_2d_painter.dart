@@ -38,6 +38,8 @@ import '../models/architect_door.dart';
 import '../models/architect_window.dart';
 import 'architect_dimension_layout.dart';
 import '../services/architect_selection.dart';
+import '../services/architect_spline_contour_tracer.dart';
+import '../services/architect_spline_geometry.dart';
 import '../services/architect_decorative_geometry.dart';
 import '../services/architect_wall_relations.dart';
 import '../services/architect_wall_overshoot_detector.dart';
@@ -274,6 +276,7 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectHatchPattern activeHatchPattern;
   final int activeHatchColorValue;
   final Offset? slabCandidatePoint;
+  final ArchitectSplineTraceCandidate? splineTracePreview;
   final ArchitectRoofTool? roofTool;
   final ArchitectLandscapeTool? landscapeTool;
   final ArchitectDragController? dragController;
@@ -406,6 +409,7 @@ class Architect2dPainter extends CustomPainter {
     this.activeHatchPattern = ArchitectHatchPattern.diagonal,
     this.activeHatchColorValue = 0xFF424242,
     this.slabCandidatePoint,
+    this.splineTracePreview,
     this.roofTool,
     this.landscapeTool,
     this.polygonEditInvalid = false,
@@ -2232,6 +2236,38 @@ class Architect2dPainter extends CustomPainter {
         ..strokeWidth = 1.5 / draftingScale
         ..style = PaintingStyle.stroke;
       canvas.drawCircle(target, 5 / draftingScale, paint);
+    }
+    if (activeTool == ArchitectTool.spline && splineTracePreview != null) {
+      final cand = splineTracePreview!;
+      final path = ArchitectSplineGeometry.generatePath(
+        cand.points,
+        closed: cand.closed,
+      );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = const Color(0x5500E5FF)
+          ..strokeWidth = 6.0 / zoomScale
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke,
+      );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..strokeWidth = 2.4 / zoomScale
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke,
+      );
+      canvas.drawCircle(
+        cand.anchorPoint,
+        5.0 / zoomScale,
+        Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..style = PaintingStyle.fill,
+      );
     }
     if (activeTool.isLandscapeTool && landscapeTool != null) {
       final lt = landscapeTool!;

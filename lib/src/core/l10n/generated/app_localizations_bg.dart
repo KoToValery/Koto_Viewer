@@ -13702,4 +13702,18 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectTerrainProposedCloned =>
       'Проектният терен е създаден от съществуващия';
+
+  @override
+  String get architectSplineTraceContour => 'Авто-контур';
+
+  @override
+  String get architectSplineTraceContourHint =>
+      'Задръжте и насочете върху хоризонтал от подложката, крива или помещение';
+
+  @override
+  String get architectSplineNoContourAtPoint =>
+      'Не е открит контур под точката';
+
+  @override
+  String get architectSplineTraceReady => 'Проследи контур';
 }

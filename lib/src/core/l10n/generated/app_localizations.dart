@@ -24797,6 +24797,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Proposed terrain created from Existing'**
   String get architectTerrainProposedCloned;
+
+  /// No description provided for @architectSplineTraceContour.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-trace'**
+  String get architectSplineTraceContour;
+
+  /// No description provided for @architectSplineTraceContourHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold & aim over a CAD underlay contour, curve, or enclosed room'**
+  String get architectSplineTraceContourHint;
+
+  /// No description provided for @architectSplineNoContourAtPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'No contour found under pointer'**
+  String get architectSplineNoContourAtPoint;
+
+  /// No description provided for @architectSplineTraceReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Trace contour'**
+  String get architectSplineTraceReady;
 }
 
 class _AppLocalizationsDelegate

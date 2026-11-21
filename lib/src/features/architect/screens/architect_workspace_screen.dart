@@ -53,6 +53,7 @@ import '../services/architect_closed_contour.dart';
 
 import '../widgets/architect_terrain_editor.dart';
 import '../services/architect_landscape_tool.dart';
+import '../services/architect_spline_contour_tracer.dart';
 import '../services/architect_underlay_contour_extractor.dart';
 import '../widgets/architect_landscape_bar.dart';
 
@@ -5710,6 +5711,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _cancelDrafting() {
+    if (_underlayMaskDrafting) { _cancelUnderlayMaskDraft(); return; }
     if (_stairDraft != null) { _cancelFreeStair(); return; }
     if (_dragController.isActive) {
       _cancelDragPlacement();
@@ -5784,6 +5786,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _axisTool.deselect();
 
     _elementTool.cancelSlabDrafting();
+    _splineTracePreview = null;
 
     _roofTool.clearDraft();
     _landscapeTool.clearDraft();
@@ -5911,6 +5914,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _axisTool.deselect();
 
     _elementTool.cancelSlabDrafting();
+    _splineTracePreview = null;
 
     _roofTool.clearDraft();
     _landscapeTool.clearDraft();
@@ -7542,6 +7546,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   double? _activePolylineWidth;
   bool _polylineArcSegmentMode = false;
   bool _maskBorder = true;
+  bool _splineTraceMode = false;
+  ArchitectSplineTraceCandidate? _splineTracePreview;
   RoofSlopeFormat _activeRoofSlopeFormat = RoofSlopeFormat.percent;
   RoofSlopeDirection _activeRoofSlopeDirection = RoofSlopeDirection.downslope;
   ArchitectLineEndCap _activeLeaderArrowStyle = ArchitectLineEndCap.arrowFilled;
@@ -13254,9 +13260,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+    if (_activeTool != ArchitectTool.spline || !_splineTraceMode) {
+      _splineTracePreview = null;
+    }
+
     // 7. Slab, Ceiling, Mask, Spline or Roof drafting candidate
 
-    if ((_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.ceiling || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain || _activeTool == ArchitectTool.mask || _activeTool == ArchitectTool.spline) &&
+    if (_activeTool == ArchitectTool.spline && _splineTraceMode) {
+      final traced = ArchitectSplineContourTracer.traceAt(
+        project: _project,
+        modelPoint: rawModel,
+        hitToleranceMeters: math.max(24.0 / _currentScale, 0.45),
+        underlayDocument: _currentUnderlayDoc,
+        underlayFrame: _effectiveUnderlayFrame,
+        underlayLayerVisibility: _effectiveUnderlayLayerVisibility,
+      );
+      _splineTracePreview = traced;
+      _cursorModel = traced?.anchorPoint ?? rawModel;
+      _activeSnapLabel = traced == null
+          ? null
+          : (traced.elevation != null
+                ? '${traced.elevation!.toStringAsFixed(2)} m'
+                : context.l10n.architectSplineTraceReady);
+      _activeMagneticGuides = [];
+    } else if ((_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.ceiling || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain || _activeTool == ArchitectTool.mask || _activeTool == ArchitectTool.spline) &&
 
         _elementTool.slabDraftPoints.isNotEmpty) {
       if (_wallDirectionLocked) return;
@@ -16203,6 +16230,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 9. In Slab / Ceiling / Mask / Spline tool
 
+    if (_activeTool == ArchitectTool.spline && _splineTraceMode) {
+      final candidate =
+          _splineTracePreview ??
+          ArchitectSplineContourTracer.traceAt(
+            project: _project,
+            modelPoint: rawModel,
+            hitToleranceMeters: math.max(24.0 / _currentScale, 0.45),
+            underlayDocument: _currentUnderlayDoc,
+            underlayFrame: _effectiveUnderlayFrame,
+            underlayLayerVisibility: _effectiveUnderlayLayerVisibility,
+          );
+      _splineTracePreview = null;
+      if (candidate == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.architectSplineNoContourAtPoint)),
+        );
+      } else {
+        _commitSpline(
+          closed: candidate.closed,
+          tracedPoints: candidate.points,
+        );
+      }
+      return;
+    }
+
     if (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.ceiling || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain || _activeTool == ArchitectTool.mask || _activeTool == ArchitectTool.spline) {
       if (_wallDirectionLocked) return;
 
@@ -17751,6 +17803,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _resetWallDraft() {
     _interactionEpoch++;
     _polylineDraftId = null;
+    _splineTracePreview = null;
     _draftStart = null;
     _draftEnd = null;
     _wallArcEnd = null;
@@ -33672,6 +33725,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Offset? get _draftCancelAnchor {
 
+    if (_underlayMaskDrafting &&
+        _underlayMaskMode == 'polygon' &&
+        _underlayMaskPoints.isNotEmpty) {
+      return _underlayMaskPoints.last;
+    }
+
     if (_activeTool == ArchitectTool.opening && _draftStart != null && _draftEnd != null) {
       return _draftEnd!;
     }
@@ -33755,11 +33814,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool get _canConfirmContour =>
 
-      (_activeTool == ArchitectTool.slab || _activeTool == ArchitectTool.ceiling || _activeTool == ArchitectTool.hatch || _activeTool == ArchitectTool.floorDrain) &&
+      (_activeTool == ArchitectTool.slab ||
+          _activeTool == ArchitectTool.ceiling ||
+          _activeTool == ArchitectTool.hatch ||
+          _activeTool == ArchitectTool.floorDrain ||
+          _activeTool == ArchitectTool.mask) &&
 
       ArchitectPolygonGeometry.valid(_elementTool.slabDraftPoints);
 
+  bool get _canConfirmSpline =>
+      _activeTool == ArchitectTool.spline &&
+      !_splineTraceMode &&
+      _elementTool.slabDraftPoints.length >= 2;
 
+  bool get _canConfirmUnderlayMask =>
+      _underlayMaskDrafting &&
+      _underlayMaskMode == 'polygon' &&
+      _underlayMaskPoints.length >= 3;
+
+  bool get _canConfirmPolyline =>
+      _activeTool == ArchitectTool.cadLine &&
+      _cadPolylineMode &&
+      _polylineDraftId != null &&
+      _draftStart != null;
 
   bool get _canConfirmZone => _activeTool == ArchitectTool.zone &&
 
@@ -33771,7 +33848,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _activeTool.isLandscapeTool && _landscapeTool.canCommit(_activeTool.name);
 
   bool get _canConfirmDraft => _canConfirmDimension || _canConfirmRoofDraft || _canConfirmLandscapeDraft ||
-      _canConfirmContour || _canConfirmZone ||
+      _canConfirmContour || _canConfirmSpline || _canConfirmUnderlayMask || _canConfirmPolyline || _canConfirmZone ||
       (_activeTool == ArchitectTool.opening && _draftStart != null && _draftEnd != null);
 
   void _commitColumnPlacement() {
@@ -34413,8 +34490,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _onConfirmDraft() {
+    if (_canConfirmUnderlayMask) {
+      _commitUnderlayMask(_underlayMaskPoints);
+      return;
+    }
+
     if (_canConfirmLandscapeDraft) {
       _commitLandscapeDraft();
+      return;
+    }
+
+    if (_canConfirmPolyline) {
+      _finishChainedWall();
+      return;
+    }
+
+    if (_canConfirmSpline) {
+      _commitSpline(closed: false);
       return;
     }
 
@@ -34444,6 +34536,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_canConfirmContour) {
 
       if (_activeTool == ArchitectTool.hatch) { _commitHatch(); return; }
+
+      if (_activeTool == ArchitectTool.mask) { _commitMask(); return; }
+
+      if (_activeTool == ArchitectTool.floorDrain) { _commitFloorDrain(); return; }
 
       if (_activeTool == ArchitectTool.ceiling) { _commitCeilingDraft(); return; }
 
@@ -34684,7 +34780,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                       ? 'architect-roof-confirm'
 
-                      : _canConfirmContour || _canConfirmZone
+                      : _canConfirmContour ||
+                              _canConfirmSpline ||
+                              _canConfirmUnderlayMask ||
+                              _canConfirmPolyline ||
+                              _canConfirmZone
 
                       ? 'architect-draft-confirm'
 
@@ -34708,7 +34808,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                 ),
 
-                tooltip: _canConfirmRoofDraft || _canConfirmContour || _canConfirmZone
+                tooltip: _canConfirmRoofDraft ||
+                        _canConfirmContour ||
+                        _canConfirmSpline ||
+                        _canConfirmUnderlayMask ||
+                        _canConfirmPolyline ||
+                        _canConfirmZone
 
                     ? context.l10n.architectDimensionFinish
 
@@ -35146,6 +35251,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               ArchitectTerrainDraftMode.pickContour;
                       final pickedElev =
                           _landscapeTool.pickedContourPreview?.suggestedElevation;
+                      final isTracingSpline =
+                          _activeTool == ArchitectTool.spline && _splineTraceMode;
+                      final tracedElev = _splineTracePreview?.elevation;
                       final isArcDrafting = _wallArcEnd != null &&
                           _draftStart != null &&
                           _curvedDraftTool;
@@ -35154,6 +35262,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                 ? 'Z = ${pickedElev.toStringAsFixed(2)} m'
                                 : _landscapeTool.pickedContourPreview != null
                                 ? context.l10n.architectTerrainModePickContour
+                                : null)
+                          : isTracingSpline
+                          ? (tracedElev != null
+                                ? 'Z = ${tracedElev.toStringAsFixed(2)} m'
+                                : _splineTracePreview != null
+                                ? context.l10n.architectSplineTraceReady
                                 : null)
                           : isArcDrafting
                           ? 'h=${_project.formatLength((_wallArcEnd! - _draftStart!).distance * _draftArcBulge.abs() / 2)}'
@@ -35893,41 +36007,84 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         Positioned(
           top: 8,
           left: 8,
-          child: Material(
-            color: const Color(0xEE1E242C),
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Colors.white24),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const AppIcon(AppIconId.spline, size: 20, color: Colors.cyanAccent),
-                  const SizedBox(width: 8),
-                  Text(context.l10n.architectToolSpline, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  const SizedBox(width: 8),
-                  _lineStyleControl(),
-                  if (_elementTool.slabDraftPoints.length >= 2)
-                    IconButton(
-                      tooltip: context.l10n.applyAction,
-                      icon: const AppIcon(AppIconId.confirm, color: Colors.cyanAccent),
-                      onPressed: () => _commitSpline(closed: false),
-                    ),
-                  if (_elementTool.slabDraftPoints.length >= 3)
-                    IconButton(
-                      tooltip: context.l10n.architectSplineClose,
-                      icon: const Icon(Icons.all_inclusive, color: Colors.cyanAccent, size: 20),
-                      onPressed: () => _commitSpline(closed: true),
-                    ),
-                  IconButton(
-                    tooltip: context.l10n.cancel,
-                    icon: const AppIcon(AppIconId.close, color: Colors.white70),
-                    onPressed: () => setState(_elementTool.cancelSlabDrafting),
+          right: 8,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              color: const Color(0xEE1E242C),
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(color: Colors.white24),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const AppIcon(AppIconId.spline, size: 20, color: Colors.cyanAccent),
+                      const SizedBox(width: 8),
+                      Text(context.l10n.architectToolSpline, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      Theme(
+                        data: ThemeData.dark(),
+                        child: Tooltip(
+                          message: context.l10n.architectSplineTraceContourHint,
+                          child: FilterChip(
+                            key: const ValueKey('architect-spline-trace-contour'),
+                            showCheckmark: false,
+                            avatar: const Icon(Icons.auto_fix_high, size: 16),
+                            label: Text(context.l10n.architectSplineTraceContour),
+                            selected: _splineTraceMode,
+                            onSelected: (val) => setState(() {
+                              _splineTraceMode = val;
+                              _splineTracePreview = null;
+                              _elementTool.cancelSlabDrafting();
+                            }),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _lineStyleControl(),
+                      if (!_splineTraceMode && _elementTool.slabDraftPoints.length >= 2)
+                        IconButton(
+                          tooltip: context.l10n.applyAction,
+                          icon: const DecoratedBox(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF16A34A),
+                            ),
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: AppIcon(AppIconId.confirm, size: 16, color: Colors.white),
+                            ),
+                          ),
+                          onPressed: () => _commitSpline(closed: false),
+                        ),
+                      if (!_splineTraceMode && _elementTool.slabDraftPoints.length >= 3)
+                        IconButton(
+                          tooltip: context.l10n.architectSplineClose,
+                          icon: const Icon(Icons.all_inclusive, color: Colors.cyanAccent, size: 20),
+                          onPressed: () => _commitSpline(closed: true),
+                        ),
+                      if (_elementTool.slabDraftPoints.isNotEmpty || _splineTraceMode)
+                        IconButton(
+                          tooltip: context.l10n.cancel,
+                          icon: const AppIcon(AppIconId.close, color: Colors.white70),
+                          onPressed: () => setState(() {
+                            _elementTool.cancelSlabDrafting();
+                            _splineTracePreview = null;
+                            if (_elementTool.slabDraftPoints.isEmpty) {
+                              _splineTraceMode = false;
+                            }
+                          }),
+                        ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -37123,9 +37280,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
-  void _commitSpline({bool closed = false}) {
-    if (_elementTool.slabDraftPoints.length < 2) return;
-    final points = List<Offset>.from(_elementTool.slabDraftPoints);
+  void _commitSpline({bool closed = false, List<Offset>? tracedPoints}) {
+    final sourcePoints = tracedPoints ?? _elementTool.slabDraftPoints;
+    if (sourcePoints.length < 2) return;
+    final points = List<Offset>.from(sourcePoints);
     final bounds = ArchitectSceneGeometry.boundsOf(points);
     final id = ArchitectElementId.next('spline');
     try {
@@ -37147,6 +37305,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
       setState(() {
         _elementTool.cancelSlabDrafting();
+        _splineTracePreview = null;
         _draftStart = null;
         _draftEnd = null;
       });
@@ -38078,6 +38237,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     slabDraftPoints: _elementTool.slabDraftPoints,
 
     slabCandidatePoint: _elementTool.slabCandidatePoint,
+    splineTracePreview:
+        _activeTool == ArchitectTool.spline && _splineTraceMode
+        ? _splineTracePreview
+        : null,
     marqueePoints: _marqueeTool.points,
     marqueePolygon: _marqueeTool.mode==ArchitectSelectMode.polygon && _marqueeTool.points.length>=3
         ? List<Offset>.of(_marqueeTool.points) : _marqueeTool.previewPolygon,
