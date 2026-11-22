@@ -107,6 +107,21 @@ void _expectChipSelected(
   );
 }
 
+Future<void> _selectPopupOption(
+  WidgetTester tester,
+  String popupKey,
+  String itemText,
+) async {
+  final popup = find.byKey(ValueKey(popupKey));
+  expect(popup, findsOneWidget);
+  await tester.ensureVisible(popup);
+  await tester.tap(popup);
+  await tester.pumpAndSettle();
+  final item = find.text(itemText).last;
+  await tester.tap(item);
+  await tester.pumpAndSettle();
+}
+
 AppLocalizations _l10n(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(ArchitectLandscapeBar)))!;
 
@@ -116,107 +131,89 @@ void main() {
 
   for (final locale in const [Locale('en'), Locale('bg')]) {
     testWidgets(
-      'Planting & all Landscape bar chips update highlight cleanly on sequential taps (${locale.languageCode})',
+      'Streamlined Landscape bar controls & Contour Auto-trace / Spline modes work cleanly (${locale.languageCode})',
       (tester) async {
         await _pumpWorkspace(tester, locale: locale);
         await _openLandscapeCategory(tester);
-
-        // 1. Planting (Vegetation): multiple species taps + mode toggle + hedge switch.
-        await _selectLandscapeTool(tester, ArchitectTool.vegetation);
         final l10n = _l10n(tester);
 
-        _expectChipSelected(
-          tester,
-          ArchitectPlantSpecies.deciduousCanopy.label(l10n),
-          selected: true,
+        // Verify removed clutter is absent from ArchitectLandscapeBar
+        expect(
+          find.byKey(const ValueKey('architect-terrain-sync-geodesy')),
+          findsNothing,
         );
-        _expectChipSelected(
-          tester,
-          ArchitectPlantSpecies.coniferPine.label(l10n),
-          selected: false,
+        expect(
+          find.byKey(const ValueKey('architect-landscape-fillet')),
+          findsNothing,
         );
+        expect(
+          find.byKey(const ValueKey('architect-landscape-chamfer')),
+          findsNothing,
+        );
+
+        // 1. Contour tool (Хоризонтал): Auto-trace vs Manual Spline toggle
+        await _selectLandscapeTool(tester, ArchitectTool.contour);
+        final autoChip = tester.widget<ChoiceChip>(
+          find.byKey(const ValueKey('architect-contour-auto-trace')),
+        );
+        final manualChip = tester.widget<ChoiceChip>(
+          find.byKey(const ValueKey('architect-contour-manual-spline')),
+        );
+        expect(autoChip.selected, isTrue);
+        expect(manualChip.selected, isFalse);
+
+        final manualFinder = find.byKey(
+          const ValueKey('architect-contour-manual-spline'),
+        );
+        await tester.ensureVisible(manualFinder);
+        await tester.tap(manualFinder);
+        await tester.pump();
+        expect(
+          tester
+              .widget<ChoiceChip>(
+                find.byKey(const ValueKey('architect-contour-auto-trace')),
+              )
+              .selected,
+          isFalse,
+        );
+        expect(
+          tester
+              .widget<ChoiceChip>(
+                find.byKey(const ValueKey('architect-contour-manual-spline')),
+              )
+              .selected,
+          isTrue,
+        );
+
+        // 2. Vegetation: compact species popup + placement mode chips
+        await _selectLandscapeTool(tester, ArchitectTool.vegetation);
         _expectChipSelected(
           tester,
           ArchitectVegetationPlacementMode.single.label(l10n),
           selected: true,
         );
-        _expectChipSelected(
+        await _selectPopupOption(
           tester,
-          ArchitectVegetationPlacementMode.row.label(l10n),
-          selected: false,
-        );
-
-        await _tapChip(tester, ArchitectPlantSpecies.coniferPine.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectPlantSpecies.deciduousCanopy.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectPlantSpecies.coniferPine.label(l10n),
-          selected: true,
-        );
-
-        await _tapChip(
-          tester,
-          ArchitectPlantSpecies.columnarCypress.label(l10n),
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectPlantSpecies.coniferPine.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectPlantSpecies.columnarCypress.label(l10n),
-          selected: true,
-        );
-
-        await _tapChip(tester, ArchitectPlantSpecies.trimmedHedge.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectPlantSpecies.columnarCypress.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
+          'architect-vegetation-species',
           ArchitectPlantSpecies.trimmedHedge.label(l10n),
-          selected: true,
         );
         expect(
           _chipFinder(ArchitectVegetationPlacementMode.single.label(l10n)),
           findsNothing,
         );
-
-        await _tapChip(
-          tester,
-          ArchitectPlantSpecies.deciduousMinimal.label(l10n),
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectPlantSpecies.trimmedHedge.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectPlantSpecies.deciduousMinimal.label(l10n),
-          selected: true,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectVegetationPlacementMode.single.label(l10n),
-          selected: true,
+        expect(
+          find.byKey(const ValueKey('architect-vegetation-hedge-width')),
+          findsOneWidget,
         );
 
+        await _selectPopupOption(
+          tester,
+          'architect-vegetation-species',
+          ArchitectPlantSpecies.coniferPine.label(l10n),
+        );
         await _tapChip(
           tester,
           ArchitectVegetationPlacementMode.row.label(l10n),
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectVegetationPlacementMode.single.label(l10n),
-          selected: false,
         );
         _expectChipSelected(
           tester,
@@ -224,51 +221,16 @@ void main() {
           selected: true,
         );
         expect(
-          find.descendant(
-            of: find.byType(ArchitectLandscapeBar),
-            matching: find.textContaining(l10n.architectVegetationRowSpacing),
-          ),
+          find.byKey(const ValueKey('architect-vegetation-spacing')),
           findsOneWidget,
         );
 
-        // 2. Site Fence: multiple preset taps + height stepper increment.
+        // 3. Site Fence: compact preset popup + height/thickness chips
         await _selectLandscapeTool(tester, ArchitectTool.siteFence);
-        _expectChipSelected(
+        await _selectPopupOption(
           tester,
-          ArchitectSiteFencePreset.piersAndSlats.label(l10n),
-          selected: true,
-        );
-
-        await _tapChip(
-          tester,
-          ArchitectSiteFencePreset.gabionFence.label(l10n),
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectSiteFencePreset.piersAndSlats.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectSiteFencePreset.gabionFence.label(l10n),
-          selected: true,
-        );
-
-        await _tapChip(tester, ArchitectSiteFencePreset.rcRetaining.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectSiteFencePreset.gabionFence.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
+          'architect-fence-preset',
           ArchitectSiteFencePreset.rcRetaining.label(l10n),
-          selected: true,
-        );
-
-        final plusButtons = find.descendant(
-          of: find.byType(ArchitectLandscapeBar),
-          matching: find.byIcon(Icons.add_rounded),
         );
         expect(
           find.descendant(
@@ -277,164 +239,57 @@ void main() {
           ),
           findsOneWidget,
         );
-        await tester.ensureVisible(plusButtons.first);
-        await tester.tap(plusButtons.first);
-        await tester.pump();
-        expect(
-          find.descendant(
-            of: find.byType(ArchitectLandscapeBar),
-            matching: find.text('${l10n.architectFenceHeight} 1.70 m'),
-          ),
-          findsOneWidget,
-        );
 
-        // 3. Pathway: curb mode + paving material + closed pad toggle.
+        // 4. Pathway: compact material & curb popups + closed pad toggle
         await _selectLandscapeTool(tester, ArchitectTool.pathway);
-        _expectChipSelected(
+        await _selectPopupOption(
           tester,
-          ArchitectPathwayCurbMode.both.label(l10n),
-          selected: true,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectPavingMaterial.stoneSlabs.label(l10n),
-          selected: true,
-        );
-        _expectChipSelected(tester, l10n.architectPathwayClosedPad, selected: false);
-
-        await _tapChip(tester, ArchitectPathwayCurbMode.left.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectPathwayCurbMode.both.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectPathwayCurbMode.left.label(l10n),
-          selected: true,
-        );
-
-        await _tapChip(tester, ArchitectPathwayCurbMode.none.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectPathwayCurbMode.left.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
+          'architect-pathway-curb',
           ArchitectPathwayCurbMode.none.label(l10n),
-          selected: true,
         );
-
-        await _tapChip(tester, ArchitectPavingMaterial.cobblePavers.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectPavingMaterial.stoneSlabs.label(l10n),
-          selected: false,
+        expect(
+          find.byKey(const ValueKey('architect-pathway-curb-width')),
+          findsNothing,
         );
-        _expectChipSelected(
+        await _selectPopupOption(
           tester,
-          ArchitectPavingMaterial.cobblePavers.label(l10n),
-          selected: true,
-        );
-
-        await _tapChip(tester, ArchitectPavingMaterial.timberDecking.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectPavingMaterial.cobblePavers.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
+          'architect-pathway-material',
           ArchitectPavingMaterial.timberDecking.label(l10n),
-          selected: true,
         );
-
         await _tapChip(tester, l10n.architectPathwayClosedPad);
-        _expectChipSelected(tester, l10n.architectPathwayClosedPad, selected: true);
+        _expectChipSelected(
+          tester,
+          l10n.architectPathwayClosedPad,
+          selected: true,
+        );
 
-        // 4. Street: marking style + sidewalk & closed loop toggles.
+        // 5. Street: marking popup + sidewalk & closed toggles
         await _selectLandscapeTool(tester, ArchitectTool.street);
-        _expectChipSelected(
+        await _selectPopupOption(
           tester,
-          ArchitectRoadMarkingStyle.dashed.label(l10n),
-          selected: true,
-        );
-        _expectChipSelected(
-          tester,
-          l10n.architectStreetSidewalkLeft,
-          selected: true,
-        );
-        _expectChipSelected(
-          tester,
-          l10n.architectStreetSidewalkRight,
-          selected: true,
-        );
-        _expectChipSelected(tester, l10n.architectPathwayClosedPad, selected: false);
-
-        await _tapChip(tester, ArchitectRoadMarkingStyle.solid.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectRoadMarkingStyle.dashed.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
+          'architect-street-marking',
           ArchitectRoadMarkingStyle.solid.label(l10n),
-          selected: true,
         );
-
-        await _tapChip(tester, ArchitectRoadMarkingStyle.none.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectRoadMarkingStyle.solid.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectRoadMarkingStyle.none.label(l10n),
-          selected: true,
-        );
-
         await _tapChip(tester, l10n.architectStreetSidewalkLeft);
         _expectChipSelected(
           tester,
           l10n.architectStreetSidewalkLeft,
           selected: false,
         );
-        await _tapChip(tester, l10n.architectPathwayClosedPad);
-        _expectChipSelected(tester, l10n.architectPathwayClosedPad, selected: true);
 
-        // 5. Terrain: existing/proposed + modes + contour toggles.
+        // 6. Terrain: existing/proposed + modes + pad elevation chip
         await _selectLandscapeTool(tester, ArchitectTool.terrain);
         _expectChipSelected(
           tester,
           ArchitectTerrainState.existing.label(l10n),
           selected: true,
         );
-        _expectChipSelected(
-          tester,
-          ArchitectTerrainState.proposed.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectTerrainDraftMode.boundary.label(l10n),
-          selected: true,
-        );
-
         await _tapChip(tester, ArchitectTerrainState.proposed.label(l10n));
         _expectChipSelected(
           tester,
-          ArchitectTerrainState.existing.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
           ArchitectTerrainState.proposed.label(l10n),
           selected: true,
         );
-
         await _tapChip(
           tester,
           ArchitectTerrainDraftMode.boundaryRect.label(l10n),
@@ -444,51 +299,15 @@ void main() {
           ArchitectTerrainDraftMode.boundaryRect.label(l10n),
           selected: true,
         );
-
-        await _tapChip(
-          tester,
-          ArchitectTerrainDraftMode.pickContour.label(l10n),
-        );
+        await _tapChip(tester, ArchitectTerrainDraftMode.pad.label(l10n));
         _expectChipSelected(
           tester,
-          ArchitectTerrainDraftMode.pickContour.label(l10n),
+          ArchitectTerrainDraftMode.pad.label(l10n),
           selected: true,
         );
-
-        await _tapChip(tester, ArchitectTerrainDraftMode.contour.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectTerrainDraftMode.pickContour.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectTerrainDraftMode.contour.label(l10n),
-          selected: true,
-        );
-        await _tapChip(tester, l10n.architectTerrainContourMajor);
-        _expectChipSelected(
-          tester,
-          l10n.architectTerrainContourMajor,
-          selected: true,
-        );
-        await _tapChip(tester, l10n.architectTerrainContourClosed);
-        _expectChipSelected(
-          tester,
-          l10n.architectTerrainContourClosed,
-          selected: true,
-        );
-
-        await _tapChip(tester, ArchitectTerrainDraftMode.spot.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectTerrainDraftMode.contour.label(l10n),
-          selected: false,
-        );
-        _expectChipSelected(
-          tester,
-          ArchitectTerrainDraftMode.spot.label(l10n),
-          selected: true,
+        expect(
+          find.byKey(const ValueKey('architect-terrain-pad-elevation')),
+          findsOneWidget,
         );
 
         expect(tester.takeException(), isNull);

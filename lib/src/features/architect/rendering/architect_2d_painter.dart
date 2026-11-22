@@ -2272,7 +2272,7 @@ class Architect2dPainter extends CustomPainter {
     if (activeTool.isLandscapeTool && landscapeTool != null) {
       final lt = landscapeTool!;
       if (lt.pickedContourPreview != null &&
-          lt.terrainMode == ArchitectTerrainDraftMode.pickContour) {
+          lt.isPickingContour(activeTool.name)) {
         ArchitectLandscapePainterHelper.drawPickedContourPreview(
           canvas: canvas,
           candidate: lt.pickedContourPreview!,
@@ -2285,7 +2285,7 @@ class Architect2dPainter extends CustomPainter {
         cursorWorld: activeDraftEnd ?? cursorPosition,
         zoomScale: zoomScale,
         accentColor: switch (activeTool) {
-          ArchitectTool.terrain =>
+          ArchitectTool.terrain || ArchitectTool.contour =>
             lt.terrainState == ArchitectTerrainState.proposed
                 ? const Color(0xFF15803D)
                 : const Color(0xFF92400E),

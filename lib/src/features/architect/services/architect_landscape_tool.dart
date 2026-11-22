@@ -33,7 +33,14 @@ class ArchitectLandscapeTool extends ChangeNotifier {
   double contourAbsoluteElevation = 0.0;
   bool contourClosed = false;
   bool contourMajor = false;
+  bool contourAutoTrace = true;
   ArchitectPickedContourCandidate? pickedContourPreview;
+
+  /// True when the active tool/mode picks an existing/underlay contour with the lifted pointer.
+  bool isPickingContour(String toolName) =>
+      (toolName == 'terrain' &&
+          terrainMode == ArchitectTerrainDraftMode.pickContour) ||
+      (toolName == 'contour' && contourAutoTrace && draftPoints.isEmpty);
 
   // --- Pathway State ---
   double pathwayWidth = 1.50;
@@ -259,13 +266,29 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           return commitDraft(toolName: toolName, project: project);
         }
         if ((terrainMode == ArchitectTerrainDraftMode.boundary ||
-                terrainMode == ArchitectTerrainDraftMode.pad) &&
+                terrainMode == ArchitectTerrainDraftMode.pad ||
+                terrainMode == ArchitectTerrainDraftMode.hole) &&
             draftPoints.length >= 3 &&
             (worldPoint - draftPoints.first).distance <= closeThresholdWorld) {
           return commitDraft(toolName: toolName, project: project);
         }
+        if (terrainMode == ArchitectTerrainDraftMode.contour &&
+            draftPoints.length >= 3 &&
+            (worldPoint - draftPoints.first).distance <= closeThresholdWorld) {
+          contourClosed = true;
+          return commitDraft(toolName: toolName, project: project);
+        }
         if (terrainMode == ArchitectTerrainDraftMode.pickContour) {
           return null;
+        }
+        draftPoints.add(worldPoint);
+        return null;
+
+      case 'contour':
+        if (draftPoints.length >= 3 &&
+            (worldPoint - draftPoints.first).distance <= closeThresholdWorld) {
+          contourClosed = true;
+          return commitDraft(toolName: toolName, project: project);
         }
         draftPoints.add(worldPoint);
         return null;
@@ -421,6 +444,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
               : (effectiveElevation + datum),
           closed: contourClosed,
           isMajor: contourMajor,
+          isSpline: true,
         );
         return _updateSurface(
           project,

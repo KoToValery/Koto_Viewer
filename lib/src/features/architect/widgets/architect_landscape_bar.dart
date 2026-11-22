@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../core/icons/app_icon.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import '../../bim_editing/widgets/bim_numeric_keypad.dart';
 import '../models/architect_project.dart';
 import '../rendering/architect_2d_painter.dart';
 import '../services/architect_landscape_tool.dart';
-import 'architect_numeric_keypad.dart';
 
-/// Contextual sub-bar for the Landscape (`Ландшафт`) tools:
-/// Terrain, Pathway with Automatic Curb, Vegetation, and Site Fence / Gabion.
+/// Streamlined contextual sub-bar for the Landscape (`Ландшафт`) tools:
+/// Terrain, Contour (`Авто-контур` / `Сплайн`), Pathway, Street, Vegetation, and Site Fence.
 class ArchitectLandscapeBar extends StatelessWidget {
   final ArchitectTool activeTool;
   final ArchitectLandscapeTool landscapeTool;
@@ -45,8 +45,6 @@ class ArchitectLandscapeBar extends StatelessWidget {
   });
 
   ArchitectLandscapeTool get controller => landscapeTool;
-  VoidCallback? get onUndoDraftPoint => onUndoPoint;
-  VoidCallback? get onSyncFromGeodesy => onSyncTerrainFromGeodesy;
 
   void _notifyChanged() {
     controller.notifyChanged();
@@ -60,11 +58,10 @@ class ArchitectLandscapeBar extends StatelessWidget {
       builder: (context, _) {
         final l = context.l10n;
         final colors = Theme.of(context).colorScheme;
-        final canCommit = controller.canCommit(activeTool.name);
         final hasDraft = controller.draftPoints.isNotEmpty;
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
             color: colors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(12),
@@ -76,8 +73,9 @@ class ArchitectLandscapeBar extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (activeTool == ArchitectTool.terrain ||
-                    activeTool == ArchitectTool.contour)
+                if (activeTool == ArchitectTool.contour)
+                  ..._buildContourControls(context, l, colors)
+                else if (activeTool == ArchitectTool.terrain)
                   ..._buildTerrainControls(context, l, colors)
                 else if (activeTool == ArchitectTool.pathway)
                   ..._buildPathwayControls(context, l, colors)
@@ -87,75 +85,21 @@ class ArchitectLandscapeBar extends StatelessWidget {
                   ..._buildVegetationControls(context, l, colors)
                 else if (activeTool == ArchitectTool.siteFence)
                   ..._buildSiteFenceControls(context, l, colors),
-                if (onTriggerFillet != null || onTriggerChamfer != null) ...[
-                  const SizedBox(width: 8),
+                if (hasDraft && onUndoPoint != null) ...[
+                  const SizedBox(width: 6),
                   _divider(colors),
                   const SizedBox(width: 4),
-                  if (onTriggerFillet != null)
-                    IconButton(
-                      key: const ValueKey('architect-landscape-fillet'),
-                      tooltip: l.architectFillet,
-                      visualDensity: VisualDensity.compact,
-                      onPressed: onTriggerFillet,
-                      icon: const AppIcon(AppIconId.fillet, size: 18),
+                  IconButton(
+                    key: const ValueKey('architect-landscape-undo-point'),
+                    tooltip: l.architectZoneUndoPoint,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onUndoPoint,
+                    icon: AppIcon(
+                      AppIconId.undo,
+                      size: 16,
+                      color: colors.onSurfaceVariant,
                     ),
-                  if (onTriggerChamfer != null)
-                    IconButton(
-                      key: const ValueKey('architect-landscape-chamfer'),
-                      tooltip: l.architectChamfer,
-                      visualDensity: VisualDensity.compact,
-                      onPressed: onTriggerChamfer,
-                      icon: const AppIcon(AppIconId.chamfer, size: 18),
-                    ),
-                ],
-                if (hasDraft) ...[
-                  const SizedBox(width: 8),
-                  _divider(colors),
-                  const SizedBox(width: 6),
-                  if (canCommit && onCommitDraft != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: FilledButton.tonalIcon(
-                        key: const ValueKey('architect-landscape-commit'),
-                        onPressed: onCommitDraft,
-                        style: FilledButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                        ),
-                        icon: const Icon(Icons.check_rounded, size: 16),
-                        label: Text(
-                          l.architectZoneClose,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ),
-                  if (onUndoDraftPoint != null)
-                    IconButton(
-                      key: const ValueKey('architect-landscape-undo-point'),
-                      tooltip: l.architectZoneUndoPoint,
-                      visualDensity: VisualDensity.compact,
-                      onPressed: onUndoDraftPoint,
-                      icon: AppIcon(
-                        AppIconId.undo,
-                        size: 16,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  if (onCancelDraft != null)
-                    IconButton(
-                      key: const ValueKey('architect-landscape-cancel'),
-                      tooltip: l.cancel,
-                      visualDensity: VisualDensity.compact,
-                      onPressed: onCancelDraft,
-                      icon: Icon(
-                        Icons.close_rounded,
-                        size: 18,
-                        color: colors.error,
-                      ),
-                    ),
+                  ),
                 ],
               ],
             ),
@@ -165,15 +109,11 @@ class ArchitectLandscapeBar extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildTerrainControls(
+  List<Widget> _buildStateAndDatumPrefix(
     BuildContext context,
     AppLocalizations l,
     ColorScheme colors,
   ) {
-    final isContourMode = activeTool == ArchitectTool.contour ||
-        controller.terrainMode == ArchitectTerrainDraftMode.contour;
-    final isSpotMode = controller.terrainMode == ArchitectTerrainDraftMode.spot;
-
     return [
       _chip(
         colors: colors,
@@ -188,119 +128,33 @@ class ArchitectLandscapeBar extends StatelessWidget {
         label: l.architectTerrainStateProposed,
         onTap: () => onTerrainStateChanged(ArchitectTerrainState.proposed),
       ),
-      const SizedBox(width: 8),
+      const SizedBox(width: 6),
       _divider(colors),
-      const SizedBox(width: 8),
-      if (activeTool != ArchitectTool.contour) ...[
-        for (final mode in ArchitectTerrainDraftMode.values) ...[
-          _chip(
-            colors: colors,
-            selected: controller.terrainMode == mode,
-            label: _terrainModeLabel(l, mode),
-            onTap: () {
-              controller.terrainMode = mode;
-              controller.clearDraft();
-              _notifyChanged();
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
-        const SizedBox(width: 4),
-        _divider(colors),
-        const SizedBox(width: 8),
-      ],
-      // Project Datum (±0.00 Level) Button
+      const SizedBox(width: 6),
+    ];
+  }
+
+  List<Widget> _buildDatumAndQuickActionsSuffix(
+    BuildContext context,
+    AppLocalizations l,
+    ColorScheme colors,
+  ) {
+    return [
       ActionChip(
         key: const ValueKey('architect-terrain-datum'),
         visualDensity: VisualDensity.compact,
         avatar: Icon(Icons.height_rounded, size: 15, color: colors.primary),
         label: Text(
-          '${l.architectTerrainDatum}: ${controller.terrainDatumElevation.toStringAsFixed(2)} m',
+          '±0.00: ${controller.terrainDatumElevation.toStringAsFixed(2)} m',
           style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
         ),
-        onPressed: () => _promptDatumDialog(context, l),
+        onPressed: () => _promptDatumKeypad(context, l),
       ),
-      const SizedBox(width: 8),
-      _divider(colors),
-      const SizedBox(width: 8),
-      if (isContourMode || isSpotMode) ...[
-        // Absolute Elevation stepper & tap-to-edit
-        _stepper(
-          colors: colors,
-          label:
-              '${l.architectTerrainAbsoluteElevation}: ${controller.contourAbsoluteElevation.toStringAsFixed(2)} m',
-          onDec: () {
-            controller.contourAbsoluteElevation =
-                ((controller.contourAbsoluteElevation - 0.50) * 100).round() / 100.0;
-            controller.terrainElevation = controller.contourAbsoluteElevation -
-                controller.terrainDatumElevation;
-            _notifyChanged();
-          },
-          onInc: () {
-            controller.contourAbsoluteElevation =
-                ((controller.contourAbsoluteElevation + 0.50) * 100).round() / 100.0;
-            controller.terrainElevation = controller.contourAbsoluteElevation -
-                controller.terrainDatumElevation;
-            _notifyChanged();
-          },
-          onTapLabel: () => _promptAbsoluteElevationDialog(context, l),
-        ),
-        const SizedBox(width: 4),
-        // Relative Elevation feedback chip
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Text(
-            '(${l.architectTerrainRelativeElevation}: ${_formatSignedMeters(controller.terrainElevation)})',
-            style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
-          ),
-        ),
-        if (isContourMode) ...[
-          const SizedBox(width: 4),
-          _chip(
-            colors: colors,
-            selected: controller.contourMajor,
-            label: l.architectTerrainContourMajor,
-            onTap: () {
-              controller.contourMajor = !controller.contourMajor;
-              _notifyChanged();
-            },
-          ),
-          const SizedBox(width: 4),
-          _chip(
-            colors: colors,
-            selected: controller.contourClosed,
-            label: l.architectTerrainContourClosed,
-            onTap: () {
-              controller.contourClosed = !controller.contourClosed;
-              _notifyChanged();
-            },
-          ),
-        ],
-      ] else ...[
-        _stepper(
-          colors: colors,
-          label:
-              '${l.architectTerrainElevationLabel} ${_formatSignedMeters(controller.terrainElevation)}',
-          onDec: () {
-            controller.terrainElevation =
-                ((controller.terrainElevation - 0.10) * 100).round() / 100.0;
-            controller.contourAbsoluteElevation =
-                controller.terrainElevation + controller.terrainDatumElevation;
-            _notifyChanged();
-          },
-          onInc: () {
-            controller.terrainElevation =
-                ((controller.terrainElevation + 0.10) * 100).round() / 100.0;
-            controller.contourAbsoluteElevation =
-                controller.terrainElevation + controller.terrainDatumElevation;
-            _notifyChanged();
-          },
-        ),
-      ],
       if (onCreateProposedFromExisting != null &&
           project != null &&
-          project!.existingTerrain.hasOuterBoundary &&
+          project!.existingTerrain.isNotEmpty &&
           project!.proposedTerrain.isEmpty) ...[
+        const SizedBox(width: 6),
         ActionChip(
           key: const ValueKey('architect-terrain-create-proposed'),
           visualDensity: VisualDensity.compact,
@@ -315,9 +169,9 @@ class ArchitectLandscapeBar extends StatelessWidget {
           ),
           onPressed: onCreateProposedFromExisting,
         ),
-        const SizedBox(width: 6),
       ],
       if (hasSelectedContourOrSpot && onEditSelectedElevation != null) ...[
+        const SizedBox(width: 6),
         ActionChip(
           key: const ValueKey('architect-terrain-edit-elevation'),
           visualDensity: VisualDensity.compact,
@@ -328,72 +182,129 @@ class ArchitectLandscapeBar extends StatelessWidget {
           ),
           onPressed: onEditSelectedElevation,
         ),
-        const SizedBox(width: 6),
-      ],
-      if (onSyncFromGeodesy != null) ...[
-        const SizedBox(width: 8),
-        ActionChip(
-          key: const ValueKey('architect-terrain-sync-geodesy'),
-          visualDensity: VisualDensity.compact,
-          avatar: AppIcon(
-            AppIconId.terrain,
-            size: 15,
-            color: colors.primary,
-          ),
-          label: Text(
-            l.architectTerrainFromGeodesy,
-            style: const TextStyle(fontSize: 11.5),
-          ),
-          onPressed: onSyncFromGeodesy,
-        ),
       ],
     ];
   }
 
-  Future<void> _promptDatumDialog(
+  List<Widget> _buildContourControls(
+    BuildContext context,
+    AppLocalizations l,
+    ColorScheme colors,
+  ) {
+    return [
+      ..._buildStateAndDatumPrefix(context, l, colors),
+      Tooltip(
+        message: l.architectSplineTraceContourHint,
+        child: ChoiceChip(
+          key: const ValueKey('architect-contour-auto-trace'),
+          selected: controller.contourAutoTrace,
+          showCheckmark: false,
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          avatar: const Icon(Icons.auto_fix_high, size: 15),
+          label: Text(
+            l.architectSplineTraceContour,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight:
+                  controller.contourAutoTrace ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+          onSelected: (_) {
+            controller.contourAutoTrace = true;
+            controller.clearDraft();
+            _notifyChanged();
+          },
+        ),
+      ),
+      const SizedBox(width: 4),
+      ChoiceChip(
+        key: const ValueKey('architect-contour-manual-spline'),
+        selected: !controller.contourAutoTrace,
+        showCheckmark: false,
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        avatar: const AppIcon(AppIconId.spline, size: 15),
+        label: Text(
+          l.architectToolSpline,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight:
+                !controller.contourAutoTrace ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+        onSelected: (_) {
+          controller.contourAutoTrace = false;
+          controller.clearDraft();
+          _notifyChanged();
+        },
+      ),
+      const SizedBox(width: 6),
+      _divider(colors),
+      const SizedBox(width: 6),
+      ..._buildDatumAndQuickActionsSuffix(context, l, colors),
+    ];
+  }
+
+  List<Widget> _buildTerrainControls(
+    BuildContext context,
+    AppLocalizations l,
+    ColorScheme colors,
+  ) {
+    return [
+      ..._buildStateAndDatumPrefix(context, l, colors),
+      for (final mode in ArchitectTerrainDraftMode.values) ...[
+        _chip(
+          colors: colors,
+          selected: controller.terrainMode == mode,
+          label: _terrainModeLabel(l, mode),
+          onTap: () {
+            controller.terrainMode = mode;
+            controller.clearDraft();
+            _notifyChanged();
+          },
+        ),
+        const SizedBox(width: 4),
+      ],
+      const SizedBox(width: 2),
+      _divider(colors),
+      const SizedBox(width: 6),
+      if (controller.terrainMode == ArchitectTerrainDraftMode.pad) ...[
+        _numericChip(
+          context: context,
+          key: const ValueKey('architect-terrain-pad-elevation'),
+          colors: colors,
+          title: l.architectTerrainElevationLabel,
+          label:
+              '${l.architectTerrainElevationLabel} ${_formatSignedMeters(controller.terrainElevation)}',
+          initialValue: controller.terrainElevation,
+          unitLabel: 'm',
+          decimals: 2,
+          allowNegative: true,
+          onSubmitted: (val) {
+            controller.terrainElevation = val;
+            controller.contourAbsoluteElevation =
+                val + controller.terrainDatumElevation;
+            _notifyChanged();
+          },
+        ),
+        const SizedBox(width: 6),
+      ],
+      ..._buildDatumAndQuickActionsSuffix(context, l, colors),
+    ];
+  }
+
+  Future<void> _promptDatumKeypad(
     BuildContext context,
     AppLocalizations l,
   ) async {
-    final textController = TextEditingController(
-      text: controller.terrainDatumElevation.toStringAsFixed(2),
-    );
-    final res = await showDialog<double>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.architectTerrainDatumDialogTitle),
-        content: TextField(
-          controller: textController,
-          keyboardType: TextInputType.none,
-          onTap: () => openArchitectNumericKeypad(
-            context: ctx,
-            controller: textController,
-            title: l.architectTerrainDatum,
-            unitLabel: 'm',
-            decimals: 3,
-            allowNegative: true,
-          ),
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: l.architectTerrainDatum,
-            suffixText: 'm',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              final val = double.tryParse(
-                textController.text.replaceAll(',', '.'),
-              );
-              Navigator.pop(ctx, val);
-            },
-            child: Text(l.ok),
-          ),
-        ],
-      ),
+    final res = await BimNumericKeypad.showInputDialog(
+      context,
+      title: l.architectTerrainDatumDialogTitle,
+      initialText: controller.terrainDatumElevation.toStringAsFixed(2),
+      unitLabel: 'm',
+      decimals: 3,
+      allowNegative: true,
     );
     if (res != null) {
       controller.terrainDatumElevation = res;
@@ -409,132 +320,74 @@ class ArchitectLandscapeBar extends StatelessWidget {
     }
   }
 
-  Future<void> _promptAbsoluteElevationDialog(
-    BuildContext context,
-    AppLocalizations l,
-  ) async {
-    final textController = TextEditingController(
-      text: controller.contourAbsoluteElevation.toStringAsFixed(2),
-    );
-    final res = await showDialog<double>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.architectTerrainAbsoluteElevation),
-        content: TextField(
-          controller: textController,
-          keyboardType: TextInputType.none,
-          onTap: () => openArchitectNumericKeypad(
-            context: ctx,
-            controller: textController,
-            title: l.architectTerrainAbsoluteElevation,
-            unitLabel: 'm',
-            decimals: 3,
-            allowNegative: true,
-          ),
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: l.architectTerrainAbsoluteElevation,
-            suffixText: 'm',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              final val = double.tryParse(
-                textController.text.replaceAll(',', '.'),
-              );
-              Navigator.pop(ctx, val);
-            },
-            child: Text(l.ok),
-          ),
-        ],
-      ),
-    );
-    if (res != null) {
-      controller.contourAbsoluteElevation = res;
-      controller.terrainElevation = res - controller.terrainDatumElevation;
-      _notifyChanged();
-    }
-  }
-
   List<Widget> _buildPathwayControls(
     BuildContext context,
     AppLocalizations l,
     ColorScheme colors,
   ) {
     return [
-      _stepper(
+      _popupChip<ArchitectPavingMaterial>(
+        key: const ValueKey('architect-pathway-material'),
         colors: colors,
-        label:
-            '${l.architectPathwayWidth}: ${controller.pathwayWidth.toStringAsFixed(2)} m',
-        onDec: () {
-          controller.pathwayWidth = (controller.pathwayWidth - 0.10).clamp(
-            0.40,
-            12.0,
-          );
-          _notifyChanged();
-        },
-        onInc: () {
-          controller.pathwayWidth = (controller.pathwayWidth + 0.10).clamp(
-            0.40,
-            12.0,
-          );
+        label: _pavingMaterialLabel(l, controller.pathwayMaterial),
+        values: ArchitectPavingMaterial.values,
+        selected: controller.pathwayMaterial,
+        itemLabel: (m) => _pavingMaterialLabel(l, m),
+        onSelected: (m) {
+          controller.pathwayMaterial = m;
           _notifyChanged();
         },
       ),
-      const SizedBox(width: 8),
-      _divider(colors),
-      const SizedBox(width: 8),
-      for (final curb in ArchitectPathwayCurbMode.values) ...[
-        _chip(
-          colors: colors,
-          selected: controller.pathwayCurbMode == curb,
-          label: _curbModeLabel(l, curb),
-          onTap: () {
-            controller.pathwayCurbMode = curb;
-            _notifyChanged();
-          },
-        ),
-        const SizedBox(width: 4),
-      ],
+      const SizedBox(width: 6),
+      _numericChip(
+        context: context,
+        key: const ValueKey('architect-pathway-width'),
+        colors: colors,
+        title: l.architectPathwayWidth,
+        label:
+            '${l.architectPathwayWidth}: ${controller.pathwayWidth.toStringAsFixed(2)} m',
+        initialValue: controller.pathwayWidth,
+        unitLabel: 'm',
+        min: 0.40,
+        max: 12.0,
+        onSubmitted: (v) {
+          controller.pathwayWidth = v.clamp(0.40, 12.0);
+          _notifyChanged();
+        },
+      ),
+      const SizedBox(width: 6),
+      _popupChip<ArchitectPathwayCurbMode>(
+        key: const ValueKey('architect-pathway-curb'),
+        colors: colors,
+        label: _curbModeLabel(l, controller.pathwayCurbMode),
+        values: ArchitectPathwayCurbMode.values,
+        selected: controller.pathwayCurbMode,
+        itemLabel: (c) => _curbModeLabel(l, c),
+        onSelected: (c) {
+          controller.pathwayCurbMode = c;
+          _notifyChanged();
+        },
+      ),
       if (controller.pathwayCurbMode != ArchitectPathwayCurbMode.none) ...[
-        const SizedBox(width: 4),
-        _stepper(
+        const SizedBox(width: 6),
+        _numericChip(
+          context: context,
+          key: const ValueKey('architect-pathway-curb-width'),
           colors: colors,
-          label:
-              '${l.architectPathwayCurbWidth}: ${(controller.pathwayCurbWidth * 100).round()} cm',
-          onDec: () {
-            controller.pathwayCurbWidth = (controller.pathwayCurbWidth - 0.02)
-                .clamp(0.06, 0.35);
-            _notifyChanged();
-          },
-          onInc: () {
-            controller.pathwayCurbWidth = (controller.pathwayCurbWidth + 0.02)
-                .clamp(0.06, 0.35);
+          title: l.architectPathwayCurbWidth,
+          label: '${(controller.pathwayCurbWidth * 100).round()} cm',
+          initialValue: controller.pathwayCurbWidth * 100,
+          unitLabel: 'cm',
+          decimals: 0,
+          min: 6,
+          max: 35,
+          onSubmitted: (v) {
+            controller.pathwayCurbWidth = (v / 100.0).clamp(0.06, 0.35);
             _notifyChanged();
           },
         ),
       ],
-      const SizedBox(width: 8),
-      _divider(colors),
-      const SizedBox(width: 8),
-      for (final mat in ArchitectPavingMaterial.values) ...[
-        _chip(
-          colors: colors,
-          selected: controller.pathwayMaterial == mat,
-          label: _pavingMaterialLabel(l, mat),
-          onTap: () {
-            controller.pathwayMaterial = mat;
-            _notifyChanged();
-          },
-        ),
-        const SizedBox(width: 4),
-      ],
-      const SizedBox(width: 4),
+      const SizedBox(width: 6),
       _chip(
         colors: colors,
         selected: controller.pathwayClosed,
@@ -553,39 +406,36 @@ class ArchitectLandscapeBar extends StatelessWidget {
     ColorScheme colors,
   ) {
     return [
-      _stepper(
+      _numericChip(
+        context: context,
+        key: const ValueKey('architect-street-width'),
         colors: colors,
+        title: l.architectStreetRoadWidth,
         label:
             '${l.architectStreetRoadWidth}: ${controller.streetRoadWidth.toStringAsFixed(2)} m',
-        onDec: () {
-          controller.streetRoadWidth =
-              (controller.streetRoadWidth - 0.50).clamp(2.50, 30.0);
-          _notifyChanged();
-        },
-        onInc: () {
-          controller.streetRoadWidth =
-              (controller.streetRoadWidth + 0.50).clamp(2.50, 30.0);
+        initialValue: controller.streetRoadWidth,
+        unitLabel: 'm',
+        min: 2.50,
+        max: 30.0,
+        onSubmitted: (v) {
+          controller.streetRoadWidth = v.clamp(2.50, 30.0);
           _notifyChanged();
         },
       ),
-      const SizedBox(width: 8),
-      _divider(colors),
-      const SizedBox(width: 8),
-      for (final style in ArchitectRoadMarkingStyle.values) ...[
-        _chip(
-          colors: colors,
-          selected: controller.streetMarkingStyle == style,
-          label: style.label(l),
-          onTap: () {
-            controller.streetMarkingStyle = style;
-            _notifyChanged();
-          },
-        ),
-        const SizedBox(width: 4),
-      ],
-      const SizedBox(width: 4),
-      _divider(colors),
-      const SizedBox(width: 8),
+      const SizedBox(width: 6),
+      _popupChip<ArchitectRoadMarkingStyle>(
+        key: const ValueKey('architect-street-marking'),
+        colors: colors,
+        label: controller.streetMarkingStyle.label(l),
+        values: ArchitectRoadMarkingStyle.values,
+        selected: controller.streetMarkingStyle,
+        itemLabel: (s) => s.label(l),
+        onSelected: (s) {
+          controller.streetMarkingStyle = s;
+          _notifyChanged();
+        },
+      ),
+      const SizedBox(width: 6),
       _chip(
         colors: colors,
         selected: controller.streetHasLeftSidewalk,
@@ -595,24 +445,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           _notifyChanged();
         },
       ),
-      if (controller.streetHasLeftSidewalk) ...[
-        const SizedBox(width: 4),
-        _stepper(
-          colors: colors,
-          label: '${controller.streetLeftSidewalkWidth.toStringAsFixed(2)} m',
-          onDec: () {
-            controller.streetLeftSidewalkWidth =
-                (controller.streetLeftSidewalkWidth - 0.20).clamp(0.40, 8.0);
-            _notifyChanged();
-          },
-          onInc: () {
-            controller.streetLeftSidewalkWidth =
-                (controller.streetLeftSidewalkWidth + 0.20).clamp(0.40, 8.0);
-            _notifyChanged();
-          },
-        ),
-      ],
-      const SizedBox(width: 6),
+      const SizedBox(width: 4),
       _chip(
         colors: colors,
         selected: controller.streetHasRightSidewalk,
@@ -620,41 +453,6 @@ class ArchitectLandscapeBar extends StatelessWidget {
         onTap: () {
           controller.streetHasRightSidewalk =
               !controller.streetHasRightSidewalk;
-          _notifyChanged();
-        },
-      ),
-      if (controller.streetHasRightSidewalk) ...[
-        const SizedBox(width: 4),
-        _stepper(
-          colors: colors,
-          label: '${controller.streetRightSidewalkWidth.toStringAsFixed(2)} m',
-          onDec: () {
-            controller.streetRightSidewalkWidth =
-                (controller.streetRightSidewalkWidth - 0.20).clamp(0.40, 8.0);
-            _notifyChanged();
-          },
-          onInc: () {
-            controller.streetRightSidewalkWidth =
-                (controller.streetRightSidewalkWidth + 0.20).clamp(0.40, 8.0);
-            _notifyChanged();
-          },
-        ),
-      ],
-      const SizedBox(width: 8),
-      _divider(colors),
-      const SizedBox(width: 8),
-      _stepper(
-        colors: colors,
-        label:
-            '${l.architectStreetCurb}: ${(controller.streetCurbWidth * 100).round()} cm',
-        onDec: () {
-          controller.streetCurbWidth =
-              (controller.streetCurbWidth - 0.02).clamp(0.08, 0.40);
-          _notifyChanged();
-        },
-        onInc: () {
-          controller.streetCurbWidth =
-              (controller.streetCurbWidth + 0.02).clamp(0.08, 0.40);
           _notifyChanged();
         },
       ),
@@ -677,22 +475,20 @@ class ArchitectLandscapeBar extends StatelessWidget {
     ColorScheme colors,
   ) {
     return [
-      for (final sp in ArchitectPlantSpecies.values) ...[
-        _chip(
-          colors: colors,
-          selected: controller.plantSpecies == sp,
-          label: _speciesLabel(l, sp),
-          onTap: () {
-            controller.applySpeciesDefaults(sp);
-            controller.clearDraft();
-            _notifyChanged();
-          },
-        ),
-        const SizedBox(width: 4),
-      ],
-      const SizedBox(width: 4),
-      _divider(colors),
-      const SizedBox(width: 8),
+      _popupChip<ArchitectPlantSpecies>(
+        key: const ValueKey('architect-vegetation-species'),
+        colors: colors,
+        label: _speciesLabel(l, controller.plantSpecies),
+        values: ArchitectPlantSpecies.values,
+        selected: controller.plantSpecies,
+        itemLabel: (s) => _speciesLabel(l, s),
+        onSelected: (s) {
+          controller.applySpeciesDefaults(s);
+          controller.clearDraft();
+          _notifyChanged();
+        },
+      ),
+      const SizedBox(width: 6),
       if (controller.plantSpecies != ArchitectPlantSpecies.trimmedHedge) ...[
         _chip(
           colors: colors,
@@ -721,80 +517,78 @@ class ArchitectLandscapeBar extends StatelessWidget {
             _notifyChanged();
           },
         ),
-        const SizedBox(width: 8),
-        _stepper(
+        const SizedBox(width: 6),
+        _numericChip(
+          context: context,
+          key: const ValueKey('architect-vegetation-crown'),
           colors: colors,
+          title: l.architectVegetationCrownDiameter,
           label:
               '${l.architectVegetationCrownDiameter} ${controller.plantCrownDiameter.toStringAsFixed(1)} m',
-          onDec: () {
-            controller.plantCrownDiameter =
-                (controller.plantCrownDiameter - 0.2).clamp(0.4, 16.0);
-            _notifyChanged();
-          },
-          onInc: () {
-            controller.plantCrownDiameter =
-                (controller.plantCrownDiameter + 0.2).clamp(0.4, 16.0);
+          initialValue: controller.plantCrownDiameter,
+          unitLabel: 'm',
+          decimals: 1,
+          min: 0.4,
+          max: 16.0,
+          onSubmitted: (v) {
+            controller.plantCrownDiameter = v.clamp(0.4, 16.0);
             _notifyChanged();
           },
         ),
-        const SizedBox(width: 6),
         if (controller.plantPlacementMode ==
             ArchitectVegetationPlacementMode.row) ...[
-          _stepper(
+          const SizedBox(width: 6),
+          _numericChip(
+            context: context,
+            key: const ValueKey('architect-vegetation-spacing'),
             colors: colors,
+            title: l.architectVegetationRowSpacing,
             label:
                 '${l.architectVegetationRowSpacing}: ${controller.plantRowSpacing.toStringAsFixed(1)} m',
-            onDec: () {
-              controller.plantRowSpacing = (controller.plantRowSpacing - 0.5)
-                  .clamp(0.5, 25.0);
-              _notifyChanged();
-            },
-            onInc: () {
-              controller.plantRowSpacing = (controller.plantRowSpacing + 0.5)
-                  .clamp(0.5, 25.0);
+            initialValue: controller.plantRowSpacing,
+            unitLabel: 'm',
+            decimals: 1,
+            min: 0.5,
+            max: 25.0,
+            onSubmitted: (v) {
+              controller.plantRowSpacing = v.clamp(0.5, 25.0);
               _notifyChanged();
             },
           ),
-          const SizedBox(width: 6),
         ],
       ] else ...[
-        _stepper(
+        _numericChip(
+          context: context,
+          key: const ValueKey('architect-vegetation-hedge-width'),
           colors: colors,
+          title: l.architectPathwayWidth,
           label:
               '${l.architectPathwayWidth}: ${controller.hedgeWidth.toStringAsFixed(2)} m',
-          onDec: () {
-            controller.hedgeWidth = (controller.hedgeWidth - 0.10).clamp(
-              0.30,
-              2.50,
-            );
-            _notifyChanged();
-          },
-          onInc: () {
-            controller.hedgeWidth = (controller.hedgeWidth + 0.10).clamp(
-              0.30,
-              2.50,
-            );
+          initialValue: controller.hedgeWidth,
+          unitLabel: 'm',
+          min: 0.30,
+          max: 2.50,
+          onSubmitted: (v) {
+            controller.hedgeWidth = v.clamp(0.30, 2.50);
             _notifyChanged();
           },
         ),
-        const SizedBox(width: 6),
       ],
-      _stepper(
+      const SizedBox(width: 6),
+      _numericChip(
+        context: context,
+        key: const ValueKey('architect-vegetation-height'),
         colors: colors,
+        title: l.architectVegetationHeight,
         label:
             '${l.architectVegetationHeight}: ${controller.plantHeight.toStringAsFixed(1)} m',
-        onDec: () {
-          controller.plantHeight = (controller.plantHeight - 0.3).clamp(
-            0.4,
-            24.0,
-          );
-          _notifyChanged();
-        },
-        onInc: () {
-          controller.plantHeight = (controller.plantHeight + 0.3).clamp(
-            0.4,
-            24.0,
-          );
+        initialValue: controller.plantHeight,
+        unitLabel: 'm',
+        decimals: 1,
+        min: 0.4,
+        max: 24.0,
+        onSubmitted: (v) {
+          controller.plantHeight = v.clamp(0.4, 24.0);
           _notifyChanged();
         },
       ),
@@ -807,75 +601,70 @@ class ArchitectLandscapeBar extends StatelessWidget {
     ColorScheme colors,
   ) {
     return [
-      for (final preset in ArchitectSiteFencePreset.values) ...[
-        _chip(
-          colors: colors,
-          selected: controller.fencePreset == preset,
-          label: _fencePresetLabel(l, preset),
-          onTap: () {
-            controller.applyFencePresetDefaults(preset);
-            _notifyChanged();
-          },
-        ),
-        const SizedBox(width: 4),
-      ],
-      const SizedBox(width: 4),
-      _divider(colors),
-      const SizedBox(width: 8),
-      _stepper(
+      _popupChip<ArchitectSiteFencePreset>(
+        key: const ValueKey('architect-fence-preset'),
         colors: colors,
-        label:
-            '${l.architectFenceHeight} ${controller.fenceHeight.toStringAsFixed(2)} m',
-        onDec: () {
-          controller.fenceHeight = (controller.fenceHeight - 0.10).clamp(
-            0.50,
-            4.50,
-          );
-          _notifyChanged();
-        },
-        onInc: () {
-          controller.fenceHeight = (controller.fenceHeight + 0.10).clamp(
-            0.50,
-            4.50,
-          );
+        label: _fencePresetLabel(l, controller.fencePreset),
+        values: ArchitectSiteFencePreset.values,
+        selected: controller.fencePreset,
+        itemLabel: (p) => _fencePresetLabel(l, p),
+        onSelected: (p) {
+          controller.applyFencePresetDefaults(p);
           _notifyChanged();
         },
       ),
       const SizedBox(width: 6),
-      _stepper(
+      _numericChip(
+        context: context,
+        key: const ValueKey('architect-fence-height'),
         colors: colors,
+        title: l.architectFenceHeight,
         label:
-            '${l.architectFenceThickness} ${(controller.fenceThickness * 100).round()} cm',
-        onDec: () {
-          controller.fenceThickness = (controller.fenceThickness - 0.05).clamp(
-            0.12,
-            1.50,
-          );
+            '${l.architectFenceHeight} ${controller.fenceHeight.toStringAsFixed(2)} m',
+        initialValue: controller.fenceHeight,
+        unitLabel: 'm',
+        min: 0.50,
+        max: 4.50,
+        onSubmitted: (v) {
+          controller.fenceHeight = v.clamp(0.50, 4.50);
           _notifyChanged();
         },
-        onInc: () {
-          controller.fenceThickness = (controller.fenceThickness + 0.05).clamp(
-            0.12,
-            1.50,
-          );
+      ),
+      const SizedBox(width: 6),
+      _numericChip(
+        context: context,
+        key: const ValueKey('architect-fence-thickness'),
+        colors: colors,
+        title: l.architectFenceThickness,
+        label:
+            '${l.architectFenceThickness} ${(controller.fenceThickness * 100).round()} cm',
+        initialValue: controller.fenceThickness * 100,
+        unitLabel: 'cm',
+        decimals: 0,
+        min: 12,
+        max: 150,
+        onSubmitted: (v) {
+          controller.fenceThickness = (v / 100.0).clamp(0.12, 1.50);
           _notifyChanged();
         },
       ),
       if (controller.fencePreset != ArchitectSiteFencePreset.rcRetaining &&
           controller.fencePreset != ArchitectSiteFencePreset.gabionRetaining) ...[
         const SizedBox(width: 6),
-        _stepper(
+        _numericChip(
+          context: context,
+          key: const ValueKey('architect-fence-spacing'),
           colors: colors,
+          title: l.architectFencePierSpacing,
           label:
               '${l.architectFencePierSpacing}: ${controller.fencePierSpacing.toStringAsFixed(1)} m',
-          onDec: () {
-            controller.fencePierSpacing = (controller.fencePierSpacing - 0.20)
-                .clamp(1.20, 6.00);
-            _notifyChanged();
-          },
-          onInc: () {
-            controller.fencePierSpacing = (controller.fencePierSpacing + 0.20)
-                .clamp(1.20, 6.00);
+          initialValue: controller.fencePierSpacing,
+          unitLabel: 'm',
+          decimals: 1,
+          min: 1.20,
+          max: 6.00,
+          onSubmitted: (v) {
+            controller.fencePierSpacing = v.clamp(1.20, 6.00);
             _notifyChanged();
           },
         ),
@@ -905,55 +694,91 @@ class ArchitectLandscapeBar extends StatelessWidget {
     );
   }
 
-  Widget _stepper({
+  Widget _popupChip<T>({
+    required Key key,
     required ColorScheme colors,
     required String label,
-    required VoidCallback onDec,
-    required VoidCallback onInc,
-    VoidCallback? onTapLabel,
+    required List<T> values,
+    required T selected,
+    required String Function(T) itemLabel,
+    required ValueChanged<T> onSelected,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
-            onTap: onDec,
-            borderRadius: BorderRadius.circular(6),
-            child: const Padding(
-              padding: EdgeInsets.all(4),
-              child: Icon(Icons.remove_rounded, size: 15),
-            ),
+    return PopupMenuButton<T>(
+      key: key,
+      onSelected: onSelected,
+      itemBuilder: (_) => [
+        for (final v in values)
+          CheckedPopupMenuItem<T>(
+            value: v,
+            checked: v == selected,
+            child: Text(itemLabel(v)),
           ),
-          InkWell(
-            onTap: onTapLabel,
-            borderRadius: BorderRadius.circular(4),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: colors.secondaryContainer.withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colors.outlineVariant),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: colors.onSecondaryContainer,
               ),
             ),
-          ),
-          InkWell(
-            onTap: onInc,
-            borderRadius: BorderRadius.circular(6),
-            child: const Padding(
-              padding: EdgeInsets.all(4),
-              child: Icon(Icons.add_rounded, size: 15),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down_rounded,
+              size: 16,
+              color: colors.onSecondaryContainer,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _numericChip({
+    required BuildContext context,
+    required Key key,
+    required ColorScheme colors,
+    required String title,
+    required String label,
+    required double initialValue,
+    required String unitLabel,
+    int decimals = 2,
+    double? min,
+    double? max,
+    bool allowNegative = false,
+    required ValueChanged<double> onSubmitted,
+  }) {
+    return ActionChip(
+      key: key,
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+      ),
+      onPressed: () async {
+        final res = await BimNumericKeypad.showInputDialog(
+          context,
+          title: title,
+          initialText: initialValue.toStringAsFixed(decimals),
+          unitLabel: unitLabel,
+          decimals: decimals,
+          min: min,
+          max: max,
+          allowNegative: allowNegative,
+        );
+        if (res != null) onSubmitted(res);
+      },
     );
   }
 

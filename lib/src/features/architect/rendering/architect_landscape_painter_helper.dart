@@ -1561,7 +1561,10 @@ class ArchitectLandscapePainterHelper {
     required double zoomScale,
   }) {
     if (candidate.points.length < 2) return;
-    final path = _polygonPath(candidate.points, closed: candidate.closed);
+    final path = ArchitectSplineGeometry.generatePath(
+      candidate.points,
+      closed: candidate.closed,
+    );
     canvas.drawPath(
       path,
       Paint()

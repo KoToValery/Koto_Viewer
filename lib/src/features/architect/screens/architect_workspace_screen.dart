@@ -13475,19 +13475,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _cursorModel = pt;
 
     } else if (_activeTool.isLandscapeTool) {
-      if (_activeTool == ArchitectTool.terrain &&
-          _landscapeTool.terrainMode == ArchitectTerrainDraftMode.pickContour) {
-        final doc = _currentUnderlayDoc;
-        final frame = _effectiveUnderlayFrame;
-        final candidate = (doc != null && frame != null)
-            ? ArchitectUnderlayContourExtractor.pickAt(
-                document: doc,
-                frame: frame,
-                layerVisibility: _effectiveUnderlayLayerVisibility,
-                modelPoint: rawModel,
-                hitToleranceMeters: math.max(24.0 / _currentScale, 0.45),
-              )
-            : null;
+      if (_landscapeTool.isPickingContour(_activeTool.name)) {
+        final candidate = _resolvePickedTerrainContour(rawModel);
         _landscapeTool.setPickedContourPreview(candidate);
         _cursorModel = candidate?.anchorPoint ?? rawModel;
         _activeSnapLabel = candidate == null
@@ -16455,62 +16444,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    // 9b. In Landscape tools (Terrain, Pathway, Vegetation, Site Fence)
+    // 9b. In Landscape tools (Terrain, Contour, Pathway, Vegetation, Site Fence, Street)
     if (_activeTool.isLandscapeTool) {
-      if (_activeTool == ArchitectTool.terrain &&
-          _landscapeTool.terrainMode == ArchitectTerrainDraftMode.pickContour) {
+      if (_landscapeTool.isPickingContour(_activeTool.name)) {
         final l = context.l10n;
-        final doc = _currentUnderlayDoc;
-        final frame = _effectiveUnderlayFrame;
-        if (doc == null || frame == null) {
-          _landscapeTool.setPickedContourPreview(null);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.architectTerrainNoUnderlayHint)),
-          );
-          return;
-        }
-        final activeSurface =
-            _landscapeTool.terrainState == ArchitectTerrainState.existing
-            ? _project.existingTerrain
-            : _project.proposedTerrain;
-        if (!activeSurface.hasOuterBoundary) {
-          _landscapeTool.setPickedContourPreview(null);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.architectTerrainCreateBoundaryFirst)),
-          );
-          return;
-        }
         final candidate =
             _landscapeTool.pickedContourPreview ??
-            ArchitectUnderlayContourExtractor.pickAt(
-              document: doc,
-              frame: frame,
-              layerVisibility: _effectiveUnderlayLayerVisibility,
-              modelPoint: rawModel,
-              hitToleranceMeters: math.max(24.0 / _currentScale, 0.45),
-            );
+            _resolvePickedTerrainContour(rawModel);
         _landscapeTool.setPickedContourPreview(null);
         if (candidate == null) {
+          final hasUnderlay =
+              _currentUnderlayDoc != null && _effectiveUnderlayFrame != null;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.architectTerrainNoContourAtPoint)),
+            SnackBar(
+              content: Text(
+                hasUnderlay
+                    ? l.architectTerrainNoContourAtPoint
+                    : l.architectTerrainNoUnderlayHint,
+              ),
+            ),
           );
           return;
         }
         _promptAndCommitPickedContour(candidate);
         return;
-      }
-
-      if (!_landscapeTool.isDrafting) {
-        final hitId = ArchitectLandscapeTool.hitTestLandscapeElement(
-          project: _project,
-          storey: _project.activeStorey,
-          worldPoint: rawModel,
-          hitTolerance: math.max(22.0 / _currentScale, 0.35),
-        );
-        if (hitId != null) {
-          _selectAt(rawModel, toggle: _multiSelect);
-          return;
-        }
       }
 
       final anchor = _landscapeTool.draftPoints.lastOrNull;
@@ -16532,11 +16489,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             )
           : null;
       final pt = (orthoPerp?.$2 != null) ? orthoPerp!.$1 : snap.point;
+      final closeRadius = math.min(18.0 / _currentScale, 0.35);
+      final isManualContour =
+          (_activeTool == ArchitectTool.contour &&
+              !_landscapeTool.contourAutoTrace) ||
+          (_activeTool == ArchitectTool.terrain &&
+              _landscapeTool.terrainMode == ArchitectTerrainDraftMode.contour);
+      if (isManualContour &&
+          _landscapeTool.draftPoints.length >= 3 &&
+          (pt - _landscapeTool.draftPoints.first).distance <= closeRadius) {
+        _landscapeTool.contourClosed = true;
+        _promptAndCommitManualContour();
+        return;
+      }
       final nextProject = _landscapeTool.handleTap(
         toolName: _activeTool.name,
         worldPoint: pt,
         project: _project,
-        closeThresholdWorld: math.min(18.0 / _currentScale, 0.35),
+        closeThresholdWorld: closeRadius,
       );
       if (nextProject != null) {
         setState(() {
@@ -34196,6 +34166,55 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  ArchitectPickedContourCandidate? _resolvePickedTerrainContour(
+    Offset rawModel,
+  ) {
+    final hitTol = math.max(24.0 / _currentScale, 0.45);
+    final doc = _currentUnderlayDoc;
+    final frame = _effectiveUnderlayFrame;
+    if (doc != null && frame != null) {
+      final fromUnderlay = ArchitectUnderlayContourExtractor.pickAt(
+        document: doc,
+        frame: frame,
+        layerVisibility: _effectiveUnderlayLayerVisibility,
+        modelPoint: rawModel,
+        hitToleranceMeters: hitTol,
+      );
+      if (fromUnderlay != null && fromUnderlay.points.length >= 2) {
+        final simplified = ArchitectSplineContourTracer.simplifyForSpline(
+          fromUnderlay.points,
+          closed: fromUnderlay.closed,
+          toleranceMeters: 0.008,
+          maxPoints: 96,
+        );
+        return ArchitectPickedContourCandidate(
+          points: simplified.length >= 2 ? simplified : fromUnderlay.points,
+          closed: fromUnderlay.closed,
+          suggestedElevation: fromUnderlay.suggestedElevation,
+          sourceLayer: fromUnderlay.sourceLayer,
+          anchorPoint: fromUnderlay.anchorPoint,
+        );
+      }
+    }
+    final traced = ArchitectSplineContourTracer.traceAt(
+      project: _project,
+      modelPoint: rawModel,
+      hitToleranceMeters: hitTol,
+      underlayDocument: doc,
+      underlayFrame: frame,
+      underlayLayerVisibility: _effectiveUnderlayLayerVisibility,
+    );
+    if (traced != null && traced.points.length >= 2) {
+      return ArchitectPickedContourCandidate(
+        points: traced.points,
+        closed: traced.closed,
+        suggestedElevation: traced.elevation,
+        anchorPoint: traced.anchorPoint,
+      );
+    }
+    return null;
+  }
+
   Future<void> _promptAndCommitPickedContour(
     ArchitectPickedContourCandidate candidate,
   ) async {
@@ -34228,20 +34247,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (clippedPieces.isEmpty) return;
 
     final rel = double.parse((pickedAbs - datum).toStringAsFixed(4));
+    final isMajorAuto =
+        _landscapeTool.contourMajor ||
+        ((pickedAbs - pickedAbs.roundToDouble()).abs() < 1e-3 &&
+            pickedAbs.round() % 5 == 0);
     final stamp = DateTime.now().microsecondsSinceEpoch;
-    final added = <ArchitectTerrainContour>[
-      for (var i = 0; i < clippedPieces.length; i++)
-        if (clippedPieces[i].points.length >= 2)
+    final added = <ArchitectTerrainContour>[];
+    for (var i = 0; i < clippedPieces.length; i++) {
+      final pts = ArchitectSplineContourTracer.simplifyForSpline(
+        clippedPieces[i].points,
+        closed: clippedPieces[i].closed,
+        toleranceMeters: 0.008,
+        maxPoints: 96,
+      );
+      if (pts.length >= 2) {
+        added.add(
           ArchitectTerrainContour(
             id: 'terr_cnt_${stamp}_$i',
-            points: clippedPieces[i].points,
+            points: pts,
             elevation: rel,
             rawAbsoluteElevation: pickedAbs,
             closed: clippedPieces[i].closed,
-            isMajor: _landscapeTool.contourMajor,
-            isSpline: false,
+            isMajor: isMajorAuto,
+            isSpline: true,
           ),
-    ];
+        );
+      }
+    }
     if (added.isEmpty) return;
 
     final nextSurface = surface.copyWith(
@@ -34281,7 +34313,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       decimals: 3,
       allowNegative: true,
     );
-    if (!mounted || pickedAbs == null) return;
+    if (!mounted || pickedAbs == null) {
+      _landscapeTool.contourClosed = false;
+      return;
+    }
 
     _landscapeTool.contourAbsoluteElevation = pickedAbs;
     _landscapeTool.terrainElevation = pickedAbs - datum;
@@ -34289,6 +34324,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       toolName: _activeTool.name,
       project: _project,
     );
+    _landscapeTool.contourClosed = false;
     if (nextProject != null) {
       setState(() {
         _commands.commit(nextProject, applyDraftingDefaults: true);
@@ -35467,9 +35503,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           (_splitActive ? _splitPoint1 : null);
 
                       final isPickingContour =
-                          _activeTool == ArchitectTool.terrain &&
-                          _landscapeTool.terrainMode ==
-                              ArchitectTerrainDraftMode.pickContour;
+                          _activeTool.isLandscapeTool &&
+                          _landscapeTool.isPickingContour(_activeTool.name);
                       final pickedElev =
                           _landscapeTool.pickedContourPreview?.suggestedElevation;
                       final isTracingSpline =
