@@ -11,6 +11,7 @@ import '../rendering/dxf_quadtree.dart';
 //
 // [SEC-01-TABLES] [TAG:DXF_M_TABLES] DxfPolylineVertex, DxfLayer, DxfTextStyle
 // [SEC-02-COMPILED] [TAG:DXF_M_COMPILED] DxfCompiledLine & DxfCompiledBlock caches
+//   [TAG:DXF_M_SUBPATH_POINTS] Geometry size for the viewport cache
 // [SEC-03-BLOCKS] [TAG:DXF_M_BLOCKS] DxfBlock definition container
 // [SEC-04-BASE] [TAG:DXF_M_BASE] DxfEntity abstract base entity
 // [SEC-05-CURVES] [TAG:DXF_M_CURVES] DxfLine, Circle, Arc, Ellipse, Polyline, Spline
@@ -208,6 +209,7 @@ class DxfCompiledLine {
   });
 }
 
+// --- SUBSECTION: [TAG:DXF_M_SUBPATH_POINTS] Geometry size for the viewport cache ---
 /// A pre-compiled group of homogeneous continuous geometry (lines, arcs, circles, polylines)
 /// within a CAD block sharing the same layer, color, and line weight.
 class DxfCompiledSubpath {
@@ -216,6 +218,8 @@ class DxfCompiledSubpath {
   final int? trueColor;
   final double? lineWeight;
   final Path path;
+  /// Counts line vertices and estimates the control points of oval contours.
+  final int pointCount;
 
   const DxfCompiledSubpath({
     required this.layer,
@@ -223,7 +227,13 @@ class DxfCompiledSubpath {
     this.trueColor,
     this.lineWeight,
     required this.path,
+    this.pointCount = 0,
   });
+}
+
+class _DxfSubpathGeometry {
+  final path = Path();
+  int pointCount = 0;
 }
 
 /// Compiled representation of a CAD Block definition for ultra-fast batch rendering.
@@ -262,8 +272,10 @@ class DxfCompiledBlock {
     bool hasSingleLayer = true;
     bool allContinuous = true;
 
-    final subpathMap = <String, Path>{};
-    final subpathMeta = <String, ({String layer, int? colorIndex, int? trueColor, double? lineWeight})>{};
+    final subpathsByStyle = <
+      ({String layer, int? colorIndex, int? trueColor, double? lineWeight}),
+      _DxfSubpathGeometry
+    >{};
 
     bool isContinuous(String? lineType) {
       if (lineType == null) return true;
@@ -271,13 +283,10 @@ class DxfCompiledBlock {
       return lt.isEmpty || lt == 'CONTINUOUS' || lt == 'BYLAYER' || lt == 'BYBLOCK';
     }
 
-    void addToSubpath(String layer, int? colorIndex, int? trueColor, double? lineWeight, void Function(Path p) addGeom) {
-      final key = '${layer}_${colorIndex}_${trueColor}_$lineWeight';
-      final p = subpathMap.putIfAbsent(key, () {
-        subpathMeta[key] = (layer: layer, colorIndex: colorIndex, trueColor: trueColor, lineWeight: lineWeight);
-        return Path();
-      });
-      addGeom(p);
+    void addToSubpath(String layer, int? colorIndex, int? trueColor, double? lineWeight, int Function(Path p) addGeom) {
+      final style = (layer: layer, colorIndex: colorIndex, trueColor: trueColor, lineWeight: lineWeight);
+      final geometry = subpathsByStyle.putIfAbsent(style, _DxfSubpathGeometry.new);
+      geometry.pointCount += addGeom(geometry.path);
     }
 
     for (final e in block.entities) {
@@ -329,6 +338,7 @@ class DxfCompiledBlock {
           addToSubpath(e.layer, e.colorIndex, e.trueColor, e.lineWeight, (p) {
             p.moveTo(lx1, ly1);
             p.lineTo(lx2, ly2);
+            return 2;
           });
         } else {
           other.add(e);
@@ -349,6 +359,7 @@ class DxfCompiledBlock {
             final double rad = startRad + s * step;
             p.lineTo(cx + r * math.cos(rad), cy + r * math.sin(rad));
           }
+          return segments + 1;
         });
       } else if (e is DxfCircle && isContinuous(e.lineType) && e.radius > 0) {
         final cx = e.center.dx - baseX;
@@ -356,11 +367,13 @@ class DxfCompiledBlock {
         final r = e.radius;
         addToSubpath(e.layer, e.colorIndex, e.trueColor, e.lineWeight, (p) {
           p.addOval(Rect.fromCircle(center: Offset(cx, cy), radius: r));
+          return 16; // Upper estimate for the oval's control points and verbs.
         });
       } else if (e is DxfLwPolyline && isContinuous(e.lineType) && e.vertices.isNotEmpty) {
         addToSubpath(e.layer, e.colorIndex, e.trueColor, e.lineWeight, (p) {
           final v0 = e.vertices.first;
           p.moveTo(v0.x - baseX, v0.y - baseY);
+          var points = 1;
           for (int i = 0; i < e.vertices.length; i++) {
             final v1 = e.vertices[i];
             final isLast = (i == e.vertices.length - 1);
@@ -371,13 +384,16 @@ class DxfCompiledBlock {
               for (int k = 1; k < arcPoints.length; k++) {
                 p.lineTo(arcPoints[k].dx - baseX, arcPoints[k].dy - baseY);
               }
+              points += arcPoints.length - 1;
             } else {
               p.lineTo(v2.x - baseX, v2.y - baseY);
+              points++;
             }
           }
           if (e.isClosed) {
             p.close();
           }
+          return points;
         });
       } else {
         other.add(e);
@@ -385,14 +401,15 @@ class DxfCompiledBlock {
     }
 
     final subpaths = <DxfCompiledSubpath>[];
-    for (final entry in subpathMap.entries) {
-      final meta = subpathMeta[entry.key]!;
+    for (final entry in subpathsByStyle.entries) {
+      final style = entry.key;
       subpaths.add(DxfCompiledSubpath(
-        layer: meta.layer,
-        colorIndex: meta.colorIndex,
-        trueColor: meta.trueColor,
-        lineWeight: meta.lineWeight,
-        path: entry.value,
+        layer: style.layer,
+        colorIndex: style.colorIndex,
+        trueColor: style.trueColor,
+        lineWeight: style.lineWeight,
+        path: entry.value.path,
+        pointCount: entry.value.pointCount,
       ));
     }
 

@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
+import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_math.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_painter.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_viewport_picture_cache.dart';
 
@@ -66,6 +67,113 @@ void main() {
       expect(hidden.shouldRepaint(first), isTrue);
       expect((await _pixels(hidden)).every((value) => value == 0), isTrue);
       expect(cache.recordings, 3);
+    },
+  );
+
+  test('retains block paths by their complete scene transform', () {
+    final block = DxfBlock(
+      name: 'detail',
+      entities: List.generate(
+        12,
+        (i) =>
+            DxfLine(p1: Offset(i.toDouble(), 0), p2: Offset(i.toDouble(), 10)),
+      ),
+    );
+    final source = block.compiled.subpaths.single;
+    expect(source.pointCount, 24);
+
+    final cache = DxfViewportPictureCache();
+    addTearDown(cache.dispose);
+    DxfAffineMatrix placement(double x) => DxfAffineMatrix.forInsert(
+      scaleX: -2,
+      scaleY: 3,
+      rotationDeg: 28,
+      canvasOrigin: Offset(x, 40),
+      fitScale: 2,
+    );
+
+    final path = cache.blockPaths.obtain(source, placement(80));
+    expect(cache.blockPaths.obtain(source, placement(80)), same(path));
+    final moved = cache.blockPaths.obtain(source, placement(90));
+    expect(moved, isNot(same(path)));
+    expect(moved.getBounds().left, closeTo(path.getBounds().left + 10, 0.001));
+
+    cache.dispose();
+    expect(cache.blockPaths.obtain(source, placement(80)), isNot(same(path)));
+  });
+
+  test(
+    'keeps nested block geometry and lineweights across zoom bands',
+    () async {
+      const bounds = Rect.fromLTWH(0, 0, 200, 200);
+      final layer = DxfLayer(name: 'detail', colorIndex: 2);
+      final document = DxfDocument(
+        layers: {layer.name: layer},
+        blocks: {
+          'leaf': DxfBlock(
+            name: 'leaf',
+            basePoint: const Offset(4, 10),
+            entities: List.generate(
+              12,
+              (i) => DxfLine(
+                p1: Offset(4 + i * 2.0, 10),
+                p2: Offset(4 + i * 2.0, 20),
+                layer: layer.name,
+              ),
+            ),
+          ),
+          'parent': DxfBlock(
+            name: 'parent',
+            entities: const [
+              DxfInsert(
+                blockName: 'leaf',
+                insertPoint: Offset(8, 16),
+                scaleX: -1.2,
+                scaleY: 2.0,
+                rotationDeg: 15,
+                colCount: 2,
+                colSpacing: 35,
+              ),
+            ],
+          ),
+        },
+        entities: const [
+          DxfInsert(
+            blockName: 'parent',
+            insertPoint: Offset(88, 80),
+            rotationDeg: 25,
+          ),
+        ],
+        headerVars: {},
+        bounds: bounds,
+        entityStats: {},
+      );
+      final cache = DxfViewportPictureCache();
+      addTearDown(cache.dispose);
+      Future<Uint8List> pixels(
+        double scale, {
+        bool retained = true,
+        int revision = 0,
+      }) => _pixels(
+        DxfPainter(
+          document: document,
+          theme: DxfCanvasTheme.darkCad,
+          visibleCadRect: bounds,
+          showGrid: false,
+          currentScale: scale,
+          viewportPictures: retained ? cache : null,
+          revision: revision,
+        ),
+      );
+
+      expect((await pixels(1)).any((value) => value != 0), isTrue);
+      final detail = await pixels(2);
+      expect(detail, await pixels(2, retained: false));
+      expect(cache.recordings, 2);
+      layer.customLineweight = 0.70;
+      final thicker = await pixels(2, revision: 1);
+      expect(thicker, isNot(detail));
+      expect(thicker, await pixels(2, retained: false));
     },
   );
 }

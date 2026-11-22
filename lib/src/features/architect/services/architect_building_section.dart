@@ -413,6 +413,7 @@ class ArchitectBuildingSection {
     final visibility = cut.visibility.resolved(project.sectionVisibility);
     final regions = <ArchitectSectionRegion>[];
     final highPriorityCutouts = <Path>[];
+    final roofWallCapCutouts = <Path>[];
     final roofProfiles = <String, Path>{};
     final cutOpeningIds = <String>{};
     final cutOpeningAperturePaths = <String, Path>{};
@@ -435,6 +436,16 @@ class ArchitectBuildingSection {
         storeyRoofSlices[floor.id] = slices;
         for (final s in slices) {
           highPriorityCutouts.add(s.envelopePath);
+          final capTop = s.bottomProfile.isEmpty
+              ? 1e4
+              : s.bottomProfile.map((p) => p.dy).reduce(math.max) + 0.5;
+          for (final cap in s.wallCapIntervals) {
+            roofWallCapCutouts.add(
+              Path()..addRect(
+                Rect.fromLTRB(cap.fromS, cap.maxWallZ, cap.toS, capTop),
+              ),
+            );
+          }
           final roof = floor.roofs.firstWhere((r) => r.id == s.roofId);
           if (s.bottomProfile.length >= 2) {
             final a = s.bottomProfile.first, b = s.bottomProfile.last;
@@ -738,8 +749,53 @@ class ArchitectBuildingSection {
 
         // Boolean-subtract overlapping roof envelopes (including Mauerlat & Ridge Purlin),
         // slabs, and concrete columns so zero redundant lines or hatches overlap!
+        final preRoofWallPath = wallPath;
+        for (final cutout in highPriorityCutouts) {
+          try {
+            wallPath = Path.combine(
+              PathOperation.difference,
+              wallPath!,
+              cutout,
+            );
+          } catch (_) {}
+        }
+        if (preRoofWallPath != null && wallPath != null) {
+          try {
+            final roofTrimmedMask = Path.combine(
+              PathOperation.difference,
+              preRoofWallPath,
+              wallPath,
+            );
+            if (!roofTrimmedMask.getBounds().isEmpty) {
+              extraCutMaskPaths.add(roofTrimmedMask);
+            }
+          } catch (_) {}
+        }
+        if ((!useCompositions || wall.system.isSpecial) &&
+            roofWallCapCutouts.isNotEmpty &&
+            wallPath != null) {
+          final preCapWallPath = wallPath;
+          for (final cutout in roofWallCapCutouts) {
+            try {
+              wallPath = Path.combine(
+                PathOperation.difference,
+                wallPath!,
+                cutout,
+              );
+            } catch (_) {}
+          }
+          try {
+            final capMask = Path.combine(
+              PathOperation.difference,
+              preCapWallPath,
+              wallPath!,
+            );
+            if (!capMask.getBounds().isEmpty) {
+              extraCutMaskPaths.add(capMask);
+            }
+          } catch (_) {}
+        }
         for (final cutout in [
-          ...highPriorityCutouts,
           ...columnCutouts,
           if (!useCompositions || wall.system.isSpecial) ...[
             ...junctionPlan.wallCoreCutouts,
@@ -1110,6 +1166,28 @@ class ArchitectBuildingSection {
                     (!wall.isExterior ||
                         (firstCoreIdx >= 0 && layerIdx > firstCoreIdx));
                 if (isCore) {
+                  if (roofWallCapCutouts.isNotEmpty) {
+                    final preCapCore = region;
+                    for (final cutout in roofWallCapCutouts) {
+                      try {
+                        region = Path.combine(
+                          PathOperation.difference,
+                          region,
+                          cutout,
+                        );
+                      } catch (_) {}
+                    }
+                    try {
+                      final capMask = Path.combine(
+                        PathOperation.difference,
+                        preCapCore,
+                        region,
+                      );
+                      if (!capMask.getBounds().isEmpty) {
+                        extraCutMaskPaths.add(capMask);
+                      }
+                    } catch (_) {}
+                  }
                   for (final cutout in [
                     ...junctionPlan.wallCoreCutouts,
                     ...?junctionPlan.wallBaseDetailCutouts[wall.id],
@@ -1766,16 +1844,16 @@ class ArchitectBuildingSection {
     // Keep disconnected members separate while triangulating: decomposing one
     // large union creates artificial strips at every other member's X station.
     final cutMasks = [
-      for (final (maskPath, isRoof) in [
+      for (final maskPath in [
         for (final region in regions)
-          if (region.occludesProjection) (region.path, region.roof),
-        for (final path in extraCutMaskPaths) (path, false),
+          if (region.occludesProjection) region.path,
+        ...extraCutMaskPaths,
       ])
         for (final (a, b, c) in ArchitectPathSolid.triangulateContours(
           ArchitectPathSolid.contours(
             maskPath,
             tolerance: .00001,
-            preserveShortEdges: isRoof,
+            preserveShortEdges: true,
           ),
           fillType: maskPath.fillType,
           compact: false,

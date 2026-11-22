@@ -203,16 +203,26 @@ class ArchitectWallSolids {
               (wall.isSlopedTop
                   ? math.max(wall.height, wall.endHeight!)
                   : wall.height);
-      breaks.addAll([bottom, top, nominalTops[wall.id]!]);
+      breaks.addAll([bottom, top]);
+      if (!roofFootprint.getBounds().isEmpty) {
+        final outsideRoof = Path.combine(
+          PathOperation.difference,
+          Path()..addPolygon(wall.polygonCorners, true),
+          roofFootprint,
+        );
+        if (!outsideRoof.getBounds().isEmpty) {
+          breaks.add(nominalTops[wall.id]!);
+        }
+      }
       if (wall.coreMaterial == WallCoreMaterial.brick ||
           wall.coreMaterial == WallCoreMaterial.aeratedConcrete) {
-        final wallH = top - bottom;
+        final wallH = nominalTops[wall.id]! - bottom;
         if (wallH > 3.00) {
           var step = 1;
           while (true) {
             final zBeltBot = bottom + step * 3.00;
             final zBeltTop = zBeltBot + 0.20;
-            if (top - zBeltTop < 0.40) break;
+            if (bottom + wallH - zBeltTop < 0.40) break;
             breaks.add(zBeltBot);
             breaks.add(zBeltTop);
             step++;
@@ -359,9 +369,7 @@ class ArchitectWallSolids {
             (wall.coreMaterial == WallCoreMaterial.brick ||
                 wall.coreMaterial == WallCoreMaterial.aeratedConcrete)) {
           final wallBot = storey.elevation + wall.baseOffset;
-          final wallH = wall.isSlopedTop
-              ? math.max(wall.height, wall.endHeight!)
-              : wall.height;
+          final wallH = nominalTops[wall.id]! - wallBot;
           if (wallH > 3.00) {
             var step = 1;
             while (true) {
@@ -387,6 +395,8 @@ class ArchitectWallSolids {
             part.bottom,
             part.top,
             effectiveColor,
+            contourTolerance: .0001,
+            preserveShortEdges: true,
           );
 
           final exteriorLayer = wall.resolvedLayers.first;

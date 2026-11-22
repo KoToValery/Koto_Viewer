@@ -1301,6 +1301,7 @@ class ArchitectRoofGeometry {
 
         if (!isDiscreteBattenGap &&
             !(hasJoinedFraming &&
+                slopeDirDotSection <= 0.35 &&
                 layer.role == ArchitectRoofLayerRole.rafters)) {
           final poly = <Offset>[
             Offset(s0, zTop0 - dTopV),
@@ -1628,8 +1629,8 @@ class ArchitectRoofGeometry {
           }
 
           wallCapIntervals.add((
-            fromS: wSpan.fromS - 0.005,
-            toS: wSpan.toS + 0.005,
+            fromS: wSpan.fromS,
+            toS: wSpan.toS,
             maxWallZ: zCurrentBot,
           ));
         }
@@ -1999,22 +2000,6 @@ class ArchitectRoofGeometry {
             envelope = Path.combine(PathOperation.union, envelope, m.path);
           } catch (_) {}
         }
-      }
-      // Also union the vertical cap zone above each supporting wall's 10 cm ring beam
-      // so zero masonry wall slivers protrude beside the Mauerlat!
-      for (final cap in draft.wallCapIntervals) {
-        final capRect = Path()
-          ..addRect(
-            Rect.fromLTRB(
-              cap.fromS,
-              cap.maxWallZ,
-              cap.toS,
-              math.max(draft.zTop0, draft.zTop1) + 0.5,
-            ),
-          );
-        try {
-          envelope = Path.combine(PathOperation.union, envelope, capRect);
-        } catch (_) {}
       }
 
       result.add(

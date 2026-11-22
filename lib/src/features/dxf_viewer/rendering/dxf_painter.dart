@@ -9,6 +9,7 @@ import 'dxf_hatch_pattern_helper.dart';
 import 'dxf_linetype_helper.dart';
 import 'dxf_math.dart';
 import 'dxf_snap_helper.dart';
+import 'dxf_viewport_block_paths.dart';
 import 'dxf_viewport_picture_cache.dart';
 
 // ============================================================================
@@ -29,6 +30,7 @@ import 'dxf_viewport_picture_cache.dart';
 //   [TAG:HATCH_INTERACTIVE_BUDGET] Bound pattern detail in the Viewer
 //   [TAG:PAINTER_WIPEOUT] Background masks retain source draw order
 // [SEC-07-BLOCKS] [TAG:PAINTER_BLOCKS] Blocks & INSERT entities expansion
+//   [TAG:BLOCK_SCENE_PATHS] Retain placed geometry across vector recordings
 // [SEC-08-DIMS] [TAG:PAINTER_DIMS] Dimensions, leaders & arrowheads
 // [SEC-09-SNAPS] [TAG:PAINTER_SNAPS] Snapping, magnetic highlights & annotations
 // [SEC-10-MEASURE] [TAG:PAINTER_MEASURE] Interactive measurement tools & badges
@@ -209,6 +211,7 @@ class DxfPainter extends CustomPainter {
   /// Allow a lightweight preview of costly hatch patterns in the Viewer.
   final bool interactiveHatches;
   final DxfViewportPictureCache? viewportPictures;
+  final DxfViewportBlockPaths? _blockPaths;
   final ValueListenable<DxfViewportMotion>? motionPreview;
   final bool overlaysOnly;
   final bool Function(DxfEntity entity)? entityFilter;
@@ -247,6 +250,7 @@ class DxfPainter extends CustomPainter {
     this.visibleCadRect,
     this.interactiveHatches = false,
     this.viewportPictures,
+    DxfViewportBlockPaths? blockPaths,
     this.motionPreview,
     this.overlaysOnly = false,
     this.entityFilter,
@@ -256,7 +260,8 @@ class DxfPainter extends CustomPainter {
     this.drawingStrokeWidthOverride,
     this.modelPlacement,
     this.modelLayerOverrides,
-  }) : super(repaint: motionPreview);
+  }) : _blockPaths = blockPaths,
+       super(repaint: motionPreview);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -300,6 +305,7 @@ class DxfPainter extends CustomPainter {
             currentScale: scale,
             visibleCadRect: region,
             interactiveHatches: interactiveHatches,
+            blockPaths: activeLayout == 'Model' ? cache.blockPaths : null,
             settings: settings,
             showGrid: showGrid,
             entityFilter: entityFilter,
@@ -1266,7 +1272,7 @@ class DxfPainter extends CustomPainter {
     } else if (entity is DxfSolid) {
       _renderSolid(canvas, entity, fillPaint, strokePaint, toCanvas);
     } else if (entity is DxfHatch) {
-      _renderHatch(canvas, entity, fillPaint, strokePaint, toCanvas, fitScale);
+      _renderHatch(canvas, entity, strokePaint, toCanvas, fitScale);
     } else if (entity is DxfInsert) {
       _renderInsert(
         canvas: canvas,
@@ -2046,7 +2052,6 @@ class DxfPainter extends CustomPainter {
   void _renderHatch(
     Canvas canvas,
     DxfHatch hatch,
-    Paint fillPaint,
     Paint strokePaint,
     Offset Function(Offset) toCanvas,
     double fitScale,
@@ -2066,9 +2071,12 @@ class DxfPainter extends CustomPainter {
     }
 
     final visible = _hatchPatternVisibleRect;
-    if (visible != null &&
-        !visible.inflate(strokePaint.strokeWidth).overlaps(path.getBounds())) {
-      return;
+    Rect? visibleBounds;
+    if (visible != null) {
+      final pathBounds = path.getBounds();
+      final clip = visible.inflate(strokePaint.strokeWidth);
+      if (!clip.overlaps(pathBounds)) return;
+      visibleBounds = pathBounds.intersect(clip);
     }
 
     // --- SUBSECTION: [TAG:PAINTER_WIPEOUT] Mask previous geometry with the drawing background ---
@@ -2101,23 +2109,27 @@ class DxfPainter extends CustomPainter {
     final bool isPureSolid = hatch.isSolid && !hasExplicitPatternLines;
 
     if (!isPureSolid) {
-      _renderHatchPatternLines(canvas, path, hatch, strokePaint, toCanvas, fitScale);
+      _renderHatchPatternLines(
+        canvas,
+        path,
+        visibleBounds ?? path.getBounds(),
+        hatch,
+        strokePaint,
+        toCanvas,
+        fitScale,
+      );
     }
   }
 
   void _renderHatchPatternLines(
     Canvas canvas,
     Path clipPath,
+    Rect bounds,
     DxfHatch hatch,
     Paint strokePaint,
     Offset Function(Offset) toCanvas,
     double fitScale,
   ) {
-    var bounds = clipPath.getBounds();
-    final visible = _hatchPatternVisibleRect;
-    if (visible != null) {
-      bounds = bounds.intersect(visible.inflate(strokePaint.strokeWidth));
-    }
     if (bounds.isEmpty || !bounds.isFinite) return;
 
     final double scale = currentScale.clamp(0.001, 10000.0);
@@ -2433,6 +2445,7 @@ class DxfPainter extends CustomPainter {
 
   // === SECTION: BLOCKS & INSERT ENTITIES ===
 
+  // --- SUBSECTION: [TAG:BLOCK_SCENE_PATHS] Retain placed geometry across vector recordings ---
   void _renderInsert({
     required Canvas canvas,
     required DxfInsert insert,
@@ -2507,7 +2520,8 @@ class DxfPainter extends CustomPainter {
 
         // Ultra-Fast Path: Batch render pre-compiled geometry subpaths
         if (compiled.subpaths.isNotEmpty) {
-          final Float64List matrix4 = matrix.toFloat64List();
+          final blockPaths = _blockPaths;
+          final matrix4 = blockPaths == null ? matrix.toFloat64List() : null;
 
           for (int i = 0; i < compiled.subpaths.length; i++) {
             final subpath = compiled.subpaths[i];
@@ -2544,7 +2558,9 @@ class DxfPainter extends CustomPainter {
               ..strokeJoin = StrokeJoin.round
               ..isAntiAlias = true;
 
-            final screenPath = subpath.path.transform(matrix4);
+            final screenPath = blockPaths == null
+                ? subpath.path.transform(matrix4!)
+                : blockPaths.obtain(subpath, matrix);
             canvas.drawPath(screenPath, strokePaint);
           }
 

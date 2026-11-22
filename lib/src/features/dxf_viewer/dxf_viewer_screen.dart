@@ -53,7 +53,7 @@ import '../structural_designer/structural_designer_screen.dart';
 // QUICK NAV: Use rg -n on a [TAG:...] anchor or concrete class/method name from the companion map.
 //
 // [SEC-01-WIDGET]   Widget Declaration & Public Api
-//   [TAG:VIEWPORT_PICTURE_CACHE] Retained CAD layer and layer revision
+//   [TAG:VIEWPORT_PICTURE_CACHE] Retained CAD layer, motion preview and layer revision
 // ============================================================================
 
 // === SECTION: [SEC-01-WIDGET] WIDGET DECLARATION & PUBLIC API ===
@@ -84,9 +84,10 @@ class DxfViewerScreen extends StatefulWidget {
 // === SECTION: STATE & LIFECYCLE (LOAD, SETTINGS, TRANSFORM) ===
 class _DxfViewerScreenState extends State<DxfViewerScreen> {
   final TransformationController _transformController = TransformationController();
-  // --- SUBSECTION: [TAG:VIEWPORT_PICTURE_CACHE] Retained CAD layer and layer revision ---
+  // --- SUBSECTION: [TAG:VIEWPORT_PICTURE_CACHE] Retained CAD layer, motion preview and layer revision ---
   final _viewportPictures = DxfViewportPictureCache();
   final _motionPreview = ValueNotifier(DxfViewportMotion.idle);
+  final _motionWorkSample = Stopwatch();
   int _layerRevision = 0;
 
   DxfDocument? _document;
@@ -261,9 +262,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       _hudScale.value = scale;
     }
 
-    // Keep navigation responsive by transforming the cached CAD layer on the GPU first.
-    // While actively zooming via wheel, dragging, or middle-mouse panning,
-    // skip scheduling CPU repaints so InteractiveViewer transforms the texture layer at 144 FPS.
+    // Transform the retained layer during input and defer new vector recordings.
     if (_isGestureActive || _isWheelScrolling || _middlePanStart != null) {
       _updateMotionPreview();
       return;
@@ -279,6 +278,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   void _syncCanvasAfterTransform() {
     if (!mounted || _isGestureActive || _isWheelScrolling || _middlePanStart != null) return;
+    _motionWorkSample.stop();
     _motionPreview.value = DxfViewportMotion.idle;
     setState(() {
       _renderScale = _currentScale;
@@ -286,11 +286,40 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   }
 
   void _updateMotionPreview() {
-    if (_activeLayout != 'Model' || (_document?.entities.length ?? 0) <
-        DxfViewportPictureCache.minOverviewEntities) return;
-    _motionPreview.value = _currentScale <= 2
-        ? DxfViewportMotion.overview
-        : DxfViewportMotion.detail;
+    final document = _document;
+    if (_activeLayout != 'Model' || document == null ||
+        document.entities.length < DxfViewportPictureCache.minOverviewEntities) return;
+
+    // Limit magnification of the fit-to-screen image. Within that limit, a
+    // packed Model view can be expensive even after zooming in from fit.
+    if (!_viewportPictures.hasOverview || _currentScale > 4) {
+      _motionWorkSample.stop();
+      _motionPreview.value = DxfViewportMotion.detail;
+      return;
+    }
+    if (_motionWorkSample.isRunning &&
+        _motionWorkSample.elapsedMilliseconds < 64) return;
+    _motionWorkSample..reset()..start();
+
+    final viewport = _getVisibleCadRect();
+    final index = document.spatialIndex;
+    // Keep the current preview around the boundary between light and heavy views.
+    final budget = _motionPreview.value == DxfViewportMotion.overview ? 8000 : 12000;
+    final useOverview = viewport == null || index == null
+        ? _currentScale <= 2
+        : !viewport.isEmpty && index.reachesWorkBudget(viewport, budget, (entity) {
+            if (entity is DxfInsert) {
+              final children = document.blocks[entity.blockName]?.entities.length ?? 0;
+              return 8 + (children * entity.rowCount * entity.colCount).clamp(0, 32);
+            }
+            final layer = document.layers[entity.layer];
+            if (layer != null && (!layer.isVisible || layer.isFrozen)) return 0;
+            if (entity is DxfHatch && !entity.isSolid && !entity.isWipeout) {
+              return 6 + (entity.patternLines?.length ?? 0).clamp(0, 16);
+            }
+            return 1;
+          });
+    _motionPreview.value = useOverview ? DxfViewportMotion.overview : DxfViewportMotion.detail;
   }
 
   void _updateHudCadCoord(Offset coord) {
@@ -1251,6 +1280,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   void _handleGeneralPointerCancel(PointerCancelEvent event) {
     _middlePanStart = null;
     _middlePanMatrix = null;
+    _motionWorkSample.stop();
     _motionPreview.value = DxfViewportMotion.idle;
     if (_isMeasureMode) {
       _handleMeasurePointerCancel(event);

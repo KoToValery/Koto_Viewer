@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'dxf_viewport_block_paths.dart';
+
 enum DxfViewportMotion { idle, overview, detail }
 
 /// Vector recordings in the viewer's untransformed scene coordinates.
@@ -12,6 +14,7 @@ class DxfViewportPictureCache {
   static const _maxRegions = 8;
   static const _maxEstimatedBytes = 16 * 1024 * 1024;
   final _regions = <DxfViewportPicture>[];
+  final blockPaths = DxfViewportBlockPaths();
   Object? _content;
   int _estimatedBytes = 0;
   Timer? _overviewTimer;
@@ -144,6 +147,7 @@ class DxfViewportPictureCache {
       entry.picture.dispose();
     }
     _regions.clear();
+    blockPaths.clear();
     _estimatedBytes = 0;
     _content = null;
   }

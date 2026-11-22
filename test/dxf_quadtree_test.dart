@@ -67,6 +67,30 @@ void main() {
       expect(queryResult.contains(line2), isFalse);
     });
 
+    test('Estimates visible work and stops when it reaches the budget', () {
+      final lines = List.generate(
+        100,
+        (i) => DxfLine(p1: Offset(i * 10.0, 5), p2: Offset(i * 10.0 + 4, 10)),
+      );
+      final index = DxfQuadTree.build(
+        lines,
+        const {},
+        const Rect.fromLTWH(0, 0, 1000, 1000),
+      );
+      const visible = Rect.fromLTWH(2, 2, 95, 20);
+      expect(index.query(visible), hasLength(10));
+      var visits = 0;
+      int cost(DxfEntity entity) {
+        visits++;
+        return 3;
+      }
+
+      expect(index.reachesWorkBudget(visible, 12, cost), isTrue);
+      expect(visits, 4);
+      expect(index.reachesWorkBudget(visible, 31, cost), isFalse);
+      expect(visits, 14);
+    });
+
     test('DxfParser automatically builds spatialIndex upon parsing', () {
       const dxfContent = '''0
 SECTION
