@@ -13615,6 +13615,38 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get architectCeilingAnchorUpperSlab => 'From upper slab (Δh)';
+
+  @override
+  String get architectCeilingAnchorClearHeight => 'From finished floor (H)';
+
+  @override
+  String get architectCeilingClearHeightLabel =>
+      'Clear height from finished floor (H)';
+
+  @override
+  String get architectCeilingUnderRoof => 'Roof underside (auto-trimmed)';
+
+  @override
+  String get architectCeilingFreeSpace => 'Open / free space';
+
+  @override
+  String get architectCeilingRoofClearance => 'Min clearance to roof';
+
+  @override
+  String get architectCeilingClippedWarning =>
+      'Ceiling elevation is above the roof underside and gets completely trimmed.';
+
+  @override
+  String get architectCeilingSectionToUpper => 'To upper slab';
+
+  @override
+  String get architectCeilingSectionToRoof => 'To roof';
+
+  @override
+  String get architectCeilingSectionToFloor => 'To finished floor';
+
+  @override
   String get architectTerrainModeBoundaryRect => 'Rectangle';
 
   @override

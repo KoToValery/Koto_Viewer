@@ -10,7 +10,9 @@ import '../services/architect_ceiling_geometry.dart';
 class ArchitectCeilingDraftingBar extends StatelessWidget {
   final SuspendedCeilingType type;
   final bool fromRoom;
+  final CeilingElevationAnchor elevationAnchor;
   final double dropFromUpperSlab;
+  final double clearHeight;
   final int pointCount;
   final bool canFinish;
   final ArchitectSuspendedCeiling? selected;
@@ -18,7 +20,9 @@ class ArchitectCeilingDraftingBar extends StatelessWidget {
   final bool pickingGridOrigin;
   final ValueChanged<SuspendedCeilingType> onTypeChanged;
   final ValueChanged<bool> onFromRoomChanged;
+  final ValueChanged<CeilingElevationAnchor>? onAnchorChanged;
   final ValueChanged<double> onDropChanged;
+  final ValueChanged<double>? onClearHeightChanged;
   final VoidCallback onProperties;
   final VoidCallback? onCenterGrid;
   final VoidCallback? onTogglePickOrigin;
@@ -30,7 +34,9 @@ class ArchitectCeilingDraftingBar extends StatelessWidget {
     super.key,
     required this.type,
     required this.fromRoom,
+    this.elevationAnchor = CeilingElevationAnchor.fromUpperSlab,
     required this.dropFromUpperSlab,
+    this.clearHeight = 2.55,
     this.pointCount = 0,
     this.canFinish = false,
     this.selected,
@@ -38,7 +44,9 @@ class ArchitectCeilingDraftingBar extends StatelessWidget {
     this.pickingGridOrigin = false,
     required this.onTypeChanged,
     required this.onFromRoomChanged,
+    this.onAnchorChanged,
     required this.onDropChanged,
+    this.onClearHeightChanged,
     required this.onProperties,
     this.onCenterGrid,
     this.onTogglePickOrigin,
@@ -49,6 +57,9 @@ class ArchitectCeilingDraftingBar extends StatelessWidget {
 
   Widget _stepper({
     required String key,
+    required String anchorBadge,
+    required String anchorTooltip,
+    required VoidCallback onToggleAnchor,
     required String tooltip,
     required String text,
     required VoidCallback onMinus,
@@ -58,9 +69,35 @@ class ArchitectCeilingDraftingBar extends StatelessWidget {
     key: ValueKey(key),
     mainAxisSize: MainAxisSize.min,
     children: [
+      Tooltip(
+        message: anchorTooltip,
+        child: InkWell(
+          key: const ValueKey('ceiling-anchor-toggle'),
+          borderRadius: BorderRadius.circular(6),
+          onTap: onToggleAnchor,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.cyanAccent.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: Colors.cyanAccent.withValues(alpha: 0.45),
+              ),
+            ),
+            child: Text(
+              anchorBadge,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.cyanAccent,
+              ),
+            ),
+          ),
+        ),
+      ),
       IconButton(
         tooltip: tooltip,
-        constraints: const BoxConstraints.tightFor(width: 34, height: 38),
+        constraints: const BoxConstraints.tightFor(width: 32, height: 38),
         padding: EdgeInsets.zero,
         onPressed: onMinus,
         icon: const Icon(Icons.remove, size: 16),
@@ -94,7 +131,7 @@ class ArchitectCeilingDraftingBar extends StatelessWidget {
       ),
       IconButton(
         tooltip: tooltip,
-        constraints: const BoxConstraints.tightFor(width: 34, height: 38),
+        constraints: const BoxConstraints.tightFor(width: 32, height: 38),
         padding: EdgeInsets.zero,
         onPressed: onPlus,
         icon: const Icon(Icons.add, size: 16),
@@ -107,11 +144,19 @@ class ArchitectCeilingDraftingBar extends StatelessWidget {
     final l = context.l10n;
     final screen = MediaQuery.sizeOf(context).width;
     final effectiveType = selected?.type ?? type;
+    final effectiveAnchor = selected?.elevationAnchor ?? elevationAnchor;
     final effectiveDrop = selected?.dropFromUpperSlab ?? dropFromUpperSlab;
+    final effectiveClear =
+        metrics?.clearHeight ?? selected?.clearHeight ?? clearHeight;
     final dropCm = (effectiveDrop * 100).round();
-    final clearText = metrics == null
-        ? 'Δh=${dropCm}cm'
-        : 'Δh=${dropCm}cm · H=${metrics!.clearHeight.toStringAsFixed(2)}m';
+    final isClearMode = effectiveAnchor == CeilingElevationAnchor.clearHeight;
+    final clearText = isClearMode
+        ? (metrics != null && !metrics!.isFreeSpace
+              ? 'H=${effectiveClear.toStringAsFixed(2)}m'
+              : 'H=${effectiveClear.toStringAsFixed(2)}m')
+        : (metrics == null
+              ? 'Δh=${dropCm}cm'
+              : 'Δh=${dropCm}cm · H=${effectiveClear.toStringAsFixed(2)}m');
 
     return Material(
       color: const Color(0xEE1E242C),
@@ -198,13 +243,30 @@ class ArchitectCeilingDraftingBar extends StatelessWidget {
                 const SizedBox(width: 4),
                 _stepper(
                   key: 'ceiling-drop-stepper',
-                  tooltip: l.architectCeilingDropLabel,
+                  anchorBadge: isClearMode ? 'H' : 'Δh',
+                  anchorTooltip: isClearMode
+                      ? l.architectCeilingAnchorClearHeight
+                      : l.architectCeilingAnchorUpperSlab,
+                  onToggleAnchor: () => onAnchorChanged?.call(
+                    isClearMode
+                        ? CeilingElevationAnchor.fromUpperSlab
+                        : CeilingElevationAnchor.clearHeight,
+                  ),
+                  tooltip: isClearMode
+                      ? l.architectCeilingClearHeightLabel
+                      : l.architectCeilingDropLabel,
                   text: clearText,
                   warn: metrics?.hasAnyConflict ?? false,
-                  onMinus: () =>
-                      onDropChanged((effectiveDrop - 0.05).clamp(0.05, 2.0)),
-                  onPlus: () =>
-                      onDropChanged((effectiveDrop + 0.05).clamp(0.05, 2.0)),
+                  onMinus: () => isClearMode
+                      ? onClearHeightChanged?.call(
+                          (effectiveClear - 0.05).clamp(1.20, 10.0),
+                        )
+                      : onDropChanged((effectiveDrop - 0.05).clamp(0.05, 3.0)),
+                  onPlus: () => isClearMode
+                      ? onClearHeightChanged?.call(
+                          (effectiveClear + 0.05).clamp(1.20, 10.0),
+                        )
+                      : onDropChanged((effectiveDrop + 0.05).clamp(0.05, 3.0)),
                 ),
                 if (selected != null &&
                     effectiveType == SuspendedCeilingType.armstrong) ...[

@@ -24732,6 +24732,66 @@ abstract class AppLocalizations {
   /// **'Clashes with {count} overhead beam(s).'**
   String architectCeilingBeamConflictDetails(Object count);
 
+  /// No description provided for @architectCeilingAnchorUpperSlab.
+  ///
+  /// In en, this message translates to:
+  /// **'From upper slab (Δh)'**
+  String get architectCeilingAnchorUpperSlab;
+
+  /// No description provided for @architectCeilingAnchorClearHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'From finished floor (H)'**
+  String get architectCeilingAnchorClearHeight;
+
+  /// No description provided for @architectCeilingClearHeightLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear height from finished floor (H)'**
+  String get architectCeilingClearHeightLabel;
+
+  /// No description provided for @architectCeilingUnderRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'Roof underside (auto-trimmed)'**
+  String get architectCeilingUnderRoof;
+
+  /// No description provided for @architectCeilingFreeSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Open / free space'**
+  String get architectCeilingFreeSpace;
+
+  /// No description provided for @architectCeilingRoofClearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Min clearance to roof'**
+  String get architectCeilingRoofClearance;
+
+  /// No description provided for @architectCeilingClippedWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Ceiling elevation is above the roof underside and gets completely trimmed.'**
+  String get architectCeilingClippedWarning;
+
+  /// No description provided for @architectCeilingSectionToUpper.
+  ///
+  /// In en, this message translates to:
+  /// **'To upper slab'**
+  String get architectCeilingSectionToUpper;
+
+  /// No description provided for @architectCeilingSectionToRoof.
+  ///
+  /// In en, this message translates to:
+  /// **'To roof'**
+  String get architectCeilingSectionToRoof;
+
+  /// No description provided for @architectCeilingSectionToFloor.
+  ///
+  /// In en, this message translates to:
+  /// **'To finished floor'**
+  String get architectCeilingSectionToFloor;
+
   /// No description provided for @architectTerrainModeBoundaryRect.
   ///
   /// In en, this message translates to:

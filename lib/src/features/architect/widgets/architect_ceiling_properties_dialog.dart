@@ -40,6 +40,9 @@ class _ArchitectCeilingPropertiesDialogState
   late final TextEditingController _dropCtrl = TextEditingController(
     text: formatArchitectNumericValue(_working.dropFromUpperSlab, decimals: 3),
   );
+  late final TextEditingController _clearHeightCtrl = TextEditingController(
+    text: formatArchitectNumericValue(_working.clearHeight, decimals: 3),
+  );
   late final TextEditingController _panelThickCtrl = TextEditingController(
     text: formatArchitectNumericValue(_working.panelThickness, decimals: 4),
   );
@@ -66,6 +69,7 @@ class _ArchitectCeilingPropertiesDialogState
   void dispose() {
     _labelCtrl.dispose();
     _dropCtrl.dispose();
+    _clearHeightCtrl.dispose();
     _panelThickCtrl.dispose();
     _carrierCtrl.dispose();
     _insulationCtrl.dispose();
@@ -82,6 +86,7 @@ class _ArchitectCeilingPropertiesDialogState
 
   void _commitNumeric({
     double? drop,
+    double? clearHeight,
     double? panelThickness,
     double? gridSystemHeight,
     double? insulationThickness,
@@ -92,6 +97,7 @@ class _ArchitectCeilingPropertiesDialogState
     _update(
       _working.copyWith(
         dropFromUpperSlab: drop ?? _working.dropFromUpperSlab,
+        clearHeight: clearHeight ?? _working.clearHeight,
         panelThickness: panelThickness ?? _working.panelThickness,
         gridSystemHeight: gridSystemHeight ?? _working.gridSystemHeight,
         insulationThickness:
@@ -140,9 +146,27 @@ class _ArchitectCeilingPropertiesDialogState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _metricRow(
-                    l.architectCeilingUpperSlab,
-                    '${widget.project.formatLevel(metrics.upperSlabBottom)}'
-                    '${metrics.fromActualUpperSlab ? '' : ' (${l.architectCeilingUpperSlabEstimated})'}',
+                    switch (metrics.overheadSupport) {
+                      CeilingOverheadSupport.upperSlab =>
+                        l.architectCeilingUpperSlab,
+                      CeilingOverheadSupport.roof =>
+                        l.architectCeilingUnderRoof,
+                      CeilingOverheadSupport.freeSpace =>
+                        l.architectCeilingFreeSpace,
+                    },
+                    switch (metrics.overheadSupport) {
+                      CeilingOverheadSupport.upperSlab =>
+                        widget.project.formatLevel(metrics.upperSlabBottom),
+                      CeilingOverheadSupport.roof =>
+                        metrics.roofMinUnderside != null &&
+                                metrics.roofMaxUnderside != null
+                            ? '${widget.project.formatLevel(metrics.roofMinUnderside!)} .. ${widget.project.formatLevel(metrics.roofMaxUnderside!)}'
+                            : widget.project.formatLevel(
+                                metrics.upperSlabBottom,
+                              ),
+                      CeilingOverheadSupport.freeSpace =>
+                        widget.project.formatLevel(metrics.upperSlabBottom),
+                    },
                   ),
                   const SizedBox(height: 4),
                   _metricRow(
@@ -157,11 +181,25 @@ class _ArchitectCeilingPropertiesDialogState
                   ),
                   const SizedBox(height: 4),
                   _metricRow(
-                    l.architectCeilingPlenum,
-                    widget.project.formatLength(metrics.plenumDepth),
-                    warn: metrics.hasPlenumConflict,
+                    metrics.isUnderRoof
+                        ? l.architectCeilingRoofClearance
+                        : l.architectCeilingPlenum,
+                    widget.project.formatLength(
+                      metrics.isUnderRoof && metrics.roofMinUnderside != null
+                          ? metrics.roofMinUnderside! -
+                                (metrics.ceilingElevation +
+                                    _working.constructionThickness)
+                          : metrics.plenumDepth,
+                    ),
+                    warn: metrics.hasPlenumConflict && !metrics.isUnderRoof,
                   ),
-                  if (metrics.hasPlenumConflict) ...[
+                  if (metrics.isFullyClippedByRoof) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      l.architectCeilingClippedWarning,
+                      style: TextStyle(color: colors.error, fontSize: 12),
+                    ),
+                  ] else if (metrics.hasPlenumConflict) ...[
                     const SizedBox(height: 6),
                     Text(
                       l.architectCeilingPlenumWarning,
@@ -218,48 +256,148 @@ class _ArchitectCeilingPropertiesDialogState
             ),
             const SizedBox(height: 14),
 
-            // --- Drop from upper slab ---
-            ArchitectNumericFormField(
-              fieldKey: const ValueKey('ceiling-prop-drop'),
-              controller: _dropCtrl,
-              title: l.architectCeilingDropLabel,
-              unitLabel: 'm',
-              decimals: 3,
-              min: 0.02,
-              max: 3.0,
-              decoration: InputDecoration(
-                labelText: l.architectCeilingDropLabel,
-                suffixText: 'm',
-                border: const OutlineInputBorder(),
-              ),
-              onChanged: (text) {
-                final v = double.tryParse(text.replaceAll(',', '.'));
-                if (v != null && v >= 0.02 && v <= 3.0) {
-                  _commitNumeric(drop: v);
+            // --- Elevation Anchor ---
+            SegmentedButton<CeilingElevationAnchor>(
+              key: const ValueKey('ceiling-prop-anchor'),
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: CeilingElevationAnchor.fromUpperSlab,
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      l.architectCeilingAnchorUpperSlab,
+                      maxLines: 1,
+                    ),
+                  ),
+                ),
+                ButtonSegment(
+                  value: CeilingElevationAnchor.clearHeight,
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      l.architectCeilingAnchorClearHeight,
+                      maxLines: 1,
+                    ),
+                  ),
+                ),
+              ],
+              selected: {_working.elevationAnchor},
+              onSelectionChanged: (sel) {
+                final nextAnchor = sel.first;
+                if (nextAnchor == CeilingElevationAnchor.clearHeight) {
+                  final syncedH = metrics.clearHeight.clamp(1.0, 12.0);
+                  _clearHeightCtrl.text = formatArchitectNumericValue(
+                    syncedH,
+                    decimals: 3,
+                  );
+                  _update(
+                    _working.copyWith(
+                      elevationAnchor: nextAnchor,
+                      clearHeight: syncedH,
+                    ),
+                  );
+                } else {
+                  final syncedDrop = metrics.effectiveDrop.clamp(0.05, 3.0);
+                  _dropCtrl.text = formatArchitectNumericValue(
+                    syncedDrop,
+                    decimals: 3,
+                  );
+                  _update(
+                    _working.copyWith(
+                      elevationAnchor: nextAnchor,
+                      dropFromUpperSlab: syncedDrop,
+                    ),
+                  );
                 }
               },
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final cm in [15, 20, 25, 30, 40])
-                  ChoiceChip(
-                    label: Text('$cm cm'),
-                    selected:
-                        ((_working.dropFromUpperSlab * 100).round() == cm),
-                    onSelected: (_) {
-                      final m = cm / 100.0;
-                      _dropCtrl.text = formatArchitectNumericValue(
-                        m,
-                        decimals: 3,
-                      );
-                      _commitNumeric(drop: m);
-                    },
-                  ),
-              ],
-            ),
+            const SizedBox(height: 12),
+
+            if (_working.elevationAnchor ==
+                CeilingElevationAnchor.fromUpperSlab) ...[
+              ArchitectNumericFormField(
+                fieldKey: const ValueKey('ceiling-prop-drop'),
+                controller: _dropCtrl,
+                title: l.architectCeilingDropLabel,
+                unitLabel: 'm',
+                decimals: 3,
+                min: 0.02,
+                max: 3.0,
+                decoration: InputDecoration(
+                  labelText: l.architectCeilingDropLabel,
+                  suffixText: 'm',
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (text) {
+                  final v = double.tryParse(text.replaceAll(',', '.'));
+                  if (v != null && v >= 0.02 && v <= 3.0) {
+                    _commitNumeric(drop: v);
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final cm in [15, 20, 25, 30, 40])
+                    ChoiceChip(
+                      label: Text('$cm cm'),
+                      selected:
+                          ((_working.dropFromUpperSlab * 100).round() == cm),
+                      onSelected: (_) {
+                        final m = cm / 100.0;
+                        _dropCtrl.text = formatArchitectNumericValue(
+                          m,
+                          decimals: 3,
+                        );
+                        _commitNumeric(drop: m);
+                      },
+                    ),
+                ],
+              ),
+            ] else ...[
+              ArchitectNumericFormField(
+                fieldKey: const ValueKey('ceiling-prop-clear-height'),
+                controller: _clearHeightCtrl,
+                title: l.architectCeilingClearHeightLabel,
+                unitLabel: 'm',
+                decimals: 3,
+                min: 1.0,
+                max: 12.0,
+                decoration: InputDecoration(
+                  labelText: l.architectCeilingClearHeightLabel,
+                  suffixText: 'm',
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (text) {
+                  final v = double.tryParse(text.replaceAll(',', '.'));
+                  if (v != null && v >= 1.0 && v <= 12.0) {
+                    _commitNumeric(clearHeight: v);
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final h in [2.40, 2.55, 2.70, 3.00])
+                    ChoiceChip(
+                      label: Text('${h.toStringAsFixed(2)} m'),
+                      selected: ((_working.clearHeight - h).abs() < 0.005),
+                      onSelected: (_) {
+                        _clearHeightCtrl.text = formatArchitectNumericValue(
+                          h,
+                          decimals: 3,
+                        );
+                        _commitNumeric(clearHeight: h);
+                      },
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 14),
 
             // --- Type-specific parameters ---

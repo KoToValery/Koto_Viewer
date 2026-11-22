@@ -13666,6 +13666,38 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String get architectCeilingAnchorUpperSlab => 'От горна плоча (Δh)';
+
+  @override
+  String get architectCeilingAnchorClearHeight => 'От готов под (H)';
+
+  @override
+  String get architectCeilingClearHeightLabel =>
+      'Светла височина от готов под (H)';
+
+  @override
+  String get architectCeilingUnderRoof => 'Под покрив (автоматично изрязване)';
+
+  @override
+  String get architectCeilingFreeSpace => 'Свободно пространство';
+
+  @override
+  String get architectCeilingRoofClearance => 'Мин. хлабина до покрив';
+
+  @override
+  String get architectCeilingClippedWarning =>
+      'Котата е над долния ръб на покрива — таванът се изрязва изцяло.';
+
+  @override
+  String get architectCeilingSectionToUpper => 'До горна плоча';
+
+  @override
+  String get architectCeilingSectionToRoof => 'До покрив';
+
+  @override
+  String get architectCeilingSectionToFloor => 'До готов под';
+
+  @override
   String get architectTerrainModeBoundaryRect => 'Правоъгълник';
 
   @override

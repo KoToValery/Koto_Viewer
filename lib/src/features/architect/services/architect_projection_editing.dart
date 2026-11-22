@@ -2,7 +2,9 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
+import 'architect_ceiling_geometry.dart';
 import 'architect_decorative_geometry.dart';
+import 'architect_roof_geometry.dart';
 import 'architect_selection.dart';
 import 'architect_selection_candidates.dart';
 import 'architect_slab_geometry.dart';
@@ -12,6 +14,7 @@ enum ArchitectProjectionKind {
   door,
   window,
   decorative,
+  ceiling,
   roof,
   stair,
   column,
@@ -32,7 +35,8 @@ class ArchitectProjectedElement {
       kind == ArchitectProjectionKind.door ||
       kind == ArchitectProjectionKind.window;
   bool get isDecorative => kind == ArchitectProjectionKind.decorative;
-  bool get hasFacadeClearances => isOpening || isDecorative;
+  bool get isCeiling => kind == ArchitectProjectionKind.ceiling;
+  bool get hasFacadeClearances => isOpening || isDecorative || isCeiling;
 }
 
 class ArchitectOpeningMeasure {
@@ -81,6 +85,9 @@ class ArchitectProjectionEditing {
       }
       if (s.roofs.any((e) => e.id == id)) {
         return ArchitectProjectedElement(id, s, ArchitectProjectionKind.roof);
+      }
+      if (s.ceilings.any((e) => e.id == id)) {
+        return ArchitectProjectedElement(id, s, ArchitectProjectionKind.ceiling);
       }
       if (s.stairs.any((e) => e.id == id)) {
         return ArchitectProjectedElement(id, s, ArchitectProjectionKind.stair);
@@ -411,6 +418,33 @@ class ArchitectProjectionEditing {
             else
               e,
         ],
+        ceilings: [
+          for (final c in s.ceilings)
+            if (c.id == id)
+              () {
+                final metrics = ArchitectCeilingGeometry.computeMetrics(
+                  p,
+                  s,
+                  c,
+                );
+                final nextZ = metrics.ceilingElevation + dz;
+                final nextClearH = nextZ - s.elevation;
+                if (nextClearH < 0.2) {
+                  throw ArgumentError('Ceiling below finished floor');
+                }
+                final nextDrop = math.max(
+                  0.02,
+                  metrics.upperSlabBottom - nextZ,
+                );
+                return c.copyWith(
+                  polygon: [for (final pt in c.polygon) pt + horizontal],
+                  clearHeight: nextClearH,
+                  dropFromUpperSlab: nextDrop,
+                );
+              }()
+            else
+              c,
+        ],
         stairs: [
           for (final e in s.stairs)
             if (e.id == id)
@@ -437,11 +471,15 @@ class ArchitectProjectionEditing {
     Offset origin,
     Offset right, {
     Set<String>? visible,
+    Path? elementPath,
   }) {
     final ref = find(p, id);
     if (ref == null) return [];
     if (ref.isDecorative) {
       return _decorativeMeasures(p, ref, origin, right);
+    }
+    if (ref.isCeiling) {
+      return _ceilingMeasures(p, ref, origin, right, elementPath: elementPath);
     }
     if (!ref.isOpening) return [];
     final host = ref.host!, data = _record(p, ref);
@@ -663,6 +701,68 @@ class ArchitectProjectionEditing {
       );
     }
     return result;
+  }
+
+  static List<ArchitectOpeningMeasure> _ceilingMeasures(
+    ArchitectProject p,
+    ArchitectProjectedElement ref,
+    Offset origin,
+    Offset right, {
+    Path? elementPath,
+  }) {
+    final ceiling = ref.storey.ceilings.firstWhere((c) => c.id == ref.id);
+    final metrics = ArchitectCeilingGeometry.computeMetrics(
+      p,
+      ref.storey,
+      ceiling,
+    );
+    final bounds = elementPath?.getBounds();
+    double viewX(Offset pt) =>
+        (pt.dx - origin.dx) * right.dx + (pt.dy - origin.dy) * right.dy;
+    final centreX = bounds != null && !bounds.isEmpty
+        ? bounds.center.dx
+        : viewX(ceiling.centroid);
+    final ceilingZ = metrics.ceilingElevation;
+    final floorZ = ref.storey.elevation;
+    final clearH = (ceilingZ - floorZ).clamp(0.0, 30.0);
+
+    double? upperZ;
+    if (metrics.overheadSupport == CeilingOverheadSupport.upperSlab) {
+      upperZ = metrics.upperSlabBottom;
+    } else if (metrics.overheadSupport == CeilingOverheadSupport.roof &&
+        p.roofStorey != null) {
+      final roofStorey = p.roofStorey!;
+      if (bounds != null && !bounds.isEmpty) {
+        const steps = 16;
+        for (var i = 0; i <= steps; i++) {
+          final sx = bounds.left + (bounds.right - bounds.left) * (i / steps);
+          final rz = ArchitectRoofGeometry.roofUndersideZAt(
+            roofStorey,
+            origin + right * sx,
+          );
+          if (rz != null && (upperZ == null || rz < upperZ)) {
+            upperZ = rz;
+          }
+        }
+      }
+      upperZ ??= metrics.roofMinUnderside ?? metrics.upperSlabBottom;
+    }
+
+    return [
+      ArchitectOpeningMeasure(
+        ArchitectOpeningDistance.sill,
+        clearH,
+        Offset(centreX, floorZ),
+        Offset(centreX, ceilingZ),
+      ),
+      if (upperZ != null)
+        ArchitectOpeningMeasure(
+          ArchitectOpeningDistance.head,
+          math.max(0.0, upperZ - ceilingZ),
+          Offset(centreX, ceilingZ),
+          Offset(centreX, upperZ),
+        ),
+    ];
   }
 
   /// Stretches the horizontal span (or depth if viewed edge-on) of a decorative

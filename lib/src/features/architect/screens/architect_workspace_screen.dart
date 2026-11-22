@@ -6626,7 +6626,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ? _project.activeStorey.slabs.where((s) => s.id == _selectedElementId).firstOrNull
       : null;
 
-  bool get _hatchOrSlabSelected => _selectedHatch != null || _selectedSlab != null;
+  bool get _hatchOrSlabSelected =>
+      _selectedHatch != null || _selectedSlab != null || _selectedCeiling != null;
 
   ArchitectPolygonEdgeMode get _effectivePolygonEdgeMode => _hatchOrSlabSelected
       ? _polygonPull ? ArchitectPolygonEdgeMode.pull
@@ -7868,16 +7869,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Widget _ceilingControl() {
     final selected = _selectedCeiling;
+    final tmpl = _baseCeilingTemplate();
+    final draftHasPoints = _elementTool.slabDraftPoints.length >= 3;
+    final previewPoly = draftHasPoints
+        ? _elementTool.slabDraftPoints
+        : const [Offset.zero, Offset(4, 0), Offset(4, 4), Offset(0, 4)];
+    final inferredNoUpperSlab =
+        selected == null &&
+        _ceilingDraftTemplate == null &&
+        ArchitectCeilingGeometry.upperStoreyOf(
+              _project,
+              _project.activeStorey,
+            ) ==
+            null &&
+        (_project.roofStorey?.slabs.isEmpty ?? true);
     final sample =
         selected ??
-        _baseCeilingTemplate().copyWith(
+        tmpl.copyWith(
           type: _ceilingType,
-          polygon: const [
-            Offset.zero,
-            Offset(4, 0),
-            Offset(4, 4),
-            Offset(0, 4),
-          ],
+          elevationAnchor: inferredNoUpperSlab
+              ? CeilingElevationAnchor.clearHeight
+              : tmpl.elevationAnchor,
+          polygon: previewPoly,
         );
     final metrics = ArchitectCeilingGeometry.computeMetrics(
       _project,
@@ -7887,7 +7900,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return ArchitectCeilingDraftingBar(
       type: selected?.type ?? _ceilingType,
       fromRoom: _ceilingFromRoom,
+      elevationAnchor: sample.elevationAnchor,
       dropFromUpperSlab: sample.dropFromUpperSlab,
+      clearHeight: sample.clearHeight,
       pointCount: _elementTool.slabDraftPoints.length,
       canFinish: ArchitectPolygonGeometry.valid(_elementTool.slabDraftPoints),
       selected: selected,
@@ -7908,7 +7923,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         } else {
           setState(() {
             _ceilingType = t;
-            _ceilingDraftTemplate = _baseCeilingTemplate().copyWith(type: t);
+            _ceilingDraftTemplate = tmpl.copyWith(type: t);
           });
         }
       },
@@ -7916,19 +7931,76 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _ceilingFromRoom = r;
         _elementTool.cancelSlabDrafting();
       }),
-      onDropChanged: (drop) {
+      onAnchorChanged: (anchor) {
         if (selected != null) {
+          final next = anchor == CeilingElevationAnchor.clearHeight
+              ? selected.copyWith(
+                  elevationAnchor: anchor,
+                  clearHeight: metrics.clearHeight.clamp(1.20, 10.0),
+                )
+              : selected.copyWith(
+                  elevationAnchor: anchor,
+                  dropFromUpperSlab: metrics.effectiveDrop.clamp(0.05, 3.0),
+                );
           _commands.execute(
             UpdateArchitectCeiling(
               storeyId: _project.activeStoreyId,
-              ceiling: selected.copyWith(dropFromUpperSlab: drop),
+              ceiling: next,
             ),
           );
           _saveBiMProjectIfAttached();
         } else {
           setState(() {
-            _ceilingDraftTemplate = _baseCeilingTemplate().copyWith(
+            _ceilingDraftTemplate = anchor == CeilingElevationAnchor.clearHeight
+                ? tmpl.copyWith(
+                    elevationAnchor: anchor,
+                    clearHeight: metrics.clearHeight.clamp(1.20, 10.0),
+                  )
+                : tmpl.copyWith(
+                    elevationAnchor: anchor,
+                    dropFromUpperSlab: metrics.effectiveDrop.clamp(0.05, 3.0),
+                  );
+          });
+        }
+      },
+      onDropChanged: (drop) {
+        if (selected != null) {
+          _commands.execute(
+            UpdateArchitectCeiling(
+              storeyId: _project.activeStoreyId,
+              ceiling: selected.copyWith(
+                elevationAnchor: CeilingElevationAnchor.fromUpperSlab,
+                dropFromUpperSlab: drop,
+              ),
+            ),
+          );
+          _saveBiMProjectIfAttached();
+        } else {
+          setState(() {
+            _ceilingDraftTemplate = tmpl.copyWith(
+              elevationAnchor: CeilingElevationAnchor.fromUpperSlab,
               dropFromUpperSlab: drop,
+            );
+          });
+        }
+      },
+      onClearHeightChanged: (clearH) {
+        if (selected != null) {
+          _commands.execute(
+            UpdateArchitectCeiling(
+              storeyId: _project.activeStoreyId,
+              ceiling: selected.copyWith(
+                elevationAnchor: CeilingElevationAnchor.clearHeight,
+                clearHeight: clearH,
+              ),
+            ),
+          );
+          _saveBiMProjectIfAttached();
+        } else {
+          setState(() {
+            _ceilingDraftTemplate = tmpl.copyWith(
+              elevationAnchor: CeilingElevationAnchor.clearHeight,
+              clearHeight: clearH,
             );
           });
         }
@@ -7972,9 +8044,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     final tmpl = _baseCeilingTemplate();
+    final hasSlabAbove = ArchitectCeilingGeometry.hasActualUpperSlab(
+      _project,
+      _project.activeStorey,
+      points,
+    );
+    final anchor = _ceilingDraftTemplate != null
+        ? tmpl.elevationAnchor
+        : (hasSlabAbove
+              ? CeilingElevationAnchor.fromUpperSlab
+              : CeilingElevationAnchor.clearHeight);
     final ceiling = tmpl.copyWith(
       id: ArchitectElementId.next('ceil'),
       type: _ceilingDraftTemplate != null ? tmpl.type : _ceilingType,
+      elevationAnchor: anchor,
       polygon: points,
       holes: contour?.holes ?? const [],
       clearBulges: true,
@@ -9926,6 +10009,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           id != null &&
           _effectiveSelection.contains(id) &&
           _selectedSlab == null &&
+          _selectedCeiling == null &&
           _polygonEditId == null) {
 
         _groupDragIds = _effectiveSelection;
@@ -10920,6 +11004,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       !_wallDirectionLocked &&
 
+      !_pickingCeilingOrigin &&
+
       _polygonEditId == null &&
 
       _pendingShape == null &&
@@ -11900,6 +11986,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     for (final slab in _project.activeStorey.slabs) {
 
       if (slab.id == id) return slab.polygon;
+
+    }
+
+    for (final ceiling in _project.activeStorey.ceilings) {
+
+      if (ceiling.id == id) return ceiling.polygon;
 
     }
 
@@ -14376,6 +14468,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           .any((p) => p.id == id && p.isPolygon,
       );
       final isHatchOrSlab = source.activeStorey.slabs.any((s) => s.id == id) ||
+          source.activeStorey.ceilings.any((c) => c.id == id) ||
           source.activeStorey.cadPrimitives.any((p) => p.id == id && p.type == CadPrimitiveType.hatch);
       final isRoofEdge =
           holeIndex == null &&
@@ -19212,6 +19305,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    for (final ceiling in storey.ceilings) {
+
+      if (ceiling.id == targetId) return ceiling.polygon;
+
+    }
+
     for (final roof in storey.roofs) {
 
       if (roof.id == targetId) return roof.points;
@@ -19595,7 +19694,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           tooltip: context.l10n.bimNewPoint,
                           icon: const AppIcon(AppIconId.locationAdd, size: 20),
                           onPressed: _polygonDistanceOpen ? null
-                              : () => _startNewPointSession((_selectedHatch?.id ?? _selectedSlab!.id)),
+                              : () => _startNewPointSession(
+                                    (_selectedHatch?.id ?? _selectedSlab?.id ?? _selectedCeiling!.id),
+                                  ),
                         ),
                         IconButton(
                           constraints: const BoxConstraints.tightFor(width: 36, height: 44,
@@ -22095,6 +22196,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final isSlab = storey.slabs.any((s) => s.id == elementId);
 
+    final isCeiling = storey.ceilings.any((c) => c.id == elementId);
+
     final isRoof = storey.roofs.any((r) => r.id == elementId);
 
     final isCadPrim = storey.cadPrimitives.any((c) => c.id == elementId);
@@ -22446,14 +22549,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       );
 
-    } else if (isSlab || isRoof || isCadPrim) {
+    } else if (isSlab || isCeiling || isRoof || isCadPrim) {
       items.add(
         _radialItem(
           action: ArchitectRadialAction.edit,
           color: const Color(0xFF00E5FF),
         ),
       );
-      if (isSlab || (isCadPrim && !isLine)) {
+      if (isSlab || isCeiling || (isCadPrim && !isLine)) {
         items.add(
           _radialItem(
             action: ArchitectRadialAction.curve,
@@ -26192,6 +26295,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
       return;
     }
+    final ceiling = storey.ceilings.where((c) => c.id == _curvingEdgeElementId).firstOrNull;
+    if (ceiling != null) {
+      final bulges = List<double>.from(ceiling.bulges ?? List.filled(ceiling.polygon.length, 0.0));
+      final segIdx = _curvingEdgeSegmentIndex ?? 0;
+      if (segIdx < bulges.length) {
+        bulges[segIdx] = _curvingEdgeBulge;
+        final previewCeiling = ceiling.copyWith(bulges: bulges);
+        final nextCeilings = storey.ceilings.map((c) => c.id == ceiling.id ? previewCeiling : c).toList();
+        _elementMovePreview = _project.updateActiveStorey(storey.copyWith(ceilings: nextCeilings));
+      }
+      return;
+    }
   }
 
   void _initCurvingEdgeSession({
@@ -26318,6 +26433,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
       return;
     }
+    final ceiling = storey.ceilings.where((c) => c.id == id).firstOrNull;
+    if (ceiling != null && ceiling.polygon.length >= 3) {
+      final pts = ceiling.polygon;
+      int segIdx = segmentIndex ?? _polygonSelectedEdge ?? 0;
+      if (segmentIndex == null && _polygonSelectedEdge == null && _lastTapModelPosition != null) {
+        segIdx = _findClosestSegmentIndex(pts, _lastTapModelPosition!);
+      }
+      segIdx = segIdx.clamp(0, pts.length - 1);
+      final bulge = (ceiling.bulges != null && segIdx < ceiling.bulges!.length) ? ceiling.bulges![segIdx] : 0.0;
+      _initCurvingEdgeSession(
+        id: id,
+        segmentIndex: segIdx,
+        p1: pts[segIdx],
+        p2: pts[(segIdx + 1) % pts.length],
+        bulge: bulge,
+      );
+      return;
+    }
   }
 
   void _commitCurvingEdgeSession() {
@@ -26393,6 +26526,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
               ),
             );
+          }
+        } else {
+          final ceiling = storey.ceilings.where((c) => c.id == id).firstOrNull;
+          if (ceiling != null) {
+            final bulges = List<double>.from(ceiling.bulges ?? List.filled(ceiling.polygon.length, 0.0));
+            final segIdx = _curvingEdgeSegmentIndex ?? 0;
+            if (segIdx < bulges.length) {
+              bulges[segIdx] = bulge;
+              _commands.execute(
+                _linearCommand(
+                  UpdateArchitectBulges(
+                    storeyId: storey.id,
+                    elementId: id,
+                    bulges: bulges,
+                  ),
+                ),
+              );
+            }
           }
         }
       }
@@ -36009,11 +36160,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if ((_activeTool == ArchitectTool.ceiling || _selectedCeiling != null) &&
           _effectiveSelection.length <= 1 &&
           _cutOpeningTargetId == null)
-        Positioned(top: 8, left: 8, child: _ceilingControl()),
+        Positioned(
+          top: _polygonEditId != null && _commandPreview == null ? 60 : 8,
+          left: 8,
+          child: _ceilingControl(),
+        ),
 
       if (_pickingCeilingOrigin && _selectedCeiling != null)
         Positioned(
-          top: 60,
+          top: _polygonEditId != null && _commandPreview == null ? 112 : 60,
           left: 8,
           child: IgnorePointer(
             child: ArchitectCanvasHint(

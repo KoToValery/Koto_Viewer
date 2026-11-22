@@ -1185,6 +1185,7 @@ class ArchitectSectionDrawing {
   final String? selected;
   final String? fontFamily;
   final String? selectedRoofId;
+  final String? selectedCeilingId;
   ArchitectSectionDrawing(
     this.project,
     this.cut,
@@ -1194,6 +1195,7 @@ class ArchitectSectionDrawing {
     this.selected,
     this.fontFamily, [
     this.selectedRoofId,
+    this.selectedCeilingId,
   ]) : data = data.forView(cut);
   double get textHeight => project.dimensionScale.textHeight;
   _DetailLayout _detailLayout(ArchitectSlabDetail detail) {
@@ -1434,6 +1436,8 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
           .toSet();
       final path = region.path.transform(matrix.storage);
       final isSelectedRoof = region.sourceId == drawing.selectedRoofId;
+      final isSelectedCeiling =
+          region.ceiling && region.sourceId == drawing.selectedCeilingId;
       final timber = region.timberCrossSectionPolygon;
       final pattern = region.effectiveHatch;
       if (region.drawHatch && path.getBounds().shortestSide > 2) {
@@ -1471,9 +1475,15 @@ class ArchitectBuildingSectionPainter extends CustomPainter {
       canvas.drawPath(
         path,
         Paint()
-          ..color = isSelectedRoof ? drawing.colors.primary : color
+          ..color = isSelectedCeiling
+              ? const Color(0xFF00E5FF)
+              : isSelectedRoof
+              ? drawing.colors.primary
+              : color
           ..style = PaintingStyle.stroke
-          ..strokeWidth = isSelectedRoof ? math.max(1.5, width) : width,
+          ..strokeWidth = (isSelectedRoof || isSelectedCeiling)
+              ? math.max(1.8, width)
+              : width,
       );
     }
     architectDrawingSources(canvas, const [], 'sectionTerrain');

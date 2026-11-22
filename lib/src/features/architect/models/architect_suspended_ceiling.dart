@@ -41,10 +41,23 @@ enum GypsumBoardVariant {
   };
 }
 
-/// Suspended ceiling entity anchored below the upper structural slab underside.
-///
-/// [dropFromUpperSlab] measures the vertical distance (in metres) from the
-/// underside of the upper slab down to the visible bottom face of the ceiling.
+/// How the suspended ceiling elevation is anchored vertically.
+enum CeilingElevationAnchor {
+  /// Measured down (`dropFromUpperSlab`) from the overhead slab underside.
+  fromUpperSlab,
+
+  /// Measured up (`clearHeight`) from the current storey's finished floor.
+  clearHeight;
+
+  String localizedName(AppLocalizations l) => switch (this) {
+    CeilingElevationAnchor.fromUpperSlab => l.architectCeilingAnchorUpperSlab,
+    CeilingElevationAnchor.clearHeight => l.architectCeilingAnchorClearHeight,
+  };
+}
+
+/// Suspended ceiling entity anchored below the upper structural slab underside
+/// or at a fixed clear height above the finished floor (e.g. directly under a
+/// sloped roof or in a free/atrium space).
 class ArchitectSuspendedCeiling {
   final String id;
   final SuspendedCeilingType type;
@@ -52,9 +65,17 @@ class ArchitectSuspendedCeiling {
   final List<double>? bulges;
   final List<List<Offset>> holes;
 
+  /// Vertical anchor mode: below overhead slab underside or above finished floor.
+  final CeilingElevationAnchor elevationAnchor;
+
   /// Vertical drop in metres from the underside of the upper structural slab
   /// to the visible bottom face of the suspended ceiling (default 0.25 m).
   final double dropFromUpperSlab;
+
+  /// Clear height in metres from the current storey's finished floor up to the
+  /// visible bottom face of the suspended ceiling when [elevationAnchor] is
+  /// [CeilingElevationAnchor.clearHeight] (default 2.55 m).
+  final double clearHeight;
 
   /// Single panel/board thickness in metres (e.g. 0.015 m Armstrong, 0.0125 m GK).
   final double panelThickness;
@@ -93,7 +114,9 @@ class ArchitectSuspendedCeiling {
     required this.polygon,
     this.bulges,
     this.holes = const [],
+    this.elevationAnchor = CeilingElevationAnchor.fromUpperSlab,
     this.dropFromUpperSlab = 0.25,
+    this.clearHeight = 2.55,
     double? panelThickness,
     this.gridSystemHeight = 0.04,
     this.hasInsulation = false,
@@ -165,7 +188,9 @@ class ArchitectSuspendedCeiling {
     List<double>? bulges,
     bool clearBulges = false,
     List<List<Offset>>? holes,
+    CeilingElevationAnchor? elevationAnchor,
     double? dropFromUpperSlab,
+    double? clearHeight,
     double? panelThickness,
     double? gridSystemHeight,
     bool? hasInsulation,
@@ -191,7 +216,9 @@ class ArchitectSuspendedCeiling {
     polygon: polygon ?? this.polygon,
     bulges: clearBulges ? null : (bulges ?? this.bulges),
     holes: holes ?? this.holes,
+    elevationAnchor: elevationAnchor ?? this.elevationAnchor,
     dropFromUpperSlab: dropFromUpperSlab ?? this.dropFromUpperSlab,
+    clearHeight: clearHeight ?? this.clearHeight,
     panelThickness: panelThickness ?? this.panelThickness,
     gridSystemHeight: gridSystemHeight ?? this.gridSystemHeight,
     hasInsulation: hasInsulation ?? this.hasInsulation,
@@ -219,7 +246,12 @@ class ArchitectSuspendedCeiling {
     ],
     if (bulges != null && bulges!.any((b) => b.abs() > 1e-6)) 'bulges': bulges,
     if (holes.isNotEmpty) 'holes': ArchitectContour.write(holes),
+    if (elevationAnchor != CeilingElevationAnchor.fromUpperSlab)
+      'elevationAnchor': elevationAnchor.name,
     'dropFromUpperSlab': dropFromUpperSlab,
+    if (elevationAnchor == CeilingElevationAnchor.clearHeight ||
+        (clearHeight - 2.55).abs() > 1e-6)
+      'clearHeight': clearHeight,
     'panelThickness': panelThickness,
     'gridSystemHeight': gridSystemHeight,
     if (hasInsulation) 'hasInsulation': true,
@@ -263,8 +295,13 @@ class ArchitectSuspendedCeiling {
           ?.map((b) => (b as num).toDouble())
           .toList(),
       holes: ArchitectContour.read(json['holes']),
+      elevationAnchor: CeilingElevationAnchor.values.firstWhere(
+        (a) => a.name == json['elevationAnchor'],
+        orElse: () => CeilingElevationAnchor.fromUpperSlab,
+      ),
       dropFromUpperSlab:
           (json['dropFromUpperSlab'] as num?)?.toDouble() ?? 0.25,
+      clearHeight: (json['clearHeight'] as num?)?.toDouble() ?? 2.55,
       panelThickness: (json['panelThickness'] as num?)?.toDouble(),
       gridSystemHeight: (json['gridSystemHeight'] as num?)?.toDouble() ?? 0.04,
       hasInsulation: json['hasInsulation'] as bool? ?? false,

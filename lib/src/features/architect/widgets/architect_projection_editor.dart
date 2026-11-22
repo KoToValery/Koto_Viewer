@@ -9,10 +9,12 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
+import '../services/architect_ceiling_geometry.dart';
 import '../services/architect_command_controller.dart';
 import '../services/architect_stair_rules.dart';
 import '../services/architect_projection_editing.dart';
 import '../services/architect_projection_snap.dart';
+import 'architect_ceiling_properties_dialog.dart';
 import 'architect_element_properties_dialog.dart';
 import 'architect_properties_shell.dart';
 import 'architect_roof_layers_dialog.dart';
@@ -140,6 +142,7 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
           widget.origin,
           widget.right,
           visible: widget.paths.keys.toSet(),
+          elementPath: widget.paths[id!],
         );
 
   @override
@@ -201,12 +204,37 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
     }
   }
 
-  String label(ArchitectOpeningDistance kind) => switch (kind) {
-    ArchitectOpeningDistance.left => context.l10n.architectProjectionLeft,
-    ArchitectOpeningDistance.right => context.l10n.architectProjectionRight,
-    ArchitectOpeningDistance.sill => context.l10n.architectPropertySill,
-    ArchitectOpeningDistance.head => context.l10n.architectProjectionHead,
-  };
+  String label(ArchitectOpeningDistance kind) {
+    final ref = selected;
+    if (ref?.isCeiling == true) {
+      final ceiling = ref!.storey.ceilings
+          .where((c) => c.id == ref.id)
+          .firstOrNull;
+      final overhead = ceiling == null
+          ? null
+          : ArchitectCeilingGeometry.resolveOverheadSupport(
+              project,
+              ref.storey,
+              ceiling,
+            );
+      return switch (kind) {
+        ArchitectOpeningDistance.sill =>
+          context.l10n.architectCeilingSectionToFloor,
+        ArchitectOpeningDistance.head =>
+          overhead?.support == CeilingOverheadSupport.roof
+              ? context.l10n.architectCeilingSectionToRoof
+              : context.l10n.architectCeilingSectionToUpper,
+        ArchitectOpeningDistance.left => context.l10n.architectProjectionLeft,
+        ArchitectOpeningDistance.right => context.l10n.architectProjectionRight,
+      };
+    }
+    return switch (kind) {
+      ArchitectOpeningDistance.left => context.l10n.architectProjectionLeft,
+      ArchitectOpeningDistance.right => context.l10n.architectProjectionRight,
+      ArchitectOpeningDistance.sill => context.l10n.architectPropertySill,
+      ArchitectOpeningDistance.head => context.l10n.architectProjectionHead,
+    };
+  }
   Future<double?> number(String title, double value, {bool signed = false}) =>
       showDialog<double>(
         context: context,
@@ -370,6 +398,32 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
           ),
           onApply: (next) => apply(
             () => next.copyWith(activeStoreyId: document.activeStoreyId),
+          ),
+        ),
+      );
+      widget.onPropertiesPreview?.call(null);
+      return;
+    }
+    if (ref.kind == ArchitectProjectionKind.ceiling) {
+      await showArchitectProperties<void>(
+        context: context,
+        builder: (_) => ArchitectCeilingPropertiesDialog(
+          project: local,
+          ceiling: ref.storey.ceilings.firstWhere((c) => c.id == ref.id),
+          isCurrent: () => identical(document, project),
+          onPreview: (next) => widget.onPropertiesPreview?.call(
+            widget.controller.prepare(
+              UpdateArchitectCeiling(
+                storeyId: ref.storey.id,
+                ceiling: next,
+              ).apply(document),
+            ),
+          ),
+          onApply: (next) => apply(
+            () => UpdateArchitectCeiling(
+              storeyId: ref.storey.id,
+              ceiling: next,
+            ).apply(document),
           ),
         ),
       );
@@ -881,7 +935,9 @@ class _ProjectionEditorState extends State<ArchitectProjectionEditor> {
                               onPressed: () => moveNumber(true),
                               icon: const AppIcon(AppIconId.swapHorizontal),
                             ),
-                          if (ref.hasFacadeClearances && widget.elevation)
+                          if (ref.hasFacadeClearances &&
+                              widget.elevation &&
+                              !ref.isCeiling)
                             PopupMenuButton<String>(
                               tooltip: l.architectWallAlign,
                               icon: const AppIcon(AppIconId.alignLeft),

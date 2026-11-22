@@ -51,6 +51,7 @@ class ArchitectSectionRegion {
   final Path path;
   final bool slab;
   final bool roof;
+  final bool ceiling;
   final bool structural;
   final List<Offset>? timberCrossSectionPolygon;
   final Color? customFillColor;
@@ -65,6 +66,7 @@ class ArchitectSectionRegion {
     this.path, {
     this.slab = false,
     this.roof = false,
+    this.ceiling = false,
     this.structural = false,
     this.timberCrossSectionPolygon,
     this.customFillColor,
@@ -151,6 +153,7 @@ class ArchitectBuildingSection {
             path(r.path),
             slab: r.slab,
             roof: r.roof,
+            ceiling: r.ceiling,
             structural: r.structural,
             timberCrossSectionPolygon: r.timberCrossSectionPolygon
                 ?.map(point)
@@ -1851,8 +1854,8 @@ class ArchitectBuildingSection {
     for (final floor in project.storeys) {
       if (!floor.isBuildingStorey || floor.ceilings.isEmpty) continue;
       for (final ceiling in floor.ceilings) {
-        final spans = ArchitectCeilingGeometry.sectionIntervals(ceiling, cut);
-        if (spans.isEmpty) continue;
+        final rawSpans = ArchitectCeilingGeometry.sectionIntervals(ceiling, cut);
+        if (rawSpans.isEmpty) continue;
 
         final metrics = ArchitectCeilingGeometry.computeMetrics(
           project,
@@ -1862,7 +1865,16 @@ class ArchitectBuildingSection {
         final zBottom = metrics.ceilingElevation;
         final zPanelTop = zBottom + ceiling.effectivePanelThickness;
         final zCarrierTop = zPanelTop + ceiling.gridSystemHeight;
-        final zUpperSlab = metrics.upperSlabBottom;
+
+        final spans = metrics.isUnderRoof
+            ? ArchitectCeilingGeometry.trimSectionSpansToRoof(
+                project: project,
+                section: cut,
+                spans: rawSpans,
+                cutZ: zBottom,
+              )
+            : rawSpans;
+        if (spans.isEmpty) continue;
 
         final panelPath = Path();
         final carrierPath = Path();
@@ -1883,14 +1895,19 @@ class ArchitectBuildingSection {
               ),
             );
           }
-          if (zUpperSlab > zCarrierTop + 0.02) {
-            const step = 1.20;
-            final startX = a + math.min(0.30, (b - a) * 0.5);
-            final endX = b - 0.15;
-            if (startX <= endX + 1e-4) {
-              for (var x = startX; x <= endX + 1e-4; x += step) {
+          const step = 1.20;
+          final startX = a + math.min(0.30, (b - a) * 0.5);
+          final endX = b - 0.15;
+          if (startX <= endX + 1e-4) {
+            for (var x = startX; x <= endX + 1e-4; x += step) {
+              final zTop = ArchitectCeilingGeometry.hangerTopElevationAt(
+                project,
+                metrics,
+                cut.pointAt(x),
+              );
+              if (zTop != null && zTop > zCarrierTop + 0.02) {
                 hangerPath.moveTo(x, zCarrierTop);
-                hangerPath.lineTo(x, zUpperSlab);
+                hangerPath.lineTo(x, zTop);
               }
             }
           }
@@ -1903,6 +1920,7 @@ class ArchitectBuildingSection {
               ceiling.id,
               SlabMaterial.plasterboard,
               clippedPanel,
+              ceiling: true,
               drawHatch: true,
               mergeOutline: false,
             ),
@@ -1916,6 +1934,7 @@ class ArchitectBuildingSection {
               ceiling.id,
               SlabMaterial.custom,
               clippedCarrier,
+              ceiling: true,
               drawHatch: false,
               mergeOutline: false,
             ),
@@ -1930,6 +1949,7 @@ class ArchitectBuildingSection {
                 ceiling.id,
                 SlabMaterial.mineralWool,
                 clippedWool,
+                ceiling: true,
                 drawHatch: true,
                 mergeOutline: false,
               ),
@@ -2547,6 +2567,105 @@ class ArchitectBuildingSection {
       }
     }
     return result;
+  }
+
+  static ({ArchitectStorey storey, ArchitectSuspendedCeiling ceiling})?
+  findCeilingById(ArchitectProject project, String ceilingId) {
+    for (final floor in project.storeys) {
+      for (final c in floor.ceilings.where((c) => c.id == ceilingId)) {
+        return (storey: floor, ceiling: c);
+      }
+    }
+    return null;
+  }
+
+  String? pickCeiling(Offset point, double tolerance) {
+    for (final r in regions.reversed.where((r) => r.ceiling)) {
+      if (r.path.contains(point)) return r.sourceId;
+    }
+    for (final r in regions.reversed.where((r) => r.ceiling)) {
+      if ([
+        Offset(tolerance, 0),
+        Offset(-tolerance, 0),
+        Offset(0, tolerance),
+        Offset(0, -tolerance),
+        Offset(tolerance * 0.7, tolerance * 0.7),
+        Offset(-tolerance * 0.7, -tolerance * 0.7),
+      ].any((offset) => r.path.contains(point + offset))) {
+        return r.sourceId;
+      }
+    }
+    return null;
+  }
+
+  Rect? ceilingBounds(String ceilingId) {
+    Rect? result;
+    for (final r in regions.where((r) => r.ceiling && r.sourceId == ceilingId)) {
+      final b = r.path.getBounds();
+      if (!b.isEmpty) {
+        result = result?.expandToInclude(b) ?? b;
+      }
+    }
+    return result;
+  }
+
+  /// Resolves overhead reference elevation (`upperSlabBottom` or minimum
+  /// roof underside in this section cut), ceiling bottom elevation, and floor
+  /// elevation for interactive section dimension editing.
+  static ({
+    CeilingOverheadSupport support,
+    double? upperZ,
+    double ceilingZ,
+    double floorZ,
+  })?
+  ceilingSectionMetrics(
+    ArchitectProject project,
+    ArchitectSection cut,
+    String ceilingId,
+  ) {
+    final hit = findCeilingById(project, ceilingId);
+    if (hit == null) return null;
+    final floor = hit.storey;
+    final ceiling = hit.ceiling;
+    final metrics = ArchitectCeilingGeometry.computeMetrics(
+      project,
+      floor,
+      ceiling,
+    );
+    double? upperZ;
+    if (metrics.overheadSupport == CeilingOverheadSupport.upperSlab) {
+      upperZ = metrics.upperSlabBottom;
+    } else if (metrics.overheadSupport == CeilingOverheadSupport.roof &&
+        project.roofStorey != null) {
+      final rawSpans = ArchitectCeilingGeometry.sectionIntervals(ceiling, cut);
+      final spans = ArchitectCeilingGeometry.trimSectionSpansToRoof(
+        project: project,
+        section: cut,
+        spans: rawSpans,
+        cutZ: metrics.ceilingElevation,
+      );
+      final roofStorey = project.roofStorey!;
+      for (final (a, b) in spans) {
+        final steps = math.max(4, ((b - a) / 0.1).ceil()).clamp(4, 64);
+        for (var i = 0; i <= steps; i++) {
+          final s = a + (b - a) * (i / steps);
+          final rz = ArchitectRoofGeometry.roofUndersideZAt(
+            roofStorey,
+            cut.pointAt(s),
+          );
+          if (rz != null && (upperZ == null || rz < upperZ)) {
+            upperZ = rz;
+          }
+        }
+      }
+      upperZ ??= metrics.roofMinUnderside ?? metrics.upperSlabBottom;
+    }
+    return (
+      support: metrics.overheadSupport,
+      upperZ: upperZ,
+      ceilingZ: metrics.ceilingElevation,
+      floorZ: floor.elevation,
+    );
   }
 
   String? pickSlab(Offset point, double tolerance) {

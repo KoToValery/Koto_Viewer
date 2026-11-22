@@ -476,5 +476,110 @@ void main() {
         isFalse,
       );
     });
+
+    test('ceiling under sloped roof trims contour & hangers cleanly and exposes section metrics', () {
+      const ceiling = ArchitectSuspendedCeiling(
+        id: 'ceil_roof',
+        type: SuspendedCeilingType.gypsumBoard,
+        elevationAnchor: CeilingElevationAnchor.clearHeight,
+        clearHeight: 2.60,
+        polygon: [
+          Offset(0, 0),
+          Offset(6, 0),
+          Offset(6, 4),
+          Offset(0, 4),
+        ],
+      );
+      final roundtrip = ArchitectSuspendedCeiling.fromJson(ceiling.toJson());
+      expect(roundtrip.elevationAnchor, CeilingElevationAnchor.clearHeight);
+      expect(roundtrip.clearHeight, closeTo(2.60, 1e-6));
+
+      final roofProject = ArchitectProject(
+        id: 'p_roof_ceil',
+        name: 'Mansard House',
+        createdAt: DateTime(2026, 11, 21),
+        updatedAt: DateTime(2026, 11, 21),
+        activeStoreyId: 's0',
+        storeys: [
+          ArchitectStorey(
+            id: 's0',
+            name: '±0.00',
+            elevation: 0.0,
+            height: 2.8,
+            ceilings: const [ceiling],
+          ),
+          ArchitectStorey(
+            id: 'roof',
+            name: 'Roof',
+            elevation: 2.8,
+            height: 2.0,
+            isRoof: true,
+            roofs: [
+              ArchitectRoofPlane(
+                id: 'r1',
+                storeyId: 'roof',
+                points: const [
+                  Offset(0, 0),
+                  Offset(6, 0),
+                  Offset(6, 4),
+                  Offset(0, 4),
+                ],
+                eavesEdgeIndex: 0, // Slopes upward along +Y from y=0 (2.8m) toward y=4
+                slopeDegrees: 30.0,
+                baseElevationOffset: -0.8, // Starts around z=2.0 at eaves y=0, rising past z=4.0 at y=4
+              ),
+            ],
+          ),
+        ],
+        sections: const [
+          ArchitectSection(
+            id: 'sec_roof',
+            name: 'B-B',
+            start: Offset(3, -1),
+            end: Offset(3, 5),
+          ),
+        ],
+      );
+
+      final metrics = ArchitectCeilingGeometry.computeMetrics(
+        roofProject,
+        roofProject.storeys.first,
+        ceiling,
+      );
+      expect(metrics.overheadSupport, CeilingOverheadSupport.roof);
+      expect(metrics.ceilingElevation, closeTo(2.60, 1e-6));
+
+      // At y=0.2 (low eaves, roof underside ~2.1m < 2.60m), ceiling must be trimmed away!
+      // At y=3.5 (high side, roof underside > 3.5m), ceiling remains intact!
+      final clipped = ArchitectCeilingGeometry.effectivePath(
+        roofProject,
+        roofProject.storeys.first,
+        ceiling,
+        metrics: metrics,
+      );
+      expect(clipped.contains(const Offset(3.0, 0.2)), isFalse);
+      expect(clipped.contains(const Offset(3.0, 3.5)), isTrue);
+
+      final sec = ArchitectBuildingSection.build(
+        roofProject,
+        roofProject.sections.first,
+        includeProjection: false,
+      );
+      final bounds = sec.ceilingBounds('ceil_roof');
+      expect(bounds, isNotNull);
+      expect(sec.pickCeiling(bounds!.center, 0.1), 'ceil_roof');
+
+      final secMetrics = ArchitectBuildingSection.ceilingSectionMetrics(
+        roofProject,
+        roofProject.sections.first,
+        'ceil_roof',
+      );
+      expect(secMetrics, isNotNull);
+      expect(secMetrics!.support, CeilingOverheadSupport.roof);
+      expect(secMetrics.ceilingZ, closeTo(2.60, 1e-4));
+      expect(secMetrics.floorZ, closeTo(0.0, 1e-6));
+      expect(secMetrics.upperZ, isNotNull);
+      expect(secMetrics.upperZ!, greaterThanOrEqualTo(2.59));
+    });
   });
 }

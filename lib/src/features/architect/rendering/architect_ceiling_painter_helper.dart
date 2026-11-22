@@ -67,29 +67,61 @@ class ArchitectCeilingPainterHelper {
           ceiling.id == selectedElementId ||
           selectedElementIds.contains(ceiling.id);
 
-      final path = ArchitectContour.path(
+      final metrics = ArchitectCeilingGeometry.computeMetrics(
+        project,
+        storey,
+        ceiling,
+      );
+      final rawPath = ArchitectContour.path(
         ceiling.polygon,
         ceiling.holes,
         bulges: ceiling.bulges,
       );
-
-      canvas.drawPath(
-        path,
-        isSelected
-            ? fillSelected
-            : (ceiling.type == SuspendedCeilingType.armstrong
-                  ? fillArmstrong
-                  : fillGypsum),
+      final path = ArchitectCeilingGeometry.effectivePath(
+        project,
+        storey,
+        ceiling,
+        metrics: metrics,
       );
 
-      if (ceiling.type == SuspendedCeilingType.armstrong) {
-        final gridLines = ArchitectCeilingGeometry.armstrongGridLines(ceiling);
-        for (final (a, b) in gridLines) {
-          canvas.drawLine(a, b, gridPaint);
+      if (!path.getBounds().isEmpty) {
+        canvas.drawPath(
+          path,
+          isSelected
+              ? fillSelected
+              : (ceiling.type == SuspendedCeilingType.armstrong
+                    ? fillArmstrong
+                    : fillGypsum),
+        );
+
+        if (ceiling.type == SuspendedCeilingType.armstrong) {
+          final gridLines = ArchitectCeilingGeometry.armstrongGridLines(
+            ceiling,
+          );
+          if (gridLines.isNotEmpty) {
+            canvas.save();
+            if (metrics.isUnderRoof) {
+              canvas.clipPath(path);
+            }
+            for (final (a, b) in gridLines) {
+              canvas.drawLine(a, b, gridPaint);
+            }
+            canvas.restore();
+          }
         }
+
+        canvas.drawPath(path, isSelected ? selectedBorderPaint : borderPaint);
       }
 
-      canvas.drawPath(path, isSelected ? selectedBorderPaint : borderPaint);
+      if (isSelected && (metrics.isUnderRoof || path.getBounds().isEmpty)) {
+        canvas.drawPath(
+          rawPath,
+          Paint()
+            ..color = const Color(0x8000E5FF)
+            ..strokeWidth = 1.1 / zoomScale
+            ..style = PaintingStyle.stroke,
+        );
+      }
 
       // Draw crisp cutout markers on holes.
       for (final hole in ceiling.holes) {
@@ -122,11 +154,6 @@ class ArchitectCeilingPainterHelper {
       // Designation & elevation readout (print-first).
       if ((ceiling.showLabel || ceiling.showElevationMarker) &&
           (ArchitectTextScope.current != null || zoomScale > 10.0)) {
-        final metrics = ArchitectCeilingGeometry.computeMetrics(
-          project,
-          storey,
-          ceiling,
-        );
         final lines = <String>[];
         if (ceiling.showLabel) {
           if (ceiling.label.trim().isNotEmpty) {
