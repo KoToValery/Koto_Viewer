@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/l10n/l10n_extensions.dart';
@@ -12,13 +14,19 @@ import 'services/bim_export_service.dart';
 import 'services/bim_project_library_service.dart';
 import 'services/bim_underlay_loader.dart';
 import 'widgets/bim_new_project_wizard.dart';
+import 'widgets/bim_project_import_helper.dart';
 
 /// Screen listing all user's standalone BiM Work Projects with options to
-/// open, align, rename, export ZIP packages, or create new projects.
+/// open, align, rename, import/export ZIP packages, or create new projects.
 class BimProjectLibraryScreen extends StatefulWidget {
   final BimProjectLibraryService? libraryService;
+  final Future<Uint8List?> Function()? pickImportZipBytes;
 
-  const BimProjectLibraryScreen({super.key, this.libraryService});
+  const BimProjectLibraryScreen({
+    super.key,
+    this.libraryService,
+    this.pickImportZipBytes,
+  });
 
   @override
   State<BimProjectLibraryScreen> createState() =>
@@ -133,6 +141,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         try {
           underlays = await BimUnderlayLoader.loadAndAlign(
             project: project,
+            libraryService: _library,
             mode: BimUnderlayLoadMode.architecturalOriginal,
           );
         } catch (_) {}
@@ -174,11 +183,39 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         .then((_) => _loadProjects());
   }
 
+  Future<void> _importProjectZip() async {
+    final result = await pickAndImportArchitecturalProject(
+      context,
+      libraryService: _library,
+      pickZipBytes: widget.pickImportZipBytes,
+    );
+    if (result == null || !mounted) return;
+    if (_filterType == 'structural') {
+      setState(() => _filterType = 'architectural');
+    }
+    await _loadProjects();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.l10n.architectImportProjectSuccess(result.project.name),
+        ),
+        backgroundColor: const Color(0xFF00E676),
+        action: SnackBarAction(
+          label: context.l10n.bimProjectOpen,
+          textColor: Colors.black,
+          onPressed: () => _openProject(result.project),
+        ),
+      ),
+    );
+  }
+
   Future<void> _exportProjectZip(BimWorkProject project) async {
     try {
+      final latestProject = await _library.loadProject(project.id) ?? project;
       dynamic zipFile;
-      if (project.projectType == BimProjectType.architectural) {
-        final arch = await _library.loadArchitectProject(project.id);
+      if (latestProject.projectType == BimProjectType.architectural) {
+        final arch = await _library.loadArchitectProject(latestProject.id);
         if (arch == null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -192,11 +229,14 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
           return;
         }
         zipFile = await BimExportService.exportArchitecturalProjectZip(
-          project: project,
+          project: latestProject,
           architect: arch,
+          libraryService: _library,
         );
       } else {
-        final structural = await _library.loadStructuralProject(project.id);
+        final structural = await _library.loadStructuralProject(
+          latestProject.id,
+        );
         if (structural == null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -209,8 +249,9 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         }
 
         zipFile = await BimExportService.exportProjectZip(
-          project: project,
+          project: latestProject,
           structural: structural,
+          libraryService: _library,
         );
       }
 
@@ -334,6 +375,12 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         ),
         actions: [
           IconButton(
+            key: const ValueKey('bim-library-import-zip'),
+            icon: const AppIcon(AppIconId.upload),
+            tooltip: l10n.architectImportProject,
+            onPressed: _importProjectZip,
+          ),
+          IconButton(
             icon: const AppIcon(AppIconId.add),
             tooltip: l10n.bimProjectNew,
             onPressed: _openNewProjectWizard,
@@ -441,21 +488,45 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              ElevatedButton.icon(
-                icon: const AppIcon(AppIconId.add),
-                label: Text(l10n.bimProjectNew),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00E5FF),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 14,
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const AppIcon(AppIconId.add),
+                    label: Text(l10n.bimProjectNew),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00E5FF),
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: _openNewProjectWizard,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                  OutlinedButton.icon(
+                    key: const ValueKey('bim-library-empty-import-zip'),
+                    icon: const AppIcon(AppIconId.upload),
+                    label: Text(l10n.architectImportProjectShort),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white24),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: _importProjectZip,
                   ),
-                ),
-                onPressed: _openNewProjectWizard,
+                ],
               ),
             ],
           ),

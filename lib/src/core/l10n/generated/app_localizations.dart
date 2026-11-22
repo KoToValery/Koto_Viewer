@@ -24881,6 +24881,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Trace contour'**
   String get architectSplineTraceReady;
+
+  /// Action label to import a full architectural project package from ZIP
+  ///
+  /// In en, this message translates to:
+  /// **'Import Project (ZIP)'**
+  String get architectImportProject;
+
+  /// Compact button label for importing an architectural project ZIP
+  ///
+  /// In en, this message translates to:
+  /// **'Import (ZIP)'**
+  String get architectImportProjectShort;
+
+  /// Progress indicator message while importing a project package
+  ///
+  /// In en, this message translates to:
+  /// **'Importing project package…'**
+  String get architectImportProjectPreparing;
+
+  /// Snackbar message when an architectural project ZIP is imported
+  ///
+  /// In en, this message translates to:
+  /// **'Project imported: {name}'**
+  String architectImportProjectSuccess(String name);
+
+  /// Error when picked file is not a valid ZIP archive
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid or corrupted ZIP archive.'**
+  String get architectImportProjectInvalidArchive;
+
+  /// Error when required project manifest files are missing in the ZIP
+  ///
+  /// In en, this message translates to:
+  /// **'This archive is not a valid architectural project package.'**
+  String get architectImportProjectMissingManifest;
+
+  /// Error when importing a non-architectural package
+  ///
+  /// In en, this message translates to:
+  /// **'Only architectural project packages (.zip) can be imported here.'**
+  String get architectImportProjectUnsupportedType;
+
+  /// Error when checksums or referenced underlay files fail validation
+  ///
+  /// In en, this message translates to:
+  /// **'Package integrity check failed or referenced assets are missing.'**
+  String get architectImportProjectIntegrityFailed;
+
+  /// Generic import failure snackbar message
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String architectImportProjectFailed(String error);
 }
 
 class _AppLocalizationsDelegate

@@ -13697,4 +13697,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectSplineTraceReady => 'Trace contour';
+
+  @override
+  String get architectImportProject => 'Import Project (ZIP)';
+
+  @override
+  String get architectImportProjectShort => 'Import (ZIP)';
+
+  @override
+  String get architectImportProjectPreparing => 'Importing project package…';
+
+  @override
+  String architectImportProjectSuccess(String name) {
+    return 'Project imported: $name';
+  }
+
+  @override
+  String get architectImportProjectInvalidArchive =>
+      'Invalid or corrupted ZIP archive.';
+
+  @override
+  String get architectImportProjectMissingManifest =>
+      'This archive is not a valid architectural project package.';
+
+  @override
+  String get architectImportProjectUnsupportedType =>
+      'Only architectural project packages (.zip) can be imported here.';
+
+  @override
+  String get architectImportProjectIntegrityFailed =>
+      'Package integrity check failed or referenced assets are missing.';
+
+  @override
+  String architectImportProjectFailed(String error) {
+    return 'Import failed: $error';
+  }
 }

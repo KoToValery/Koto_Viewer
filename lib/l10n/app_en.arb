@@ -7503,5 +7503,33 @@
   "architectSplineTraceContour": "Auto-trace",
   "architectSplineTraceContourHint": "Hold & aim over a CAD underlay contour, curve, or enclosed room",
   "architectSplineNoContourAtPoint": "No contour found under pointer",
-  "architectSplineTraceReady": "Trace contour"
+  "architectSplineTraceReady": "Trace contour",
+  "architectImportProject": "Import Project (ZIP)",
+  "@architectImportProject": { "description": "Action label to import a full architectural project package from ZIP" },
+  "architectImportProjectShort": "Import (ZIP)",
+  "@architectImportProjectShort": { "description": "Compact button label for importing an architectural project ZIP" },
+  "architectImportProjectPreparing": "Importing project package…",
+  "@architectImportProjectPreparing": { "description": "Progress indicator message while importing a project package" },
+  "architectImportProjectSuccess": "Project imported: {name}",
+  "@architectImportProjectSuccess": {
+    "description": "Snackbar message when an architectural project ZIP is imported",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "architectImportProjectInvalidArchive": "Invalid or corrupted ZIP archive.",
+  "@architectImportProjectInvalidArchive": { "description": "Error when picked file is not a valid ZIP archive" },
+  "architectImportProjectMissingManifest": "This archive is not a valid architectural project package.",
+  "@architectImportProjectMissingManifest": { "description": "Error when required project manifest files are missing in the ZIP" },
+  "architectImportProjectUnsupportedType": "Only architectural project packages (.zip) can be imported here.",
+  "@architectImportProjectUnsupportedType": { "description": "Error when importing a non-architectural package" },
+  "architectImportProjectIntegrityFailed": "Package integrity check failed or referenced assets are missing.",
+  "@architectImportProjectIntegrityFailed": { "description": "Error when checksums or referenced underlay files fail validation" },
+  "architectImportProjectFailed": "Import failed: {error}",
+  "@architectImportProjectFailed": {
+    "description": "Generic import failure snackbar message",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  }
 }

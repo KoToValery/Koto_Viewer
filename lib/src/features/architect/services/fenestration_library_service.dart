@@ -162,6 +162,40 @@ class FenestrationLibraryService extends ChangeNotifier {
     return style;
   }
 
+  /// Imports custom fenestration styles from a project package if not already
+  /// present in this library, without changing active placement styles.
+  Future<int> importCustomStylesIfMissing(
+    List<ArchitectFenestrationStyle> styles,
+  ) async {
+    if (styles.isEmpty) return 0;
+    await init();
+    final standardIds = {
+      for (final s in ArchitectFenestrationStyle.standardCatalog()) s.id,
+    };
+    var added = 0;
+    final previous = List<ArchitectFenestrationStyle>.of(_customStyles);
+    for (final raw in styles) {
+      final style = raw.isPreset ? raw.copyWith() : raw;
+      if (standardIds.contains(style.id) ||
+          _customStyles.any((s) => s.id == style.id)) {
+        continue;
+      }
+      _customStyles.add(style);
+      added++;
+    }
+    if (added == 0) return 0;
+    try {
+      await _persist();
+    } catch (_) {
+      _customStyles
+        ..clear()
+        ..addAll(previous);
+      rethrow;
+    }
+    notifyListeners();
+    return added;
+  }
+
   /// Deletes a custom style from the library.
   Future<bool> deleteStyle(String id) async {
     await init();

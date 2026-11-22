@@ -4700,5 +4700,14 @@
   "architectSplineTraceContour": "Авто-контур",
   "architectSplineTraceContourHint": "Задръжте и насочете върху хоризонтал от подложката, крива или помещение",
   "architectSplineNoContourAtPoint": "Не е открит контур под точката",
-  "architectSplineTraceReady": "Проследи контур"
+  "architectSplineTraceReady": "Проследи контур",
+  "architectImportProject": "Импорт на проект (ZIP)",
+  "architectImportProjectShort": "Импорт (ZIP)",
+  "architectImportProjectPreparing": "Импортиране на проектния пакет…",
+  "architectImportProjectSuccess": "Проектът е импортиран: {name}",
+  "architectImportProjectInvalidArchive": "Невалиден или повреден ZIP архив.",
+  "architectImportProjectMissingManifest": "Този архив не е валиден пакет на архитектурен проект.",
+  "architectImportProjectUnsupportedType": "Тук могат да се импортират само пакети на архитектурни проекти (.zip).",
+  "architectImportProjectIntegrityFailed": "Проверката за цялост на пакета е неуспешна или липсват файлове/подложки.",
+  "architectImportProjectFailed": "Неуспешен импорт: {error}"
 }
