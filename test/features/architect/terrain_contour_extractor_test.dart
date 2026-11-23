@@ -374,5 +374,53 @@ EOF
       );
       expect(geodetic.contours.where((c) => c.elevation == 546.25), hasLength(1));
     });
+
+    test('detectElevation=false stitches broken contours without capturing elevation', () {
+      final doc = DxfDocument(
+        entities: const [
+          DxfLwPolyline(
+            layer: 'TOPO',
+            elevation: 542.50,
+            vertices: [
+              DxfPolylineVertex(x: 0, y: 0),
+              DxfPolylineVertex(x: 5, y: 0),
+            ],
+          ),
+          DxfText(
+            layer: 'TOPO',
+            text: '542.50',
+            insertPoint: Offset(6.2, 0.0),
+            height: 0.5,
+          ),
+          DxfLwPolyline(
+            layer: 'TOPO',
+            elevation: 542.50,
+            vertices: [
+              DxfPolylineVertex(x: 8, y: 0),
+              DxfPolylineVertex(x: 14, y: 0.5),
+            ],
+          ),
+        ],
+        blocks: const {},
+        layers: {'0': DxfLayer(name: '0'), 'TOPO': DxfLayer(name: 'TOPO')},
+        headerVars: const {},
+        bounds: const Rect.fromLTRB(-1, -1, 15, 2),
+        entityStats: const {},
+      );
+
+      final pickedNoElev = ArchitectUnderlayContourExtractor.pickAt(
+        document: doc,
+        frame: const BimCoordinateFrame(),
+        layerVisibility: const {},
+        modelPoint: const Offset(2.5, 0.0),
+        hitToleranceMeters: 0.5,
+        detectElevation: false,
+      );
+      expect(pickedNoElev, isNotNull);
+      expect(pickedNoElev!.suggestedElevation, isNull);
+      // Full contour still stitched across the inline text gap!
+      expect(pickedNoElev.points.first.dx, closeTo(0.0, 1e-3));
+      expect(pickedNoElev.points.last.dx, closeTo(14.0, 1e-3));
+    });
   });
 }

@@ -392,12 +392,15 @@ class ArchitectUnderlayContourExtractor {
 
   /// Picks the contour under [modelPoint] within [hitToleranceMeters],
   /// automatically stitching connected segments and bridging elevation-text gaps.
+  /// Set [detectElevation] to `false` to disable automatic elevation capture
+  /// while still stitching split segments and inline text gaps.
   static ArchitectPickedContourCandidate? pickAt({
     required DxfDocument document,
     required BimCoordinateFrame frame,
     required Map<String, bool> layerVisibility,
     required Offset modelPoint,
     required double hitToleranceMeters,
+    bool detectElevation = true,
   }) {
     final index = _indexFor(document, frame, layerVisibility);
     if (index.curves.isEmpty) return null;
@@ -438,10 +441,11 @@ class ArchitectUnderlayContourExtractor {
       capturedGapTextElev = result.gapTextElevation;
     }
 
-    final suggestedElev =
-        resolvedElev ??
-        capturedGapTextElev ??
-        _nearestTextElevation(chain, index.texts, maxDist: 1.5);
+    final suggestedElev = detectElevation
+        ? (resolvedElev ??
+            capturedGapTextElev ??
+            _nearestTextElevation(chain, index.texts, maxDist: 1.5))
+        : null;
 
     return ArchitectPickedContourCandidate(
       points: chain,

@@ -16,6 +16,7 @@ import 'package:kotoview/src/features/architect/services/architect_selection_can
 import 'package:kotoview/src/features/architect/services/architect_sheet_layout.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'architect_editing_test.dart' as editing;
 import 'architect_tool_test_helper.dart' as tools;
 import 'architect_workspace_interaction_test.dart' as workspace;
 
@@ -531,6 +532,236 @@ void main() {
         expect(restored.sitePlan, isTrue);
         expect(restored.scale, 200);
         expect(ArchitectSheetLayout.drawingName(restored, l), l.architectSitePlan);
+      },
+    );
+
+    test(
+      'CutArchitectContourOpening, UpdateArchitectPolygon holes, and InsertArchitectElementPoint support terrain boundaries and contours',
+      () {
+        final starter = ArchitectProject.starterWithCatalog(
+          name: 'Terrain polygon ops',
+          storeyCount: 1,
+        );
+        final site = starter.siteStorey!;
+        const bnd = ArchitectTerrainBoundary(
+          id: 'terr_outer',
+          polygon: [Offset(-6, -6), Offset(6, -6), Offset(6, 6), Offset(-6, 6)],
+        );
+        const openContour = ArchitectTerrainContour(
+          id: 'terr_cnt_open',
+          points: [Offset(-5, 0), Offset(5, 0)],
+          elevation: 1.0,
+          closed: false,
+        );
+        final project = starter.copyWith(
+          activeStoreyId: site.id,
+          proposedTerrain: const ArchitectTerrainSurface(
+            state: ArchitectTerrainState.proposed,
+            boundaries: [bnd],
+            contours: [openContour],
+          ),
+        );
+
+        expect(CutArchitectContourOpening.target(site, bnd.id), isNull);
+        final host = CutArchitectContourOpening.targetInProject(project, bnd.id);
+        expect(host, isNotNull);
+        expect(host!.$1, bnd.polygon);
+        expect(host.$2, isEmpty);
+
+        const holePoly = [
+          Offset(-2, -2),
+          Offset(2, -2),
+          Offset(2, 2),
+          Offset(-2, 2),
+        ];
+        final withHole = CutArchitectContourOpening(
+          storeyId: site.id,
+          elementId: bnd.id,
+          polygon: holePoly,
+        ).apply(project);
+        expect(withHole.proposedTerrain.boundaries, hasLength(2));
+        final holeBnd = withHole.proposedTerrain.boundaries.last;
+        expect(holeBnd.isHole, isTrue);
+        expect(holeBnd.polygon, holePoly);
+
+        final hostWithHole =
+            CutArchitectContourOpening.targetInProject(withHole, bnd.id);
+        expect(hostWithHole!.$2, hasLength(1));
+
+        // Editing holeIndex 0 updates the hole boundary rather than overwriting outer boundary
+        const resizedHole = [
+          Offset(-3, -2),
+          Offset(2, -2),
+          Offset(2, 2),
+          Offset(-3, 2),
+        ];
+        final editedHoleProj = UpdateArchitectPolygon(
+          storeyId: site.id,
+          elementId: bnd.id,
+          polygon: resizedHole,
+          holeIndex: 0,
+        ).apply(withHole);
+        expect(editedHoleProj.proposedTerrain.boundaries.first.polygon, bnd.polygon);
+        expect(editedHoleProj.proposedTerrain.boundaries.last.polygon, resizedHole);
+
+        // InsertArchitectElementPoint inserts a vertex on both closed terrain boundaries and open contours
+        expect(
+          InsertArchitectElementPoint.pathOf(site, bnd.id, project: withHole),
+          isNotNull,
+        );
+        final withNewBndPt = InsertArchitectElementPoint(
+          storeyId: site.id,
+          elementId: bnd.id,
+          point: const Offset(0, -6),
+          newElementId: 'pt_bnd',
+        ).apply(withHole);
+        expect(withNewBndPt.proposedTerrain.boundaries.first.polygon, hasLength(5));
+
+        final withNewCntPt = InsertArchitectElementPoint(
+          storeyId: site.id,
+          elementId: openContour.id,
+          point: const Offset(0, 0),
+          newElementId: 'pt_cnt',
+        ).apply(withHole);
+        expect(withNewCntPt.proposedTerrain.contours.single.points, hasLength(3));
+      },
+    );
+
+    testWidgets(
+      'selecting terrain enables polygon edit handles & bar and exposes active Cut openings in radial menu',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final starter = ArchitectProject.starterWithCatalog(
+          name: 'Terrain radial & edit',
+          storeyCount: 1,
+          groundHeight: 3,
+          typicalHeight: 3,
+        );
+        const bnd = ArchitectTerrainBoundary(
+          id: 'terr_bnd_radial',
+          polygon: [Offset(0, 0), Offset(8, 0), Offset(8, 6), Offset(0, 6)],
+        );
+        const hole = [Offset(2, 2), Offset(4, 2), Offset(4, 4), Offset(2, 4)];
+        final model = ArchitectCommandController(
+          starter.copyWith(
+            activeStoreyId: starter.siteStorey!.id,
+            existingTerrain: const ArchitectTerrainSurface(
+              state: ArchitectTerrainState.existing,
+              boundaries: [bnd],
+            ),
+          ),
+        );
+        addTearDown(model.dispose);
+
+        await workspace.open(tester, model);
+        await tools.choose(tester, Icons.near_me_outlined);
+        await tester.pumpAndSettle();
+
+        // Selecting terrain enters polygon edit mode automatically (handles/leader lines + edge bar)
+        await workspace.wallTap(tester, const Offset(4, 0));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('architect-polygon-angle-lock')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-selection-new-point')),
+          findsOneWidget,
+        );
+
+        // Radial/context menu has Cut openings active and cuts an opening into terrain
+        await editing.contextHold(tester, const Offset(1, 1));
+        final cut = find.byKey(const ValueKey('architect-radial-cutOpening'));
+        expect(cut, findsOneWidget);
+        await tester.tap(cut);
+        await tester.pumpAndSettle();
+        for (final pt in hole) {
+          await tester.tapAt(workspace.screen(tester, pt));
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.byKey(const ValueKey('architect-command-apply')));
+        await tester.pumpAndSettle();
+
+        expect(model.project.existingTerrain.boundaries, hasLength(2));
+        expect(model.project.existingTerrain.boundaries.last.isHole, isTrue);
+        model.undo();
+        await tester.pumpAndSettle();
+        expect(model.project.existingTerrain.boundaries, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'selecting a placed terrain object displays the terrain command bar with object commands while Terrain tool shows draw-only commands',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final starter = ArchitectProject.starterWithCatalog(
+          name: 'Terrain bar split test',
+          storeyCount: 1,
+          groundHeight: 3,
+          typicalHeight: 3,
+        );
+        const bnd = ArchitectTerrainBoundary(
+          id: 'terr_placed_bar',
+          polygon: [Offset(0, 0), Offset(8, 0), Offset(8, 6), Offset(0, 6)],
+        );
+        final model = ArchitectCommandController(
+          starter.copyWith(
+            activeStoreyId: starter.siteStorey!.id,
+            existingTerrain: const ArchitectTerrainSurface(
+              state: ArchitectTerrainState.existing,
+              boundaries: [bnd],
+            ),
+          ),
+        );
+        addTearDown(model.dispose);
+
+        await workspace.open(tester, model);
+        await tools.choose(tester, Icons.near_me_outlined);
+        await tester.pumpAndSettle();
+
+        final l = lookupAppLocalizations(const Locale('en'));
+
+        // Select the existing terrain object -> terrain command bar appears with secondary commands
+        await workspace.wallTap(tester, const Offset(4, 0));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('architect-terrain-datum')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('architect-terrain-create-proposed')),
+          findsOneWidget,
+        );
+        expect(find.text(l.architectTerrainModePad), findsOneWidget);
+        expect(find.text(l.architectTerrainModeHole), findsOneWidget);
+        expect(find.text(l.architectTerrainModeSpot), findsOneWidget);
+        expect(find.text(l.architectTerrainModeContour), findsOneWidget);
+        expect(find.text(l.architectTerrainModePickContour), findsOneWidget);
+        expect(find.text(l.architectTerrainModeBoundary), findsNothing);
+        expect(find.text(l.architectTerrainModeBoundaryRect), findsNothing);
+
+        // Choosing Pad starts Pad sub-mode without altering the placed boundary type
+        final padChip = find.text(l.architectTerrainModePad);
+        await tester.ensureVisible(padChip);
+        await tester.tap(padChip);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('architect-terrain-pad-elevation')),
+          findsOneWidget,
+        );
+        expect(model.project.existingTerrain.boundaries.single.isFlatPad, isFalse);
+
+        // Switching to another landscape tool and back to Terrain resets to draw-only commands
+        await tester.tap(find.byKey(const ValueKey('architect-tool-contour')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('architect-tool-terrain')));
+        await tester.pumpAndSettle();
+        expect(find.text(l.architectTerrainStateExisting), findsOneWidget);
+        expect(find.text(l.architectTerrainStateProposed), findsOneWidget);
+        expect(find.text(l.architectTerrainModeBoundary), findsOneWidget);
+        expect(find.text(l.architectTerrainModeBoundaryRect), findsOneWidget);
+        expect(find.text(l.architectTerrainModePad), findsNothing);
+        expect(find.byKey(const ValueKey('architect-terrain-datum')), findsNothing);
+        expect(tester.takeException(), isNull);
       },
     );
   });

@@ -5870,6 +5870,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _terrainDrafting = false;
 
+    _terrainSubModeActive = false;
+
     _viewDraft = null;
 
     _placingDownpipe = false;
@@ -5982,6 +5984,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _terrainDrafting = false;
 
+  bool _terrainSubModeActive = false;
+
 
 
   void _startTerrainDraft() {
@@ -6019,9 +6023,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _editingGroupId = null;
     }
 
+    final wasTerrainSubMode = _terrainSubModeActive;
+
     _cutOpeningTargetId = null;
 
     _terrainDrafting = false;
+
+    _terrainSubModeActive = false;
 
     _placingDownpipe = false;
 
@@ -6034,7 +6042,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final sameCommand = tool == ArchitectTool.select
         ? previousMode == ArchitectInteractionMode.singleSelect
-        : _activeTool == tool && previousMode != ArchitectInteractionMode.contextEdit;
+        : _activeTool == tool &&
+            previousMode != ArchitectInteractionMode.contextEdit &&
+            !(tool == ArchitectTool.terrain && wasTerrainSubMode);
     final nextTool = toggle && sameCommand ? ArchitectTool.pan : tool;
 
     _resetDimensionDraft();
@@ -6090,6 +6100,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _commands.setPlanMode(ArchitectPlanMode.ceilingServices);
     }
     if (nextTool.isLandscapeTool) {
+      if (nextTool == ArchitectTool.terrain &&
+          _landscapeTool.terrainMode != ArchitectTerrainDraftMode.boundary &&
+          _landscapeTool.terrainMode != ArchitectTerrainDraftMode.boundaryRect) {
+        _landscapeTool.terrainMode = ArchitectTerrainDraftMode.boundary;
+      }
       final activeSurf = _landscapeTool.terrainState == ArchitectTerrainState.existing
           ? _project.existingTerrain
           : _project.proposedTerrain;
@@ -6781,8 +6796,53 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ? _project.activeStorey.slabs.where((s) => s.id == _selectedElementId).firstOrNull
       : null;
 
+  ArchitectTerrainBoundary? get _selectedTerrainBoundary {
+    if (_effectiveSelection.length != 1 || !_project.activeStorey.isSite) {
+      return null;
+    }
+    final id = _selectedElementId;
+    if (id == null) return null;
+    for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+      for (final b in surface.boundaries) {
+        if (b.id == id) return b;
+      }
+    }
+    return null;
+  }
+
+  ArchitectTerrainContour? get _selectedTerrainContour {
+    if (_effectiveSelection.length != 1 || !_project.activeStorey.isSite) {
+      return null;
+    }
+    final id = _selectedElementId;
+    if (id == null) return null;
+    for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+      for (final c in surface.contours) {
+        if (c.id == id) return c;
+      }
+    }
+    return null;
+  }
+
+  ArchitectTerrainSpot? get _selectedTerrainSpot {
+    if (_effectiveSelection.length != 1 || !_project.activeStorey.isSite) {
+      return null;
+    }
+    final id = _selectedElementId;
+    if (id == null) return null;
+    for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+      for (final s in surface.spots) {
+        if (s.id == id) return s;
+      }
+    }
+    return null;
+  }
+
   bool get _hatchOrSlabSelected =>
-      _selectedHatch != null || _selectedSlab != null || _selectedCeiling != null;
+      _selectedHatch != null ||
+      _selectedSlab != null ||
+      _selectedCeiling != null ||
+      _selectedTerrainBoundary != null;
 
   ArchitectPolygonEdgeMode get _effectivePolygonEdgeMode => _hatchOrSlabSelected
       ? _polygonPull ? ArchitectPolygonEdgeMode.pull
@@ -6807,7 +6867,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   int? get _selectedPolygonHoleIndex {
     final id = _selectedElementId ?? _selectedZoneId;
     if (id == null || _polygonContourElementId != id || _polygonContourIndex <= 0) return null;
-    final host = CutArchitectContourOpening.target(_project.activeStorey, id);
+    final host = CutArchitectContourOpening.targetInProject(_project, id);
     final index = _polygonContourIndex - 1;
     return host != null && index < host.$2.length ? index : null;
   }
@@ -6815,7 +6875,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _selectPolygonContour(Offset point) {
     final id = _selectedElementId ?? _selectedZoneId;
     if (id == null || _effectiveSelection.length > 1) return;
-    final host = CutArchitectContourOpening.target(_project.activeStorey, id);
+    final host = CutArchitectContourOpening.targetInProject(_project, id);
     if (host == null) return;
     final ring = ArchitectPolygonEditor.hitContour(host.$1, host.$2,
         point, _currentScale, offsetLengthPx: _handleOffsetLength,
@@ -10191,7 +10251,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    final polygon = _selectedPolygon;
+    final polygon = _selectedTerrainContour?.closed == false
+        ? null
+        : _selectedPolygon;
 
     final isDirectContour =
 
@@ -10415,25 +10477,70 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     final polyline = _selectedPolyline ?? _selectedSpline;
-    if (polyline != null && !_moveSelection && !_mirrorActive && _offsetOptions == null && _chamferFilletSourceId == null &&
-        !_splitActive && _newPointTargetId == null) {
-      final points = polyline.linePoints;
-      final edgeHit = polyline.type == CadPrimitiveType.spline ? null : ArchitectPolylineEditing.hitEdge(points,rawModel,_currentScale,_handleOffsetLength);
-      final hit = edgeHit ?? ArchitectPolylineEditing.hit(
-          points, rawModel, _currentScale, _handleOffsetLength,
-      );
+    final openContour =
+        polyline == null && _selectedTerrainContour?.closed == false
+            ? _selectedTerrainContour
+            : null;
+    final polyPoints = polyline?.linePoints ?? openContour?.points;
+    final polyElementId = polyline?.id ?? openContour?.id;
+    final polyIsSpline = polyline?.type == CadPrimitiveType.spline ||
+        openContour?.isSpline == true;
+    if (polyPoints != null &&
+        polyElementId != null &&
+        !_moveSelection &&
+        !_mirrorActive &&
+        _offsetOptions == null &&
+        _chamferFilletSourceId == null &&
+        !_splitActive &&
+        _newPointTargetId == null) {
+      final points = polyPoints;
+      final edgeHit = polyIsSpline && openContour == null
+          ? null
+          : ArchitectPolylineEditing.hitEdge(
+              points,
+              rawModel,
+              _currentScale,
+              _handleOffsetLength,
+            );
+      final hit = edgeHit ??
+          ArchitectPolylineEditing.hit(
+            points,
+            rawModel,
+            _currentScale,
+            _handleOffsetLength,
+          );
       if (hit != null) {
         final (index, isOffset) = hit;
-        _polylineEdgeDrag=edgeHit!=null;
-        final point = _polylineEdgeDrag ? (points[index]+points[index+1])/2 : points[index];
-        final handle = !isOffset ? point : _polylineEdgeDrag
-          ? ArchitectPolylineEditing.edgeHandle(points,index,_currentScale,_handleOffsetLength)
-          : ArchitectPolylineEditing.handle(points,index,_currentScale,_handleOffsetLength);
+        _polylineEdgeDrag = edgeHit != null;
+        final point = _polylineEdgeDrag
+            ? (points[index] + points[index + 1]) / 2
+            : points[index];
+        final handle = !isOffset
+            ? point
+            : _polylineEdgeDrag
+                ? ArchitectPolylineEditing.edgeHandle(
+                    points,
+                    index,
+                    _currentScale,
+                    _handleOffsetLength,
+                  )
+                : ArchitectPolylineEditing.handle(
+                    points,
+                    index,
+                    _currentScale,
+                    _handleOffsetLength,
+                  );
         _polylineVertexIndex = index;
         _wallDragStart = !_polylineEdgeDrag && index == 0;
-        _wallEndpointOriginal = ArchitectWall(id: polyline.id,
-          startPoint: _polylineEdgeDrag ? points[index] : points[index == 0 ? 0 : index - 1],
-          endPoint: _polylineEdgeDrag ? point : points[index == 0 ? 1 : index], thickness: .001,
+        _wallEndpointOriginal = ArchitectWall(
+          id: polyElementId,
+          startPoint: _polylineEdgeDrag
+              ? points[index]
+              : points[index == 0 ? 0 : index - 1],
+          endPoint: _polylineEdgeDrag
+              ? point
+              : points[index == 0 ? 1 : index],
+          thickness: .001,
         );
         _wallEndpointIsOffset = isOffset;
         _wallEndpointDisplacement = handle - point;
@@ -12750,17 +12857,43 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       try {
 
         final polylineIndex = _polylineVertexIndex;
-        final polyline = _elementMoveOriginal!.activeStorey.cadPrimitives
+        final sourceProj = _elementMoveOriginal!;
+        final polyline = sourceProj.activeStorey.cadPrimitives
             .where((p) => p.id == original.id &&
                 (p.type == CadPrimitiveType.polyline || p.type == CadPrimitiveType.spline),
             ).firstOrNull;
+        final openContour = polyline == null && sourceProj.activeStorey.isSite
+            ? [sourceProj.proposedTerrain, sourceProj.existingTerrain]
+                .expand((s) => s.contours)
+                .where((c) => c.id == original.id && !c.closed)
+                .firstOrNull
+            : null;
         _elementMovePreview = polylineIndex != null && polyline != null
             ? UpdateArchitectPolyline(
                 storeyId: _project.activeStoreyId, elementId: original.id,
                 points: _polylineEdgeDrag ? ArchitectPolylineEditing.moveEdge(polyline.linePoints,polylineIndex,
                   snap.point-(polyline.linePoints[polylineIndex]+polyline.linePoints[polylineIndex+1])/2)
                   : ArchitectPolylineEditing.moveVertex(polyline.linePoints,polylineIndex,snap.point),
-              ).apply(_elementMoveOriginal!)
+              ).apply(sourceProj)
+            : polylineIndex != null && openContour != null
+            ? UpdateArchitectPolygon(
+                storeyId: _project.activeStoreyId,
+                elementId: original.id,
+                polygon: _polylineEdgeDrag
+                    ? ArchitectPolylineEditing.moveEdge(
+                        openContour.points,
+                        polylineIndex,
+                        snap.point -
+                            (openContour.points[polylineIndex] +
+                                    openContour.points[polylineIndex + 1]) /
+                                2,
+                      )
+                    : ArchitectPolylineEditing.moveVertex(
+                        openContour.points,
+                        polylineIndex,
+                        snap.point,
+                      ),
+              ).apply(sourceProj)
             : _linearCommand(
 
           UpdateArchitectWall(
@@ -13612,9 +13745,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _cursorModel = candidate?.anchorPoint ?? rawModel;
         _activeSnapLabel = candidate == null
             ? null
-            : (candidate.suggestedElevation != null
-                  ? '${candidate.suggestedElevation!.toStringAsFixed(2)} m'
-                  : context.l10n.architectTerrainModePickContour);
+            : context.l10n.architectTerrainModePickContour;
         _activeMagneticGuides = [];
       } else {
         final resolved = _resolveLandscapeDraftPoint(
@@ -19462,9 +19593,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    final storey = (_elementMovePreview ?? _project).activeStorey;
+    final previewProject = _elementMovePreview ?? _project;
+    final storey = previewProject.activeStorey;
     final holeIndex = _selectedPolygonHoleIndex;
-    final host = CutArchitectContourOpening.target(storey, targetId);
+    final host = CutArchitectContourOpening.targetInProject(
+      previewProject,
+      targetId,
+    );
     if (holeIndex != null && host != null && holeIndex < host.$2.length) {
       return host.$2[holeIndex];
     }
@@ -19501,6 +19636,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (zone.id == targetId) return zone.polygon;
 
+    }
+
+    if (storey.isSite) {
+      for (final surface in [
+        previewProject.proposedTerrain,
+        previewProject.existingTerrain,
+      ]) {
+        for (final b in surface.boundaries) {
+          if (b.id == targetId && b.polygon.length >= 3) return b.polygon;
+        }
+        for (final c in surface.contours) {
+          if (c.id == targetId && c.closed && c.points.length >= 3) {
+            return c.points;
+          }
+        }
+      }
     }
 
     return null;
@@ -22927,7 +23078,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_effectiveSelection.length <= 1 &&
 
-        CutArchitectContourOpening.target(storey, elementId) != null &&
+        CutArchitectContourOpening.targetInProject(_project, elementId) != null &&
 
         _commands.view == ArchitectWorkspaceView.plan) {
 
@@ -22943,7 +23094,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (!items.any((it) => it.action == ArchitectRadialAction.newPoint) &&
 
-        InsertArchitectElementPoint.pathOf(storey, elementId) != null) {
+        InsertArchitectElementPoint.pathOf(storey, elementId, project: _project) != null) {
 
       items.add(
 
@@ -23008,7 +23159,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (initialPick != null) _selectPolygonContour(initialPick);
     final holeIndex = _selectedPolygonHoleIndex;
     final source = _project.activeStorey;
-    final path = InsertArchitectElementPoint.pathOf(source, id, holeIndex: holeIndex,
+    final path = InsertArchitectElementPoint.pathOf(
+      source,
+      id,
+      holeIndex: holeIndex,
+      project: _project,
     );
     if (path == null || path.points.length < 2) {
       _cancelGeometryCommand();
@@ -23029,10 +23184,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _activeSnapLabel = null;
     });
     final seed = initialPick ?? InsertArchitectElementPoint.locate(
-      source, id, (path.points[0] + path.points[1]) / 2,
-      atMidpoint: true, holeIndex: holeIndex,
+      source,
+      id,
+      (path.points[0] + path.points[1]) / 2,
+      atMidpoint: true,
+      holeIndex: holeIndex,
+      project: _project,
     )!.point;
-    final hit = InsertArchitectElementPoint.locate(source, id, seed, holeIndex: holeIndex,
+    final hit = InsertArchitectElementPoint.locate(
+      source,
+      id,
+      seed,
+      holeIndex: holeIndex,
+      project: _project,
     )!;
     final wall = source.walls.where((w) => w.id == id).firstOrNull;
     final edge = path.points[(hit.edge + 1) % path.points.length] - path.points[hit.edge];
@@ -23099,6 +23263,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _newPointTargetId!,
       holeIndex: _newPointHoleIndex,
+      project: _project,
 
     );
 
@@ -23684,8 +23849,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final wasValid = _newPointValid;
     _newPointCandidate = candidate;
     _newPointValid = InsertArchitectElementPoint.canInsert(
-      _newPointSource ?? _project.activeStorey, _newPointTargetId!, candidate,
+      _newPointSource ?? _project.activeStorey,
+      _newPointTargetId!,
+      candidate,
       holeIndex: _newPointHoleIndex,
+      project: _project,
     );
     _newPointLeaderLine = (candidate, candidate + _newPointGripOffset / _currentScale,
     );
@@ -23775,6 +23943,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       targetId,
       holeIndex: holeIndex,
+      project: _project,
 
     );
 
@@ -25043,12 +25212,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     HapticFeedback.selectionClick();
 
     _selectPolygonContour(point);
-    if (_hatchOrSlabSelected && !_multiSelect) {
+    if ((_hatchOrSlabSelected || _selectedTerrainContour?.closed == true) &&
+        !_multiSelect) {
       setState(() {
         _enterPolygonEditing(id);
-        _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
-          _selectedPolygon!, point, 18 / _currentScale,
-        );
+        final selectedPoly = _selectedPolygon;
+        _polygonSelectedEdge = selectedPoly == null
+            ? null
+            : ArchitectPolygonDimensions.hitEdge(
+                selectedPoly, point, 18 / _currentScale,
+              );
       });
     }
     return true;
@@ -27888,7 +28061,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _selectedZoneId = zone.id;
           _zoneTool.startEditingZone(zone);
         }
-        if (_hatchOrSlabSelected) _enterPolygonEditing(ids.single);
+        if (_hatchOrSlabSelected || _selectedTerrainContour?.closed == true) {
+          _enterPolygonEditing(ids.single);
+        }
       }
       // Area selection remains in the explicitly chosen Multi mode.
       _selectionCyclePoint = null;
@@ -31140,7 +31315,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           );
         }
-        if (InsertArchitectElementPoint.pathOf(storey, ids.single) != null) {
+        if (InsertArchitectElementPoint.pathOf(storey, ids.single, project: _project) != null) {
           actions.add(
             action(
               'architect-selection-new-point',
@@ -33045,9 +33220,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _saveBiMProjectIfAttached();
                   },
                   onOpenDecorativeStudio: () => _openDecorativeStudio(),
-                  landscapeBar: _activeTool.isLandscapeTool
+                  selectedTerrain: _selectedTerrainBoundary != null ||
+                      _selectedTerrainSpot != null ||
+                      _selectedTerrainContour != null,
+                  landscapeBar: (_activeTool.isLandscapeTool ||
+                          _selectedTerrainBoundary != null ||
+                          _selectedTerrainSpot != null ||
+                          _selectedTerrainContour != null)
                       ? ArchitectLandscapeBar(
-                          activeTool: _activeTool,
+                          activeTool: (_selectedTerrainBoundary != null ||
+                                  _selectedTerrainSpot != null)
+                              ? ArchitectTool.terrain
+                              : (_selectedTerrainContour != null
+                                  ? ArchitectTool.contour
+                                  : _activeTool),
                           landscapeTool: _landscapeTool,
                           project: _project,
                           onChanged: () {
@@ -33060,6 +33246,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           onDatumUpdated: _updateTerrainDatum,
                           hasSelectedContourOrSpot:
                               _hasSelectedTerrainContourOrSpot,
+                          hasSelectedTerrain: _selectedTerrainBoundary != null ||
+                              _selectedTerrainSpot != null,
+                          terrainSubModeActive: _terrainSubModeActive,
+                          onTerrainModeSelected: _handleTerrainModeSelected,
                           onEditSelectedElevation: _editSelectedTerrainElevation,
                           onCommitDraft: _commitLandscapeDraft,
                           onUndoPoint: () {
@@ -34404,6 +34594,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         layerVisibility: _effectiveUnderlayLayerVisibility,
         modelPoint: rawModel,
         hitToleranceMeters: hitTol,
+        detectElevation: false,
       );
       if (fromUnderlay != null && fromUnderlay.points.length >= 2) {
         final simplified = ArchitectSplineContourTracer.simplifyForSpline(
@@ -34415,7 +34606,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return ArchitectPickedContourCandidate(
           points: simplified.length >= 2 ? simplified : fromUnderlay.points,
           closed: fromUnderlay.closed,
-          suggestedElevation: fromUnderlay.suggestedElevation,
+          suggestedElevation: null,
           sourceLayer: fromUnderlay.sourceLayer,
           anchorPoint: fromUnderlay.anchorPoint,
         );
@@ -34428,12 +34619,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       underlayDocument: doc,
       underlayFrame: frame,
       underlayLayerVisibility: _effectiveUnderlayLayerVisibility,
+      detectElevation: false,
     );
     if (traced != null && traced.points.length >= 2) {
       return ArchitectPickedContourCandidate(
         points: traced.points,
         closed: traced.closed,
-        suggestedElevation: traced.elevation,
+        suggestedElevation: null,
         anchorPoint: traced.anchorPoint,
       );
     }
@@ -34461,8 +34653,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ? _project.existingTerrain
         : _project.proposedTerrain;
     final datum = _resolvedTerrainDatumFor(state);
-    final initialAbs =
-        candidate.suggestedElevation ?? _landscapeTool.contourAbsoluteElevation;
+    final initialAbs = _landscapeTool.contourAbsoluteElevation;
 
     final pickedAbs = await BimNumericKeypad.showInputDialog(
       context,
@@ -35044,6 +35235,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _saveBiMProjectIfAttached();
   }
 
+  void _handleTerrainModeSelected(ArchitectTerrainDraftMode mode) {
+    setState(() {
+      _landscapeTool.terrainMode = mode;
+      _landscapeTool.clearDraft();
+      final isBoundaryDraft =
+          mode == ArchitectTerrainDraftMode.boundary ||
+          mode == ArchitectTerrainDraftMode.boundaryRect;
+      if (isBoundaryDraft) {
+        _terrainSubModeActive = false;
+      } else {
+        _terrainSubModeActive = true;
+        _selectionIds.clear();
+        _selectedElementId = null;
+        _polygonEditId = null;
+        _polygonSelectedEdge = null;
+        _polygonContourElementId = null;
+        _polygonContourIndex = 0;
+        _polygonEditor.cancel();
+        _activeTool = ArchitectTool.terrain;
+        if (_commands.isPlan &&
+            !_project.activeStorey.isSite &&
+            _project.siteStorey != null) {
+          final ensured = _modelCommands.project.ensureSiteStorey();
+          if (!identical(ensured, _modelCommands.project)) {
+            _modelCommands.commit(ensured);
+          }
+          _commands.activateStorey(ensured.siteStorey!.id);
+        }
+      }
+    });
+    _landscapeTool.notifyChanged();
+    _repaintPreview();
+  }
+
   bool get _hasSelectedTerrainContourOrSpot {
     final id = _selectedElementId;
     if (id == null || !_project.activeStorey.isSite) return false;
@@ -35262,8 +35487,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               surfChanged = true;
               return b.copyWith(
                 elevation: _landscapeTool.terrainElevation,
-                isFlatPad: _landscapeTool.terrainMode == ArchitectTerrainDraftMode.pad,
-                isHole: _landscapeTool.terrainMode == ArchitectTerrainDraftMode.hole,
               );
             }()
           else
@@ -36080,8 +36303,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       final isPickingContour =
                           _activeTool.isLandscapeTool &&
                           _landscapeTool.isPickingContour(_activeTool.name);
-                      final pickedElev =
-                          _landscapeTool.pickedContourPreview?.suggestedElevation;
                       final isTracingSpline =
                           _activeTool == ArchitectTool.spline && _splineTraceMode;
                       final tracedElev = _splineTracePreview?.elevation;
@@ -36089,9 +36310,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           _draftStart != null &&
                           _curvedDraftTool;
                       final liveDim = isPickingContour
-                          ? (pickedElev != null
-                                ? 'Z = ${pickedElev.toStringAsFixed(2)} m'
-                                : _landscapeTool.pickedContourPreview != null
+                          ? (_landscapeTool.pickedContourPreview != null
                                 ? context.l10n.architectTerrainModePickContour
                                 : null)
                           : isTracingSpline

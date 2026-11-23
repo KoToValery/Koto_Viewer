@@ -306,7 +306,7 @@ void main() {
           selected: false,
         );
 
-        // 6. Terrain: existing/proposed + modes + pad elevation chip
+        // 6. Terrain: only draw-related commands (Existing/Proposed + Boundary/Rectangular) when drafting new terrain
         await _selectLandscapeTool(tester, ArchitectTool.terrain);
         _expectChipSelected(
           tester,
@@ -328,15 +328,27 @@ void main() {
           ArchitectTerrainDraftMode.boundaryRect.label(l10n),
           selected: true,
         );
-        await _tapChip(tester, ArchitectTerrainDraftMode.pad.label(l10n));
-        _expectChipSelected(
-          tester,
-          ArchitectTerrainDraftMode.pad.label(l10n),
-          selected: true,
+        expect(
+          _chipFinder(ArchitectTerrainDraftMode.boundary.label(l10n)),
+          findsOneWidget,
+        );
+        // Secondary object commands are hidden until an existing terrain object is selected
+        for (final hiddenMode in const [
+          ArchitectTerrainDraftMode.pad,
+          ArchitectTerrainDraftMode.hole,
+          ArchitectTerrainDraftMode.spot,
+          ArchitectTerrainDraftMode.contour,
+          ArchitectTerrainDraftMode.pickContour,
+        ]) {
+          expect(_chipFinder(hiddenMode.label(l10n)), findsNothing);
+        }
+        expect(
+          find.byKey(const ValueKey('architect-terrain-datum')),
+          findsNothing,
         );
         expect(
-          find.byKey(const ValueKey('architect-terrain-pad-elevation')),
-          findsOneWidget,
+          find.byKey(const ValueKey('architect-terrain-create-proposed')),
+          findsNothing,
         );
 
         expect(tester.takeException(), isNull);

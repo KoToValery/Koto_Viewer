@@ -22,6 +22,9 @@ class ArchitectLandscapeBar extends StatelessWidget {
   final ValueChanged<double>? onDatumUpdated;
   final VoidCallback? onEditSelectedElevation;
   final bool hasSelectedContourOrSpot;
+  final bool hasSelectedTerrain;
+  final bool terrainSubModeActive;
+  final ValueChanged<ArchitectTerrainDraftMode>? onTerrainModeSelected;
   final VoidCallback? onTriggerChamfer;
   final VoidCallback? onTriggerFillet;
 
@@ -40,6 +43,9 @@ class ArchitectLandscapeBar extends StatelessWidget {
     this.onDatumUpdated,
     this.onEditSelectedElevation,
     this.hasSelectedContourOrSpot = false,
+    this.hasSelectedTerrain = false,
+    this.terrainSubModeActive = false,
+    this.onTerrainModeSelected,
     this.onTriggerChamfer,
     this.onTriggerFillet,
   });
@@ -329,22 +335,63 @@ class ArchitectLandscapeBar extends StatelessWidget {
     ];
   }
 
+  static const List<ArchitectTerrainDraftMode> _terrainDrawModes = [
+    ArchitectTerrainDraftMode.boundary,
+    ArchitectTerrainDraftMode.boundaryRect,
+  ];
+
+  static const List<ArchitectTerrainDraftMode> _terrainObjectModes = [
+    ArchitectTerrainDraftMode.pad,
+    ArchitectTerrainDraftMode.hole,
+    ArchitectTerrainDraftMode.spot,
+    ArchitectTerrainDraftMode.contour,
+    ArchitectTerrainDraftMode.pickContour,
+  ];
+
   List<Widget> _buildTerrainControls(
     BuildContext context,
     AppLocalizations l,
     ColorScheme colors,
   ) {
+    final showObjectCommands = hasSelectedTerrain || terrainSubModeActive;
+    if (!showObjectCommands) {
+      return [
+        ..._buildStateAndDatumPrefix(context, l, colors),
+        for (final mode in _terrainDrawModes) ...[
+          _chip(
+            colors: colors,
+            selected: controller.terrainMode == mode,
+            label: _terrainModeLabel(l, mode),
+            onTap: () {
+              if (onTerrainModeSelected != null) {
+                onTerrainModeSelected!(mode);
+              } else {
+                controller.terrainMode = mode;
+                controller.clearDraft();
+                _notifyChanged();
+              }
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
+      ];
+    }
+
     return [
       ..._buildStateAndDatumPrefix(context, l, colors),
-      for (final mode in ArchitectTerrainDraftMode.values) ...[
+      for (final mode in _terrainObjectModes) ...[
         _chip(
           colors: colors,
           selected: controller.terrainMode == mode,
           label: _terrainModeLabel(l, mode),
           onTap: () {
-            controller.terrainMode = mode;
-            controller.clearDraft();
-            _notifyChanged();
+            if (onTerrainModeSelected != null) {
+              onTerrainModeSelected!(mode);
+            } else {
+              controller.terrainMode = mode;
+              controller.clearDraft();
+              _notifyChanged();
+            }
           },
         ),
         const SizedBox(width: 4),

@@ -1458,14 +1458,94 @@ class Architect2dPainter extends CustomPainter {
     for (final drain in _project.activeStorey.floorDrains) {
       if (drain.id == targetId) { polygon = drain.polygon; holes = drain.holes; }
     }
+    if (polygon == null && _project.activeStorey.isSite) {
+      for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+        for (final b in surface.boundaries) {
+          if (b.id == targetId && b.polygon.length >= 3) {
+            polygon = b.polygon;
+            if (!b.isHole) {
+              holes = [
+                for (final h in surface.boundaries)
+                  if (h.isHole &&
+                      h.polygon.length >= 3 &&
+                      b.containsPoint(h.polygon.first))
+                    h.polygon,
+              ];
+            }
+          }
+        }
+        for (final c in surface.contours) {
+          if (c.id == targetId && c.closed && c.points.length >= 3) {
+            polygon = c.points;
+          }
+        }
+      }
+    }
     return (polygon, holes);
+  }
+
+  List<Offset>? _openEditableTerrainContour(String targetId) {
+    if (!_project.activeStorey.isSite) return null;
+    for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+      for (final c in surface.contours) {
+        if (c.id == targetId && !c.closed && c.points.length >= 2) {
+          return c.points;
+        }
+      }
+    }
+    return null;
   }
 
   void _drawPolygonEditing(Canvas canvas) {
     final targetId = selectedElementId ?? selectedZoneId;
     if (targetId == null) return;
     final (polygon, holes) = _editablePolygonContours(targetId);
-    if (polygon == null) return;
+    if (polygon == null) {
+      final openContour = _openEditableTerrainContour(targetId);
+      if (openContour != null && newPointCandidate == null) {
+        final scale = math.max(zoomScale, 80.0);
+        const color = Color(0xFF00BCD4);
+        for (var i = 0; i + 1 < openContour.length; i++) {
+          final mid = (openContour[i] + openContour[i + 1]) / 2;
+          canvas.drawCircle(mid, 3.5 / scale, Paint()..color = const Color(0xFFFF9800));
+          if (handleOffsetLength > 0) {
+            final grip = ArchitectPolylineEditing.edgeHandle(
+              openContour,
+              i,
+              zoomScale,
+              handleOffsetLength,
+            );
+            canvas.drawLine(
+              mid,
+              grip,
+              Paint()
+                ..color = const Color(0xFFFF9800)
+                ..strokeWidth = 1.6 / scale,
+            );
+            _drawTouchGrip(canvas, grip, scale, const Color(0xFFFF9800));
+          }
+        }
+        for (var i = 0; i < openContour.length; i++) {
+          canvas.drawCircle(openContour[i], 3.5 / scale, Paint()..color = color);
+          if (handleOffsetLength <= 0) continue;
+          final handle = ArchitectPolylineEditing.handle(
+            openContour,
+            i,
+            zoomScale,
+            handleOffsetLength,
+          );
+          canvas.drawLine(
+            openContour[i],
+            handle,
+            Paint()
+              ..color = const Color(0xFF00E5FF)
+              ..strokeWidth = 1.6 / scale,
+          );
+          _drawTouchGrip(canvas, handle, scale, color);
+        }
+      }
+      return;
+    }
     final showHandles = newPointCandidate == null;
     ArchitectPolygonPainter.draw(
       canvas: canvas,
