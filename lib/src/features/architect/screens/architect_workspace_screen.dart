@@ -4302,6 +4302,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _rasterDragOriginalPos;
   ArchitectRasterUnderlay? _rasterDragOriginal, _rasterDragPreview;
   ArchitectProject? _rasterDragSource;
+  bool _draggingCadUnderlay = false;
+  Offset? _cadDragStartModel;
+  BimCoordinateFrame? _cadDragOriginalFrame;
+  ArchitectCadUnderlayConfig? _cadDragOriginalConfig, _cadDragPreview;
+  ArchitectProject? _cadDragSource;
   bool _underlayMaskDrafting = false;
   String _underlayMaskMode = 'rect'; // 'rect' or 'polygon'
   bool _underlayMaskTargetIsCad = true;
@@ -4330,15 +4335,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       raster.containsLocalPoint(point) && ArchitectUnderlayClip.contains(
           raster.hasActiveMask ? raster.maskPolygon : null, point);
 
+  bool get _canMoveSelectedUnderlay {
+    if (_isCadUnderlaySelected) {
+      final cfg = _currentCadUnderlayConfig;
+      return cfg != null && cfg.visible && _currentUnderlayDoc != null;
+    }
+    final raster = _selectedRasterId == null ? null : _selectedRasterUnderlay;
+    return raster != null && raster.visible && !raster.locked;
+  }
+
   List<Offset>? get _selectedUnderlayCrop {
-    if (!_commands.isPlan || _dragController.isActive || _draggingRasterId != null ||
+    if (!_commands.isPlan || _dragController.isActive ||
         _underlayMaskDrafting || _rasterCalibrationStep != 0 ||
         _rotationUnderlay != null) return null;
+    if (_draggingCadUnderlay && _cadDragPreview != null && _currentUnderlayDoc != null) {
+      final preview = _cadDragPreview!;
+      if (preview.hasActiveMask) return preview.maskPolygon;
+      return preview.frame(_effectiveUnderlayFrame).cornersToModel(_currentUnderlayDoc!.bounds);
+    }
+    if (_draggingRasterId != null && _rasterDragPreview != null) {
+      final preview = _rasterDragPreview!;
+      return preview.hasActiveMask ? preview.maskPolygon : preview.localCorners;
+    }
     if (_underlayCropEditor.active) return _underlayCropEditor.preview;
     if (_isCadUnderlaySelected && _currentUnderlayDoc != null) {
       final cfg = _currentCadUnderlayConfig;
       if (cfg == null) return null;
-      if (cfg?.hasActiveMask == true) return cfg!.maskPolygon;
+      if (cfg.hasActiveMask) return cfg.maskPolygon;
       return _effectiveUnderlayFrame.cornersToModel(_currentUnderlayDoc!.bounds);
     }
     final raster = _selectedRasterId == null ? null : _selectedRasterUnderlay;
@@ -4347,6 +4370,113 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return raster.hasActiveMask ? raster.maskPolygon : raster.localCorners;
     }
     return null;
+  }
+
+  bool _startUnderlayDirectDrag(Offset raw) {
+    if (_isCadUnderlaySelected) {
+      final cfg = _currentCadUnderlayConfig;
+      if (cfg == null || !cfg.visible || _currentUnderlayDoc == null) return false;
+      _draggingCadUnderlay = true;
+      _cadDragStartModel = raw;
+      _cadDragOriginalFrame = _effectiveUnderlayFrame;
+      _cadDragOriginalConfig = cfg;
+      _cadDragPreview = cfg;
+      _cadDragSource = _project;
+      _isHandleEngaged = true;
+      setState(() {});
+      return true;
+    }
+    final raster = _selectedRasterId == null ? null : _selectedRasterUnderlay;
+    if (raster == null || raster.locked || !raster.visible) return false;
+    _draggingRasterId = raster.id;
+    _rasterDragStartModel = raw;
+    _rasterDragOriginalPos = raster.position;
+    _rasterDragOriginal = raster;
+    _rasterDragPreview = raster;
+    _rasterDragSource = _project;
+    _isHandleEngaged = true;
+    setState(() {});
+    return true;
+  }
+
+  void _updateUnderlayDirectDrag(Offset rawModel) {
+    if (_draggingCadUnderlay &&
+        _cadDragStartModel != null &&
+        _cadDragOriginalFrame != null &&
+        _cadDragOriginalConfig != null) {
+      final delta = rawModel - _cadDragStartModel!;
+      final origFrame = _cadDragOriginalFrame!;
+      final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
+      final nextFrame = origFrame.placing(origFrame.origin, delta);
+      final origCfg = _cadDragOriginalConfig!;
+      _cadDragPreview = origCfg.withFrame(nextFrame, fallback: fallback).copyWith(
+        maskPolygon: origCfg.maskPolygon?.map((p) => p + delta).toList(),
+      );
+      _handleMoved = true;
+      _repaintPreview();
+      setState(() {});
+      return;
+    }
+    if (_draggingRasterId != null &&
+        _rasterDragStartModel != null &&
+        _rasterDragOriginalPos != null) {
+      final delta = rawModel - _rasterDragStartModel!;
+      final nextPos = _rasterDragOriginalPos! + delta;
+      _rasterDragPreview = _rasterDragOriginal?.copyWith(
+        position: nextPos,
+        maskPolygon: _rasterDragOriginal?.maskPolygon?.map((p) => p + delta).toList(),
+      );
+      _handleMoved = true;
+      _repaintPreview();
+      setState(() {});
+    }
+  }
+
+  void _finishUnderlayDirectDrag() {
+    if (_draggingCadUnderlay) {
+      final source = _cadDragSource;
+      final preview = _cadDragPreview;
+      final original = _cadDragOriginalConfig;
+      final moved = _handleMoved;
+      _cancelActiveDrags();
+      if (moved &&
+          preview != null &&
+          original != null &&
+          identical(source, _project) &&
+          (preview.lockedCadOriginX != original.lockedCadOriginX ||
+              preview.lockedCadOriginY != original.lockedCadOriginY)) {
+        _commands.commit(_project.copyWith(cadUnderlays: {
+          ..._project.cadUnderlays,
+          preview.storeyId: preview,
+        }));
+        _saveBiMProjectIfAttached();
+        HapticFeedback.selectionClick();
+      }
+      setState(() {});
+      _repaintPreview();
+      return;
+    }
+    if (_draggingRasterId != null) {
+      final source = _rasterDragSource;
+      final preview = _rasterDragPreview;
+      final original = _rasterDragOriginal;
+      final moved = _handleMoved;
+      _cancelActiveDrags();
+      if (moved &&
+          preview != null &&
+          original != null &&
+          identical(source, _project) &&
+          preview.position != original.position) {
+        _commands.commit(_project.copyWith(rasterUnderlays: [
+          for (final r in _project.rasterUnderlays)
+            if (r.id == preview.id) preview else r,
+        ]));
+        _saveBiMProjectIfAttached();
+        HapticFeedback.selectionClick();
+      }
+      setState(() {});
+      _repaintPreview();
+    }
   }
 
   bool _startUnderlayCrop(Offset raw) {
@@ -4363,6 +4493,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         final distance = (grip - raw).distance;
         if (distance < best) { best = distance; edge = i; }
       }
+    }
+    final center = _canMoveSelectedUnderlay
+        ? ArchitectUnderlayCropOverlay.centerPoint(polygon)
+        : null;
+    final centerDist = center == null ? double.infinity : (center - raw).distance;
+    if (centerDist <= 24 / _currentScale && (edge == null || centerDist <= best)) {
+      return _startUnderlayDirectDrag(raw);
     }
     edge ??= ArchitectPolygonDimensions.hitEdge(polygon, raw, 10 / _currentScale);
     if (edge == null || !_underlayCropEditor.startEdge(
@@ -4431,13 +4568,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           handleLength: _handleOffsetLength,
           activeEdge: _underlayCropEditor.active ? _underlayCropEditor.index : null,
           invalid: _underlayCropEditor.invalid,
+          canMove: _canMoveSelectedUnderlay,
+          moving: _draggingCadUnderlay || _draggingRasterId != null,
         );
       },
     ),
   );
 
   ArchitectCadUnderlayConfig? get _paintCadUnderlayConfig {
-    final cfg = _underlayRotationPreview?.cadUnderlayForStorey(_project.activeStoreyId) ??
+    final cfg = _cadDragPreview ??
+        _underlayRotationPreview?.cadUnderlayForStorey(_project.activeStoreyId) ??
         _currentCadUnderlayConfig;
     return cfg != null && _underlayCropEditor.active && _underlayCropCad
         ? cfg.copyWith(maskPolygon: _underlayCropEditor.preview, maskEnabled: true) : cfg;
@@ -5997,6 +6137,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _selectedSectionRoofId = null;
 
     _isZoneTableSelected = false;
+
+    _isCadUnderlaySelected = false;
+    _selectedRasterId = null;
 
     });
   }
@@ -9119,6 +9262,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _draggingRasterId != null ||
 
+      _draggingCadUnderlay ||
+
       _groupDragIds.isNotEmpty;
 
 
@@ -9771,27 +9916,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _underlayMaskPoints.add(rawModel);
         });
         return;
-      }
-    }
-
-    if (_activeTool == ArchitectTool.rasterUnderlay &&
-        _rasterCalibrationStep == 0) {
-      final rasters = _project.rasterUnderlaysForStorey(
-        _project.activeStorey.id,
-      );
-      for (final r in rasters.reversed) {
-        if (_rasterUnderlayContains(r, rawModel)) {
-          setState(() => _selectedRasterId = r.id);
-          if (!r.locked) {
-            _draggingRasterId = r.id;
-            _rasterDragStartModel = rawModel;
-            _rasterDragOriginalPos = r.position;
-            _rasterDragOriginal = r;
-            _rasterDragSource = _project;
-            _isHandleEngaged = true;
-          }
-          return;
-        }
       }
     }
 
@@ -10838,6 +10962,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_handlePointerDown != null && !_handleMoved &&
           (event.localPosition - _handlePointerDown!).distance < 6) return;
       _updateUnderlayCrop(_screenToModel(event.localPosition));
+      return;
+    }
+    if (_draggingCadUnderlay || _draggingRasterId != null) {
+      if (_handlePointerDown != null && !_handleMoved &&
+          (event.localPosition - _handlePointerDown!).distance < 6) return;
+      _updateUnderlayDirectDrag(_screenToModel(event.localPosition));
       return;
     }
     if (_dragController.isActive) {
@@ -12132,18 +12262,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _activeSnapLabel = _dragController.currentSnapLabel;
       _activeMagneticGuides = _dragController.magneticGuides;
       _repaintPreview();
-      return;
-    }
-
-    if (_draggingRasterId != null &&
-        _rasterDragStartModel != null &&
-        _rasterDragOriginalPos != null) {
-      final delta = rawModel - _rasterDragStartModel!;
-      final nextPos = _rasterDragOriginalPos! + delta;
-      setState(() {
-        _rasterDragPreview = _rasterDragOriginal?.copyWith(position: nextPos,
-          maskPolygon: _rasterDragOriginal?.maskPolygon?.map((p) => p + delta).toList());
-      });
       return;
     }
 
@@ -13848,6 +13966,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _handlePointerDown = null;
       return;
     }
+    if (_draggingCadUnderlay || _draggingRasterId != null) {
+      if (_handleMoved) _updateUnderlayDirectDrag(_screenToModel(event.localPosition));
+      _finishUnderlayDirectDrag();
+      _handlePointerDown = null;
+      return;
+    }
     if (_dragController.isActive) {
       _updateDragAim(event.localPosition);
       if (_dragController.isPickingBasePoint) {
@@ -14254,28 +14378,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _draggingRasterId = null;
     _rasterDragStartModel = null;
     _rasterDragOriginalPos = null;
+    _draggingCadUnderlay = false;
+    _cadDragStartModel = null;
+    _cadDragOriginalFrame = null;
+    _cadDragOriginalConfig = null;
+    _cadDragPreview = null;
+    _cadDragSource = null;
 
   }
 
 
 
   void _commitActiveHandleDrag(Offset screenPos) {
-
-    if (_draggingRasterId != null) {
-      final source = _rasterDragSource;
-      final preview = _rasterDragPreview, original = _rasterDragOriginal;
-      _cancelActiveDrags();
-      if (preview != null && original != null && identical(source, _project) &&
-          preview.position != original.position) {
-        _commands.commit(_project.copyWith(rasterUnderlays: [
-          for (final r in _project.rasterUnderlays)
-            if (r.id == preview.id) preview else r,
-        ]));
-        _saveBiMProjectIfAttached();
-      }
-      HapticFeedback.selectionClick();
-      return;
-    }
 
     if (_isDraggingRoofKnuckle) {
       _isDraggingRoofKnuckle = false;
@@ -16115,6 +16229,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
+    if (_activeTool == ArchitectTool.cadUnderlay) {
+      if (_cadUnderlayContains(rawModel)) {
+        if (!_isCadUnderlaySelected || _selectedRasterId != null) {
+          setState(() {
+            _isCadUnderlaySelected = true;
+            _selectedRasterId = null;
+          });
+          HapticFeedback.selectionClick();
+        }
+      } else if (_isCadUnderlaySelected || _selectedRasterId != null) {
+        setState(() {
+          _isCadUnderlaySelected = false;
+          _selectedRasterId = null;
+        });
+      }
+      return;
+    }
+
     if (_activeTool == ArchitectTool.rasterUnderlay) {
       if (_rasterCalibrationStep > 0) {
         unawaited(_handleRasterCalibrationTap(rawModel));
@@ -16125,10 +16257,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
       for (final r in rasters.reversed) {
         if (_rasterUnderlayContains(r, rawModel)) {
-          setState(() => _selectedRasterId = r.id);
+          setState(() {
+            _selectedRasterId = r.id;
+            _isCadUnderlaySelected = false;
+          });
           HapticFeedback.selectionClick();
           return;
         }
+      }
+      if (_selectedRasterId != null || _isCadUnderlaySelected) {
+        setState(() {
+          _selectedRasterId = null;
+          _isCadUnderlaySelected = false;
+        });
       }
       return;
     }
@@ -35281,7 +35422,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   painter: ArchitectUnderlayPainter(
                     palette: _canvasPalette,
                     document: _currentUnderlayDoc,
-                    frame: _underlayRotationPreview == null
+                    frame: _underlayRotationPreview == null && _cadDragPreview == null
                         ? _effectiveUnderlayFrame
                         : _paintCadUnderlayConfig?.frame(_effectiveUnderlayFrame) ??
                             _effectiveUnderlayFrame,

@@ -402,4 +402,47 @@ void main() {
     expect(model.project.activeStorey.toJson(), before);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Underlay rotation aligns reference ray magnetically to world 90-degree axes',
+    (tester) async {
+      double? preview;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ArchitectRotationOverlay(
+              initialPivot: const Offset(200, 300),
+              toModel: (p) => p,
+              toScreen: (p) => p,
+              snap: (p, touch, selectionOnly) => ArchitectSnapResult(point: p),
+              localizeSnap: (label) => label,
+              alignReferenceToAxes: true,
+              onPreview: (_, a) => preview = a,
+              onApply: (_, _) {},
+              onCancel: () {},
+              onNavigate: (_, _, _) {},
+            ),
+          ),
+        ),
+      );
+      await tester.tapAt(const Offset(200, 300));
+      await tester.pump();
+      await tester.tapAt(const Offset(420, 340));
+      await tester.pump();
+      final startAngle = math.atan2(40, 220);
+      final gesture = await tester.startGesture(const Offset(420, 340));
+      await gesture.moveTo(const Offset(420, 302));
+      await tester.pump();
+      expect(preview, isNotNull);
+      expect((startAngle + preview!).abs(), lessThan(1e-8));
+      await gesture.moveTo(const Offset(202, 460));
+      await tester.pump();
+      expect((startAngle + preview! - math.pi / 2).abs(), lessThan(1e-8));
+      await gesture.up();
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

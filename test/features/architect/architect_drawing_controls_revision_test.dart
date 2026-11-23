@@ -15,6 +15,7 @@ import 'package:kotoview/src/features/architect/services/architect_command_contr
 import 'package:kotoview/src/features/architect/services/architect_polygon_editor.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_exact_input_overlay.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_underlay_crop_overlay.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_polygon_angle_control.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_shape_dimension_panel.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_distance_drafting_panel.dart';
@@ -477,6 +478,80 @@ void main() {
       );
       model.undo();
       expect(identical(model.project, original), isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Raster underlay central point moves directly while outer area pans and tap outside deselects',
+    (tester) async {
+      final base = editing.seeded(const ArchitectStorey(id: 's', name: ''));
+      const raster = ArchitectRasterUnderlay(
+        id: 'raster-direct',
+        storeyId: 's',
+        fileName: 'scan.png',
+        internalImagePath: '',
+        imageWidthPx: 800,
+        imageHeightPx: 600,
+        metersPerPixel: .01,
+        position: Offset(2, 1),
+        maskPolygon: [
+          Offset(3, 2),
+          Offset(9, 2),
+          Offset(9, 6),
+          Offset(3, 6),
+        ],
+      );
+      final model = ArchitectCommandController(
+        base.project.copyWith(rasterUnderlays: [raster]),
+      );
+      base.dispose();
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      workspace.camera(tester).fit(const Rect.fromLTRB(-2, -2, 14, 10));
+      await tester.pumpAndSettle();
+      await tool(tester, ArchitectTool.rasterUnderlay);
+      await workspace.wallTap(tester, const Offset(6, 4));
+      await tester.pumpAndSettle();
+      final cropFinder = find.byKey(const ValueKey('architect-underlay-crop'));
+      expect(cropFinder, findsOneWidget);
+      final overlay = tester.widget<ArchitectUnderlayCropOverlay>(cropFinder);
+      expect(overlay.canMove, isTrue);
+
+      // Dragging inside the raster away from the central point pans without moving the raster.
+      await exact.drag(tester, const Offset(4, 3), const Offset(5, 3));
+      expect(model.project.rasterUnderlays.single.position, raster.position);
+      expect(model.canUndo, isFalse);
+
+      // Dragging the central move point translates both position and mask in one undo step.
+      final center = ArchitectUnderlayCropOverlay.centerPoint(overlay.polygon)!;
+      await exact.drag(tester, center, center + const Offset(2, 1));
+      final moved = model.project.rasterUnderlays.single;
+      expect(
+        (moved.position - (raster.position + const Offset(2, 1))).distance,
+        lessThan(1e-8),
+      );
+      for (var i = 0; i < raster.maskPolygon!.length; i++) {
+        expect(
+          (moved.maskPolygon![i] - (raster.maskPolygon![i] + const Offset(2, 1)))
+              .distance,
+          lessThan(1e-8),
+        );
+      }
+      expect(model.canUndo, isTrue);
+
+      // Tapping outside the raster in rasterUnderlay tool deselects it.
+      await workspace.wallTap(tester, const Offset(-1, -1));
+      await tester.pumpAndSettle();
+      expect(cropFinder, findsNothing);
+
+      // Tapping back inside reselects it.
+      await workspace.wallTap(tester, const Offset(8, 5));
+      await tester.pumpAndSettle();
+      expect(cropFinder, findsOneWidget);
+
+      model.undo();
+      expect(model.project.rasterUnderlays.single.position, raster.position);
       expect(tester.takeException(), isNull);
     },
   );
