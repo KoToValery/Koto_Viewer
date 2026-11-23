@@ -400,22 +400,31 @@ class ArchitectLandscapeBar extends StatelessWidget {
       _divider(colors),
       const SizedBox(width: 6),
       if (controller.terrainMode == ArchitectTerrainDraftMode.pad) ...[
-        _numericChip(
-          context: context,
-          key: const ValueKey('architect-terrain-pad-elevation'),
-          colors: colors,
-          title: l.architectTerrainElevationLabel,
-          label:
-              '${l.architectTerrainElevationLabel} ${_formatSignedMeters(controller.terrainElevation)}',
-          initialValue: controller.terrainElevation,
-          unitLabel: 'm',
-          decimals: 2,
-          allowNegative: true,
-          onSubmitted: (val) {
-            controller.terrainElevation = val;
-            controller.contourAbsoluteElevation =
-                val + controller.terrainDatumElevation;
-            _notifyChanged();
+        Builder(
+          builder: (context) {
+            final datum = _effectiveDatum();
+            final padAbs = controller.terrainElevation + datum;
+            final label = datum.abs() > 1e-4
+                ? '${l.architectTerrainElevationLabel} ${padAbs.toStringAsFixed(2)} m'
+                : '${l.architectTerrainElevationLabel} ${_formatSignedMeters(controller.terrainElevation)}';
+            return _numericChip(
+              context: context,
+              key: const ValueKey('architect-terrain-pad-elevation'),
+              colors: colors,
+              title: l.architectTerrainElevationLabel,
+              label: label,
+              initialValue: padAbs,
+              unitLabel: 'm',
+              decimals: 3,
+              allowNegative: true,
+              onSubmitted: (val) {
+                controller.terrainDatumElevation = datum;
+                controller.contourAbsoluteElevation = val;
+                controller.terrainElevation =
+                    double.parse((val - datum).toStringAsFixed(4));
+                _notifyChanged();
+              },
+            );
           },
         ),
         const SizedBox(width: 6),

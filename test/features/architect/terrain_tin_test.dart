@@ -385,5 +385,72 @@ void main() {
         expect(maxZ - minZ, closeTo(31.0, 1e-3));
       },
     );
+
+    test(
+      'Spot Z uses effectiveRelative(datum) in TIN vertices and Flat pad flattens cleanly without cutting holes',
+      () async {
+        const surface = ArchitectTerrainSurface(
+          state: ArchitectTerrainState.proposed,
+          datumElevation: 460.0,
+          boundaries: [
+            ArchitectTerrainBoundary(
+              id: 'outer',
+              polygon: [
+                Offset(0, 0),
+                Offset(20, 0),
+                Offset(20, 20),
+                Offset(0, 20),
+              ],
+              autoInterpolateElevation: true,
+            ),
+            ArchitectTerrainBoundary(
+              id: 'pad1',
+              polygon: [
+                Offset(12, 12),
+                Offset(18, 12),
+                Offset(18, 18),
+                Offset(12, 18),
+              ],
+              elevation: 2.5,
+              isFlatPad: true,
+            ),
+          ],
+          contours: [
+            ArchitectTerrainContour(
+              id: 'c_low',
+              points: [Offset(0, 2), Offset(20, 2)],
+              elevation: 0.0,
+              rawAbsoluteElevation: 458.0,
+            ),
+            ArchitectTerrainContour(
+              id: 'c_high',
+              points: [Offset(0, 18), Offset(20, 18)],
+              elevation: 0.0,
+              rawAbsoluteElevation: 464.0,
+            ),
+          ],
+          spots: [
+            ArchitectTerrainSpot(
+              id: 'spot1',
+              position: Offset(5, 10),
+              // Even with stale relative elevation, rawAbsoluteElevation=463.5 at datum=460 => +3.5m
+              elevation: 0.0,
+              rawAbsoluteElevation: 463.5,
+            ),
+          ],
+        );
+
+        final tin = ArchitectTerrainTin.build(surface);
+        expect(tin, isNotNull);
+        expect(
+          tin!.evaluateElevationAt(const Offset(5, 10)),
+          closeTo(3.5, 1e-3),
+        );
+        expect(
+          tin.evaluateElevationAt(const Offset(15, 15)),
+          closeTo(2.5, 1e-3),
+        );
+      },
+    );
   });
 }

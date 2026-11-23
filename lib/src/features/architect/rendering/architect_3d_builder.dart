@@ -1542,9 +1542,9 @@ class Architect3dBuilder {
         }
       }
 
-      // Cut out holes and flat cutout pads
+      // Cut out holes (flat grading pads stay filled at pad.elevation)
       for (final b in activeTerrain.boundaries) {
-        if (b.polygon.length < 3 || (!b.isCutoutPad && !b.isHole)) continue;
+        if (b.polygon.length < 3 || !b.isHole) continue;
         try {
           terrainFootprint = Path.combine(
             PathOperation.difference,

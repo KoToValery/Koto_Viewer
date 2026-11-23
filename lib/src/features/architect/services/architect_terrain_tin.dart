@@ -333,9 +333,12 @@ class ArchitectTerrainTin {
       }
     }
 
-    // 4. Insert explicit spots (exact Z).
+    // 4. Insert explicit spots (exact Z relative to datum).
     for (final s in surface.spots) {
-      addOrReusePoint(s.position, s.elevation);
+      addOrReusePoint(
+        s.position,
+        s.effectiveRelative(surface.datumElevation),
+      );
     }
 
     void insertPolygonEdgeWithContourSplits({
