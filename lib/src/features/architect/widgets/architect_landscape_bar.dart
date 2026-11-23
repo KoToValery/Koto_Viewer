@@ -198,7 +198,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           visualDensity: VisualDensity.compact,
           avatar: Icon(Icons.edit_rounded, size: 15, color: colors.primary),
           label: Text(
-            l.architectTerrainEditElevation,
+            '${l.architectTerrainEditElevation}: ${controller.contourAbsoluteElevation.toStringAsFixed(2)} m',
             style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
           ),
           onPressed: onEditSelectedElevation,
@@ -326,7 +326,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           visualDensity: VisualDensity.compact,
           avatar: Icon(Icons.edit_rounded, size: 15, color: colors.primary),
           label: Text(
-            l.architectTerrainEditElevation,
+            '${l.architectTerrainEditElevation}: ${controller.contourAbsoluteElevation.toStringAsFixed(2)} m',
             style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
           ),
           onPressed: onEditSelectedElevation,

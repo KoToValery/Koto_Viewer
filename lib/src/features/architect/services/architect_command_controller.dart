@@ -2247,6 +2247,11 @@ class CutArchitectContourOpening extends ArchitectModelCommand {
           holeIdx++;
           holeId = '${elementId}_hole_$holeIdx';
         }
+        final nextSpots = surface.withHoleVertexSpots(
+          holeId: holeId,
+          points: polygon,
+          fallbackRelativeElevation: bnd.elevation,
+        );
         final nextSurface = surface.copyWith(
           boundaries: [
             ...surface.boundaries,
@@ -2257,6 +2262,7 @@ class CutArchitectContourOpening extends ArchitectModelCommand {
               isHole: true,
             ),
           ],
+          spots: nextSpots,
         );
         return isProposed
             ? project.copyWith(
@@ -2687,7 +2693,8 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
               'Opening would cross its host or another opening',
             );
           }
-          final targetHoleId = containedHoles[index].id;
+          final targetHole = containedHoles[index];
+          final targetHoleId = targetHole.id;
           final nextSurface = surface.copyWith(
             boundaries: [
               for (final b in surface.boundaries)
@@ -2695,6 +2702,10 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
                     ? b.copyWith(polygon: List.unmodifiable(clean))
                     : b,
             ],
+            spots: surface.syncHoleVertexSpots(
+              oldPolygon: targetHole.polygon,
+              newPolygon: clean,
+            ),
           );
           return isProposed
               ? project.copyWith(
@@ -2719,6 +2730,12 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
                   ? b.copyWith(polygon: List.unmodifiable(clean))
                   : b,
           ],
+          spots: bnd.isHole
+              ? surface.syncHoleVertexSpots(
+                  oldPolygon: bnd.polygon,
+                  newPolygon: clean,
+                )
+              : surface.spots,
         );
         return isProposed
             ? project.copyWith(
@@ -3082,12 +3099,51 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     if (path.closed) {
       final points = List<Offset>.of(path.points)
         ..insert(hit.edge + 1, insertion);
-      return UpdateArchitectPolygon(
+      final updated = UpdateArchitectPolygon(
         storeyId: storeyId,
         elementId: elementId,
         polygon: points,
         holeIndex: holeIndex,
       ).apply(project);
+      if (storey.isSite) {
+        for (final isProposed in [true, false]) {
+          final beforeSurface =
+              isProposed ? project.proposedTerrain : project.existingTerrain;
+          final afterSurface =
+              isProposed ? updated.proposedTerrain : updated.existingTerrain;
+          final targetBnd = beforeSurface.boundaries
+              .where((b) => b.id == elementId)
+              .firstOrNull;
+          if (targetBnd != null && (holeIndex != null || targetBnd.isHole)) {
+            final idx = holeIndex;
+            final spotHostId = idx != null
+                ? () {
+                    final holes = beforeSurface.boundaries
+                        .where(
+                          (h) =>
+                              h.isHole &&
+                              h.polygon.length >= 3 &&
+                              targetBnd.containsPoint(h.polygon.first),
+                        )
+                        .toList();
+                    return idx < holes.length ? holes[idx].id : elementId;
+                  }()
+                : targetBnd.id;
+            final nextSpots = afterSurface.appendSpotForInsertedPoint(
+              spotId: '${spotHostId}_pt_$newElementId',
+              insertion: insertion,
+              fallbackRelativeElevation:
+                  beforeSurface.evaluateElevationAt(insertion) ??
+                  targetBnd.elevation,
+            );
+            final nextSurface = afterSurface.copyWith(spots: nextSpots);
+            return isProposed
+                ? updated.copyWith(proposedTerrain: nextSurface)
+                : updated.copyWith(existingTerrain: nextSurface);
+          }
+        }
+      }
+      return updated;
     }
     if (storey.isSite &&
         [project.proposedTerrain, project.existingTerrain].any(

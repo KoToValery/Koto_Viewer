@@ -408,12 +408,21 @@ class ArchitectLandscapeTool extends ChangeNotifier {
             terrainMode == ArchitectTerrainDraftMode.hole ||
             terrainMode == ArchitectTerrainDraftMode.pad) {
           final isOuter = terrainMode == ArchitectTerrainDraftMode.boundary;
+          final isHole = terrainMode == ArchitectTerrainDraftMode.hole;
+          final bndId = 'terr_bnd_$nowMicros';
+          final nextSpots = isHole
+              ? surface.withHoleVertexSpots(
+                  holeId: bndId,
+                  points: pts,
+                  fallbackRelativeElevation: terrainElevation,
+                )
+              : surface.spots;
           final boundary = ArchitectTerrainBoundary(
-            id: 'terr_bnd_$nowMicros',
+            id: bndId,
             polygon: pts,
             elevation: isOuter ? 0.0 : terrainElevation,
             isCutoutPad: terrainMode == ArchitectTerrainDraftMode.pad,
-            isHole: terrainMode == ArchitectTerrainDraftMode.hole,
+            isHole: isHole,
             autoInterpolateElevation: isOuter,
           );
           return _updateSurface(
@@ -421,6 +430,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
             surface.copyWith(
               datumElevation: _resolvedDatum(project),
               boundaries: [...surface.boundaries, boundary],
+              spots: nextSpots,
             ),
           );
         } else if (terrainMode == ArchitectTerrainDraftMode.contour) {
@@ -1022,6 +1032,10 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     ArchitectTerrainSurface surface,
     Set<String> selectedIds,
   ) {
+    final deletedHolePrefixes = [
+      for (final b in surface.boundaries)
+        if (selectedIds.contains(b.id) && b.isHole) '${b.id}_pt_',
+    ];
     return surface.copyWith(
       boundaries: surface.boundaries
           .where((b) => !selectedIds.contains(b.id))
@@ -1029,7 +1043,13 @@ class ArchitectLandscapeTool extends ChangeNotifier {
       contours: surface.contours
           .where((c) => !selectedIds.contains(c.id))
           .toList(),
-      spots: surface.spots.where((s) => !selectedIds.contains(s.id)).toList(),
+      spots: surface.spots
+          .where(
+            (s) =>
+                !selectedIds.contains(s.id) &&
+                !deletedHolePrefixes.any((prefix) => s.id.startsWith(prefix)),
+          )
+          .toList(),
     );
   }
 

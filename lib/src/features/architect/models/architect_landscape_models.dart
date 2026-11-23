@@ -388,6 +388,101 @@ class ArchitectTerrainSurface {
     );
   }
 
+  /// Creates editable spot elevations ([ArchitectTerrainSpot]) at each vertex
+  /// of a newly cut terrain opening so every corner exposes and controls `h`.
+  List<ArchitectTerrainSpot> withHoleVertexSpots({
+    required String holeId,
+    required List<Offset> points,
+    double fallbackRelativeElevation = 0.0,
+  }) {
+    final existingIds = <String>{for (final s in spots) s.id};
+    final out = List<ArchitectTerrainSpot>.of(spots);
+    for (var i = 0; i < points.length; i++) {
+      final p = points[i];
+      final alreadyHasSpot = out.any(
+        (s) => (s.position - p).distanceSquared < 0.02 * 0.02,
+      );
+      if (alreadyHasSpot) continue;
+      final evaluated = evaluateElevationAt(p);
+      final rel = double.parse(
+        (evaluated ?? fallbackRelativeElevation).toStringAsFixed(4),
+      );
+      final abs = double.parse((rel + datumElevation).toStringAsFixed(4));
+      var spotId = '${holeId}_pt_$i';
+      var suffix = 1;
+      while (existingIds.contains(spotId)) {
+        spotId = '${holeId}_pt_${i}_$suffix';
+        suffix++;
+      }
+      existingIds.add(spotId);
+      out.add(
+        ArchitectTerrainSpot(
+          id: spotId,
+          position: p,
+          elevation: rel,
+          rawAbsoluteElevation: abs,
+        ),
+      );
+    }
+    return out;
+  }
+
+  /// Moves existing vertex spots along with their edited opening polygon corners.
+  List<ArchitectTerrainSpot> syncHoleVertexSpots({
+    required List<Offset> oldPolygon,
+    required List<Offset> newPolygon,
+  }) {
+    if (oldPolygon.length != newPolygon.length) return spots;
+    final movedIndices = <int>[
+      for (var i = 0; i < oldPolygon.length; i++)
+        if ((oldPolygon[i] - newPolygon[i]).distanceSquared > 1e-10) i,
+    ];
+    if (movedIndices.isEmpty) return spots;
+    return [
+      for (final s in spots)
+        () {
+          for (final i in movedIndices) {
+            if ((s.position - oldPolygon[i]).distanceSquared < 0.02 * 0.02) {
+              return s.copyWith(position: newPolygon[i]);
+            }
+          }
+          return s;
+        }(),
+    ];
+  }
+
+  /// Appends a single editable spot for an inserted vertex on a terrain hole.
+  List<ArchitectTerrainSpot> appendSpotForInsertedPoint({
+    required String spotId,
+    required Offset insertion,
+    double fallbackRelativeElevation = 0.0,
+  }) {
+    if (spots.any((s) => (s.position - insertion).distanceSquared < 0.02 * 0.02)) {
+      return spots;
+    }
+    final evaluated = evaluateElevationAt(insertion);
+    final rel = double.parse(
+      (evaluated ?? fallbackRelativeElevation).toStringAsFixed(4),
+    );
+    final abs = double.parse((rel + datumElevation).toStringAsFixed(4));
+    final existingIds = {for (final s in spots) s.id};
+    var resolvedId = spotId;
+    var suffix = 1;
+    while (existingIds.contains(resolvedId)) {
+      resolvedId = '${spotId}_$suffix';
+      suffix++;
+    }
+    return [
+      ...spots,
+      ArchitectTerrainSpot(
+        id: resolvedId,
+        position: insertion,
+        elevation: rel,
+        rawAbsoluteElevation: abs,
+      ),
+    ];
+  }
+
   Rect? get bounds {
     Rect? result;
     void include(Offset p) {

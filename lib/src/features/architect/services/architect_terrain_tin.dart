@@ -421,6 +421,15 @@ class ArchitectTerrainTin {
     }
 
     // 7. Insert hole & cutout perimeters (split at contour & boundary crossings).
+    double? existingPointZ(Offset p) {
+      for (final pt in points) {
+        final dx = pt.x - p.dx;
+        final dy = pt.y - p.dy;
+        if (dx * dx + dy * dy <= 0.02 * 0.02) return pt.z;
+      }
+      return null;
+    }
+
     final boundarySegOffsets = [
       for (final edge in boundarySegments) (a: edge.a, b: edge.b),
     ];
@@ -430,13 +439,15 @@ class ArchitectTerrainTin {
         final b = hole[(i + 1) % hole.length];
         insertPolygonEdgeWithContourSplits(
           a: a,
-          za: topoSamples.isNotEmpty
-              ? _nearestTopoElevation(a, topoSamples)
-              : 0.0,
+          za: existingPointZ(a) ??
+              (topoSamples.isNotEmpty
+                  ? _nearestTopoElevation(a, topoSamples)
+                  : 0.0),
           b: b,
-          zb: topoSamples.isNotEmpty
-              ? _nearestTopoElevation(b, topoSamples)
-              : 0.0,
+          zb: existingPointZ(b) ??
+              (topoSamples.isNotEmpty
+                  ? _nearestTopoElevation(b, topoSamples)
+                  : 0.0),
           overwriteEnds: false,
           crossSegments: boundarySegOffsets,
         );

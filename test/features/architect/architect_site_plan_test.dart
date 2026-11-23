@@ -583,12 +583,18 @@ void main() {
         final holeBnd = withHole.proposedTerrain.boundaries.last;
         expect(holeBnd.isHole, isTrue);
         expect(holeBnd.polygon, holePoly);
+        // Cutting an opening creates an editable spot elevation at each corner
+        expect(withHole.proposedTerrain.spots, hasLength(4));
+        expect(
+          withHole.proposedTerrain.spots.map((s) => s.position),
+          containsAll(holePoly),
+        );
 
         final hostWithHole =
             CutArchitectContourOpening.targetInProject(withHole, bnd.id);
         expect(hostWithHole!.$2, hasLength(1));
 
-        // Editing holeIndex 0 updates the hole boundary rather than overwriting outer boundary
+        // Editing holeIndex 0 updates the hole boundary and syncs corner spots
         const resizedHole = [
           Offset(-3, -2),
           Offset(2, -2),
@@ -603,8 +609,37 @@ void main() {
         ).apply(withHole);
         expect(editedHoleProj.proposedTerrain.boundaries.first.polygon, bnd.polygon);
         expect(editedHoleProj.proposedTerrain.boundaries.last.polygon, resizedHole);
+        expect(
+          editedHoleProj.proposedTerrain.spots.map((s) => s.position),
+          containsAll(resizedHole),
+        );
 
-        // InsertArchitectElementPoint inserts a vertex on both closed terrain boundaries and open contours
+        // Deleting the opening also removes its generated corner spots
+        final afterDeleteHole = ArchitectLandscapeTool.deleteSelected(
+          project: editedHoleProj,
+          selectedIds: {holeBnd.id},
+        );
+        expect(afterDeleteHole.proposedTerrain.boundaries, hasLength(1));
+        expect(afterDeleteHole.proposedTerrain.spots, isEmpty);
+
+        // InsertArchitectElementPoint inserts a vertex on both closed terrain boundaries and open contours,
+        // and inserting a new point on a terrain hole adds a new editable spot at that vertex
+        final withNewHolePt = InsertArchitectElementPoint(
+          storeyId: site.id,
+          elementId: bnd.id,
+          point: const Offset(0, -2),
+          holeIndex: 0,
+          newElementId: 'pt_hole',
+        ).apply(withHole);
+        expect(withNewHolePt.proposedTerrain.boundaries.last.polygon, hasLength(5));
+        expect(withNewHolePt.proposedTerrain.spots, hasLength(5));
+        expect(
+          withNewHolePt.proposedTerrain.spots.any(
+            (s) => (s.position - const Offset(0, -2)).distance < 1e-4,
+          ),
+          isTrue,
+        );
+
         expect(
           InsertArchitectElementPoint.pathOf(site, bnd.id, project: withHole),
           isNotNull,
@@ -684,9 +719,33 @@ void main() {
 
         expect(model.project.existingTerrain.boundaries, hasLength(2));
         expect(model.project.existingTerrain.boundaries.last.isHole, isTrue);
+        // Cutting an opening generated 4 editable spots at its corners, and selecting one lets us set new h
+        expect(model.project.existingTerrain.spots, hasLength(4));
+        await tools.choose(tester, Icons.near_me_outlined);
+        await tester.pumpAndSettle();
+        await workspace.wallTap(tester, hole.first);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('architect-terrain-edit-elevation')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('architect-terrain-edit-elevation')));
+        await tester.pumpAndSettle();
+        for (final key in ['3', '.', '5']) {
+          await tester.tap(find.byKey(ValueKey('bim-number-key-$key')));
+          await tester.pump();
+        }
+        await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+        await tester.pumpAndSettle();
+        expect(
+          model.project.existingTerrain.spots.first.elevation,
+          closeTo(3.5, 1e-4),
+        );
+        model.undo();
         model.undo();
         await tester.pumpAndSettle();
         expect(model.project.existingTerrain.boundaries, hasLength(1));
+        expect(model.project.existingTerrain.spots, isEmpty);
         expect(tester.takeException(), isNull);
       },
     );
