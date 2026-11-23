@@ -2326,6 +2326,7 @@ class Architect2dPainter extends CustomPainter {
                 lt.terrainMode == ArchitectTerrainDraftMode.contour) ||
             activeTool == ArchitectTool.contour,
         isClosedSpline: lt.contourClosed,
+        canSnapToStart: lt.canCloseDraftToStart(activeTool.name),
       );
     }
     if (activeTool == ArchitectTool.column && columnPreview != null) {

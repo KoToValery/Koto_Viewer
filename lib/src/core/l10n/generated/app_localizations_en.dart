@@ -13674,7 +13674,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectTerrainContourElevationTitle => 'Contour Elevation';
 
   @override
+  String get architectTerrainContourPropertiesTitle => 'Contour properties';
+
+  @override
   String get architectTerrainSpotElevationTitle => 'Spot Elevation';
+
+  @override
+  String get architectTerrainSpotPropertiesTitle => 'Spot elevation properties';
 
   @override
   String get architectTerrainNoContourAtPoint =>

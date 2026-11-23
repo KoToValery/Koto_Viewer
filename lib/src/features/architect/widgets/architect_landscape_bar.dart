@@ -192,7 +192,6 @@ class ArchitectLandscapeBar extends StatelessWidget {
     ColorScheme colors,
   ) {
     return [
-      ..._buildStateAndDatumPrefix(context, l, colors),
       Tooltip(
         message: l.architectSplineTraceContourHint,
         child: ChoiceChip(
@@ -242,7 +241,76 @@ class ArchitectLandscapeBar extends StatelessWidget {
       const SizedBox(width: 6),
       _divider(colors),
       const SizedBox(width: 6),
-      ..._buildDatumAndQuickActionsSuffix(context, l, colors),
+      _numericChip(
+        context: context,
+        key: const ValueKey('architect-contour-elevation'),
+        colors: colors,
+        title: l.architectTerrainContourElevationTitle,
+        label:
+            '${l.architectTerrainElevationLabel} ${controller.contourAbsoluteElevation.toStringAsFixed(2)} m',
+        initialValue: controller.contourAbsoluteElevation,
+        unitLabel: 'm',
+        decimals: 3,
+        allowNegative: true,
+        onSubmitted: (val) {
+          controller.contourAbsoluteElevation = val;
+          controller.terrainElevation = val - controller.terrainDatumElevation;
+          _notifyChanged();
+        },
+      ),
+      const SizedBox(width: 6),
+      ChoiceChip(
+        key: const ValueKey('architect-contour-major'),
+        selected: controller.contourMajor,
+        showCheckmark: false,
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+        label: Text(
+          l.architectTerrainContourMajor,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: controller.contourMajor ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+        onSelected: (_) {
+          controller.contourMajor = !controller.contourMajor;
+          _notifyChanged();
+        },
+      ),
+      const SizedBox(width: 4),
+      ChoiceChip(
+        key: const ValueKey('architect-contour-closed'),
+        selected: controller.contourClosed,
+        showCheckmark: false,
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+        label: Text(
+          l.architectTerrainContourClosed,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: controller.contourClosed ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+        onSelected: (_) {
+          controller.contourClosed = !controller.contourClosed;
+          _notifyChanged();
+        },
+      ),
+      if (hasSelectedContourOrSpot && onEditSelectedElevation != null) ...[
+        const SizedBox(width: 6),
+        ActionChip(
+          key: const ValueKey('architect-terrain-edit-elevation'),
+          visualDensity: VisualDensity.compact,
+          avatar: Icon(Icons.edit_rounded, size: 15, color: colors.primary),
+          label: Text(
+            l.architectTerrainEditElevation,
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+          ),
+          onPressed: onEditSelectedElevation,
+        ),
+      ],
     ];
   }
 

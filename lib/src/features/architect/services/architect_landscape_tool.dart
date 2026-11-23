@@ -42,6 +42,30 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           terrainMode == ArchitectTerrainDraftMode.pickContour) ||
       (toolName == 'contour' && contourAutoTrace && draftPoints.isEmpty);
 
+  /// True when tapping near the first draft point closes/commits the drafted loop.
+  bool canCloseDraftToStart(String toolName) => switch (toolName) {
+    'terrain' =>
+      terrainMode == ArchitectTerrainDraftMode.boundary ||
+          terrainMode == ArchitectTerrainDraftMode.pad ||
+          terrainMode == ArchitectTerrainDraftMode.hole ||
+          terrainMode == ArchitectTerrainDraftMode.contour,
+    'contour' => true,
+    'pathway' => pathwayClosed,
+    'street' => streetClosed,
+    _ => false,
+  };
+
+  /// True when drafting an orthogonal/polygonal closed boundary (not a spline contour).
+  bool isClosedPolygonDraft(String toolName) => switch (toolName) {
+    'terrain' =>
+      terrainMode == ArchitectTerrainDraftMode.boundary ||
+          terrainMode == ArchitectTerrainDraftMode.pad ||
+          terrainMode == ArchitectTerrainDraftMode.hole,
+    'pathway' => pathwayClosed,
+    'street' => streetClosed,
+    _ => false,
+  };
+
   // --- Pathway State ---
   double pathwayWidth = 1.50;
   ArchitectPathwayCurbMode pathwayCurbMode = ArchitectPathwayCurbMode.both;

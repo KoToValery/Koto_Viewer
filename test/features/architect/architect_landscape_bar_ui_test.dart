@@ -151,8 +151,37 @@ void main() {
           findsNothing,
         );
 
-        // 1. Contour tool (Хоризонтал): Auto-trace vs Manual Spline toggle
+        // 1. Contour tool (Хоризонтал): Auto-trace vs Manual Spline toggle,
+        // and terrain-only controls (Existing/Proposed, ±0.00 datum, Create Proposed) are excluded.
         await _selectLandscapeTool(tester, ArchitectTool.contour);
+        expect(
+          find.byKey(const ValueKey('architect-terrain-datum')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-terrain-create-proposed')),
+          findsNothing,
+        );
+        expect(
+          _chipFinder(ArchitectTerrainState.existing.label(l10n)),
+          findsNothing,
+        );
+        expect(
+          _chipFinder(ArchitectTerrainState.proposed.label(l10n)),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-contour-elevation')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-contour-major')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('architect-contour-closed')),
+          findsOneWidget,
+        );
         final autoChip = tester.widget<ChoiceChip>(
           find.byKey(const ValueKey('architect-contour-auto-trace')),
         );

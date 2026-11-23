@@ -24840,11 +24840,23 @@ abstract class AppLocalizations {
   /// **'Contour Elevation'**
   String get architectTerrainContourElevationTitle;
 
+  /// Dialog title when editing properties of a single selected terrain contour
+  ///
+  /// In en, this message translates to:
+  /// **'Contour properties'**
+  String get architectTerrainContourPropertiesTitle;
+
   /// No description provided for @architectTerrainSpotElevationTitle.
   ///
   /// In en, this message translates to:
   /// **'Spot Elevation'**
   String get architectTerrainSpotElevationTitle;
+
+  /// Dialog title when editing properties of a single selected terrain spot elevation
+  ///
+  /// In en, this message translates to:
+  /// **'Spot elevation properties'**
+  String get architectTerrainSpotPropertiesTitle;
 
   /// No description provided for @architectTerrainNoContourAtPoint.
   ///

@@ -1463,6 +1463,7 @@ class ArchitectLandscapePainterHelper {
     bool isRectangleDraft = false,
     bool isSplineDraft = false,
     bool isClosedSpline = false,
+    bool canSnapToStart = false,
   }) {
     final pts = <Offset>[
       ...draftPoints,
@@ -1551,6 +1552,19 @@ class ArchitectLandscapePainterHelper {
       ..style = PaintingStyle.fill;
     for (final p in pts) {
       canvas.drawCircle(p, handleRadius, dotPaint);
+    }
+    if (canSnapToStart && draftPoints.length >= 3) {
+      final first = draftPoints.first;
+      final snappedToStart =
+          cursorWorld != null && (cursorWorld - first).distance <= 1e-3;
+      canvas.drawCircle(
+        first,
+        (snappedToStart ? 9.0 : 6.5) / zoomScale,
+        Paint()
+          ..color = snappedToStart ? const Color(0xFF00E5FF) : accentColor
+          ..strokeWidth = (snappedToStart ? 2.2 : 1.5) / zoomScale
+          ..style = PaintingStyle.stroke,
+      );
     }
   }
 

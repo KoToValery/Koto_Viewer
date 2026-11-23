@@ -61,7 +61,39 @@ void main() {
 
       final l = lookupAppLocalizations(const Locale('en'));
       final dialog = find.byKey(const ValueKey('architect-terrain-properties'));
-      expect(find.descendant(of: dialog, matching: find.text(l.architectTerrainPropertiesTitle)), findsOneWidget);
+      expect(
+        find.descendant(
+          of: dialog,
+          matching: find.text(l.architectTerrainContourPropertiesTitle),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-contour-prop-elevation')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-contour-prop-major')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-contour-prop-closed')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('architect-contour-prop-elevation')),
+      );
+      await tester.pumpAndSettle();
+      for (final key in ['1', '0', '5', '.', '5']) {
+        await tester.tap(find.byKey(ValueKey('bim-number-key-$key')));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('architect-contour-prop-major')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.descendant(of: dialog, matching: find.text(l.architectTerrainStateProposed)));
       await tester.pumpAndSettle();
       expect(model.project.existingTerrain.contours, hasLength(1));
@@ -70,12 +102,106 @@ void main() {
       expect(model.project.existingTerrain.contours, isEmpty);
       final proposed = model.project.proposedTerrain;
       expect(proposed.contours.single.id, contour.id);
+      expect(proposed.contours.single.isMajor, isTrue);
+      // Moving between surfaces preserves relative elevation above the target datum (200 + 5.5 = 205.5).
+      expect(proposed.contours.single.rawAbsoluteElevation, closeTo(205.5, 1e-4));
       expect(proposed.contours.single.points, contour.points);
-      expect(proposed.contours.single.effectiveRelative(proposed.datumElevation), contour.elevation);
+      expect(proposed.contours.single.effectiveRelative(proposed.datumElevation), closeTo(5.5, 1e-4));
+
+      // Deleting the selected contour removes it cleanly and supports undo
+      await tester.tap(find.byKey(const ValueKey('architect-selection-delete')));
+      await tester.pumpAndSettle();
+      expect(model.project.proposedTerrain.contours, isEmpty);
+      expect(model.project.existingTerrain.contours, isEmpty);
+      model.undo();
+      await tester.pumpAndSettle();
+      expect(model.project.proposedTerrain.contours.single.id, contour.id);
       model.undo();
       await tester.pumpAndSettle();
       expect(model.project.proposedTerrain.contours, isEmpty);
       expect(model.project.existingTerrain.contours.single.id, contour.id);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('deleting a selected terrain boundary removes it and supports undo', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final starter = ArchitectProject.starterWithCatalog(
+        name: 'Terrain delete test',
+        storeyCount: 1,
+        groundHeight: 3,
+        typicalHeight: 3,
+      );
+      const boundary = ArchitectTerrainBoundary(
+        id: 'bnd-del',
+        polygon: [
+          Offset(-4, -4),
+          Offset(4, -4),
+          Offset(4, 4),
+          Offset(-4, 4),
+        ],
+        autoInterpolateElevation: true,
+      );
+      final model = ArchitectCommandController(
+        starter.copyWith(
+          activeStoreyId: starter.siteStorey!.id,
+          existingTerrain: const ArchitectTerrainSurface(
+            boundaries: [boundary],
+          ),
+        ),
+      );
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      await tools.choose(tester, Icons.near_me_outlined);
+      await tester.pumpAndSettle();
+      await workspace.wallTap(tester, const Offset(0, -4));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('architect-selection-delete')));
+      await tester.pumpAndSettle();
+      expect(model.project.existingTerrain.boundaries, isEmpty);
+      model.undo();
+      await tester.pumpAndSettle();
+      expect(model.project.existingTerrain.boundaries.single.id, boundary.id);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('freehand terrain drafting snaps to first point and closes boundary', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final starter = ArchitectProject.starterWithCatalog(
+        name: 'Terrain snap start test',
+        storeyCount: 1,
+        groundHeight: 3,
+        typicalHeight: 3,
+      );
+      final model = ArchitectCommandController(
+        starter.copyWith(activeStoreyId: starter.siteStorey!.id),
+      );
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+
+      await tester.tap(find.byKey(const ValueKey('architect-tool-category')));
+      await tester.pumpAndSettle();
+      final landscapeCat = find.byKey(
+        const ValueKey('architect-category-landscape'),
+      );
+      await tester.ensureVisible(landscapeCat);
+      await tester.tap(landscapeCat);
+      await tester.pumpAndSettle();
+
+      await workspace.wallTap(tester, const Offset(1, 1));
+      await workspace.wallTap(tester, const Offset(5, 1));
+      await workspace.wallTap(tester, const Offset(5, 5));
+      expect(model.project.existingTerrain.boundaries, isEmpty);
+
+      // Tap near the first point (1, 1) -> snaps to first point and closes the boundary!
+      await workspace.wallTap(tester, const Offset(1.15, 1.12));
+      await tester.pumpAndSettle();
+
+      expect(model.project.existingTerrain.boundaries, hasLength(1));
+      expect(model.project.existingTerrain.boundaries.single.polygon, hasLength(3));
       expect(tester.takeException(), isNull);
     });
 

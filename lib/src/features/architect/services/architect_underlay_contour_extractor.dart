@@ -29,12 +29,14 @@ class _ExtractedCurve {
 class _ExtractedElevationText {
   final Offset position;
   final double value;
+  final int decimalPlaces;
   final String layer;
   final double boxRadius;
 
   const _ExtractedElevationText({
     required this.position,
     required this.value,
+    required this.decimalPlaces,
     required this.layer,
     required this.boxRadius,
   });
@@ -263,18 +265,53 @@ class ArchitectUnderlayContourExtractor {
           mapPoint: mapPoint,
         );
       } else if (entity is DxfText) {
-        final parsed = _parseNumericElevation(entity.text);
+        final parsed = _parseElevationWithMeta(entity.text);
         if (parsed != null) {
-          final pos = frame.toModel(mapPoint(entity.alignPoint ?? entity.insertPoint));
+          final textLen = entity.text.trim().length;
+          final wCad = math.max(entity.height, textLen * entity.height * 0.65);
+          final anchorCad =
+              (entity.hAlign != 0 || entity.vAlign != 0) &&
+                  entity.alignPoint != null
+              ? entity.alignPoint!
+              : entity.insertPoint;
+          final ox = switch (entity.hAlign) {
+            0 => 0.5 * wCad,
+            2 => -0.5 * wCad,
+            _ => 0.0,
+          };
+          final oy = switch (entity.vAlign) {
+            0 || 1 => 0.5 * entity.height,
+            3 => -0.5 * entity.height,
+            _ => 0.0,
+          };
+          final rad = entity.rotationDeg * math.pi / 180.0;
+          final cosA = math.cos(rad);
+          final sinA = math.sin(rad);
+          final centerCad = Offset(
+            anchorCad.dx + ox * cosA - oy * sinA,
+            anchorCad.dy + ox * sinA + oy * cosA,
+          );
+          final pos = frame.toModel(mapPoint(centerCad));
+          final edgePos = frame.toModel(
+            mapPoint(
+              Offset(
+                anchorCad.dx + wCad * cosA,
+                anchorCad.dy + wCad * sinA,
+              ),
+            ),
+          );
+          final anchorPos = frame.toModel(mapPoint(anchorCad));
+          final modelWidth = (edgePos - anchorPos).distance;
           final modelHeight = (entity.height * scaleAbs) / frame.unitsPerMeter;
           final boxR = math.max(
-            0.35,
-            math.min(3.5, modelHeight * math.max(2.0, entity.text.trim().length * 0.45)),
+            0.45,
+            math.min(6.0, math.max(modelWidth * 0.65, modelHeight * 1.6)),
           );
           texts.add(
             _ExtractedElevationText(
               position: pos,
-              value: parsed,
+              value: parsed.value,
+              decimalPlaces: parsed.decimalPlaces,
               layer: effectiveLayer,
               boxRadius: boxR,
             ),
@@ -282,18 +319,55 @@ class ArchitectUnderlayContourExtractor {
         }
       } else if (entity is DxfMText) {
         final clean = entity.cleanText;
-        final parsed = _parseNumericElevation(clean);
+        final parsed = _parseElevationWithMeta(clean);
         if (parsed != null) {
-          final pos = frame.toModel(mapPoint(entity.insertPoint));
+          final textLen = clean.trim().length;
+          final estW = math.max(entity.height, textLen * entity.height * 0.65);
+          final wCad = (entity.refWidth != null && entity.refWidth! > 0)
+              ? math.min(entity.refWidth!, textLen * entity.height * 0.72)
+              : estW;
+          final col = (entity.attachmentPoint - 1).clamp(0, 8) % 3;
+          final row = (entity.attachmentPoint - 1).clamp(0, 8) ~/ 3;
+          final ox = col == 0 ? 0.5 * wCad : (col == 2 ? -0.5 * wCad : 0.0);
+          final oy = row == 0
+              ? -0.5 * entity.height
+              : (row == 2 ? 0.5 * entity.height : 0.0);
+          final rad =
+              (entity.directionVector != null &&
+                  entity.directionVector!.distance > 1e-6)
+              ? math.atan2(
+                  entity.directionVector!.dy,
+                  entity.directionVector!.dx,
+                )
+              : entity.rotationDeg * math.pi / 180.0;
+          final cosA = math.cos(rad);
+          final sinA = math.sin(rad);
+          final anchorCad = entity.insertPoint;
+          final centerCad = Offset(
+            anchorCad.dx + ox * cosA - oy * sinA,
+            anchorCad.dy + ox * sinA + oy * cosA,
+          );
+          final pos = frame.toModel(mapPoint(centerCad));
+          final edgePos = frame.toModel(
+            mapPoint(
+              Offset(
+                anchorCad.dx + wCad * cosA,
+                anchorCad.dy + wCad * sinA,
+              ),
+            ),
+          );
+          final anchorPos = frame.toModel(mapPoint(anchorCad));
+          final modelWidth = (edgePos - anchorPos).distance;
           final modelHeight = (entity.height * scaleAbs) / frame.unitsPerMeter;
           final boxR = math.max(
-            0.35,
-            math.min(3.5, modelHeight * math.max(2.0, clean.trim().length * 0.45)),
+            0.45,
+            math.min(6.0, math.max(modelWidth * 0.65, modelHeight * 1.6)),
           );
           texts.add(
             _ExtractedElevationText(
               position: pos,
-              value: parsed,
+              value: parsed.value,
+              decimalPlaces: parsed.decimalPlaces,
               layer: effectiveLayer,
               boxRadius: boxR,
             ),
@@ -376,6 +450,51 @@ class ArchitectUnderlayContourExtractor {
       sourceLayer: bestCurve.layer,
       anchorPoint: bestAnchor,
     );
+  }
+
+  /// Extracts all stitched contours (bridging endpoint chains and inline
+  /// elevation-text gaps) for whole-document geodetic analysis.
+  static List<ArchitectPickedContourCandidate> extractStitchedContours({
+    required DxfDocument document,
+    required BimCoordinateFrame frame,
+    Map<String, bool> layerVisibility = const {},
+  }) {
+    final index = _indexFor(document, frame, layerVisibility);
+    if (index.curves.isEmpty) return const [];
+    final used = <int>{};
+    final out = <ArchitectPickedContourCandidate>[];
+    for (final c in index.curves) {
+      if (used.contains(c.id)) continue;
+      used.add(c.id);
+      if (c.closed) {
+        out.add(
+          ArchitectPickedContourCandidate(
+            points: c.points,
+            closed: true,
+            suggestedElevation: c.elevation,
+            sourceLayer: c.layer,
+          ),
+        );
+        continue;
+      }
+      final result = _stitchChain(
+        initialChain: c.points,
+        layer: c.layer,
+        index: index,
+        used: used,
+        initialElev: c.elevation,
+      );
+      final elev = result.elevation ?? result.gapTextElevation;
+      out.add(
+        ArchitectPickedContourCandidate(
+          points: result.points,
+          closed: result.closed,
+          suggestedElevation: elev,
+          sourceLayer: c.layer,
+        ),
+      );
+    }
+    return out;
   }
 
   /// Clips a picked polyline [points] cleanly to the outer [boundaries].
@@ -573,13 +692,61 @@ class ArchitectUnderlayContourExtractor {
 
     final isClosed =
         chain.length >= 4 && (chain.first - chain.last).distance <= joinTol;
-    if (isClosed) chain.removeLast();
+    if (isClosed) {
+      chain.removeLast();
+    } else if (chain.length >= 4 && index.texts.isNotEmpty) {
+      final selfGapElev = _checkSelfClosureAcrossTextGap(chain, index.texts, joinTol);
+      if (selfGapElev != null) {
+        gapElev ??= selfGapElev;
+        return (
+          points: chain,
+          closed: true,
+          elevation: elev,
+          gapTextElevation: gapElev,
+        );
+      }
+    }
     return (
       points: chain,
       closed: isClosed,
       elevation: elev,
       gapTextElevation: gapElev,
     );
+  }
+
+  static double? _checkSelfClosureAcrossTextGap(
+    List<Offset> chain,
+    List<_ExtractedElevationText> texts,
+    double joinTol,
+  ) {
+    final endPt = chain.last;
+    final startPt = chain.first;
+    final gap = startPt - endPt;
+    final gapLen = gap.distance;
+    if (gapLen <= joinTol || gapLen > 12.0) return null;
+    final endDir = _endTangent(chain, atEnd: true);
+    final startDir = _startTangent(chain, reverse: false);
+    if (endDir == null || startDir == null) return null;
+    final uGap = gap / gapLen;
+    if (endDir.dx * uGap.dx + endDir.dy * uGap.dy < 0.50) return null;
+    if (uGap.dx * startDir.dx + uGap.dy * startDir.dy < 0.40) return null;
+
+    _ExtractedElevationText? bestTxt;
+    var bestScore = double.infinity;
+    for (final txt in texts) {
+      final maxGap = math.max(4.5, txt.boxRadius * 2.6 + 1.2).clamp(4.5, 12.0);
+      if (gapLen > maxGap) continue;
+      final closest = _closestPointOnSeg(txt.position, endPt, startPt);
+      final dTxt = (closest - txt.position).distance;
+      if (dTxt <= txt.boxRadius + 1.1) {
+        final score = dTxt + (txt.decimalPlaces == 2 ? 0.0 : 0.4);
+        if (score < bestScore) {
+          bestScore = score;
+          bestTxt = txt;
+        }
+      }
+    }
+    return bestTxt?.value;
   }
 
   static ({
@@ -596,11 +763,12 @@ class ArchitectUnderlayContourExtractor {
     required double joinTol,
     bool allowSharpCorners = false,
   }) {
-    // 1. Direct endpoint connection within joinTol
+    // 1. Direct endpoint connection within joinTol (or slightly wider for collinear breaks)
     _ExtractedCurve? bestCurve;
     var bestReverse = false;
     var bestScore = double.infinity;
     final minDot = allowSharpCorners ? -0.45 : 0.25;
+    final collinearTol = math.max(joinTol, 0.22);
 
     for (final c in index.curves) {
       if (used.contains(c.id) || c.closed || c.points.length < 2) continue;
@@ -608,10 +776,11 @@ class ArchitectUnderlayContourExtractor {
       for (final reverse in [false, true]) {
         final candStart = reverse ? c.points.last : c.points.first;
         final d = (candStart - endPt).distance;
-        if (d > joinTol) continue;
+        if (d > collinearTol) continue;
         final candDir = _startTangent(c.points, reverse: reverse);
         if (dir != null && candDir != null) {
           final dot = dir.dx * candDir.dx + dir.dy * candDir.dy;
+          if (d > joinTol && dot < 0.88) continue;
           if (dot < minDot) continue;
           final score = d + (1.0 - dot) * 0.25;
           if (score < bestScore) {
@@ -619,7 +788,7 @@ class ArchitectUnderlayContourExtractor {
             bestCurve = c;
             bestReverse = reverse;
           }
-        } else if (d < bestScore) {
+        } else if (d <= joinTol && d < bestScore) {
           bestScore = d;
           bestCurve = c;
           bestReverse = reverse;
@@ -631,24 +800,27 @@ class ArchitectUnderlayContourExtractor {
     }
 
     // 2. Text-gap bridging across inline elevation labels
-    if (dir == null) return null;
-    _ExtractedElevationText? nearbyText;
+    if (dir == null || index.texts.isEmpty) return null;
+    final candidateTexts = <_ExtractedElevationText>[];
     for (final txt in index.texts) {
-      final dText = (txt.position - endPt).distance;
-      if (dText <= txt.boxRadius + 2.2) {
-        final toText = txt.position - endPt;
-        if (toText.distance > 1e-4) {
-          final uText = toText / toText.distance;
-          if (dir.dx * uText.dx + dir.dy * uText.dy > 0.35) {
-            nearbyText = txt;
-            break;
+      final toText = txt.position - endPt;
+      final dText = toText.distance;
+      final maxReach = math.max(3.5, txt.boxRadius * 2.2 + 2.2).clamp(3.5, 9.0);
+      if (dText <= maxReach) {
+        if (dText <= txt.boxRadius + 0.85) {
+          candidateTexts.add(txt);
+        } else {
+          final uText = toText / dText;
+          if (dir.dx * uText.dx + dir.dy * uText.dy > 0.25) {
+            candidateTexts.add(txt);
           }
         }
       }
     }
-    if (nearbyText == null) return null;
+    if (candidateTexts.isEmpty) return null;
 
     var bestGapScore = double.infinity;
+    _ExtractedElevationText? bestGapText;
     for (final c in index.curves) {
       if (used.contains(c.id) || c.closed || c.points.length < 2) continue;
       if (c.layer != layer) continue;
@@ -656,35 +828,43 @@ class ArchitectUnderlayContourExtractor {
         final candStart = reverse ? c.points.last : c.points.first;
         final gap = candStart - endPt;
         final gapLen = gap.distance;
-        if (gapLen < joinTol || gapLen > 4.2) continue;
+        if (gapLen < joinTol || gapLen > 12.0) continue;
         final uGap = gap / gapLen;
         final align = dir.dx * uGap.dx + dir.dy * uGap.dy;
-        if (align < 0.55) continue;
+        if (align < 0.50) continue;
         final candDir = _startTangent(c.points, reverse: reverse);
         if (candDir != null &&
-            (dir.dx * candDir.dx + dir.dy * candDir.dy) < 0.45) {
+            (dir.dx * candDir.dx + dir.dy * candDir.dy) < 0.40 &&
+            (uGap.dx * candDir.dx + uGap.dy * candDir.dy) < 0.45) {
           continue;
         }
-        // Check that gap passes near the elevation text position
-        final closestToText = _closestPointOnSeg(nearbyText.position, endPt, candStart);
-        if ((closestToText - nearbyText.position).distance >
-            nearbyText.boxRadius + 1.0) {
-          continue;
-        }
-        final score = gapLen + (1.0 - align) * 2.0;
-        if (score < bestGapScore) {
-          bestGapScore = score;
-          bestCurve = c;
-          bestReverse = reverse;
+        // Check against all nearby elevation texts so one irrelevant label cannot mask the real one
+        for (final txt in candidateTexts) {
+          final maxGap = math.max(4.5, txt.boxRadius * 2.6 + 1.2).clamp(4.5, 12.0);
+          if (gapLen > maxGap) continue;
+          final closestToText = _closestPointOnSeg(txt.position, endPt, candStart);
+          final textDist = (closestToText - txt.position).distance;
+          if (textDist > txt.boxRadius + 1.1) continue;
+          final score =
+              gapLen +
+              (1.0 - align) * 2.0 +
+              textDist * 0.6 +
+              (txt.decimalPlaces == 2 ? 0.0 : 0.4);
+          if (score < bestGapScore) {
+            bestGapScore = score;
+            bestCurve = c;
+            bestReverse = reverse;
+            bestGapText = txt;
+          }
         }
       }
     }
 
-    if (bestCurve != null) {
+    if (bestCurve != null && bestGapText != null) {
       return (
         curve: bestCurve,
         reverse: bestReverse,
-        gapTextElevation: nearbyText.value,
+        gapTextElevation: bestGapText.value,
       );
     }
     return null;
@@ -692,18 +872,46 @@ class ArchitectUnderlayContourExtractor {
 
   static Offset? _endTangent(List<Offset> pts, {required bool atEnd}) {
     if (pts.length < 2) return null;
-    final d = atEnd
-        ? (pts.last - pts[pts.length - 2])
-        : (pts.first - pts[1]);
-    return d.distance > 1e-6 ? d / d.distance : null;
+    if (atEnd) {
+      final tip = pts.last;
+      for (var i = pts.length - 2; i >= 0; i--) {
+        final d = tip - pts[i];
+        if (d.distance >= 0.15 || i == 0) {
+          return d.distance > 1e-6 ? d / d.distance : null;
+        }
+      }
+    } else {
+      final tip = pts.first;
+      for (var i = 1; i < pts.length; i++) {
+        final d = tip - pts[i];
+        if (d.distance >= 0.15 || i == pts.length - 1) {
+          return d.distance > 1e-6 ? d / d.distance : null;
+        }
+      }
+    }
+    return null;
   }
 
   static Offset? _startTangent(List<Offset> pts, {required bool reverse}) {
     if (pts.length < 2) return null;
-    final d = reverse
-        ? (pts[pts.length - 2] - pts.last)
-        : (pts[1] - pts.first);
-    return d.distance > 1e-6 ? d / d.distance : null;
+    if (reverse) {
+      final tip = pts.last;
+      for (var i = pts.length - 2; i >= 0; i--) {
+        final d = pts[i] - tip;
+        if (d.distance >= 0.15 || i == 0) {
+          return d.distance > 1e-6 ? d / d.distance : null;
+        }
+      }
+    } else {
+      final tip = pts.first;
+      for (var i = 1; i < pts.length; i++) {
+        final d = pts[i] - tip;
+        if (d.distance >= 0.15 || i == pts.length - 1) {
+          return d.distance > 1e-6 ? d / d.distance : null;
+        }
+      }
+    }
+    return null;
   }
 
   static List<Offset> _expandPolylineVertices(
@@ -765,20 +973,25 @@ class ArchitectUnderlayContourExtractor {
     return pts;
   }
 
-  static double? _parseNumericElevation(String raw) {
+  /// Parses geodetic elevation labels, rejecting bare integers (e.g. parcel/plot IDs)
+  /// and requiring 2-3 decimal digits (e.g. `542.50`, `104,25`).
+  static ({double value, int decimalPlaces})? parseElevationText(String raw) =>
+      _parseElevationWithMeta(raw);
+
+  static ({double value, int decimalPlaces})? _parseElevationWithMeta(String raw) {
     var cleaned = raw.trim();
-    if (cleaned.isEmpty || cleaned.length > 16) return null;
+    if (cleaned.isEmpty || cleaned.length > 18) return null;
     cleaned = cleaned.replaceAll(RegExp(r'\\[A-Za-z0-9]+;'), '');
     cleaned = cleaned.replaceAll(RegExp(r'[{}]'), '').trim();
     final normalized = cleaned.replaceAll(',', '.');
     final match = RegExp(
-      r'^([+-]?\d+(?:\.\d+)?)\s*(?:m|м)?$',
+      r'^(?:[HKZК]\s*=?\s*)?([+-]?\d+\.(\d{2,3}))\s*(?:m|м)?$',
       caseSensitive: false,
     ).firstMatch(normalized);
     if (match == null) return null;
     final val = double.tryParse(match.group(1)!);
     if (val == null || !val.isFinite || val.abs() > 8900) return null;
-    return val;
+    return (value: val, decimalPlaces: match.group(2)!.length);
   }
 
   static double? _nearestTextElevation(
@@ -788,12 +1001,15 @@ class ArchitectUnderlayContourExtractor {
   }) {
     if (chain.isEmpty || texts.isEmpty) return null;
     double? bestVal;
-    var bestD = maxDist;
+    var bestScore = maxDist + 0.5;
     for (final txt in texts) {
       final hit = _closestOnCurve(chain, txt.position, closed: false);
-      if (hit.distance < bestD) {
-        bestD = hit.distance;
-        bestVal = txt.value;
+      if (hit.distance < maxDist) {
+        final score = hit.distance + (txt.decimalPlaces == 2 ? 0.0 : 0.25);
+        if (score < bestScore) {
+          bestScore = score;
+          bestVal = txt.value;
+        }
       }
     }
     return bestVal;

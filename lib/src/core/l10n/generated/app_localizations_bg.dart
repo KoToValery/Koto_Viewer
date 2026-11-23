@@ -13725,7 +13725,14 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectTerrainContourElevationTitle => 'Кота на хоризонтал';
 
   @override
+  String get architectTerrainContourPropertiesTitle => 'Свойства на хоризонтал';
+
+  @override
   String get architectTerrainSpotElevationTitle => 'Височинна кота';
+
+  @override
+  String get architectTerrainSpotPropertiesTitle =>
+      'Свойства на височинна кота';
 
   @override
   String get architectTerrainNoContourAtPoint =>

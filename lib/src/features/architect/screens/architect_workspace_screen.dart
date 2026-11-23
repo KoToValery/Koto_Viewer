@@ -13603,33 +13603,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   ? '${candidate.suggestedElevation!.toStringAsFixed(2)} m'
                   : context.l10n.architectTerrainModePickContour);
         _activeMagneticGuides = [];
-      } else if (_landscapeTool.isDrafting) {
-        final anchor = _landscapeTool.draftPoints.last;
-        final snap = _snapElement(
-          rawModel,
-          anchor: anchor,
-          tolerancePixels: _touchInput ? 18 : 12,
-        );
-        final orthoPerp =
-            _landscapeTool.terrainMode == ArchitectTerrainDraftMode.boundaryRect
-            ? null
-            : ArchitectLandscapeTool.resolveDraftSnapping(
-                points: _landscapeTool.draftPoints,
-                rawPoint: snap.isSnapped ? snap.point : rawModel,
-                toleranceMeters: math.max(16.0 / _currentScale, 0.30),
-              );
-        final finalPoint =
-            (orthoPerp != null && orthoPerp.$2 != null) ? orthoPerp.$1 : snap.point;
-        _cursorModel = finalPoint;
-        _activeSnapLabel = orthoPerp?.$2 ?? snap.snapLabel;
-        _activeMagneticGuides = (orthoPerp != null && orthoPerp.$3.isNotEmpty)
-            ? orthoPerp.$3
-            : snap.magneticGuides;
       } else {
-        final snap = _snapElement(rawModel);
-        _cursorModel = snap.point;
-        _activeSnapLabel = snap.snapLabel;
-        _activeMagneticGuides = snap.magneticGuides;
+        final resolved = _resolveLandscapeDraftPoint(
+          rawModel,
+          tolerancePixels: _landscapeTool.isDrafting
+              ? (_touchInput ? 18 : 12)
+              : null,
+        );
+        _cursorModel = resolved.point;
+        _activeSnapLabel = resolved.snapLabel;
+        _activeMagneticGuides = resolved.magneticGuides;
       }
 
     } else if (_activeTool == ArchitectTool.door ||
@@ -13820,6 +13803,79 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
 
+
+  double get _landscapeCloseRadius =>
+      ((_touchInput ? 22.0 : 16.0) / _currentScale).clamp(0.20, 1.50);
+
+  ({Offset point, String? snapLabel, List<(Offset, Offset)> magneticGuides})
+  _resolveLandscapeDraftPoint(Offset rawModel, {double? tolerancePixels}) {
+    final points = _landscapeTool.draftPoints;
+    if (points.length >= 3 &&
+        _landscapeTool.canCloseDraftToStart(_activeTool.name) &&
+        (rawModel - points.first).distance <= _landscapeCloseRadius) {
+      return (
+        point: points.first,
+        snapLabel: context.l10n.architectZonePointSnapStart,
+        magneticGuides: const [],
+      );
+    }
+
+    final anchor = points.lastOrNull;
+    final snap = _snapElement(
+      rawModel,
+      anchor: anchor,
+      tolerancePixels: tolerancePixels,
+    );
+    if (anchor == null ||
+        (_activeTool == ArchitectTool.terrain &&
+            _landscapeTool.terrainMode ==
+                ArchitectTerrainDraftMode.boundaryRect)) {
+      return (
+        point: snap.point,
+        snapLabel: snap.snapLabel,
+        magneticGuides: snap.magneticGuides,
+      );
+    }
+
+    final midpointSnap =
+        snap.snapLabel == 'Midpoint' ||
+        snap.snapLabel == 'Midpoint alignment';
+    if (points.length >= 3 &&
+        !midpointSnap &&
+        _landscapeTool.isClosedPolygonDraft(_activeTool.name)) {
+      final closure =
+          BimContourDraftingGeometry.calculatePolygonClosureOrthoSnap(
+            points: points,
+            raw: snap.isSnapped ? snap.point : rawModel,
+            tolerance: math.max(16.0 / _currentScale, 0.30),
+          );
+      if (closure.isSnapped) {
+        return (
+          point: closure.point,
+          snapLabel: context.l10n.snapAlignPoint1,
+          magneticGuides: closure.magneticGuides,
+        );
+      }
+    }
+
+    final orthoPerp = ArchitectLandscapeTool.resolveDraftSnapping(
+      points: points,
+      rawPoint: snap.isSnapped ? snap.point : rawModel,
+      toleranceMeters: math.max(16.0 / _currentScale, 0.30),
+    );
+    if (orthoPerp.$2 != null) {
+      return (
+        point: orthoPerp.$1,
+        snapLabel: orthoPerp.$2,
+        magneticGuides: orthoPerp.$3,
+      );
+    }
+    return (
+      point: snap.point,
+      snapLabel: snap.snapLabel,
+      magneticGuides: snap.magneticGuides,
+    );
+  }
 
   Offset _resolveSlabPoint(Offset raw) =>
 
@@ -16611,26 +16667,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return;
       }
 
-      final anchor = _landscapeTool.draftPoints.lastOrNull;
-      final snap = _snapElement(rawModel, anchor: anchor);
       if (_activeTool == ArchitectTool.terrain &&
           _landscapeTool.terrainMode == ArchitectTerrainDraftMode.spot) {
-        _promptAndCommitSpot(snap.point);
+        final spotPoint = _snapElement(rawModel).point;
+        _promptAndCommitSpot(spotPoint);
         return;
       }
 
-      final orthoPerp =
-          (anchor != null &&
-              _landscapeTool.terrainMode !=
-                  ArchitectTerrainDraftMode.boundaryRect)
-          ? ArchitectLandscapeTool.resolveDraftSnapping(
-              points: _landscapeTool.draftPoints,
-              rawPoint: snap.isSnapped ? snap.point : rawModel,
-              toleranceMeters: math.max(16.0 / _currentScale, 0.30),
-            )
-          : null;
-      final pt = (orthoPerp?.$2 != null) ? orthoPerp!.$1 : snap.point;
-      final closeRadius = math.min(18.0 / _currentScale, 0.35);
+      final resolved = _resolveLandscapeDraftPoint(rawModel);
+      final pt = resolved.point;
+      final closeRadius = _landscapeCloseRadius;
       final isManualContour =
           (_activeTool == ArchitectTool.contour &&
               !_landscapeTool.contourAutoTrace) ||
@@ -26110,9 +26156,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (ids.length == 1) {
       if (_project.activeStorey.isSite) {
-        final state = ArchitectLandscapeTool.terrainStateOf(_project, ids.single);
+        final singleId = ids.single;
+        final state = ArchitectLandscapeTool.terrainStateOf(_project, singleId);
         if (state != null) {
-          _showTerrainProperties(ids.single, state);
+          final surface = state == ArchitectTerrainState.existing
+              ? _project.existingTerrain
+              : _project.proposedTerrain;
+          final contour = surface.contours
+              .where((c) => c.id == singleId)
+              .firstOrNull;
+          if (contour != null) {
+            _showContourProperties(singleId, state, contour, surface.datumElevation);
+            return;
+          }
+          final spot = surface.spots
+              .where((s) => s.id == singleId)
+              .firstOrNull;
+          if (spot != null) {
+            _showSpotProperties(singleId, state, spot, surface.datumElevation);
+            return;
+          }
+          _showTerrainProperties(singleId, state);
           return;
         }
       }
@@ -28652,7 +28716,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       components: storey.components.where((c) => !ids.contains(c.id)).toList(),
     );
 
-    final nextProject = _project
+    var nextProject = _project
         .updateActiveStorey(nextStorey)
         .copyWithGridAxes(
           _project.gridAxes.where((a) => !ids.contains(a.id)).toList(),
@@ -28661,6 +28725,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           sections: _project.sections.where((s) => !ids.contains(s.id)).toList(),
           elevations: _project.elevations.where((e) => !ids.contains(e.id)).toList(),
         );
+    nextProject = ArchitectLandscapeTool.deleteSelected(
+      project: nextProject,
+      selectedIds: ids,
+    );
 
     _commands.commit(nextProject);
 
@@ -34542,6 +34610,352 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _showContourProperties(
+    String id,
+    ArchitectTerrainState initialState,
+    ArchitectTerrainContour contour,
+    double datum,
+  ) async {
+    final document = _modelCommands.project;
+    final l = context.l10n;
+    final initialAbs = contour.effectiveAbsolute(datum);
+    var absElev = initialAbs;
+    var isMajor = contour.isMajor;
+    var isClosed = contour.closed;
+    var selectedState = initialState;
+
+    final result = await showArchitectProperties<
+      ({double elevation, bool isMajor, bool closed, ArchitectTerrainState state})
+    >(
+      context: context,
+      onInsets: _insetProperties,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) {
+          final changed =
+              (absElev - initialAbs).abs() > 1e-4 ||
+              isMajor != contour.isMajor ||
+              isClosed != contour.closed ||
+              selectedState != initialState;
+          return architectAlertDialog(
+            key: const ValueKey('architect-terrain-properties'),
+            title: Text(l.architectTerrainContourPropertiesTitle),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    key: const ValueKey('architect-contour-prop-elevation'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.height_rounded),
+                    title: Text(l.architectTerrainContourElevationTitle),
+                    subtitle: datum.abs() > 1e-4
+                        ? Text(
+                            '${l.architectTerrainRelativeElevation}: ${(absElev - datum).toStringAsFixed(2)} m',
+                          )
+                        : null,
+                    trailing: Text(
+                      '${absElev.toStringAsFixed(2)} m',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onTap: () async {
+                      final picked = await BimNumericKeypad.showInputDialog(
+                        context,
+                        title: l.architectTerrainContourElevationTitle,
+                        initialText: formatArchitectNumericValue(
+                          absElev,
+                          decimals: 3,
+                        ),
+                        unitLabel: 'm',
+                        decimals: 3,
+                        allowNegative: true,
+                      );
+                      if (picked != null) {
+                        update(() => absElev = picked);
+                      }
+                    },
+                  ),
+                  SwitchListTile(
+                    key: const ValueKey('architect-contour-prop-major'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l.architectTerrainContourMajor),
+                    value: isMajor,
+                    onChanged: (v) => update(() => isMajor = v),
+                  ),
+                  SwitchListTile(
+                    key: const ValueKey('architect-contour-prop-closed'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l.architectTerrainContourClosed),
+                    value: isClosed,
+                    onChanged: (v) => update(() => isClosed = v),
+                  ),
+                  const Divider(height: 16),
+                  RadioGroup<ArchitectTerrainState>(
+                    groupValue: selectedState,
+                    onChanged: (value) {
+                      if (value != null) update(() => selectedState = value);
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        RadioListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: ArchitectTerrainState.existing,
+                          title: Text(l.architectTerrainStateExisting),
+                        ),
+                        RadioListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: ArchitectTerrainState.proposed,
+                          title: Text(l.architectTerrainStateProposed),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l.cancel),
+              ),
+              FilledButton(
+                onPressed: !changed
+                    ? null
+                    : () => Navigator.pop(
+                        context,
+                        (
+                          elevation: absElev,
+                          isMajor: isMajor,
+                          closed: isClosed,
+                          state: selectedState,
+                        ),
+                      ),
+                child: Text(l.applyAction),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (!mounted ||
+        result == null ||
+        !identical(document, _modelCommands.project) ||
+        _effectiveSelection.singleOrNull != id) {
+      return;
+    }
+
+    final currentSurface = initialState == ArchitectTerrainState.existing
+        ? _project.existingTerrain
+        : _project.proposedTerrain;
+    final rel = double.parse(
+      (result.elevation - currentSurface.datumElevation).toStringAsFixed(4),
+    );
+    final updatedSurface = currentSurface.copyWith(
+      contours: [
+        for (final c in currentSurface.contours)
+          c.id == id
+              ? c.copyWith(
+                  elevation: rel,
+                  rawAbsoluteElevation: result.elevation,
+                  isMajor: result.isMajor,
+                  closed: result.closed,
+                )
+              : c,
+      ],
+    );
+    var updatedProject = initialState == ArchitectTerrainState.existing
+        ? _project.copyWith(
+            existingTerrain: updatedSurface,
+            updatedAt: DateTime.now(),
+          )
+        : _project.copyWith(
+            proposedTerrain: updatedSurface,
+            updatedAt: DateTime.now(),
+          );
+    var finalId = id;
+    if (result.state != initialState) {
+      final moved = ArchitectLandscapeTool.changeTerrainState(
+        updatedProject,
+        id,
+        result.state,
+      );
+      if (moved != null) {
+        updatedProject = moved.project;
+        finalId = moved.elementId;
+      }
+    }
+    setState(() {
+      if (finalId != id) {
+        _selectionIds
+          ..remove(id)
+          ..add(finalId);
+        _selectedElementId = finalId;
+      }
+      _loadTerrainProperties(updatedProject, finalId);
+      _commands.commit(updatedProject);
+    });
+    _saveBiMProjectIfAttached();
+  }
+
+  Future<void> _showSpotProperties(
+    String id,
+    ArchitectTerrainState initialState,
+    ArchitectTerrainSpot spot,
+    double datum,
+  ) async {
+    final document = _modelCommands.project;
+    final l = context.l10n;
+    final initialAbs = spot.effectiveAbsolute(datum);
+    var absElev = initialAbs;
+    var selectedState = initialState;
+
+    final result = await showArchitectProperties<
+      ({double elevation, ArchitectTerrainState state})
+    >(
+      context: context,
+      onInsets: _insetProperties,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) {
+          final changed =
+              (absElev - initialAbs).abs() > 1e-4 ||
+              selectedState != initialState;
+          return architectAlertDialog(
+            key: const ValueKey('architect-terrain-properties'),
+            title: Text(l.architectTerrainSpotPropertiesTitle),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  key: const ValueKey('architect-spot-prop-elevation'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.height_rounded),
+                  title: Text(l.architectTerrainSpotElevationTitle),
+                  trailing: Text(
+                    '${absElev.toStringAsFixed(2)} m',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () async {
+                    final picked = await BimNumericKeypad.showInputDialog(
+                      context,
+                      title: l.architectTerrainSpotElevationTitle,
+                      initialText: formatArchitectNumericValue(
+                        absElev,
+                        decimals: 3,
+                      ),
+                      unitLabel: 'm',
+                      decimals: 3,
+                      allowNegative: true,
+                    );
+                    if (picked != null) {
+                      update(() => absElev = picked);
+                    }
+                  },
+                ),
+                const Divider(height: 16),
+                RadioGroup<ArchitectTerrainState>(
+                  groupValue: selectedState,
+                  onChanged: (value) {
+                    if (value != null) update(() => selectedState = value);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RadioListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: ArchitectTerrainState.existing,
+                        title: Text(l.architectTerrainStateExisting),
+                      ),
+                      RadioListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: ArchitectTerrainState.proposed,
+                        title: Text(l.architectTerrainStateProposed),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l.cancel),
+              ),
+              FilledButton(
+                onPressed: !changed
+                    ? null
+                    : () => Navigator.pop(
+                        context,
+                        (elevation: absElev, state: selectedState),
+                      ),
+                child: Text(l.applyAction),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (!mounted ||
+        result == null ||
+        !identical(document, _modelCommands.project) ||
+        _effectiveSelection.singleOrNull != id) {
+      return;
+    }
+
+    final currentSurface = initialState == ArchitectTerrainState.existing
+        ? _project.existingTerrain
+        : _project.proposedTerrain;
+    final rel = double.parse(
+      (result.elevation - currentSurface.datumElevation).toStringAsFixed(4),
+    );
+    final updatedSurface = currentSurface.copyWith(
+      spots: [
+        for (final s in currentSurface.spots)
+          s.id == id
+              ? s.copyWith(
+                  elevation: rel,
+                  rawAbsoluteElevation: result.elevation,
+                )
+              : s,
+      ],
+    );
+    var updatedProject = initialState == ArchitectTerrainState.existing
+        ? _project.copyWith(
+            existingTerrain: updatedSurface,
+            updatedAt: DateTime.now(),
+          )
+        : _project.copyWith(
+            proposedTerrain: updatedSurface,
+            updatedAt: DateTime.now(),
+          );
+    var finalId = id;
+    if (result.state != initialState) {
+      final moved = ArchitectLandscapeTool.changeTerrainState(
+        updatedProject,
+        id,
+        result.state,
+      );
+      if (moved != null) {
+        updatedProject = moved.project;
+        finalId = moved.elementId;
+      }
+    }
+    setState(() {
+      if (finalId != id) {
+        _selectionIds
+          ..remove(id)
+          ..add(finalId);
+        _selectedElementId = finalId;
+      }
+      _loadTerrainProperties(updatedProject, finalId);
+      _commands.commit(updatedProject);
+    });
+    _saveBiMProjectIfAttached();
   }
 
   Future<void> _showTerrainProperties(String id, ArchitectTerrainState initial) async {
