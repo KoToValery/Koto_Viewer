@@ -5987,6 +5987,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _terrainSubModeActive = false;
 
+  bool get _isTerrainOverlaySubMode =>
+      _activeTool == ArchitectTool.terrain &&
+      _terrainSubModeActive &&
+      _landscapeTool.terrainMode != ArchitectTerrainDraftMode.boundary &&
+      _landscapeTool.terrainMode != ArchitectTerrainDraftMode.boundaryRect;
+
+  bool get _blocksElementPickOrContextMenu =>
+      _landscapeTool.isDrafting ||
+      _landscapeTool.isPickingContour(_activeTool.name) ||
+      _isTerrainOverlaySubMode;
+
 
 
   void _startTerrainDraft() {
@@ -15800,6 +15811,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _elementTool.slabDraftPoints.isEmpty &&
 
+        !_blocksElementPickOrContextMenu &&
+
         !(_touchInput && _placingWithHold) &&
 
         _effectiveSelection.isEmpty &&
@@ -21372,7 +21385,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _roofTool.isDrafting ||
 
-        _elementTool.slabDraftPoints.isNotEmpty) {
+        _elementTool.slabDraftPoints.isNotEmpty ||
+
+        _blocksElementPickOrContextMenu) {
 
       return false;
 
@@ -21483,7 +21498,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _roofTool.isDrafting ||
 
-        _elementTool.slabDraftPoints.isNotEmpty) {
+        _elementTool.slabDraftPoints.isNotEmpty ||
+
+        _blocksElementPickOrContextMenu) {
 
       return false;
 
@@ -35390,6 +35407,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _terrainSubModeActive = false;
       } else {
         _terrainSubModeActive = true;
+        _radialMenuScreenPosition = null;
+        _radialMenuItems = [];
         _selectionIds.clear();
         _selectedElementId = null;
         _polygonEditId = null;
@@ -36151,7 +36170,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         onToolHoldStart: _beginPlacementHold,
 
-        onSelectionHold: _stairDraft == null && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null
+        onSelectionHold: _stairDraft == null && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null && !_blocksElementPickOrContextMenu
 
             ? (screenPoint) {
                 final hadSelection = _selectedElementId != null;
@@ -36164,9 +36183,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             : null,
 
-        onSecondaryTap: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null
+        onSecondaryTap: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null && !_blocksElementPickOrContextMenu
             ? _onContextHold : null,
-        onContextHold: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null
+        onContextHold: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null && !_blocksElementPickOrContextMenu
 
             ? _onContextHold
 

@@ -1,7 +1,9 @@
 import 'dart:ui';
 
+import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import 'package:flutter/material.dart' show FilledButton, Icons, ValueKey;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_radial_menu.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_door.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
@@ -825,6 +827,99 @@ void main() {
         expect(find.text(l.architectTerrainModeBoundaryRect), findsOneWidget);
         expect(find.text(l.architectTerrainModePad), findsNothing);
         expect(find.byKey(const ValueKey('architect-terrain-datum')), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'picking or starting a contour inside a selected terrain does not open radial context menu or hijack selection',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final starter = ArchitectProject.starterWithCatalog(
+          name: 'Pick contour no context conflict',
+          storeyCount: 1,
+          groundHeight: 3,
+          typicalHeight: 3,
+        );
+        const bnd = ArchitectTerrainBoundary(
+          id: 'terr_placed_pick',
+          polygon: [Offset(0, 0), Offset(10, 0), Offset(10, 8), Offset(0, 8)],
+        );
+        final model = ArchitectCommandController(
+          starter.copyWith(
+            activeStoreyId: starter.siteStorey!.id,
+            existingTerrain: const ArchitectTerrainSurface(
+              state: ArchitectTerrainState.existing,
+              boundaries: [bnd],
+            ),
+          ),
+        );
+        addTearDown(model.dispose);
+
+        await workspace.open(tester, model);
+        await tools.choose(tester, Icons.near_me_outlined);
+        await tester.pumpAndSettle();
+
+        final l = lookupAppLocalizations(const Locale('en'));
+
+        // 1. Select the placed terrain boundary first
+        await workspace.wallTap(tester, const Offset(5, 0));
+        await tester.pumpAndSettle();
+
+        // 2. Choose Pick Contour from the selected terrain's command bar
+        final pickChip = find.text(l.architectTerrainModePickContour);
+        await tester.ensureVisible(pickChip);
+        await tester.tap(pickChip);
+        await tester.pumpAndSettle();
+
+        // 3. Long touch hold inside the terrain polygon must NOT trigger selection or radial context menu
+        final insideScreen = workspace.screen(tester, const Offset(5, 4));
+        final holdGesture = await tester.startGesture(
+          insideScreen,
+          kind: PointerDeviceKind.touch,
+        );
+        await tester.pump(const Duration(milliseconds: 750));
+        await holdGesture.up();
+        await tester.pumpAndSettle();
+        expect(find.byType(ArchitectRadialMenu), findsNothing);
+        expect(
+          find.byKey(const ValueKey('architect-terrain-contour-interval')),
+          findsOneWidget,
+        );
+
+        // 4. Right-click inside the terrain polygon in Pick Contour must NOT open radial menu
+        final rightClick = await tester.startGesture(
+          insideScreen,
+          kind: PointerDeviceKind.mouse,
+          buttons: kSecondaryMouseButton,
+        );
+        await rightClick.up();
+        await tester.pumpAndSettle();
+        expect(find.byType(ArchitectRadialMenu), findsNothing);
+
+        // 5. Switching to manual Contour and starting over the terrain must place contour point (showing Undo/Finish actions) without opening context menu or re-selecting terrain
+        final contourChip = find.text(l.architectTerrainModeContour);
+        await tester.ensureVisible(contourChip);
+        await tester.tap(contourChip);
+        await tester.pumpAndSettle();
+
+        await workspace.wallTap(tester, const Offset(3, 4));
+        await tester.pumpAndSettle();
+        expect(find.byType(ArchitectRadialMenu), findsNothing);
+        expect(
+          find.byKey(const ValueKey('architect-landscape-undo-point')),
+          findsOneWidget,
+        );
+
+        // Hold over terrain while contour drafting is active must also NOT open context menu
+        final secondHold = await tester.startGesture(
+          workspace.screen(tester, const Offset(7, 4)),
+          kind: PointerDeviceKind.touch,
+        );
+        await tester.pump(const Duration(milliseconds: 750));
+        await secondHold.up();
+        await tester.pumpAndSettle();
+        expect(find.byType(ArchitectRadialMenu), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
