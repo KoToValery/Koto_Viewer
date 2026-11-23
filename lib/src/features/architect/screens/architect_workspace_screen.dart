@@ -6089,17 +6089,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _project.activeStorey.isBuildingStorey) {
       _commands.setPlanMode(ArchitectPlanMode.ceilingServices);
     }
-    if (nextTool.isLandscapeTool &&
-        _commands.isPlan &&
-        !_project.activeStorey.isSite) {
-      final ensured = _modelCommands.project.ensureSiteStorey();
-      final siteId = ensured.siteStorey!.id;
-      if (!identical(ensured, _modelCommands.project)) {
-        _modelCommands.commit(ensured);
+    if (nextTool.isLandscapeTool) {
+      final activeSurf = _landscapeTool.terrainState == ArchitectTerrainState.existing
+          ? _project.existingTerrain
+          : _project.proposedTerrain;
+      final otherSurf = _landscapeTool.terrainState == ArchitectTerrainState.existing
+          ? _project.proposedTerrain
+          : _project.existingTerrain;
+      final savedDatum = activeSurf.datumElevation.abs() > 1e-4
+          ? activeSurf.datumElevation
+          : otherSurf.datumElevation;
+      if (savedDatum.abs() > 1e-4) {
+        _landscapeTool.terrainDatumElevation = savedDatum;
       }
-      _lastViewIds[ArchitectWorkspaceView.plan] = siteId;
-      _commands.setPlanMode(ArchitectPlanMode.floor);
-      _commands.activateStorey(siteId);
+      if (_commands.isPlan && !_project.activeStorey.isSite) {
+        final ensured = _modelCommands.project.ensureSiteStorey();
+        final siteId = ensured.siteStorey!.id;
+        if (!identical(ensured, _modelCommands.project)) {
+          _modelCommands.commit(ensured);
+        }
+        _lastViewIds[ArchitectWorkspaceView.plan] = siteId;
+        _commands.setPlanMode(ArchitectPlanMode.floor);
+        _commands.activateStorey(siteId);
+      }
     }
     if (nextTool.usesComponent) {
       final library = ComponentLibraryService.instance;
@@ -34424,6 +34436,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return null;
   }
 
+  double _resolvedTerrainDatumFor(ArchitectTerrainState state) {
+    final surface = state == ArchitectTerrainState.existing
+        ? _project.existingTerrain
+        : _project.proposedTerrain;
+    if (surface.datumElevation.abs() > 1e-4) return surface.datumElevation;
+    final other = state == ArchitectTerrainState.existing
+        ? _project.proposedTerrain
+        : _project.existingTerrain;
+    if (other.datumElevation.abs() > 1e-4) return other.datumElevation;
+    return _landscapeTool.terrainDatumElevation;
+  }
+
   Future<void> _promptAndCommitPickedContour(
     ArchitectPickedContourCandidate candidate,
   ) async {
@@ -34432,9 +34456,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final surface = state == ArchitectTerrainState.existing
         ? _project.existingTerrain
         : _project.proposedTerrain;
-    final datum = surface.datumElevation.abs() > 1e-4
-        ? surface.datumElevation
-        : _landscapeTool.terrainDatumElevation;
+    final datum = _resolvedTerrainDatumFor(state);
     final initialAbs =
         candidate.suggestedElevation ?? _landscapeTool.contourAbsoluteElevation;
 
@@ -34509,9 +34531,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final surface = state == ArchitectTerrainState.existing
         ? _project.existingTerrain
         : _project.proposedTerrain;
-    final datum = surface.datumElevation.abs() > 1e-4
-        ? surface.datumElevation
-        : _landscapeTool.terrainDatumElevation;
+    final datum = _resolvedTerrainDatumFor(state);
     final initialAbs = _landscapeTool.contourAbsoluteElevation;
 
     final pickedAbs = await BimNumericKeypad.showInputDialog(
@@ -34549,9 +34569,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final surface = state == ArchitectTerrainState.existing
         ? _project.existingTerrain
         : _project.proposedTerrain;
-    final datum = surface.datumElevation.abs() > 1e-4
-        ? surface.datumElevation
-        : _landscapeTool.terrainDatumElevation;
+    final datum = _resolvedTerrainDatumFor(state);
     final initialAbs = _landscapeTool.contourAbsoluteElevation;
 
     final pickedAbs = await BimNumericKeypad.showInputDialog(
@@ -35280,10 +35298,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             s,
       ];
 
-      final datumChanged = (surf.datumElevation - _landscapeTool.terrainDatumElevation).abs() > 1e-4;
-      if (surfChanged || datumChanged) {
+      if (surfChanged) {
         final nextSurf = surf.copyWith(
-          datumElevation: _landscapeTool.terrainDatumElevation,
           boundaries: nextBnd,
           contours: nextCnt,
           spots: nextSpots,

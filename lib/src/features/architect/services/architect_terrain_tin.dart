@@ -187,13 +187,14 @@ class ArchitectTerrainTin {
     for (final c in surface.contours) {
       final pts = c.resolvedPolyline(samplesPerSpan: 6);
       if (pts.isEmpty) continue;
-      contourPolylines.add((pts: pts, z: c.elevation));
+      final z = c.effectiveRelative(surface.datumElevation);
+      contourPolylines.add((pts: pts, z: z));
       for (final p in pts) {
-        topoSamples.add((p: p, z: c.elevation));
+        topoSamples.add((p: p, z: z));
       }
     }
     for (final s in surface.spots) {
-      topoSamples.add((p: s.position, z: s.elevation));
+      topoSamples.add((p: s.position, z: s.effectiveRelative(surface.datumElevation)));
     }
 
     final points = <_TinPoint>[];
@@ -626,7 +627,7 @@ class ArchitectTerrainTin {
     required Color topColor,
     required Color sideColor,
     required Color bottomColor,
-    double skirtDepth = 0.35,
+    double skirtDepth = 1.0,
   }) {
     final tin = buildingCutouts.isEmpty
         ? ArchitectTerrainTin.of(surface)

@@ -72,6 +72,14 @@ class _Architect3dViewportState extends State<Architect3dViewport> {
         !identical(
           oldWidget.project.slabAssemblies,
           widget.project.slabAssemblies,
+        ) ||
+        !identical(
+          oldWidget.project.existingTerrain,
+          widget.project.existingTerrain,
+        ) ||
+        !identical(
+          oldWidget.project.proposedTerrain,
+          widget.project.proposedTerrain,
         )) {
       _rebuild();
     }

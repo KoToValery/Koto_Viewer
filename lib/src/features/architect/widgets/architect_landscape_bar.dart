@@ -134,21 +134,36 @@ class ArchitectLandscapeBar extends StatelessWidget {
     ];
   }
 
+  double _effectiveDatum() {
+    if (project != null) {
+      final active = controller.terrainState == ArchitectTerrainState.existing
+          ? project!.existingTerrain
+          : project!.proposedTerrain;
+      if (active.datumElevation.abs() > 1e-4) return active.datumElevation;
+      final other = controller.terrainState == ArchitectTerrainState.existing
+          ? project!.proposedTerrain
+          : project!.existingTerrain;
+      if (other.datumElevation.abs() > 1e-4) return other.datumElevation;
+    }
+    return controller.terrainDatumElevation;
+  }
+
   List<Widget> _buildDatumAndQuickActionsSuffix(
     BuildContext context,
     AppLocalizations l,
     ColorScheme colors,
   ) {
+    final datum = _effectiveDatum();
     return [
       ActionChip(
         key: const ValueKey('architect-terrain-datum'),
         visualDensity: VisualDensity.compact,
         avatar: Icon(Icons.height_rounded, size: 15, color: colors.primary),
         label: Text(
-          '±0.00: ${controller.terrainDatumElevation.toStringAsFixed(2)} m',
+          '±0.00: ${datum.toStringAsFixed(2)} m',
           style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
         ),
-        onPressed: () => _promptDatumKeypad(context, l),
+        onPressed: () => _promptDatumKeypad(context, l, datum),
       ),
       if (onCreateProposedFromExisting != null &&
           project != null &&
@@ -365,11 +380,12 @@ class ArchitectLandscapeBar extends StatelessWidget {
   Future<void> _promptDatumKeypad(
     BuildContext context,
     AppLocalizations l,
+    double initialDatum,
   ) async {
     final res = await BimNumericKeypad.showInputDialog(
       context,
       title: l.architectTerrainDatumDialogTitle,
-      initialText: controller.terrainDatumElevation.toStringAsFixed(2),
+      initialText: initialDatum.toStringAsFixed(2),
       unitLabel: 'm',
       decimals: 3,
       allowNegative: true,

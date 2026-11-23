@@ -399,7 +399,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           return _updateSurface(
             project,
             surface.copyWith(
-              datumElevation: terrainDatumElevation,
+              datumElevation: _resolvedDatum(project),
               boundaries: [...surface.boundaries, boundary],
             ),
           );
@@ -419,14 +419,12 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           return _updateSurface(
             project,
             surface.copyWith(
-              datumElevation: isOuter ? terrainDatumElevation : surface.datumElevation,
+              datumElevation: _resolvedDatum(project),
               boundaries: [...surface.boundaries, boundary],
             ),
           );
         } else if (terrainMode == ArchitectTerrainDraftMode.contour) {
-          final datum = surface.datumElevation.abs() > 1e-4
-              ? surface.datumElevation
-              : terrainDatumElevation;
+          final datum = _resolvedDatum(project);
           final effectiveElevation = contourAbsoluteElevation != 0.0
               ? (contourAbsoluteElevation - datum)
               : terrainElevation;
@@ -453,9 +451,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
 
       case 'contour':
         final surface = _targetSurface(project);
-        final datum = surface.datumElevation.abs() > 1e-4
-            ? surface.datumElevation
-            : terrainDatumElevation;
+        final datum = _resolvedDatum(project);
         final effectiveElevation = contourAbsoluteElevation != 0.0
             ? (contourAbsoluteElevation - datum)
             : terrainElevation;
@@ -593,21 +589,42 @@ class ArchitectLandscapeTool extends ChangeNotifier {
         (survey.contours.isEmpty && survey.spotElevations.isEmpty)) {
       return project;
     }
-    final syncedExisting = ArchitectTerrainSurface.fromGeodeticSurvey(
+    final userDatum = project.existingTerrain.datumElevation.abs() > 1e-4
+        ? project.existingTerrain.datumElevation
+        : (project.proposedTerrain.datumElevation.abs() > 1e-4
+            ? project.proposedTerrain.datumElevation
+            : terrainDatumElevation);
+    var syncedExisting = ArchitectTerrainSurface.fromGeodeticSurvey(
       survey,
       state: ArchitectTerrainState.existing,
     );
-    final nextProposed = project.proposedTerrain.isEmpty
+    if (userDatum.abs() > 1e-4) {
+      syncedExisting = syncedExisting.withDatumElevation(userDatum);
+    }
+    var nextProposed = project.proposedTerrain.isEmpty
         ? ArchitectTerrainSurface.fromGeodeticSurvey(
             survey,
             state: ArchitectTerrainState.proposed,
           )
         : project.proposedTerrain;
+    if (userDatum.abs() > 1e-4 && project.proposedTerrain.isEmpty) {
+      nextProposed = nextProposed.withDatumElevation(userDatum);
+    }
     return project.copyWith(
       existingTerrain: syncedExisting,
       proposedTerrain: nextProposed,
       updatedAt: DateTime.now(),
     );
+  }
+
+  double _resolvedDatum(ArchitectProject project) {
+    final target = _targetSurface(project);
+    if (target.datumElevation.abs() > 1e-4) return target.datumElevation;
+    final other = terrainState == ArchitectTerrainState.existing
+        ? project.proposedTerrain
+        : project.existingTerrain;
+    if (other.datumElevation.abs() > 1e-4) return other.datumElevation;
+    return terrainDatumElevation;
   }
 
   ArchitectTerrainSurface _targetSurface(ArchitectProject project) =>
@@ -639,19 +656,15 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     );
   }
 
-  /// Updates the building ±0.00 datum elevation on [state] (and both surfaces if synced)
-  /// while preserving all contours' and spots' absolute geodetic elevations.
+  /// Updates the building ±0.00 datum elevation on both Existing and Proposed
+  /// terrain surfaces while preserving all contours' and spots' absolute geodetic elevations.
   static ArchitectProject updateSurfaceDatum(
     ArchitectProject project, {
     required ArchitectTerrainState state,
     required double newDatum,
   }) {
-    final nextExisting = state == ArchitectTerrainState.existing
-        ? project.existingTerrain.withDatumElevation(newDatum)
-        : project.existingTerrain;
-    final nextProposed = state == ArchitectTerrainState.proposed
-        ? project.proposedTerrain.withDatumElevation(newDatum)
-        : project.proposedTerrain;
+    final nextExisting = project.existingTerrain.withDatumElevation(newDatum);
+    final nextProposed = project.proposedTerrain.withDatumElevation(newDatum);
     return project.copyWith(
       existingTerrain: nextExisting,
       proposedTerrain: nextProposed,

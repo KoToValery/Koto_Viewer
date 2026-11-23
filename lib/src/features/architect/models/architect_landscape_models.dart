@@ -514,15 +514,16 @@ class ArchitectTerrainSurface {
     }
 
     for (final s in effective.spots) {
-      addSample(s.position, s.elevation, weightBoost: 2.0);
+      addSample(s.position, s.effectiveRelative(effective.datumElevation), weightBoost: 2.0);
       if (weightTotal >= 1e8) return weightedSum / weightTotal;
     }
 
     for (final c in effective.contours) {
       final pts = c.resolvedPolyline(samplesPerSpan: 8);
       if (pts.isEmpty) continue;
+      final relZ = c.effectiveRelative(effective.datumElevation);
       if (pts.length == 1) {
-        addSample(pts.first, c.elevation, weightBoost: 1.5);
+        addSample(pts.first, relZ, weightBoost: 1.5);
         continue;
       }
       final count = c.closed ? pts.length : pts.length - 1;
@@ -530,7 +531,7 @@ class ArchitectTerrainSurface {
         final a = pts[i];
         final b = pts[(i + 1) % pts.length];
         final closest = _closestPointOnSegment(point, a, b);
-        addSample(closest, c.elevation, weightBoost: 2.5);
+        addSample(closest, relZ, weightBoost: 2.5);
         if (weightTotal >= 1e8) return weightedSum / weightTotal;
       }
     }
