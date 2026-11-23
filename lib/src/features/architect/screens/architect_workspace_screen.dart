@@ -8461,6 +8461,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _cancelActiveDrags();
     _resetWallDraft();
+    _elementTool.cancelSlabDrafting();
 
     setState(() {
 
@@ -21188,7 +21189,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _onSelectionHold(Offset screenPoint) {
-    if (_placingComponent) return false;
+    if (_placingComponent || _cutOpeningTargetId != null) return false;
     if (_marqueeTool.isDrafting || _curvingEdgeElementId != null) return false;
 
     if (_wallCutIds.isNotEmpty ||
@@ -21303,7 +21304,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _onContextHold(Offset screenPoint) {
     _dismissTouchCandidates();
-    if (_marqueeTool.isDrafting || _curvingEdgeElementId != null ||
+    if (_cutOpeningTargetId != null ||
+        _marqueeTool.isDrafting ||
+        _curvingEdgeElementId != null ||
         _underlayBusy || _underlayMaskDrafting || _rasterCalibrationStep != 0 ||
         _underlayCropEditor.active || _draggingRasterId != null) return false;
 
@@ -24771,6 +24774,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _selectAt(Offset point, {
     bool invalidateGesture = true, bool toggle = false,
   }) {
+    if (_cutOpeningTargetId != null) return false;
     if (_touchInput && invalidateGesture) {
       final ids = _touchHits(point);
       setState(() => _touchCandidates = ids.length > 1
@@ -35759,7 +35763,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         onToolHoldStart: _beginPlacementHold,
 
-        onSelectionHold: _stairDraft == null && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSelectionHold: _stairDraft == null && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null
 
             ? (screenPoint) {
                 final hadSelection = _selectedElementId != null;
@@ -35772,9 +35776,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             : null,
 
-        onSecondaryTap: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSecondaryTap: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null
             ? _onContextHold : null,
-        onContextHold: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onContextHold: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null
 
             ? _onContextHold
 

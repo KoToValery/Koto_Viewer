@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -487,4 +489,74 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'Touch hold inside slab places first opening point instead of selecting slab',
+    (tester) async {
+      final floor = project().activeStorey;
+      final model = ArchitectCommandController(
+        project().copyWith(
+          storeys: [
+            floor.copyWith(
+              slabs: [floor.slabs.first],
+              roofs: [],
+              cadPrimitives: [],
+            ),
+          ],
+        ),
+      );
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      await editing.contextHold(tester, const Offset(1, 1));
+      final cut = find.byKey(const ValueKey('architect-radial-cutOpening'));
+      expect(cut, findsOneWidget);
+      await tester.tap(cut);
+      await tester.pumpAndSettle();
+
+      // Hold directly inside the slab at >= 280ms (placement hold) for point 1.
+      final gesture = await tester.startGesture(
+        workspace.screen(tester, const Offset(3, 3)),
+        kind: PointerDeviceKind.touch,
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      final painter = workspace.overlay(tester);
+      expect(painter.selectedElementId, isNull);
+      expect(painter.selectedElementIds, isEmpty);
+      expect(painter.slabDraftPoints, hasLength(1));
+      expect(find.byKey(const ValueKey('opening-draft-undo')), findsOneWidget);
+      expect(find.byKey(const ValueKey('architect-command-cancel')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('drawSlabDrafting paints closing guide to first point and high-contrast vertices', () {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    ArchitectElementsPainterHelper.drawSlabDrafting(
+      canvas: canvas,
+      points: const [Offset(0, 0), Offset(4, 0), Offset(4, 3)],
+      candidatePoint: const Offset(0, 3),
+      zoomScale: 25.0,
+      showClosingGuide: true,
+    );
+    final picture = recorder.endRecording();
+    expect(picture, isNotNull);
+    picture.dispose();
+
+    final touchRecorder = ui.PictureRecorder();
+    final touchCanvas = Canvas(touchRecorder);
+    ArchitectElementsPainterHelper.drawSlabDrafting(
+      canvas: touchCanvas,
+      points: const [Offset(0, 0), Offset(4, 0), Offset(4, 3)],
+      candidatePoint: null,
+      zoomScale: 25.0,
+      showClosingGuide: true,
+    );
+    final touchPicture = touchRecorder.endRecording();
+    expect(touchPicture, isNotNull);
+    touchPicture.dispose();
+  });
 }

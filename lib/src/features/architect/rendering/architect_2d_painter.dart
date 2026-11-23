@@ -810,6 +810,7 @@ class Architect2dPainter extends CustomPainter {
         points: slabDraftPoints,
         candidatePoint: slabCandidatePoint,
         zoomScale: zoomScale,
+        showClosingGuide: activeTool != ArchitectTool.spline,
       );
       if (roofTool != null) {
         ArchitectRoofPainterHelper.paintDraftRoof(
@@ -2204,23 +2205,6 @@ class Architect2dPainter extends CustomPainter {
         draftingScale: draftingScale,
         isStart: true,
       );
-    }
-
-    if (slabDraftPoints.isNotEmpty) {
-      _drawDraftMarker(
-        canvas,
-        slabDraftPoints.first,
-        draftingScale: draftingScale,
-        isStart: true,
-      );
-      for (int i = 1; i < slabDraftPoints.length; i++) {
-        _drawDraftMarker(
-          canvas,
-          slabDraftPoints[i],
-          draftingScale: draftingScale,
-          isStart: false,
-        );
-      }
     }
 
     if (marqueePoints.isNotEmpty) {
