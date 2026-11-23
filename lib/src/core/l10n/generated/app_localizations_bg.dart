@@ -13757,6 +13757,269 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSplineTraceReady => 'Проследи контур';
 
   @override
+  String get checkNameColumnAxial => 'Нормална сила';
+
+  @override
+  String get checkNameSeismicAxial => 'Сеизмичен натиск';
+
+  @override
+  String get checkNamePunching => 'Продънване';
+
+  @override
+  String get checkNameSlabDeflection => 'Провисване';
+
+  @override
+  String get checkNameSlabBending => 'Огъване на плочата';
+
+  @override
+  String get checkLevelOk => 'В границата';
+
+  @override
+  String get checkLevelNear => 'Близо до границата';
+
+  @override
+  String get checkLevelOver => 'Над границата';
+
+  @override
+  String get checkLevelUnknown => 'Неоценено';
+
+  @override
+  String get checkStale => 'Остаряло';
+
+  @override
+  String get checkRunning => 'Проверка…';
+
+  @override
+  String get checkPreliminary =>
+      'Предварителна еластична оценка, не е нормативна проверка.';
+
+  @override
+  String checkAssumptionColumn(String ratio, String limit) {
+    return 'Носимоспособност с e0 = max(h/30; 20 mm), армировка $ratio %. Сеизмична граница ν_d ≤ $limit.';
+  }
+
+  @override
+  String checkAssumptionWall(String ratio, String limit) {
+    return 'Носимоспособност с e0 = max(t/30; 20 mm), армировка $ratio %. Сеизмична граница ν_d ≤ $limit.';
+  }
+
+  @override
+  String checkAssumptionPunching(String ratio) {
+    return 'Контролен периметър на 2d, отрязан по ръбовете и отворите на плочата. Приета армировка на плочата $ratio %.';
+  }
+
+  @override
+  String checkAssumptionDeflection(String factor, String ratio) {
+    return 'Еластично провисване × $factor за пълзене и напукване, граница L/$ratio, L = двойно разстояние до най-близката опора.';
+  }
+
+  @override
+  String checkAssumptionBending(String radius) {
+    return 'Изчислителен момент, осреднен на $radius m, спрямо носимоспособността на сечението на плочата.';
+  }
+
+  @override
+  String checkUnsupportedArea(String area) {
+    return 'Без опора: $area m²';
+  }
+
+  @override
+  String get checkUnsupportedHint =>
+      'Тази част от плочата няма опори. Добавете колони или шайби под нея.';
+
+  @override
+  String checkSlabReaction(String value) {
+    return 'Товар от плочата върху опората: $value kN';
+  }
+
+  @override
+  String checkAxialTotal(String value) {
+    return 'Общ натиск на това ниво: $value kN';
+  }
+
+  @override
+  String get checkNotAvailable => 'Няма проверка за този елемент';
+
+  @override
+  String get checkNameWallShear => 'Сеизмично срязване';
+
+  @override
+  String get checkNameStoreyDrift => 'Етажен дрейф';
+
+  @override
+  String get checkNameStoreyTorsion => 'Усукване';
+
+  @override
+  String checkAssumptionWallShear(String mag, String ratio) {
+    return 'Метод на хоризонталните сили (EC8) със случаен ексцентрицитет ±5 % и коефициент $mag. Приета хоризонтална армировка $ratio %.';
+  }
+
+  @override
+  String get checkAssumptionDrift =>
+      'Напукана коравина 0.5·E, граница по EC8 §4.4.3.2: d_r·ν ≤ α·h.';
+
+  @override
+  String get checkAssumptionTorsion =>
+      'Главни оси на коравина, срязваща деформация в шайбите и фасади в масата. Граници: e0 ≤ 0.30·r и r ≥ l_s.';
+
+  @override
+  String get designParamsAction => 'Данни';
+
+  @override
+  String get designParamsTitle => 'Данни за проекта';
+
+  @override
+  String get designParamsSeismicSection => 'Сеизмична зона (EC8)';
+
+  @override
+  String get designParamsAgLabel => 'Ускорение a_gR (g)';
+
+  @override
+  String get designParamsAgNotSet => 'Не е зададено';
+
+  @override
+  String get designParamsAgCustom => 'Друго';
+
+  @override
+  String get designParamsSoilLabel => 'Почва';
+
+  @override
+  String get designParamsSoilTooltipA => 'Скала или скалоподобна почва';
+
+  @override
+  String get designParamsSoilTooltipB =>
+      'Много плътен пясък, чакъл или твърда глина';
+
+  @override
+  String get designParamsSoilTooltipC =>
+      'Плътен до средноплътен пясък или глина';
+
+  @override
+  String get designParamsSoilTooltipD => 'Рохкави пясъци или меки глини';
+
+  @override
+  String get designParamsSoilTooltipE => 'Алувиален слой (5–20 m) върху скала';
+
+  @override
+  String get designParamsImportanceLabel => 'Значимост';
+
+  @override
+  String get designParamsSystemLabel => 'Система';
+
+  @override
+  String get designParamsSystemAuto => 'Авто';
+
+  @override
+  String get designParamsSystemWall => 'Шайби';
+
+  @override
+  String get designParamsSystemFrame => 'Рамка';
+
+  @override
+  String get designParamsSystemDual => 'Смесена';
+
+  @override
+  String get designParamsSystemLow => 'Ниска дукт.';
+
+  @override
+  String get designParamsDriftLabel => 'Дрейф';
+
+  @override
+  String get designParamsDriftBrittle => 'Крехки (0.5%)';
+
+  @override
+  String get designParamsDriftDuctile => 'Дуктилни (0.75%)';
+
+  @override
+  String get designParamsDriftFree => 'Свободни (1.0%)';
+
+  @override
+  String get designParamsMaterialsSection => 'Бетон и товари';
+
+  @override
+  String get designParamsConcreteLabel => 'Бетон';
+
+  @override
+  String get designParamsDeadLabel => 'Пост. G (kN/m²)';
+
+  @override
+  String get designParamsLiveLabel => 'Пол. Q (kN/m²)';
+
+  @override
+  String get designParamsFacadeLabel => 'Фасада (kN/m)';
+
+  @override
+  String get designParamsApply => 'Приложи';
+
+  @override
+  String designParamsSpectrumSource(String source, String q) {
+    return 'Спектър: $source · q = $q';
+  }
+
+  @override
+  String get checkBuildingAction => 'Провери';
+
+  @override
+  String get checkBuildingTitle => 'Проверка на сградата';
+
+  @override
+  String get checkRunFullButton => 'Пълна проверка (0.25 m)';
+
+  @override
+  String checkFullDoneBadge(int ms) {
+    return '0.25 m · $ms ms';
+  }
+
+  @override
+  String checkLiveDoneBadge(int ms) {
+    return '0.50 m · $ms ms';
+  }
+
+  @override
+  String get checkSummaryColumns => 'Колони';
+
+  @override
+  String get checkSummaryWalls => 'Шайби';
+
+  @override
+  String get checkSummarySlabs => 'Плочи';
+
+  @override
+  String get checkSummaryTorsion => 'Усукване';
+
+  @override
+  String get checkSummarySeismicUnset =>
+      'Въведете сеизмична зона за шайби и дрейф';
+
+  @override
+  String checkSummaryBaseShear(String fb, String t1, String mass) {
+    return 'Базова сила F_b: $fb kN · T₁: $t1 s · Маса: $mass t';
+  }
+
+  @override
+  String get checkNeeds3dWarning =>
+      'Опростеният метод е само ориентир — препоръчва се 3D модален анализ.';
+
+  @override
+  String get checkTorsionAdviceEcc =>
+      'Добавете коравина от страната на центъра на масите.';
+
+  @override
+  String get checkTorsionAdviceFlex =>
+      'Добавете шайби по периметъра от двете страни за по-голяма усуквателна коравина.';
+
+  @override
+  String get checkSummaryAttentionList => 'Елементи за внимание';
+
+  @override
+  String get checkSummaryAllOk =>
+      'Всички оценени елементи са в предварителните граници.';
+
+  @override
+  String get checkSummaryNoElements =>
+      'Поставете плоча, колони или шайби за проверка.';
+
+  @override
   String get architectImportProject => 'Импорт на проект (ZIP)';
 
   @override

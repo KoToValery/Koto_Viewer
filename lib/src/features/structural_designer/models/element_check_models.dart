@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import '../analysis/seismic_elf_calculator.dart';
+
 // === SECTION: INDEX ===
 // === SECTION: CHECK KINDS & LEVELS ===
 // === SECTION: ELEMENT CHECK ===
@@ -26,6 +28,15 @@ enum CheckKind {
 
   /// Normalised seismic axial load of a ductile wall.
   wallSeismicAxial,
+
+  /// Shear wall seismic shear V_Ed against preliminary shear capacity V_Rd.
+  wallSeismicShear,
+
+  /// Interstorey drift d_r * nu against EC8 §4.4.3.2 limit alpha * h.
+  storeyDrift,
+
+  /// Storey torsional regularity: max(e0 / (0.3 r), l_s / r).
+  storeyTorsion,
 
   /// Long-term deflection against L_eff / 250.
   slabDeflection,
@@ -64,6 +75,13 @@ enum UtilizationLevel {
     over => const Color(0xFFB71C1C),
     unknown => const Color(0xFF546E7A),
   };
+}
+
+/// "94 %"; a number with its unit symbol, not a translatable word.
+String utilizationText(double utilization) {
+  if (!utilization.isFinite || utilization < 0) return '—';
+  if (utilization > 9.99) return '>999 %';
+  return '${(utilization * 100).round()} %';
 }
 
 // === SECTION: ELEMENT CHECK ===
@@ -178,12 +196,18 @@ class PreliminaryCheckReport {
   final Map<String, ElementUtilization> elements;
   final List<SlabCheckResult> slabs;
   final List<UnsupportedSlabArea> unsupported;
+  final SeismicElfReport? seismic;
+  final bool isFullCheck;
+  final double meshSpacingM;
   final int durationMs;
 
   const PreliminaryCheckReport({
     required this.elements,
     required this.slabs,
     required this.unsupported,
+    this.seismic,
+    this.isFullCheck = false,
+    this.meshSpacingM = 0.5,
     this.durationMs = 0,
   });
 
@@ -203,4 +227,13 @@ class PreliminaryCheckReport {
 
   Iterable<UnsupportedSlabArea> unsupportedFor(String storeyId) =>
       unsupported.where((u) => u.storeyId == storeyId);
+
+  int get overLimitCount =>
+      elements.values.where((e) => e.level == UtilizationLevel.over).length +
+      slabs.where((s) => s.governing.level == UtilizationLevel.over).length +
+      unsupported.length;
+
+  int get nearLimitCount =>
+      elements.values.where((e) => e.level == UtilizationLevel.near).length +
+      slabs.where((s) => s.governing.level == UtilizationLevel.near).length;
 }

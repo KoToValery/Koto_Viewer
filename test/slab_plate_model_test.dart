@@ -22,18 +22,24 @@ void main() {
 
   group('ACM element', () {
     test('consistent load sums to the cell area', () {
-      final el = AcmElement(0.5, 0.2);
+      final el = AcmElement(0.5, 0.5, 0.2);
       var sum = 0.0;
       for (var n = 0; n < 4; n++) {
         sum += el.load[n * 3];
       }
       expect(sum, closeTo(0.25, 1e-12));
+      final rect = AcmElement(0.6, 0.35, 0.2);
+      var rectSum = 0.0;
+      for (var n = 0; n < 4; n++) {
+        rectSum += rect.load[n * 3];
+      }
+      expect(rectSum, closeTo(0.21, 1e-12));
     });
 
-    test('rigid-body motion produces no forces', () {
-      final el = AcmElement(0.5, 0.3);
-      final h = 0.25;
-      final nodes = [Offset(-h, -h), Offset(h, -h), Offset(h, h), Offset(-h, h)];
+    test('rigid-body motion produces no forces on a rectangular cell', () {
+      final el = AcmElement(0.6, 0.35, 0.3);
+      const hx = 0.3, hy = 0.175;
+      final nodes = [Offset(-hx, -hy), Offset(hx, -hy), Offset(hx, hy), Offset(-hx, hy)];
       // w = 1 + 2x + 3y  -> wx = 2, wy = 3
       final u = [
         for (final p in nodes) ...[1 + 2 * p.dx + 3 * p.dy, 2.0, 3.0],

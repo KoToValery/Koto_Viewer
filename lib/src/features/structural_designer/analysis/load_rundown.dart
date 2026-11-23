@@ -1,9 +1,10 @@
-﻿import 'dart:math' as math;
+import 'dart:math' as math;
 import 'dart:ui';
 
 import '../models/element_check_models.dart';
 import '../models/structural_element.dart';
 import 'member_checks.dart';
+import 'seismic_elf_calculator.dart';
 import 'slab_boundary_geometry.dart';
 import 'slab_plate_model.dart';
 import 'structural_polygon_distance.dart';
@@ -34,14 +35,28 @@ class RundownLoads {
 // === SECTION: RUNDOWN ===
 
 class LoadRundown {
-  /// Isolate entry point for `compute`.
+  static const double liveSpacingM = 0.50;
+  static const double fullSpacingM = 0.25;
+
+  /// Isolate entry point for `compute` (live coarse 0.50 m mesh).
   static PreliminaryCheckReport analyzeEntry((StructuralProject, double) input) =>
-      analyze(input.$1, cadUnitsPerMeter: input.$2);
+      analyze(input.$1, cadUnitsPerMeter: input.$2, spacingM: liveSpacingM);
+
+  /// Isolate entry point for explicit full check (fine 0.25 m mesh).
+  static PreliminaryCheckReport analyzeFullEntry(
+    (StructuralProject, double) input,
+  ) => analyze(
+    input.$1,
+    cadUnitsPerMeter: input.$2,
+    spacingM: fullSpacingM,
+    isFullCheck: true,
+  );
 
   static PreliminaryCheckReport analyze(
     StructuralProject project, {
     required double cadUnitsPerMeter,
-    double spacingM = 0.5,
+    double spacingM = liveSpacingM,
+    bool isFullCheck = false,
   }) {
     final watch = Stopwatch()..start();
     final scale = cadUnitsPerMeter;
@@ -50,6 +65,10 @@ class LoadRundown {
       ..sort((a, b) => a.elevation.compareTo(b.elevation));
     if (storeys.isEmpty) return PreliminaryCheckReport.empty;
     final material = CheckMaterial.of(project);
+    final seismic = SeismicElfCalculator.analyze(
+      project,
+      cadUnitsPerMeter: scale,
+    );
 
     final elements = <String, ElementUtilization>{};
     final slabs = <SlabCheckResult>[];
@@ -83,16 +102,20 @@ class LoadRundown {
       for (final col in storey.columns) {
         final key = PreliminaryCheckReport.key(storey.id, col.id);
         final area = MemberChecks.columnAreaM2(col, scale);
-        final slabUls = plate.reactionUls[col.id] ?? 0;
-        final slabQp = plate.reactionQp[col.id] ?? 0;
+        // Uplift at a re-entrant corner is not allowed to relieve a column.
+        final slabUls = math.max(0.0, plate.reactionUls[col.id] ?? 0);
+        final slabQp = math.max(0.0, plate.reactionQp[col.id] ?? 0);
         final from = transferred[key] ?? (0.0, 0.0);
         final share = beamShare[col.id] ?? (0.0, 0.0);
         final selfWeight = RundownLoads.concreteWeight * area * height;
         final nUls = slabUls + share.$1 + from.$1 + RundownLoads.gammaG * selfWeight;
         final nQp = slabQp + share.$2 + from.$2 + selfWeight;
+        // Without a slab and without load from above the load path is unknown:
+        // a self-weight-only percentage would look like a verdict.
+        final unknownLoad = plate.status == PlateStatus.noSlab && from.$1 <= 0;
         final checks = MemberChecks.column(
-          axialUls: nUls,
-          axialQp: nQp,
+          axialUls: unknownLoad ? double.nan : nUls,
+          axialQp: unknownLoad ? double.nan : nQp,
           areaM2: area,
           minDimensionM: MemberChecks.columnMinDimensionM(col, scale),
           material: material,
@@ -119,24 +142,35 @@ class LoadRundown {
         final key = PreliminaryCheckReport.key(storey.id, wall.id);
         final lengthM = wall.length / scale, thicknessM = wall.thickness / scale;
         final area = lengthM * thicknessM;
-        final slabUls = plate.reactionUls[wall.id] ?? 0;
-        final slabQp = plate.reactionQp[wall.id] ?? 0;
+        final slabUls = math.max(0.0, plate.reactionUls[wall.id] ?? 0);
+        final slabQp = math.max(0.0, plate.reactionQp[wall.id] ?? 0);
         final from = transferred[key] ?? (0.0, 0.0);
         final share = beamShare[wall.id] ?? (0.0, 0.0);
         final selfWeight = RundownLoads.concreteWeight * area * height;
         final nUls = slabUls + share.$1 + from.$1 + RundownLoads.gammaG * selfWeight;
         final nQp = slabQp + share.$2 + from.$2 + selfWeight;
+        final unknownWallLoad =
+            plate.status == PlateStatus.noSlab && from.$1 <= 0;
+        final wallChecks = MemberChecks.wall(
+          axialUls: unknownWallLoad ? double.nan : nUls,
+          axialQp: unknownWallLoad ? double.nan : nQp,
+          areaM2: area,
+          thicknessM: thicknessM,
+          material: material,
+        );
+        final shearCheck = seismic.wallShearChecks[key];
+        if (shearCheck != null && shearCheck.isDetermined) {
+          wallChecks.add(shearCheck);
+        }
+        final driftCheck = seismic.storeyDriftChecks[storey.id];
+        if (driftCheck != null && driftCheck.isDetermined) {
+          wallChecks.add(driftCheck);
+        }
         elements[key] = ElementUtilization(
           elementId: wall.id,
           storeyId: storey.id,
           type: CheckedElementType.wall,
-          checks: MemberChecks.wall(
-            axialUls: nUls,
-            axialQp: nQp,
-            areaM2: area,
-            thicknessM: thicknessM,
-            material: material,
-          ),
+          checks: wallChecks,
           axialUls: nUls,
           axialQuasiPermanent: nQp,
           slabReactionUls: slabUls,
@@ -157,6 +191,9 @@ class LoadRundown {
       elements: elements,
       slabs: slabs,
       unsupported: unsupported,
+      seismic: seismic,
+      isFullCheck: isFullCheck,
+      meshSpacingM: spacingM,
       durationMs: watch.elapsedMilliseconds,
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'structural_tool_groups.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/cantilever_analysis_models.dart';
+import '../models/element_check_models.dart';
 import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
@@ -50,6 +51,10 @@ class ElementPaletteBar extends StatelessWidget {
   final VerticalCapacityReport? verticalCapacityReport;
   final VoidCallback? onOpenSeismicReport;
   final SeismicAnalysisReport? seismicReport;
+  final VoidCallback? onOpenBuildingCheck;
+  final VoidCallback? onOpenDesignParameters;
+  final PreliminaryCheckReport? checkReport;
+  final bool checkRunning;
   final bool hasWallStart;
   final bool hasBeamStart;
   final double currentWallLength;
@@ -117,6 +122,10 @@ class ElementPaletteBar extends StatelessWidget {
     this.verticalCapacityReport,
     this.onOpenSeismicReport,
     this.seismicReport,
+    this.onOpenBuildingCheck,
+    this.onOpenDesignParameters,
+    this.checkReport,
+    this.checkRunning = false,
     this.hasWallStart = false,
     this.hasBeamStart = false,
     this.onCustomColumnDimensions,
@@ -227,6 +236,16 @@ class ElementPaletteBar extends StatelessWidget {
             ),
           ),
       if (group == StructuralToolGroup.checks) ...[
+        if (onOpenBuildingCheck != null) _buildBuildingCheckButton(context),
+        if (onOpenDesignParameters != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ActionChip(
+              avatar: const Icon(Icons.tune_rounded, size: 16, color: Color(0xFF00E5FF)),
+              label: Text(context.l10n.designParamsAction),
+              onPressed: onOpenDesignParameters,
+            ),
+          ),
         if (onOpenVerticalCapacityReport != null)
           Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ActionChip(
             avatar: const AppIcon(AppIconId.measure, size: 16),
@@ -238,6 +257,42 @@ class ElementPaletteBar extends StatelessWidget {
         _buildSeismicAnalysisButton(context),
       ],
     ],
+    );
+  }
+
+  Widget _buildBuildingCheckButton(BuildContext context) {
+    final report = checkReport;
+    final over = report?.overLimitCount ?? 0;
+    final near = report?.nearLimitCount ?? 0;
+    final color = over > 0
+        ? UtilizationLevel.over.color
+        : near > 0
+            ? UtilizationLevel.near.color
+            : (report != null && report.elements.isNotEmpty)
+                ? UtilizationLevel.ok.color
+                : const Color(0xFF00E5FF);
+    final suffix = over > 0 ? ' ($over)' : '';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: ActionChip(
+        avatar: checkRunning
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFF00E5FF),
+                ),
+              )
+            : Icon(Icons.verified_outlined, size: 16, color: color),
+        label: Text(
+          '${context.l10n.checkBuildingAction}$suffix',
+          style: TextStyle(color: color, fontWeight: FontWeight.bold),
+        ),
+        side: BorderSide(color: color.withValues(alpha: 0.7), width: 1.2),
+        backgroundColor: color.withValues(alpha: 0.14),
+        onPressed: onOpenBuildingCheck,
+      ),
     );
   }
 

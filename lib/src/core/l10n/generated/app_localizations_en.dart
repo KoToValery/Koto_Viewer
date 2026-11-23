@@ -13705,6 +13705,271 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSplineTraceReady => 'Trace contour';
 
   @override
+  String get checkNameColumnAxial => 'Axial load';
+
+  @override
+  String get checkNameSeismicAxial => 'Seismic axial';
+
+  @override
+  String get checkNamePunching => 'Punching';
+
+  @override
+  String get checkNameSlabDeflection => 'Deflection';
+
+  @override
+  String get checkNameSlabBending => 'Slab bending';
+
+  @override
+  String get checkLevelOk => 'Within limit';
+
+  @override
+  String get checkLevelNear => 'Near limit';
+
+  @override
+  String get checkLevelOver => 'Over limit';
+
+  @override
+  String get checkLevelUnknown => 'Not evaluated';
+
+  @override
+  String get checkStale => 'Outdated';
+
+  @override
+  String get checkRunning => 'Checking…';
+
+  @override
+  String get checkPreliminary =>
+      'Preliminary elastic estimate, not a code verification.';
+
+  @override
+  String checkAssumptionColumn(String ratio, String limit) {
+    return 'Capacity with e0 = max(h/30, 20 mm), reinforcement $ratio %. Seismic limit ν_d ≤ $limit.';
+  }
+
+  @override
+  String checkAssumptionWall(String ratio, String limit) {
+    return 'Capacity with e0 = max(t/30, 20 mm), reinforcement $ratio %. Seismic limit ν_d ≤ $limit.';
+  }
+
+  @override
+  String checkAssumptionPunching(String ratio) {
+    return 'Control perimeter at 2d, clipped at slab edges and openings. Slab reinforcement $ratio % assumed.';
+  }
+
+  @override
+  String checkAssumptionDeflection(String factor, String ratio) {
+    return 'Elastic deflection × $factor for creep and cracking, limit L/$ratio, L = twice the distance to the nearest support.';
+  }
+
+  @override
+  String checkAssumptionBending(String radius) {
+    return 'Design moment averaged over $radius m against the section capacity of the slab.';
+  }
+
+  @override
+  String checkUnsupportedArea(String area) {
+    return 'No support: $area m²';
+  }
+
+  @override
+  String get checkUnsupportedHint =>
+      'This part of the slab has no supports. Add columns or walls under it.';
+
+  @override
+  String checkSlabReaction(String value) {
+    return 'Slab load on this support: $value kN';
+  }
+
+  @override
+  String checkAxialTotal(String value) {
+    return 'Total axial load at this level: $value kN';
+  }
+
+  @override
+  String get checkNotAvailable => 'Not available for this element';
+
+  @override
+  String get checkNameWallShear => 'Seismic shear';
+
+  @override
+  String get checkNameStoreyDrift => 'Storey drift';
+
+  @override
+  String get checkNameStoreyTorsion => 'Torsion';
+
+  @override
+  String checkAssumptionWallShear(String mag, String ratio) {
+    return 'EC8 lateral force method with accidental torsion ±5 % and shear factor $mag. Horizontal web steel $ratio % assumed.';
+  }
+
+  @override
+  String get checkAssumptionDrift =>
+      'Cracked stiffness 0.5·E, EC8 §4.4.3.2 limit d_r·ν ≤ α·h.';
+
+  @override
+  String get checkAssumptionTorsion =>
+      'Principal stiffness axes, shear-corrected walls, perimeter facades included. Limits: e0 ≤ 0.30·r and r ≥ l_s.';
+
+  @override
+  String get designParamsAction => 'Design data';
+
+  @override
+  String get designParamsTitle => 'Project design data';
+
+  @override
+  String get designParamsSeismicSection => 'Seismic zone (EC8)';
+
+  @override
+  String get designParamsAgLabel => 'Ground acceleration a_gR (g)';
+
+  @override
+  String get designParamsAgNotSet => 'Not set';
+
+  @override
+  String get designParamsAgCustom => 'Custom';
+
+  @override
+  String get designParamsSoilLabel => 'Soil class';
+
+  @override
+  String get designParamsSoilTooltipA => 'Rock or rock-like ground';
+
+  @override
+  String get designParamsSoilTooltipB =>
+      'Very dense sand, gravel or stiff clay';
+
+  @override
+  String get designParamsSoilTooltipC =>
+      'Dense to medium-dense sand, gravel or stiff clay';
+
+  @override
+  String get designParamsSoilTooltipD =>
+      'Loose to medium cohesionless or soft cohesive soil';
+
+  @override
+  String get designParamsSoilTooltipE =>
+      'Alluvial surface layer (5–20 m) over rock';
+
+  @override
+  String get designParamsImportanceLabel => 'Importance';
+
+  @override
+  String get designParamsSystemLabel => 'System';
+
+  @override
+  String get designParamsSystemAuto => 'Auto';
+
+  @override
+  String get designParamsSystemWall => 'Walls';
+
+  @override
+  String get designParamsSystemFrame => 'Frame';
+
+  @override
+  String get designParamsSystemDual => 'Dual';
+
+  @override
+  String get designParamsSystemLow => 'Low duct.';
+
+  @override
+  String get designParamsDriftLabel => 'Drift limit';
+
+  @override
+  String get designParamsDriftBrittle => 'Brittle (0.5%)';
+
+  @override
+  String get designParamsDriftDuctile => 'Ductile (0.75%)';
+
+  @override
+  String get designParamsDriftFree => 'Free (1.0%)';
+
+  @override
+  String get designParamsMaterialsSection => 'Concrete & loads';
+
+  @override
+  String get designParamsConcreteLabel => 'Concrete';
+
+  @override
+  String get designParamsDeadLabel => 'Dead G (kN/m²)';
+
+  @override
+  String get designParamsLiveLabel => 'Live Q (kN/m²)';
+
+  @override
+  String get designParamsFacadeLabel => 'Facade (kN/m)';
+
+  @override
+  String get designParamsApply => 'Apply';
+
+  @override
+  String designParamsSpectrumSource(String source, String q) {
+    return 'Spectrum: $source · q = $q';
+  }
+
+  @override
+  String get checkBuildingAction => 'Check';
+
+  @override
+  String get checkBuildingTitle => 'Building check';
+
+  @override
+  String get checkRunFullButton => 'Full check (0.25 m)';
+
+  @override
+  String checkFullDoneBadge(int ms) {
+    return '0.25 m · $ms ms';
+  }
+
+  @override
+  String checkLiveDoneBadge(int ms) {
+    return '0.50 m · $ms ms';
+  }
+
+  @override
+  String get checkSummaryColumns => 'Columns';
+
+  @override
+  String get checkSummaryWalls => 'Walls';
+
+  @override
+  String get checkSummarySlabs => 'Slabs';
+
+  @override
+  String get checkSummaryTorsion => 'Torsion';
+
+  @override
+  String get checkSummarySeismicUnset =>
+      'Set seismic zone for wall shear & drift';
+
+  @override
+  String checkSummaryBaseShear(String fb, String t1, String mass) {
+    return 'Base shear F_b: $fb kN · T₁: $t1 s · Mass: $mass t';
+  }
+
+  @override
+  String get checkNeeds3dWarning =>
+      'Simplified method is indicative only — 3D modal analysis recommended.';
+
+  @override
+  String get checkTorsionAdviceEcc =>
+      'Shift wall stiffness toward the centre of mass.';
+
+  @override
+  String get checkTorsionAdviceFlex =>
+      'Add perimeter shear walls on opposite sides to increase torsional stiffness.';
+
+  @override
+  String get checkSummaryAttentionList => 'Elements needing attention';
+
+  @override
+  String get checkSummaryAllOk =>
+      'All evaluated elements are within preliminary limits.';
+
+  @override
+  String get checkSummaryNoElements =>
+      'Place slabs, columns or walls to run checks.';
+
+  @override
   String get architectImportProject => 'Import Project (ZIP)';
 
   @override

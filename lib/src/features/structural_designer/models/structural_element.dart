@@ -5,6 +5,8 @@ import '../../bim_editing/geometry/bim_grid_axis.dart';
 export '../../bim_editing/geometry/bim_grid_axis.dart' show BimGridAxis, StructuralGridAxis, resequenceGridAxes;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'project_design_parameters.dart';
+export 'project_design_parameters.dart';
 import 'seismic_slab_load.dart';
 import 'staircase_core.dart';
 export 'staircase_core.dart';
@@ -1444,6 +1446,8 @@ class StructuralProject {
   final double deadLoadSuperimposed; // kN/m² (finishes, screed, ceilings)
   final double liveLoad; // kN/m² (residential: 2.0)
   final double facadeWallLoad; // kN/m along perimeter (e.g. 3.5 kN/m)
+  /// Project-level seismic and drift inputs (null until explicitly set).
+  final ProjectDesignParameters? designParameters;
 
   const StructuralProject({
     this.title = 'Конструктивен Модел',
@@ -1466,6 +1470,7 @@ class StructuralProject {
     this.deadLoadSuperimposed = 1.5,
     this.liveLoad = 2.0,
     this.facadeWallLoad = 3.5,
+    this.designParameters,
   });
 
   StoreyLevel get activeStorey =>
@@ -1778,6 +1783,8 @@ class StructuralProject {
     double? deadLoadSuperimposed,
     double? liveLoad,
     double? facadeWallLoad,
+    ProjectDesignParameters? designParameters,
+    bool clearDesignParameters = false,
   }) {
     return StructuralProject(
       title: title ?? this.title,
@@ -1793,6 +1800,9 @@ class StructuralProject {
       deadLoadSuperimposed: deadLoadSuperimposed ?? this.deadLoadSuperimposed,
       liveLoad: liveLoad ?? this.liveLoad,
       facadeWallLoad: facadeWallLoad ?? this.facadeWallLoad,
+      designParameters: clearDesignParameters
+          ? null
+          : (designParameters ?? this.designParameters),
     );
   }
 
@@ -1810,6 +1820,7 @@ class StructuralProject {
     'deadLoadSuperimposed': deadLoadSuperimposed,
     'liveLoad': liveLoad,
     'facadeWallLoad': facadeWallLoad,
+    if (designParameters != null) 'designParameters': designParameters!.toJson(),
   };
 
   factory StructuralProject.fromJson(Map<String, dynamic> json) {
@@ -1847,6 +1858,11 @@ class StructuralProject {
       deadLoadSuperimposed: (json['deadLoadSuperimposed'] as num?)?.toDouble() ?? 1.5,
       liveLoad: (json['liveLoad'] as num?)?.toDouble() ?? 2.0,
       facadeWallLoad: (json['facadeWallLoad'] as num?)?.toDouble() ?? 3.5,
+      designParameters: json['designParameters'] is Map<String, dynamic>
+          ? ProjectDesignParameters.fromJson(
+              json['designParameters'] as Map<String, dynamic>,
+            )
+          : null,
     );
   }
 }

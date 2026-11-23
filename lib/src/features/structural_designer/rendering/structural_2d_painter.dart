@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../analysis/slab_parallel_alignment_helper.dart';
 import '../models/cantilever_analysis_models.dart';
+import '../models/element_check_models.dart';
 import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
@@ -45,6 +46,11 @@ class Structural2dPainter extends CustomPainter {
   final List<CantileverZone> cantileverZones;
   final VerticalCapacityReport? verticalReport;
   final SeismicAnalysisReport? seismicReport;
+
+  /// Preliminary per-element checks: colour + percentage on supports and the
+  /// worst point of each slab. Drawn in addition to the span lines.
+  final PreliminaryCheckReport? checkReport;
+  final bool checkStale;
   final bool showCantileverHeatmap;
   final bool showSlabSpanOverlay;
   final List<SupportSpanCheck>? supportSpanChecks;
@@ -128,6 +134,8 @@ class Structural2dPainter extends CustomPainter {
     this.cantileverZones = const [],
     this.verticalReport,
     this.seismicReport,
+    this.checkReport,
+    this.checkStale = false,
     this.showCantileverHeatmap = true,
     this.showSlabSpanOverlay = true,
     this.supportSpanChecks,
@@ -280,6 +288,11 @@ class Structural2dPainter extends CustomPainter {
     for (final col in currentStorey.columns) {
       if (movingColumn?.id == col.id) continue;
       _drawColumn(canvas, col, isGhost: false);
+    }
+
+    // 4a. Slab check overlay: unsupported areas and the worst point per slab
+    if (checkReport != null) {
+      _drawSlabCheckOverlay(canvas, size);
     }
 
     // 4b. Draw Column Offset Preview (Live duplication guidance)
@@ -470,6 +483,117 @@ class Structural2dPainter extends CustomPainter {
     canvas.restore();
   }
 
+  // === SECTION: PRELIMINARY CHECK HELPERS ===
+
+  void _drawSlabCheckOverlay(Canvas canvas, Size size) {
+    final report = checkReport;
+    if (report == null) return;
+    final zoom = zoomScale.clamp(.001, 10000.0);
+    // Cells that no support holds: soft red wash plus a corner badge.
+    final washPaint = Paint()
+      ..color = _stale(const Color(0xFFFF5252).withValues(alpha: .20))
+      ..style = PaintingStyle.fill;
+    for (final area in report.unsupportedFor(currentStorey.id)) {
+      for (final cell in area.cellsCad) {
+        final pts = cell.map(cadToScene).toList();
+        canvas.drawPath(
+          Path()..addPolygon(pts, true),
+          washPaint,
+        );
+      }
+    }
+    final badges = <(Offset, String, Color)>[];
+    for (final area in report.unsupportedFor(currentStorey.id)) {
+      if (area.cellsCad.isEmpty) continue;
+      var sum = Offset.zero, count = 0;
+      for (final cell in area.cellsCad) {
+        sum += cell.first;
+        count++;
+      }
+      final text = l10n?.checkUnsupportedArea(area.areaM2.toStringAsFixed(1)) ??
+          'No support:  m²';
+      badges.add((cadToScene(sum / count.toDouble()), text, UtilizationLevel.over.color));
+    }
+    for (final slab in report.slabsFor(currentStorey.id)) {
+      final governing = slab.governing;
+      if (!governing.isDetermined) continue;
+      final name = l10n == null ? '' : '${_checkKindLabel(governing.kind)} ';
+      badges.add((
+        cadToScene(slab.governingPointCad),
+        '$name${utilizationText(governing.utilization)}',
+        governing.level.color,
+      ));
+    }
+    if (badges.isEmpty) return;
+    final placed = <Rect>[];
+    canvas.save();
+    canvas.scale(1 / zoom);
+    for (final (anchor, text, color) in badges) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            color: _stale(color),
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final centre = anchor * zoom;
+      var rect = Rect.fromCenter(
+        center: centre,
+        width: tp.width + 12,
+        height: tp.height + 8,
+      );
+      // Nudge down until clear of earlier badges; never hide a badge.
+      for (var i = 0; i < 6 && placed.any((r) => r.overlaps(rect)); i++) {
+        rect = rect.shift(Offset(0, rect.height + 2));
+      }
+      placed.add(rect);
+      final shape = RRect.fromRectAndRadius(rect, const Radius.circular(5));
+      canvas.drawRRect(shape, Paint()..color = const Color(0xF21E1E24));
+      canvas.drawRRect(
+        shape,
+        Paint()
+          ..color = _stale(color.withValues(alpha: .8))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+      tp.paint(canvas, Offset(rect.left + 6, rect.top + 4));
+    }
+    canvas.restore();
+  }
+
+  String _checkKindLabel(CheckKind kind) {
+    final l = l10n;
+    if (l == null) return '';
+    return switch (kind) {
+      CheckKind.slabDeflection => l.checkNameSlabDeflection,
+      CheckKind.slabBending => l.checkNameSlabBending,
+      CheckKind.punching => l.checkNamePunching,
+      CheckKind.columnAxial || CheckKind.wallAxial => l.checkNameColumnAxial,
+      CheckKind.columnSeismicAxial ||
+      CheckKind.wallSeismicAxial => l.checkNameSeismicAxial,
+      CheckKind.wallSeismicShear => l.checkNameWallShear,
+      CheckKind.storeyDrift => l.checkNameStoreyDrift,
+      CheckKind.storeyTorsion => l.checkNameStoreyTorsion,
+    };
+  }
+
+  // === SECTION: PRELIMINARY CHECK HELPERS ===
+
+  ElementUtilization? _elementCheck(String elementId) =>
+      checkReport?.element(currentStorey.id, elementId);
+
+  /// Level of the worst determined check, or null when none was evaluated.
+  UtilizationLevel? _supportLevel(String elementId) {
+    final governing = _elementCheck(elementId)?.governing;
+    return governing?.level;
+  }
+
+  Color _stale(Color c) => checkStale ? c.withValues(alpha: c.a * .55) : c;
+
   List<SupportOverviewLabel> _supportOverviewLabels(Size size) {
     final zoom = zoomScale.clamp(.001,10000.0);
     Offset pixel(Offset p) => cadToScene(p)*zoom;
@@ -478,8 +602,8 @@ class Structural2dPainter extends CustomPainter {
         : Rect.fromPoints(pixel(spanVisibleCadRect!.topLeft),pixel(spanVisibleCadRect!.bottomRight));
     final entries = <SupportOverviewEntry>[];
     void add(String id, String name, Offset anchor, Rect bounds, Color color,
-        {bool selected=false, bool warning=false}) {
-      final label = '$name${warning ? ' !' : ''}';
+        {bool selected=false, bool warning=false, String? detail}) {
+      final label = '$name${detail == null ? '' : ' $detail'}${warning ? ' !' : ''}';
       final tp = TextPainter(text: TextSpan(text:label,
           style:const TextStyle(fontSize:11.5,fontWeight:FontWeight.w800)),
           textDirection:TextDirection.ltr)..layout();
@@ -489,30 +613,41 @@ class Structural2dPainter extends CustomPainter {
     }
     for(final c in currentStorey.columns) {
       if(c.id==movingColumn?.id) continue;
-      final check=verticalReport?.getCheckForColumn(c.id);
+      final checked=_elementCheck(c.id);
+      final level=_supportLevel(c.id);
       final floating=seismicReport?.isColumnFloating(c.id) ?? false;
       final disconnected=seismicReport?.storeyChecks.where((s)=>s.storeyId==currentStorey.id)
           .firstOrNull?.disconnectedColumnIds.contains(c.id) ?? false;
-      final warning=floating || disconnected || (check!=null && check.status!=VerticalCapacityStatus.safe);
+      final warning=floating || disconnected ||
+          level==UtilizationLevel.near || level==UtilizationLevel.over;
       final color=floating ? const Color(0xFFE040FB) :
-        (disconnected || check?.status==VerticalCapacityStatus.critical) ? const Color(0xFFFF5252) :
-        warning ? const Color(0xFFFFB300) : const Color(0xFF82B1FF);
+        (disconnected || level==UtilizationLevel.over) ? const Color(0xFFFF5252) :
+        level==UtilizationLevel.near ? const Color(0xFFFFB300) :
+        level==UtilizationLevel.ok ? UtilizationLevel.ok.color : const Color(0xFF82B1FF);
       final symbol=StructuralOverviewLayout.columnSymbol(c.polygonVertices.map(pixel).toList());
       add(c.id,c.displayName,pixel(c.center),StructuralOverviewLayout.boundsOf(symbol),
-          color,selected:c.id==selectedColumnId,warning:warning);
+          _stale(color),selected:c.id==selectedColumnId,warning:warning,
+          detail:checked?.governing==null ? null : utilizationText(checked!.utilization));
     }
     final seismic=seismicReport?.storeyChecks.where((s)=>s.storeyId==currentStorey.id).firstOrNull;
     for(final w in currentStorey.shearWalls) {
       if(w.id==movingShearWall?.id) continue;
-      final warning=(seismic?.discontinuousWallIds.contains(w.id) ?? false) ||
+      final structural=(seismic?.discontinuousWallIds.contains(w.id) ?? false) ||
           (seismic?.disconnectedWallIds.contains(w.id) ?? false);
+      final checked=_elementCheck(w.id);
+      final level=_supportLevel(w.id);
+      final warning=structural || level==UtilizationLevel.near || level==UtilizationLevel.over;
       final pts=w.polygonVertices.map(pixel).toList();
       final center=pts.reduce((a,b)=>a+b)/pts.length.toDouble();
       // Reserve the actual section, enlarged only enough for the overview stripe.
       final bounds=StructuralOverviewLayout.boundsOf(pts).inflate(3);
       add(w.id,w.displayName,center,bounds,
-          warning ? const Color(0xFFE040FB) : const Color(0xFF64FFDA),
-          selected:w.id==selectedShearWallId,warning:warning);
+          _stale(structural ? const Color(0xFFE040FB) :
+            level==UtilizationLevel.over ? const Color(0xFFFF5252) :
+            level==UtilizationLevel.near ? const Color(0xFFFFB300) :
+            const Color(0xFF64FFDA)),
+          selected:w.id==selectedShearWallId,warning:warning,
+          detail:checked?.governing==null ? null : utilizationText(checked!.utilization));
     }
     return StructuralOverviewLayout.arrange(entries,viewport.deflate(3),
         reserved:showSlabSpanOverlay && _supportChecks.isNotEmpty
@@ -1610,8 +1745,15 @@ class Structural2dPainter extends CustomPainter {
     final warning = !isGhost && !isPreview && !isMoving &&
         ((storeyCheck?.discontinuousWallIds.contains(wall.id) ?? false) ||
          (storeyCheck?.disconnectedWallIds.contains(wall.id) ?? false));
-    final activeFill = warning ? const Color(0xFF9C27B0) : const Color(0xFF00897B);
-    final activeAccent = warning ? const Color(0xFFEA80FC) : const Color(0xFF26D6BD);
+    final wallLevel = !isGhost && !isPreview && !isMoving ? _supportLevel(wall.id) : null;
+    final wallOver = wallLevel == UtilizationLevel.over;
+    final wallNear = wallLevel == UtilizationLevel.near;
+    final activeFill = warning ? const Color(0xFF9C27B0)
+        : wallOver ? UtilizationLevel.over.fill
+        : wallNear ? UtilizationLevel.near.fill : const Color(0xFF00897B);
+    final activeAccent = warning ? const Color(0xFFEA80FC)
+        : wallOver ? UtilizationLevel.over.color
+        : wallNear ? UtilizationLevel.near.color : const Color(0xFF26D6BD);
     final fillPaint = Paint()
       ..color = isMoving
           ? const Color(0x26FFB300)
@@ -1722,9 +1864,10 @@ class Structural2dPainter extends CustomPainter {
 
     final bool isMovingThis = movingColumn != null && movingColumn!.id == col.id;
     final bool isSelected = !isGhost && !isPreview && (col.id == selectedColumnId);
-    final vCheck = (!isGhost && !isPreview && !isMovingThis)
-        ? verticalReport?.getCheckForColumn(col.id)
-        : null;
+    final live = !isGhost && !isPreview && !isMovingThis;
+    final level = live ? _supportLevel(col.id) : null;
+    final punchingOver = live &&
+        _elementCheck(col.id)?.check(CheckKind.punching)?.level == UtilizationLevel.over;
     final bool isFloating = (!isGhost && !isPreview && !isMovingThis)
         ? (seismicReport?.isColumnFloating(col.id) ?? false)
         : false;
@@ -1747,11 +1890,11 @@ class Structural2dPainter extends CustomPainter {
       // Glows MAGENTA for floating / transfer columns
       fillColor = const Color(0xEEAA00FF);
       borderColor = const Color(0xFFE040FB);
-    } else if (isDisconnected || (vCheck != null && vCheck.status == VerticalCapacityStatus.critical)) {
+    } else if (isDisconnected || level == UtilizationLevel.over) {
       // Glows RED for critical crushing or punching failure
       fillColor = const Color(0xEEB71C1C);
       borderColor = const Color(0xFFFF1744);
-    } else if (vCheck != null && vCheck.status == VerticalCapacityStatus.warning) {
+    } else if (level == UtilizationLevel.near) {
       // Glows ORANGE/AMBER for near-capacity columns
       fillColor = const Color(0xEEF57F17);
       borderColor = const Color(0xFFFFB300);
@@ -1761,14 +1904,15 @@ class Structural2dPainter extends CustomPainter {
     }
 
     // Glowing aura behind critical, warning, or floating columns
-    if ((isFloating || (vCheck != null && vCheck.status != VerticalCapacityStatus.safe)) && !isGhost && !isMovingThis) {
+    if ((isFloating || level == UtilizationLevel.near || level == UtilizationLevel.over) &&
+        !isGhost && !isMovingThis) {
       final Color auraColor = isFloating
           ? const Color(0xFFE040FB)
-          : (vCheck!.status == VerticalCapacityStatus.critical
+          : (level == UtilizationLevel.over
               ? const Color(0xFFFF1744)
               : const Color(0xFFFFB300));
       final glowPaint = Paint()
-        ..color = auraColor.withValues(alpha: 0.5)
+        ..color = _stale(auraColor.withValues(alpha: 0.5))
         ..style = PaintingStyle.stroke
         ..strokeWidth = 5.5 / zoomScale;
       canvas.drawPath(path, glowPaint);
@@ -1783,7 +1927,7 @@ class Structural2dPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = isPreview
           ? (2.2 / zoomScale)
-          : ((isFloating || (vCheck != null && vCheck.status == VerticalCapacityStatus.critical)) ? (2.4 / zoomScale) : (1.5 / zoomScale));
+          : ((isFloating || level == UtilizationLevel.over) ? (2.4 / zoomScale) : (1.5 / zoomScale));
 
     if (!isGhost && !isPreview) {
       canvas.drawPath(path, Paint()..color = const Color(0xEE0B1320)
@@ -1793,7 +1937,7 @@ class Structural2dPainter extends CustomPainter {
     canvas.drawPath(path, borderPaint);
 
     // Punching shear risk indicator (EC2 §6.4 control perimeter alert)
-    if (vCheck != null && vCheck.isPunchingCritical && !isGhost && !isMovingThis) {
+    if (punchingOver) {
       final centerScene = cadToScene(col.center);
       final double rPunching = (math.max(col.width, col.height) / 2.0 + 0.35) * cadScale;
       final punchPaint = Paint()

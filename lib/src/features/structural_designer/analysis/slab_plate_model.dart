@@ -130,14 +130,14 @@ class PlateSolution {
 
 // === SECTION: ACM ELEMENT ===
 
-/// Unit-rigidity element matrices for a square cell of side [s].
+/// Unit-rigidity element matrices for a rectangular cell sx by sy.
 class AcmElement {
   static const _terms = <(int, int)>[
     (0, 0), (1, 0), (0, 1), (2, 0), (1, 1), (0, 2),
     (3, 0), (2, 1), (1, 2), (0, 3), (3, 1), (1, 3),
   ];
 
-  final double s;
+  final double sx, sy;
   final double poisson;
 
   /// 12x12 stiffness for D = 1 (row-major).
@@ -149,15 +149,15 @@ class AcmElement {
   /// Maps element DOFs to (wxx, wyy, wxy) at the cell centre: 3x12.
   final Float64List centreCurvature;
 
-  AcmElement._(this.s, this.poisson, this.stiffness, this.load,
+  AcmElement._(this.sx, this.sy, this.poisson, this.stiffness, this.load,
       this.centreCurvature);
 
   static double _pow(double v, int e) => e <= 0 ? 1 : math.pow(v, e).toDouble();
 
-  factory AcmElement(double s, double poisson) {
-    final h = s / 2;
+  factory AcmElement(double sx, double sy, double poisson) {
+    final hx = sx / 2, hy = sy / 2;
     // Node order: (-h,-h), (h,-h), (h,h), (-h,h); DOFs (w, wx, wy).
-    final nodes = [Offset(-h, -h), Offset(h, -h), Offset(h, h), Offset(-h, h)];
+    final nodes = [Offset(-hx, -hy), Offset(hx, -hy), Offset(hx, hy), Offset(-hx, hy)];
     final c = List.generate(12, (_) => List<double>.filled(12, 0));
     for (var n = 0; n < 4; n++) {
       final x = nodes[n].dx, y = nodes[n].dy;
@@ -171,13 +171,14 @@ class AcmElement {
     final inv = _invert(c);
     // Gauss 3x3, exact for the degree-4 curvature products.
     final g = math.sqrt(3 / 5);
-    final gp = [-g * h, 0.0, g * h];
-    final gw = [5 / 9 * h, 8 / 9 * h, 5 / 9 * h];
+    final gpx = [-g * hx, 0.0, g * hx], gpy = [-g * hy, 0.0, g * hy];
+    final gwx = [5 / 9 * hx, 8 / 9 * hx, 5 / 9 * hx];
+    final gwy = [5 / 9 * hy, 8 / 9 * hy, 5 / 9 * hy];
     final kPoly = List.generate(12, (_) => List<double>.filled(12, 0));
     final fPoly = List<double>.filled(12, 0);
     for (var i = 0; i < 3; i++) {
       for (var j = 0; j < 3; j++) {
-        final x = gp[i], y = gp[j], wt = gw[i] * gw[j];
+        final x = gpx[i], y = gpy[j], wt = gwx[i] * gwy[j];
         final pxx = List<double>.filled(12, 0);
         final pyy = List<double>.filled(12, 0);
         final pxy = List<double>.filled(12, 0);
@@ -229,7 +230,7 @@ class AcmElement {
       curvature[12 + dof] = 2 * inv[5][dof];
       curvature[24 + dof] = inv[4][dof];
     }
-    return AcmElement._(s, poisson, k, f, curvature);
+    return AcmElement._(sx, sy, poisson, k, f, curvature);
   }
 
   static List<List<double>> _invert(List<List<double>> m) {
@@ -404,25 +405,32 @@ class SlabPlateModel {
     var s = spacingM;
     int nx, ny;
     while (true) {
-      nx = math.max(1, ((maxX - minX) / s).ceil());
-      ny = math.max(1, ((maxY - minY) / s).ceil());
+      // The tolerance keeps a 8.0000000001 m span from becoming 17 cells.
+      nx = math.max(1, ((maxX - minX) / s - 1e-6).ceil());
+      ny = math.max(1, ((maxY - minY) / s - 1e-6).ceil());
       if ((nx + 1) * (ny + 1) <= maxNodes) break;
       s *= 1.25;
     }
-    final element = AcmElement(s, poisson);
+    if (maxX - minX < 1e-6 || maxY - minY < 1e-6) {
+      return const PlateSolution(status: PlateStatus.invalidInput);
+    }
+    // Cells span the bounding box exactly: no overhang cell on the far side.
+    final sx = (maxX - minX) / nx, sy = (maxY - minY) / ny;
+    s = math.max(sx, sy);
+    final element = AcmElement(sx, sy, poisson);
 
     // --- Cells ---------------------------------------------------------
     final cellRegion = Int32List(nx * ny)..fillRange(0, nx * ny, -1);
     final regionMeshArea = List<double>.filled(localRegions.length, 0);
     for (var i = 0; i < nx; i++) {
       for (var j = 0; j < ny; j++) {
-        final c = Offset(minX + (i + .5) * s, minY + (j + .5) * s);
+        final c = Offset(minX + (i + .5) * sx, minY + (j + .5) * sy);
         for (var r = 0; r < localRegions.length; r++) {
           final (_, poly, holes) = localRegions[r];
           if (StructuralPolygonDistance.inside(c, poly) &&
               !holes.any((h) => StructuralPolygonDistance.inside(c, h))) {
             cellRegion[i * ny + j] = r;
-            regionMeshArea[r] += s * s;
+            regionMeshArea[r] += sx * sy;
             break;
           }
         }
@@ -431,7 +439,7 @@ class SlabPlateModel {
     int nodeOf(int i, int j) => i * (ny + 1) + j;
     final nodeCount = (nx + 1) * (ny + 1);
     Offset nodeLocal(int node) =>
-        Offset(minX + (node ~/ (ny + 1)) * s, minY + (node % (ny + 1)) * s);
+        Offset(minX + (node ~/ (ny + 1)) * sx, minY + (node % (ny + 1)) * sy);
     List<int> cellNodes(int i, int j) =>
         [nodeOf(i, j), nodeOf(i + 1, j), nodeOf(i + 1, j + 1), nodeOf(i, j + 1)];
 
@@ -471,31 +479,11 @@ class SlabPlateModel {
 
     // --- Supports --------------------------------------------------------
     final nodeSupport = List<String?>.filled(nodeCount, null);
-    int? nearestActive(Offset p, double radius) {
-      int? best;
-      var bestD = radius;
-      final ci = ((p.dx - minX) / s).round(), cj = ((p.dy - minY) / s).round();
-      final reach = (radius / s).ceil() + 1;
-      for (var i = ci - reach; i <= ci + reach; i++) {
-        for (var j = cj - reach; j <= cj + reach; j++) {
-          if (i < 0 || j < 0 || i > nx || j > ny) continue;
-          final n = nodeOf(i, j);
-          if (nodeActive[n] == 0) continue;
-          final d = (nodeLocal(n) - p).distance;
-          if (d <= bestD) {
-            bestD = d;
-            best = n;
-          }
-        }
-      }
-      return best;
-    }
-
     Iterable<int> nodesIn(double x0, double y0, double x1, double y1) sync* {
-      final i0 = math.max(0, ((x0 - minX) / s).floor());
-      final i1 = math.min(nx, ((x1 - minX) / s).ceil());
-      final j0 = math.max(0, ((y0 - minY) / s).floor());
-      final j1 = math.min(ny, ((y1 - minY) / s).ceil());
+      final i0 = math.max(0, ((x0 - minX) / sx).floor());
+      final i1 = math.min(nx, ((x1 - minX) / sx).ceil());
+      final j0 = math.max(0, ((y0 - minY) / sy).floor());
+      final j1 = math.min(ny, ((y1 - minY) / sy).ceil());
       for (var i = i0; i <= i1; i++) {
         for (var j = j0; j <= j1; j++) {
           final n = nodeOf(i, j);
@@ -529,17 +517,29 @@ class SlabPlateModel {
           x1 = math.max(x1, p.dx);
           y1 = math.max(y1, p.dy);
         }
-        for (final n in nodesIn(x0, y0, x1, y1)) {
-          if (nodeSupport[n] == null &&
-              StructuralPolygonDistance.inside(nodeLocal(n), poly)) {
+        // Nodes inside the footprint or within a quarter cell of it hold the
+        // support. A column smaller than the mesh holds the four nodes of its
+        // cell, so the result does not depend on which node happens to be near.
+        final reach = .25 * s;
+        for (final n in nodesIn(x0 - reach, y0 - reach, x1 + reach, y1 + reach)) {
+          if (nodeSupport[n] != null) continue;
+          final p = nodeLocal(n);
+          if (StructuralPolygonDistance.inside(p, poly) ||
+              _distanceToRing(p, poly) <= reach) {
             nodeSupport[n] = support.id;
             claimed++;
           }
         }
         if (claimed == 0) {
-          final centre = Offset((x0 + x1) / 2, (y0 + y1) / 2);
-          final n = nearestActive(centre, .75 * s);
-          if (n != null && nodeSupport[n] == null) nodeSupport[n] = support.id;
+          final cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+          final ci = ((cx - minX) / sx).floor(), cj = ((cy - minY) / sy).floor();
+          for (final (i, j) in [(ci, cj), (ci + 1, cj), (ci, cj + 1), (ci + 1, cj + 1)]) {
+            if (i < 0 || j < 0 || i > nx || j > ny) continue;
+            final n = nodeOf(i, j);
+            if (nodeActive[n] == 1 && nodeSupport[n] == null) {
+              nodeSupport[n] = support.id;
+            }
+          }
         }
       }
     }
@@ -598,12 +598,12 @@ class SlabPlateModel {
       for (var j = 0; j < ny; j++) {
         final r = cellRegion[i * ny + j];
         if (r < 0) continue;
-        final cellLoad = localRegions[r].$1.loadUls * s * s * regionScale[r];
+        final cellLoad = localRegions[r].$1.loadUls * sx * sy * regionScale[r];
         totalLoad += cellLoad;
         if (stableRoots.contains(find(nodeOf(i, j)))) {
           keptCell[i * ny + j] = 1;
         } else {
-          unsupportedArea += s * s * regionScale[r];
+          unsupportedArea += sx * sy * regionScale[r];
           lostLoad += cellLoad;
           unsupportedCells.add([
             for (final n in cellNodes(i, j)) toCad(nodeLocal(n)),
@@ -660,20 +660,34 @@ class SlabPlateModel {
       }
     }
 
-    int? modelNodeNear(Offset local) {
-      final n = nearestActive(local, .75 * s);
-      return n != null && nodeInModel[n] == 1 ? n : null;
+    // A concentrated load is shared bilinearly by the four nodes of its cell
+    // (nodes outside the model are dropped and the rest renormalised), so the
+    // result does not depend on which node happens to be nearest.
+    bool distribute(Offset local, double uls, double qp) {
+      final px = ((local.dx - minX) / sx).clamp(0.0, nx.toDouble());
+      final py = ((local.dy - minY) / sy).clamp(0.0, ny.toDouble());
+      final i = math.min(px.floor(), nx - 1), j = math.min(py.floor(), ny - 1);
+      final fx = px - i, fy = py - j;
+      final nodes = [nodeOf(i, j), nodeOf(i + 1, j), nodeOf(i, j + 1), nodeOf(i + 1, j + 1)];
+      final weights = [(1 - fx) * (1 - fy), fx * (1 - fy), (1 - fx) * fy, fx * fy];
+      var total = 0.0;
+      for (var k = 0; k < 4; k++) {
+        if (nodeInModel[nodes[k]] == 1) total += weights[k];
+      }
+      if (total < 1e-9) return false;
+      for (var k = 0; k < 4; k++) {
+        if (nodeInModel[nodes[k]] == 0 || weights[k] == 0) continue;
+        addNodeLoad(nodes[k], uls * weights[k] / total, qp * weights[k] / total);
+      }
+      return true;
     }
 
     for (final load in pointLoads) {
       final local = toLocal(load.pointCad);
-      final n = modelNodeNear(local);
       totalLoad += load.uls;
-      if (n == null) {
+      if (!distribute(local, load.uls, load.quasiPermanent)) {
         lostLoad += load.uls;
         lostIds.add(load.sourceId);
-      } else {
-        addNodeLoad(n, load.uls, load.quasiPermanent);
       }
     }
     for (final load in lineLoads) {
@@ -686,12 +700,7 @@ class SlabPlateModel {
         final uls = load.uls * length / pieces;
         final qp = load.quasiPermanent * length / pieces;
         totalLoad += uls;
-        final n = modelNodeNear(p);
-        if (n == null) {
-          lostLoad += uls;
-        } else {
-          addNodeLoad(n, uls, qp);
-        }
+        if (!distribute(p, uls, qp)) lostLoad += uls;
       }
     }
 
@@ -816,7 +825,7 @@ class SlabPlateModel {
           wxy += element.centreCurvature[24 + b] * ue[b];
         }
         cells.add(PlateCellResult(
-          toCad(Offset(minX + (i + .5) * s, minY + (j + .5) * s)),
+          toCad(Offset(minX + (i + .5) * sx, minY + (j + .5) * sy)),
           componentIds[find(ns.first)]!,
           region.thicknessM,
           -dScale * (wxx + poisson * wyy),
@@ -863,6 +872,15 @@ class SlabPlateModel {
       lostPointLoadIds: lostIds,
       totalLoadUls: totalLoad,
     );
+  }
+
+  static double _distanceToRing(Offset p, List<Offset> ring) {
+    var best = double.infinity;
+    for (var i = 0; i < ring.length; i++) {
+      best = math.min(best, StructuralPolygonDistance.pointToSegment(
+          p, ring[i], ring[(i + 1) % ring.length]));
+    }
+    return best;
   }
 
   static double _area(List<Offset> ring) {
