@@ -13738,4 +13738,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String architectImportProjectFailed(String error) {
     return 'Import failed: $error';
   }
+
+  @override
+  String get architectTerrainContourInterval => 'Contour Interval';
+
+  @override
+  String get architectTerrainContourIntervalShort => 'Δh';
+
+  @override
+  String get architectTerrainContourIntervalHint =>
+      'Vertical elevation step (Δh) between contours. 0.00 = auto-calculated after 2 contours.';
 }

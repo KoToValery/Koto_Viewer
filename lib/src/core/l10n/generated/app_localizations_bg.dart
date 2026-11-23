@@ -13791,4 +13791,14 @@ class AppLocalizationsBg extends AppLocalizations {
   String architectImportProjectFailed(String error) {
     return 'Неуспешен импорт: $error';
   }
+
+  @override
+  String get architectTerrainContourInterval => 'Сечение на хоризонталите';
+
+  @override
+  String get architectTerrainContourIntervalShort => 'Δh';
+
+  @override
+  String get architectTerrainContourIntervalHint =>
+      'Вертикална стъпка (Δh) между хоризонталите. 0.00 = автоматично след 2 хоризонтала.';
 }

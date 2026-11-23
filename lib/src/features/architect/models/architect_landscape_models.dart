@@ -4,9 +4,20 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import '../../../core/l10n/generated/app_localizations.dart';
+import '../../bim_editing/properties/bim_distance_unit.dart';
 import '../services/architect_spline_geometry.dart';
 import '../services/architect_terrain_tin.dart';
 import 'architect_underlay_models.dart';
+
+/// Elevation and contour-interval display unit for terrain:
+/// uses meters for all metric projects (m/cm/mm) and feet for imperial projects (ft/in).
+BimDistanceUnit terrainElevationUnit(
+  BimDistanceUnit projectUnits, [
+  BimDistanceUnit? levelUnits,
+]) =>
+    ((levelUnits?.isImperial ?? false) || projectUnits.isImperial)
+        ? BimDistanceUnit.feet
+        : BimDistanceUnit.meters;
 
 /// State of the terrain surface: natural existing grade vs. graded proposed design.
 enum ArchitectTerrainState {
@@ -313,6 +324,8 @@ class ArchitectTerrainSurface {
   final String id;
   final ArchitectTerrainState state;
   final double datumElevation;
+  final double contourInterval;
+  final bool contourIntervalManual;
   final List<ArchitectTerrainBoundary> boundaries;
   final List<ArchitectTerrainContour> contours;
   final List<ArchitectTerrainSpot> spots;
@@ -321,6 +334,8 @@ class ArchitectTerrainSurface {
     this.id = 'terrain_surface',
     this.state = ArchitectTerrainState.existing,
     this.datumElevation = 0.0,
+    this.contourInterval = 0.0,
+    this.contourIntervalManual = false,
     this.boundaries = const [],
     this.contours = const [],
     this.spots = const [],
@@ -373,6 +388,8 @@ class ArchitectTerrainSurface {
       id: 'terrain_proposed',
       state: ArchitectTerrainState.proposed,
       datumElevation: datumElevation,
+      contourInterval: contourInterval,
+      contourIntervalManual: contourIntervalManual,
       boundaries: [
         for (var i = 0; i < boundaries.length; i++)
           boundaries[i].copyWith(id: 'prop_bnd_${stamp}_$i'),
@@ -841,6 +858,8 @@ class ArchitectTerrainSurface {
     String? id,
     ArchitectTerrainState? state,
     double? datumElevation,
+    double? contourInterval,
+    bool? contourIntervalManual,
     List<ArchitectTerrainBoundary>? boundaries,
     List<ArchitectTerrainContour>? contours,
     List<ArchitectTerrainSpot>? spots,
@@ -848,6 +867,9 @@ class ArchitectTerrainSurface {
     id: id ?? this.id,
     state: state ?? this.state,
     datumElevation: datumElevation ?? this.datumElevation,
+    contourInterval: contourInterval ?? this.contourInterval,
+    contourIntervalManual:
+        contourIntervalManual ?? this.contourIntervalManual,
     boundaries: boundaries ?? this.boundaries,
     contours: contours ?? this.contours,
     spots: spots ?? this.spots,
@@ -857,6 +879,8 @@ class ArchitectTerrainSurface {
     'id': id,
     'state': state.name,
     if (datumElevation.abs() > 1e-4) 'datumElevation': datumElevation,
+    if (contourInterval > 1e-4) 'contourInterval': contourInterval,
+    if (contourIntervalManual) 'contourIntervalManual': true,
     if (boundaries.isNotEmpty)
       'boundaries': boundaries.map((b) => b.toJson()).toList(),
     if (contours.isNotEmpty)
@@ -872,6 +896,9 @@ class ArchitectTerrainSurface {
           orElse: () => ArchitectTerrainState.existing,
         ),
         datumElevation: (json['datumElevation'] as num?)?.toDouble() ?? 0.0,
+        contourInterval:
+            (json['contourInterval'] as num?)?.toDouble() ?? 0.0,
+        contourIntervalManual: json['contourIntervalManual'] == true,
         boundaries: [
           for (final b in json['boundaries'] as List? ?? const [])
             if (b is Map)

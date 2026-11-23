@@ -52,6 +52,7 @@ import '../rendering/architect_floor_drain_painter_helper.dart';
 import '../services/architect_closed_contour.dart';
 
 import '../widgets/architect_terrain_editor.dart';
+import '../services/architect_contour_interval_predictor.dart';
 import '../services/architect_landscape_tool.dart';
 import '../services/architect_spline_contour_tracer.dart';
 import '../services/architect_underlay_contour_extractor.dart';
@@ -6117,6 +6118,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (savedDatum.abs() > 1e-4) {
         _landscapeTool.terrainDatumElevation = savedDatum;
       }
+      final savedInterval = activeSurf.contourInterval > 1e-4
+          ? activeSurf.contourInterval
+          : otherSurf.contourInterval;
+      _landscapeTool.contourInterval = savedInterval;
       if (_commands.isPlan && !_project.activeStorey.isSite) {
         final ensured = _modelCommands.project.ensureSiteStorey();
         final siteId = ensured.siteStorey!.id;
@@ -33244,6 +33249,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           onCreateProposedFromExisting:
                               _createProposedTerrainFromExisting,
                           onDatumUpdated: _updateTerrainDatum,
+                          onContourIntervalUpdated:
+                              _updateTerrainContourInterval,
                           hasSelectedContourOrSpot:
                               _hasSelectedTerrainContourOrSpot,
                           hasSelectedTerrain: _selectedTerrainBoundary != null ||
@@ -34644,24 +34651,99 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return _landscapeTool.terrainDatumElevation;
   }
 
+  double _resolvedContourIntervalMetersFor(ArchitectTerrainState state) {
+    final surface = state == ArchitectTerrainState.existing
+        ? _project.existingTerrain
+        : _project.proposedTerrain;
+    if (surface.contourInterval > 1e-4) return surface.contourInterval;
+    final other = state == ArchitectTerrainState.existing
+        ? _project.proposedTerrain
+        : _project.existingTerrain;
+    if (other.contourInterval > 1e-4) return other.contourInterval;
+    if (_landscapeTool.contourInterval > 1e-4) {
+      return _landscapeTool.contourInterval;
+    }
+    return ArchitectContourIntervalPredictor.inferIntervalMeters(
+          surface.contours,
+          datumElevation: _resolvedTerrainDatumFor(state),
+        ) ??
+        0.0;
+  }
+
+  Future<double?> _showContourElevationDialog({
+    required ArchitectTerrainState state,
+    required List<Offset> candidatePoints,
+    required bool candidateClosed,
+  }) async {
+    final l = context.l10n;
+    final surface = state == ArchitectTerrainState.existing
+        ? _project.existingTerrain
+        : _project.proposedTerrain;
+    final elevUnit = terrainElevationUnit(_project.units, _project.levelUnits);
+    final stepMeters = _resolvedContourIntervalMetersFor(state);
+    final predictedAbsMeters =
+        ArchitectContourIntervalPredictor.predictNextAbsoluteElevation(
+      surface: surface,
+      candidatePoints: candidatePoints,
+      candidateClosed: candidateClosed,
+      fallbackAbsoluteElevation: _landscapeTool.contourAbsoluteElevation,
+      explicitIntervalMeters: stepMeters > 1e-4 ? stepMeters : null,
+    );
+    final stepDisplay = stepMeters > 1e-4 ? elevUnit.toUnit(stepMeters) : null;
+    final pickedInUnit = await BimNumericKeypad.showInputDialog(
+      context,
+      title: l.architectTerrainContourElevationTitle,
+      initialText: formatArchitectNumericValue(
+        elevUnit.toUnit(predictedAbsMeters),
+        decimals: 3,
+      ),
+      unitLabel: elevUnit.symbol,
+      decimals: 3,
+      stepDelta: stepDisplay,
+      allowNegative: true,
+    );
+    if (!mounted || pickedInUnit == null) return null;
+    return elevUnit.fromUnit(pickedInUnit);
+  }
+
+  ArchitectProject _withAutoInferredInterval(
+    ArchitectProject proj,
+    ArchitectTerrainState state,
+  ) {
+    final target = state == ArchitectTerrainState.existing
+        ? proj.existingTerrain
+        : proj.proposedTerrain;
+    if (target.contourIntervalManual) return proj;
+    final inferred = ArchitectContourIntervalPredictor.inferIntervalMeters(
+      target.contours,
+      datumElevation: _resolvedTerrainDatumFor(state),
+    );
+    if (inferred == null || inferred <= 1e-4) return proj;
+    _landscapeTool.contourInterval = inferred;
+    final nextTarget = target.copyWith(contourInterval: inferred);
+    final other = state == ArchitectTerrainState.existing
+        ? proj.proposedTerrain
+        : proj.existingTerrain;
+    final nextOther = (!other.contourIntervalManual && other.contourInterval <= 1e-4)
+        ? other.copyWith(contourInterval: inferred)
+        : other;
+    return state == ArchitectTerrainState.existing
+        ? proj.copyWith(existingTerrain: nextTarget, proposedTerrain: nextOther)
+        : proj.copyWith(proposedTerrain: nextTarget, existingTerrain: nextOther);
+  }
+
   Future<void> _promptAndCommitPickedContour(
     ArchitectPickedContourCandidate candidate,
   ) async {
-    final l = context.l10n;
     final state = _landscapeTool.terrainState;
     final surface = state == ArchitectTerrainState.existing
         ? _project.existingTerrain
         : _project.proposedTerrain;
     final datum = _resolvedTerrainDatumFor(state);
-    final initialAbs = _landscapeTool.contourAbsoluteElevation;
-
-    final pickedAbs = await BimNumericKeypad.showInputDialog(
-      context,
-      title: l.architectTerrainContourElevationTitle,
-      initialText: formatArchitectNumericValue(initialAbs, decimals: 3),
-      unitLabel: 'm',
-      decimals: 3,
-      allowNegative: true,
+    final pickedAbs = await _showContourElevationDialog(
+      state: state,
+      candidatePoints: candidate.points,
+      candidateClosed: candidate.closed,
     );
     if (!mounted || pickedAbs == null) return;
 
@@ -34673,10 +34755,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (clippedPieces.isEmpty) return;
 
     final rel = double.parse((pickedAbs - datum).toStringAsFixed(4));
+    final intervalMeters = _resolvedContourIntervalMetersFor(state);
+    final majorStep = intervalMeters > 1e-4 ? intervalMeters * 5.0 : 5.0;
     final isMajorAuto =
         _landscapeTool.contourMajor ||
-        ((pickedAbs - pickedAbs.roundToDouble()).abs() < 1e-3 &&
-            pickedAbs.round() % 5 == 0);
+        ((pickedAbs / majorStep) - (pickedAbs / majorStep).roundToDouble())
+                .abs() <
+            1e-3;
     final stamp = DateTime.now().microsecondsSinceEpoch;
     final added = <ArchitectTerrainContour>[];
     for (var i = 0; i < clippedPieces.length; i++) {
@@ -34706,9 +34791,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       datumElevation: datum,
       contours: [...surface.contours, ...added],
     );
-    final nextProject = state == ArchitectTerrainState.existing
+    var nextProject = state == ArchitectTerrainState.existing
         ? _project.copyWith(existingTerrain: nextSurface, updatedAt: DateTime.now())
         : _project.copyWith(proposedTerrain: nextSurface, updatedAt: DateTime.now());
+    nextProject = _withAutoInferredInterval(nextProject, state);
 
     setState(() {
       _landscapeTool.contourAbsoluteElevation = pickedAbs;
@@ -34721,21 +34807,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _promptAndCommitManualContour() async {
-    final l = context.l10n;
     final state = _landscapeTool.terrainState;
-    final surface = state == ArchitectTerrainState.existing
-        ? _project.existingTerrain
-        : _project.proposedTerrain;
     final datum = _resolvedTerrainDatumFor(state);
-    final initialAbs = _landscapeTool.contourAbsoluteElevation;
-
-    final pickedAbs = await BimNumericKeypad.showInputDialog(
-      context,
-      title: l.architectTerrainContourElevationTitle,
-      initialText: formatArchitectNumericValue(initialAbs, decimals: 3),
-      unitLabel: 'm',
-      decimals: 3,
-      allowNegative: true,
+    final pickedAbs = await _showContourElevationDialog(
+      state: state,
+      candidatePoints: List<Offset>.of(_landscapeTool.draftPoints),
+      candidateClosed: _landscapeTool.contourClosed,
     );
     if (!mounted || pickedAbs == null) {
       _landscapeTool.contourClosed = false;
@@ -34744,14 +34821,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _landscapeTool.contourAbsoluteElevation = pickedAbs;
     _landscapeTool.terrainElevation = pickedAbs - datum;
-    final nextProject = _landscapeTool.commitDraft(
+    var nextProject = _landscapeTool.commitDraft(
       toolName: _activeTool.name,
       project: _project,
     );
     _landscapeTool.contourClosed = false;
     if (nextProject != null) {
+      nextProject = _withAutoInferredInterval(nextProject, state);
       setState(() {
-        _commands.commit(nextProject, applyDraftingDefaults: true);
+        _commands.commit(nextProject!, applyDraftingDefaults: true);
       });
       _saveBiMProjectIfAttached();
       HapticFeedback.mediumImpact();
@@ -34765,17 +34843,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ? _project.existingTerrain
         : _project.proposedTerrain;
     final datum = _resolvedTerrainDatumFor(state);
+    final elevUnit = terrainElevationUnit(_project.units, _project.levelUnits);
     final initialAbs = _landscapeTool.contourAbsoluteElevation;
 
-    final pickedAbs = await BimNumericKeypad.showInputDialog(
+    final pickedInUnit = await BimNumericKeypad.showInputDialog(
       context,
       title: l.architectTerrainSpotElevationTitle,
-      initialText: formatArchitectNumericValue(initialAbs, decimals: 3),
-      unitLabel: 'm',
+      initialText: formatArchitectNumericValue(
+        elevUnit.toUnit(initialAbs),
+        decimals: 3,
+      ),
+      unitLabel: elevUnit.symbol,
       decimals: 3,
       allowNegative: true,
     );
-    if (!mounted || pickedAbs == null) return;
+    if (!mounted || pickedInUnit == null) return;
+    final pickedAbs = elevUnit.fromUnit(pickedInUnit);
 
     final rel = double.parse((pickedAbs - datum).toStringAsFixed(4));
     final spot = ArchitectTerrainSpot(
@@ -35174,46 +35257,107 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Future<void> _showTerrainProperties(String id, ArchitectTerrainState initial) async {
     final document = _modelCommands.project;
     final l = context.l10n;
+    final elevUnit = terrainElevationUnit(document.units, document.levelUnits);
+    final initialIntervalMeters = _resolvedContourIntervalMetersFor(initial);
     var selected = initial;
-    final result = await showArchitectProperties<ArchitectTerrainState>(
+    var intervalMeters = initialIntervalMeters;
+    final result = await showArchitectProperties<
+        ({ArchitectTerrainState state, double intervalMeters})>(
       context: context,
       onInsets: _insetProperties,
       builder: (context) => StatefulBuilder(
-        builder: (context, update) => architectAlertDialog(
-          key: const ValueKey('architect-terrain-properties'),
-          title: Text(l.architectTerrainPropertiesTitle),
-          content: RadioGroup<ArchitectTerrainState>(
-            groupValue: selected,
-            onChanged: (value) {
-              if (value != null) update(() => selected = value);
-            },
-            child: Column(
+        builder: (context, update) {
+          final changed =
+              selected != initial ||
+              (intervalMeters - initialIntervalMeters).abs() > 1e-4;
+          final displayInterval = elevUnit.toUnit(intervalMeters);
+          return architectAlertDialog(
+            key: const ValueKey('architect-terrain-properties'),
+            title: Text(l.architectTerrainPropertiesTitle),
+            content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                RadioListTile(
-                  value: ArchitectTerrainState.existing,
-                  title: Text(l.architectTerrainStateExisting),
+                RadioGroup<ArchitectTerrainState>(
+                  groupValue: selected,
+                  onChanged: (value) {
+                    if (value != null) update(() => selected = value);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RadioListTile(
+                        value: ArchitectTerrainState.existing,
+                        title: Text(l.architectTerrainStateExisting),
+                      ),
+                      RadioListTile(
+                        value: ArchitectTerrainState.proposed,
+                        title: Text(l.architectTerrainStateProposed),
+                      ),
+                    ],
+                  ),
                 ),
-                RadioListTile(
-                  value: ArchitectTerrainState.proposed,
-                  title: Text(l.architectTerrainStateProposed),
+                const Divider(height: 12),
+                ListTile(
+                  key: const ValueKey('architect-terrain-prop-interval'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.unfold_more_rounded),
+                  title: Text(l.architectTerrainContourInterval),
+                  trailing: Text(
+                    '${displayInterval.toStringAsFixed(2)} ${elevUnit.symbol}',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () async {
+                    final picked = await BimNumericKeypad.showInputDialog(
+                      context,
+                      title: l.architectTerrainContourInterval,
+                      initialText: displayInterval.toStringAsFixed(2),
+                      unitLabel: elevUnit.symbol,
+                      decimals: 3,
+                      min: 0.0,
+                      allowNegative: false,
+                    );
+                    if (picked != null) {
+                      final meters = elevUnit.fromUnit(picked);
+                      update(
+                        () => intervalMeters =
+                            meters <= 1e-4 ? 0.0 : double.parse(meters.toStringAsFixed(4)),
+                      );
+                    }
+                  },
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
-            FilledButton(
-              onPressed: selected == initial ? null : () => Navigator.pop(context, selected),
-              child: Text(l.applyAction),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l.cancel),
+              ),
+              FilledButton(
+                onPressed: !changed
+                    ? null
+                    : () => Navigator.pop(
+                        context,
+                        (state: selected, intervalMeters: intervalMeters),
+                      ),
+                child: Text(l.applyAction),
+              ),
+            ],
+          );
+        },
       ),
     );
-    if (!mounted || result == null || !identical(document, _modelCommands.project) ||
+    if (!mounted ||
+        result == null ||
+        !identical(document, _modelCommands.project) ||
         _effectiveSelection.singleOrNull != id) return;
-    _setTerrainState(result);
+    if ((result.intervalMeters - initialIntervalMeters).abs() > 1e-4) {
+      _updateTerrainContourInterval(result.intervalMeters);
+    }
+    if (result.state != initial) {
+      _setTerrainState(result.state);
+    }
   }
 
   void _setTerrainState(ArchitectTerrainState state) {
@@ -35308,6 +35452,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _saveBiMProjectIfAttached();
   }
 
+  void _updateTerrainContourInterval(double intervalMeters) {
+    final next = ArchitectLandscapeTool.updateSurfaceContourInterval(
+      _project,
+      intervalMeters: intervalMeters,
+      manual: intervalMeters > 1e-4,
+    );
+    setState(() {
+      _landscapeTool.contourInterval = intervalMeters;
+      _commands.commit(next);
+    });
+    _saveBiMProjectIfAttached();
+  }
+
   Future<void> _editSelectedTerrainElevation() async {
     final id = _selectedElementId;
     if (id == null) return;
@@ -35321,21 +35478,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (contour == null && spot == null) return;
 
     final datum = surface.datumElevation;
+    final elevUnit = terrainElevationUnit(_project.units, _project.levelUnits);
     final currentAbs = contour != null
         ? contour.effectiveAbsolute(datum)
         : spot!.effectiveAbsolute(datum);
+    final stepMeters = contour != null ? _resolvedContourIntervalMetersFor(state) : 0.0;
+    final stepDisplay = stepMeters > 1e-4 ? elevUnit.toUnit(stepMeters) : null;
     final l = context.l10n;
-    final picked = await BimNumericKeypad.showInputDialog(
+    final pickedInUnit = await BimNumericKeypad.showInputDialog(
       context,
       title: contour != null
           ? l.architectTerrainContourElevationTitle
           : l.architectTerrainSpotElevationTitle,
-      initialText: formatArchitectNumericValue(currentAbs, decimals: 3),
-      unitLabel: 'm',
+      initialText: formatArchitectNumericValue(
+        elevUnit.toUnit(currentAbs),
+        decimals: 3,
+      ),
+      unitLabel: elevUnit.symbol,
       decimals: 3,
+      stepDelta: stepDisplay,
       allowNegative: true,
     );
-    if (!mounted || picked == null) return;
+    if (!mounted || pickedInUnit == null) return;
+    final picked = elevUnit.fromUnit(pickedInUnit);
 
     final rel = double.parse((picked - datum).toStringAsFixed(4));
     final nextSurface = surface.copyWith(

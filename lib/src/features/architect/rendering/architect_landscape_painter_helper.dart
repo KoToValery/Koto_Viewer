@@ -146,18 +146,45 @@ class ArchitectLandscapePainterHelper {
     }
 
     // 2. Contour Iso-lines
+    final elevUnit = terrainElevationUnit(project.units, project.levelUnits);
+    final isScreenCanvas = ArchitectTextScope.current == null;
     for (final contour in surface.contours) {
       if (contour.points.length < 2) continue;
       final isSelected = selectedIds.contains(contour.id);
-      final path = contour.isSpline && contour.points.length >= 3
+      final isSpline = contour.isSpline && contour.points.length >= 3;
+      final path = isSpline
           ? ArchitectSplineGeometry.generatePath(
               contour.points,
               closed: contour.closed,
             )
           : _polygonPath(contour.points, closed: contour.closed);
+      final contourColor = isSelected
+          ? const Color(0xFF2563EB)
+          : (isProposed
+              ? const Color(0xFF15803D)
+              : const Color(0xFFB45309));
+      final baseWidthPx = isSelected
+          ? 3.2
+          : contour.isMajor
+              ? (isProposed ? 2.8 : 2.5)
+              : (isProposed ? 1.9 : 1.7);
+      final strokeWidth = baseWidthPx / zoomScale;
+
+      if (isScreenCanvas) {
+        final haloPaint = Paint()
+          ..color = palette.background.withValues(alpha: 0.80)
+          ..strokeWidth = (baseWidthPx + 2.4) / zoomScale
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke;
+        canvas.drawPath(path, haloPaint);
+      }
+
       final strokePaint = Paint()
-        ..color = isSelected ? const Color(0xFF2563EB) : primaryColor
-        ..strokeWidth = (isSelected ? 2.0 : (isProposed ? 1.25 : 1.0)) / zoomScale
+        ..color = contourColor
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke;
 
       if (isProposed) {
@@ -167,23 +194,39 @@ class ArchitectLandscapePainterHelper {
           canvas,
           path,
           strokePaint,
-          dashLength: 0.35,
-          gapLength: 0.18,
+          dashLength: contour.isMajor ? 0.55 : 0.38,
+          gapLength: contour.isMajor ? 0.20 : 0.16,
         );
       }
 
-      final midIdx = contour.points.length ~/ 2;
       final cntLabelZ = surface.datumElevation.abs() > 1e-4
-          ? (contour.elevation + surface.datumElevation).toStringAsFixed(2)
+          ? elevUnit
+              .toUnit(contour.effectiveAbsolute(surface.datumElevation))
+              .toStringAsFixed(2)
           : project.formatLevel(contour.elevation);
-      _drawSmallLabel(
-        canvas: canvas,
-        text: contour.isMajor ? '$cntLabelZ [Г]' : cntLabelZ,
-        worldPos: contour.points[midIdx],
-        zoomScale: zoomScale,
-        color: strokePaint.color,
-        elementId: contour.id,
-      );
+      final labelText = contour.isMajor ? '$cntLabelZ [Г]' : cntLabelZ;
+
+      var totalLen = 0.0;
+      for (var i = 0; i + 1 < contour.points.length; i++) {
+        totalLen += (contour.points[i + 1] - contour.points[i]).distance;
+      }
+      final labelCount = totalLen > 45.0 ? 3 : (totalLen > 22.0 ? 2 : 1);
+      for (var k = 1; k <= labelCount; k++) {
+        final frac = k / (labelCount + 1);
+        final idx = (contour.points.length * frac)
+            .floor()
+            .clamp(0, contour.points.length - 1);
+        _drawSmallLabel(
+          canvas: canvas,
+          text: labelText,
+          worldPos: contour.points[idx],
+          zoomScale: zoomScale,
+          color: contourColor,
+          elementId: k == 1 ? contour.id : null,
+          badge: true,
+          badgeBackground: palette.background.withValues(alpha: 0.90),
+        );
+      }
     }
 
     // 3. Spot Elevations
@@ -212,7 +255,9 @@ class ArchitectLandscapePainterHelper {
       }
 
       final spotLabelZ = surface.datumElevation.abs() > 1e-4
-          ? (spot.elevation + surface.datumElevation).toStringAsFixed(2)
+          ? elevUnit
+              .toUnit(spot.effectiveAbsolute(surface.datumElevation))
+              .toStringAsFixed(2)
           : project.formatLevel(spot.elevation);
       _drawSmallLabel(
         canvas: canvas,
@@ -1722,8 +1767,13 @@ class ArchitectLandscapePainterHelper {
     required double zoomScale,
     required Color color,
     String? elementId,
+    bool badge = false,
+    Color? badgeBackground,
   }) {
     final scope = ArchitectTextScope.current;
+    final fontSize = badge
+        ? (11.0 / zoomScale).clamp(0.14, 1.40)
+        : (10.5 / zoomScale).clamp(0.12, 0.55);
     final tp = ArchitectTextPainter(
       elementId: elementId,
       role: ArchitectAnnotationRole.site,
@@ -1732,12 +1782,45 @@ class ArchitectLandscapePainterHelper {
         text: text,
         style: TextStyle(
           color: color,
-          fontSize: (10.5 / zoomScale).clamp(0.12, 0.42),
-          fontWeight: FontWeight.w600,
+          fontSize: fontSize,
+          fontWeight: badge ? FontWeight.w700 : FontWeight.w600,
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+    if (badge) {
+      final padX = fontSize * 0.28;
+      final padY = fontSize * 0.14;
+      final topLeft =
+          worldPos - Offset(tp.width * 0.5, tp.height * 0.5);
+      final rect = Rect.fromLTWH(
+        topLeft.dx - padX,
+        topLeft.dy - padY,
+        tp.width + padX * 2,
+        tp.height + padY * 2,
+      );
+      final rrect = RRect.fromRectAndRadius(
+        rect,
+        Radius.circular(fontSize * 0.22),
+      );
+      if (scope == null) {
+        canvas.drawRRect(
+          rrect,
+          Paint()
+            ..color = badgeBackground ?? const Color(0xE6FFFFFF)
+            ..style = PaintingStyle.fill,
+        );
+        canvas.drawRRect(
+          rrect,
+          Paint()
+            ..color = color.withValues(alpha: 0.45)
+            ..strokeWidth = 0.8 / zoomScale
+            ..style = PaintingStyle.stroke,
+        );
+      }
+      tp.paint(canvas, topLeft);
+      return;
+    }
     tp.paint(canvas, worldPos);
   }
 

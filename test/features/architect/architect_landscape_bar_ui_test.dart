@@ -175,6 +175,49 @@ void main() {
           findsOneWidget,
         );
         expect(
+          find.byKey(const ValueKey('architect-terrain-contour-interval')),
+          findsOneWidget,
+        );
+        expect(
+          find.text('${l10n.architectTerrainContourIntervalShort}: 0.00 m'),
+          findsOneWidget,
+        );
+        // Set Δh = 0.50 m directly via keypad dialog and verify step nudge buttons appear in elevation dialog
+        final intervalChip = find.byKey(
+          const ValueKey('architect-terrain-contour-interval'),
+        );
+        await tester.ensureVisible(intervalChip);
+        await tester.tap(intervalChip);
+        await tester.pumpAndSettle();
+        for (final key in ['0', '.', '5']) {
+          await tester.tap(find.byKey(ValueKey('bim-number-key-$key')));
+          await tester.pump();
+        }
+        await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('${l10n.architectTerrainContourIntervalShort}: 0.50 m'),
+          findsOneWidget,
+        );
+        final contourElevChip = find.byKey(
+          const ValueKey('architect-contour-elevation'),
+        );
+        await tester.ensureVisible(contourElevChip);
+        await tester.tap(contourElevChip);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('bim-numeric-step-minus')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('bim-numeric-step-plus')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('bim-numeric-step-plus')));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+        await tester.pumpAndSettle();
+        expect(
           find.byKey(const ValueKey('architect-contour-major')),
           findsOneWidget,
         );
@@ -355,4 +398,62 @@ void main() {
       },
     );
   }
+
+  testWidgets('Imperial project uses ft for contour interval Δh and converts to meters cleanly', (tester) async {
+    final ctrl = ArchitectCommandController(
+      ArchitectProject(
+        id: 'p-imp',
+        name: 'Imperial Terrain Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        units: BimDistanceUnit.inches,
+        levelUnits: BimDistanceUnit.feet,
+        activeStoreyId: 's1',
+        storeys: const [ArchitectStorey(id: 's1', name: 'Floor 1')],
+      ),
+    );
+    addTearDown(ctrl.dispose);
+
+    tester.view.physicalSize = const Size(500, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ArchitectWorkspaceScreen(
+          commandController: ctrl,
+          bimProject: _bimProject(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openLandscapeCategory(tester);
+    await _selectLandscapeTool(tester, ArchitectTool.contour);
+    final l10n = _l10n(tester);
+
+    expect(
+      find.text('${l10n.architectTerrainContourIntervalShort}: 0.00 ft'),
+      findsOneWidget,
+    );
+    final chip = find.byKey(const ValueKey('architect-terrain-contour-interval'));
+    await tester.ensureVisible(chip);
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('bim-number-key-1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('bim-numeric-dialog-apply')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('${l10n.architectTerrainContourIntervalShort}: 1.00 ft'),
+      findsOneWidget,
+    );
+    // Stored internally in meters: 1 ft = 0.3048 m
+    expect(ctrl.project.existingTerrain.contourInterval, closeTo(0.3048, 1e-4));
+    expect(tester.takeException(), isNull);
+  });
 }

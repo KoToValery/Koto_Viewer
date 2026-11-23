@@ -725,11 +725,12 @@ void main() {
         await tester.pumpAndSettle();
         await workspace.wallTap(tester, hole.first);
         await tester.pumpAndSettle();
-        expect(
-          find.byKey(const ValueKey('architect-terrain-edit-elevation')),
-          findsOneWidget,
+        final editElevBtn = find.byKey(
+          const ValueKey('architect-terrain-edit-elevation'),
         );
-        await tester.tap(find.byKey(const ValueKey('architect-terrain-edit-elevation')));
+        expect(editElevBtn, findsOneWidget);
+        await tester.ensureVisible(editElevBtn);
+        await tester.tap(editElevBtn);
         await tester.pumpAndSettle();
         for (final key in ['3', '.', '5']) {
           await tester.tap(find.byKey(ValueKey('bim-number-key-$key')));
@@ -786,6 +787,10 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byKey(const ValueKey('architect-terrain-datum')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('architect-terrain-contour-interval')),
+          findsOneWidget,
+        );
         expect(
           find.byKey(const ValueKey('architect-terrain-create-proposed')),
           findsOneWidget,

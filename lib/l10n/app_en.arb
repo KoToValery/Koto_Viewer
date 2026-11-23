@@ -7535,5 +7535,17 @@
     "placeholders": {
       "error": { "type": "String" }
     }
+  },
+  "architectTerrainContourInterval": "Contour Interval",
+  "@architectTerrainContourInterval": {
+    "description": "Dialog title and properties label for the vertical elevation step between terrain contour lines"
+  },
+  "architectTerrainContourIntervalShort": "Δh",
+  "@architectTerrainContourIntervalShort": {
+    "description": "Short mobile chip prefix for the contour elevation interval"
+  },
+  "architectTerrainContourIntervalHint": "Vertical elevation step (Δh) between contours. 0.00 = auto-calculated after 2 contours.",
+  "@architectTerrainContourIntervalHint": {
+    "description": "Tooltip describing the terrain contour elevation interval control"
   }
 }

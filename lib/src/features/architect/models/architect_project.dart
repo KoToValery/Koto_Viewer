@@ -947,8 +947,16 @@ class ArchitectProject {
     if (rasterUnderlays.isNotEmpty)
       'rasterUnderlays': rasterUnderlays.map((r) => r.toJson()).toList(),
     if (geodeticSurvey != null) 'geodeticSurvey': geodeticSurvey!.toJson(),
-    if (!existingTerrain.isEmpty) 'existingTerrain': existingTerrain.toJson(),
-    if (!proposedTerrain.isEmpty) 'proposedTerrain': proposedTerrain.toJson(),
+    if (existingTerrain.isNotEmpty ||
+        existingTerrain.datumElevation.abs() > 1e-4 ||
+        existingTerrain.contourInterval > 1e-4 ||
+        existingTerrain.contourIntervalManual)
+      'existingTerrain': existingTerrain.toJson(),
+    if (proposedTerrain.isNotEmpty ||
+        proposedTerrain.datumElevation.abs() > 1e-4 ||
+        proposedTerrain.contourInterval > 1e-4 ||
+        proposedTerrain.contourIntervalManual)
+      'proposedTerrain': proposedTerrain.toJson(),
   };
 
   factory ArchitectProject.fromJson(

@@ -30,6 +30,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
   ArchitectTerrainDraftMode terrainMode = ArchitectTerrainDraftMode.boundary;
   double terrainElevation = 0.0;
   double terrainDatumElevation = 0.0;
+  double contourInterval = 0.0;
   double contourAbsoluteElevation = 0.0;
   bool contourClosed = false;
   bool contourMajor = false;
@@ -678,6 +679,26 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     return project.copyWith(
       existingTerrain: nextExisting,
       proposedTerrain: nextProposed,
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  static ArchitectProject updateSurfaceContourInterval(
+    ArchitectProject project, {
+    required double intervalMeters,
+    required bool manual,
+  }) {
+    final clean = intervalMeters <= 1e-4 ? 0.0 : double.parse(intervalMeters.toStringAsFixed(4));
+    final isManual = clean > 1e-4 && manual;
+    return project.copyWith(
+      existingTerrain: project.existingTerrain.copyWith(
+        contourInterval: clean,
+        contourIntervalManual: isManual,
+      ),
+      proposedTerrain: project.proposedTerrain.copyWith(
+        contourInterval: clean,
+        contourIntervalManual: isManual,
+      ),
       updatedAt: DateTime.now(),
     );
   }

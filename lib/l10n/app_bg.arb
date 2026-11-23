@@ -4711,5 +4711,8 @@
   "architectImportProjectMissingManifest": "Този архив не е валиден пакет на архитектурен проект.",
   "architectImportProjectUnsupportedType": "Тук могат да се импортират само пакети на архитектурни проекти (.zip).",
   "architectImportProjectIntegrityFailed": "Проверката за цялост на пакета е неуспешна или липсват файлове/подложки.",
-  "architectImportProjectFailed": "Неуспешен импорт: {error}"
+  "architectImportProjectFailed": "Неуспешен импорт: {error}",
+  "architectTerrainContourInterval": "Сечение на хоризонталите",
+  "architectTerrainContourIntervalShort": "Δh",
+  "architectTerrainContourIntervalHint": "Вертикална стъпка (Δh) между хоризонталите. 0.00 = автоматично след 2 хоризонтала."
 }

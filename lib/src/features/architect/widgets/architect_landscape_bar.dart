@@ -20,6 +20,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
   final VoidCallback? onSyncTerrainFromGeodesy;
   final VoidCallback? onCreateProposedFromExisting;
   final ValueChanged<double>? onDatumUpdated;
+  final ValueChanged<double>? onContourIntervalUpdated;
   final VoidCallback? onEditSelectedElevation;
   final bool hasSelectedContourOrSpot;
   final bool hasSelectedTerrain;
@@ -41,6 +42,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
     this.onSyncTerrainFromGeodesy,
     this.onCreateProposedFromExisting,
     this.onDatumUpdated,
+    this.onContourIntervalUpdated,
     this.onEditSelectedElevation,
     this.hasSelectedContourOrSpot = false,
     this.hasSelectedTerrain = false,
@@ -154,23 +156,89 @@ class ArchitectLandscapeBar extends StatelessWidget {
     return controller.terrainDatumElevation;
   }
 
+  BimDistanceUnit get _elevUnit => project != null
+      ? terrainElevationUnit(project!.units, project!.levelUnits)
+      : BimDistanceUnit.meters;
+
+  double _effectiveContourIntervalMeters() {
+    if (project != null) {
+      final active = controller.terrainState == ArchitectTerrainState.existing
+          ? project!.existingTerrain
+          : project!.proposedTerrain;
+      if (active.contourInterval > 1e-4) return active.contourInterval;
+      final other = controller.terrainState == ArchitectTerrainState.existing
+          ? project!.proposedTerrain
+          : project!.existingTerrain;
+      if (other.contourInterval > 1e-4) return other.contourInterval;
+    }
+    return controller.contourInterval;
+  }
+
+  Widget _contourIntervalChip(
+    BuildContext context,
+    AppLocalizations l,
+    ColorScheme colors,
+  ) {
+    final elevUnit = _elevUnit;
+    final intervalMeters = _effectiveContourIntervalMeters();
+    final displayVal = elevUnit.toUnit(intervalMeters);
+    return Tooltip(
+      message: l.architectTerrainContourIntervalHint,
+      child: ActionChip(
+        key: const ValueKey('architect-terrain-contour-interval'),
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        avatar: Icon(Icons.unfold_more_rounded, size: 15, color: colors.primary),
+        label: Text(
+          '${l.architectTerrainContourIntervalShort}: ${displayVal.toStringAsFixed(2)} ${elevUnit.symbol}',
+          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+        ),
+        onPressed: () async {
+          final res = await BimNumericKeypad.showInputDialog(
+            context,
+            title: l.architectTerrainContourInterval,
+            initialText: displayVal.toStringAsFixed(2),
+            unitLabel: elevUnit.symbol,
+            decimals: 3,
+            min: 0.0,
+            allowNegative: false,
+          );
+          if (res != null) {
+            final meters = elevUnit.fromUnit(res);
+            final cleanMeters = meters <= 1e-4
+                ? 0.0
+                : double.parse(meters.toStringAsFixed(4));
+            controller.contourInterval = cleanMeters;
+            onContourIntervalUpdated?.call(cleanMeters);
+            _notifyChanged();
+          }
+        },
+      ),
+    );
+  }
+
   List<Widget> _buildDatumAndQuickActionsSuffix(
     BuildContext context,
     AppLocalizations l,
     ColorScheme colors,
   ) {
     final datum = _effectiveDatum();
+    final elevUnit = _elevUnit;
+    final datumDisplay = elevUnit.toUnit(datum);
+    final editDisplay = elevUnit.toUnit(controller.contourAbsoluteElevation);
     return [
       ActionChip(
         key: const ValueKey('architect-terrain-datum'),
         visualDensity: VisualDensity.compact,
         avatar: Icon(Icons.height_rounded, size: 15, color: colors.primary),
         label: Text(
-          '±0.00: ${datum.toStringAsFixed(2)} m',
+          '±0.00: ${datumDisplay.toStringAsFixed(2)} ${elevUnit.symbol}',
           style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
         ),
         onPressed: () => _promptDatumKeypad(context, l, datum),
       ),
+      const SizedBox(width: 6),
+      _contourIntervalChip(context, l, colors),
       if (onCreateProposedFromExisting != null &&
           project != null &&
           project!.existingTerrain.isNotEmpty &&
@@ -198,7 +266,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           visualDensity: VisualDensity.compact,
           avatar: Icon(Icons.edit_rounded, size: 15, color: colors.primary),
           label: Text(
-            '${l.architectTerrainEditElevation}: ${controller.contourAbsoluteElevation.toStringAsFixed(2)} m',
+            '${l.architectTerrainEditElevation}: ${editDisplay.toStringAsFixed(2)} ${elevUnit.symbol}',
             style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
           ),
           onPressed: onEditSelectedElevation,
@@ -212,6 +280,10 @@ class ArchitectLandscapeBar extends StatelessWidget {
     AppLocalizations l,
     ColorScheme colors,
   ) {
+    final elevUnit = _elevUnit;
+    final elevDisplay = elevUnit.toUnit(controller.contourAbsoluteElevation);
+    final stepMeters = _effectiveContourIntervalMeters();
+    final stepDisplay = stepMeters > 1e-4 ? elevUnit.toUnit(stepMeters) : null;
     return [
       Tooltip(
         message: l.architectSplineTraceContourHint,
@@ -268,17 +340,21 @@ class ArchitectLandscapeBar extends StatelessWidget {
         colors: colors,
         title: l.architectTerrainContourElevationTitle,
         label:
-            '${l.architectTerrainElevationLabel} ${controller.contourAbsoluteElevation.toStringAsFixed(2)} m',
-        initialValue: controller.contourAbsoluteElevation,
-        unitLabel: 'm',
+            '${l.architectTerrainElevationLabel} ${elevDisplay.toStringAsFixed(2)} ${elevUnit.symbol}',
+        initialValue: elevDisplay,
+        unitLabel: elevUnit.symbol,
         decimals: 3,
         allowNegative: true,
+        stepDelta: stepDisplay,
         onSubmitted: (val) {
-          controller.contourAbsoluteElevation = val;
-          controller.terrainElevation = val - controller.terrainDatumElevation;
+          final meters = elevUnit.fromUnit(val);
+          controller.contourAbsoluteElevation = meters;
+          controller.terrainElevation = meters - controller.terrainDatumElevation;
           _notifyChanged();
         },
       ),
+      const SizedBox(width: 6),
+      _contourIntervalChip(context, l, colors),
       const SizedBox(width: 6),
       ChoiceChip(
         key: const ValueKey('architect-contour-major'),
@@ -326,7 +402,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           visualDensity: VisualDensity.compact,
           avatar: Icon(Icons.edit_rounded, size: 15, color: colors.primary),
           label: Text(
-            '${l.architectTerrainEditElevation}: ${controller.contourAbsoluteElevation.toStringAsFixed(2)} m',
+            '${l.architectTerrainEditElevation}: ${elevDisplay.toStringAsFixed(2)} ${elevUnit.symbol}',
             style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
           ),
           onPressed: onEditSelectedElevation,
@@ -403,25 +479,29 @@ class ArchitectLandscapeBar extends StatelessWidget {
         Builder(
           builder: (context) {
             final datum = _effectiveDatum();
-            final padAbs = controller.terrainElevation + datum;
+            final elevUnit = _elevUnit;
+            final padAbsMeters = controller.terrainElevation + datum;
+            final padAbsDisplay = elevUnit.toUnit(padAbsMeters);
+            final padRelDisplay = elevUnit.toUnit(controller.terrainElevation);
             final label = datum.abs() > 1e-4
-                ? '${l.architectTerrainElevationLabel} ${padAbs.toStringAsFixed(2)} m'
-                : '${l.architectTerrainElevationLabel} ${_formatSignedMeters(controller.terrainElevation)}';
+                ? '${l.architectTerrainElevationLabel} ${padAbsDisplay.toStringAsFixed(2)} ${elevUnit.symbol}'
+                : '${l.architectTerrainElevationLabel} ${_formatSignedUnit(padRelDisplay, elevUnit.symbol)}';
             return _numericChip(
               context: context,
               key: const ValueKey('architect-terrain-pad-elevation'),
               colors: colors,
               title: l.architectTerrainElevationLabel,
               label: label,
-              initialValue: padAbs,
-              unitLabel: 'm',
+              initialValue: padAbsDisplay,
+              unitLabel: elevUnit.symbol,
               decimals: 3,
               allowNegative: true,
               onSubmitted: (val) {
+                final absMeters = elevUnit.fromUnit(val);
                 controller.terrainDatumElevation = datum;
-                controller.contourAbsoluteElevation = val;
+                controller.contourAbsoluteElevation = absMeters;
                 controller.terrainElevation =
-                    double.parse((val - datum).toStringAsFixed(4));
+                    double.parse((absMeters - datum).toStringAsFixed(4));
                 _notifyChanged();
               },
             );
@@ -436,26 +516,29 @@ class ArchitectLandscapeBar extends StatelessWidget {
   Future<void> _promptDatumKeypad(
     BuildContext context,
     AppLocalizations l,
-    double initialDatum,
+    double initialDatumMeters,
   ) async {
+    final elevUnit = _elevUnit;
+    final initialDisplay = elevUnit.toUnit(initialDatumMeters);
     final res = await BimNumericKeypad.showInputDialog(
       context,
       title: l.architectTerrainDatumDialogTitle,
-      initialText: initialDatum.toStringAsFixed(2),
-      unitLabel: 'm',
+      initialText: initialDisplay.toStringAsFixed(2),
+      unitLabel: elevUnit.symbol,
       decimals: 3,
       allowNegative: true,
     );
     if (res != null) {
-      controller.terrainDatumElevation = res;
+      final resMeters = elevUnit.fromUnit(res);
+      controller.terrainDatumElevation = resMeters;
       if (controller.contourAbsoluteElevation != 0.0) {
         controller.terrainElevation =
-            controller.contourAbsoluteElevation - res;
+            controller.contourAbsoluteElevation - resMeters;
       } else {
         controller.contourAbsoluteElevation =
-            controller.terrainElevation + res;
+            controller.terrainElevation + resMeters;
       }
-      onDatumUpdated?.call(res);
+      onDatumUpdated?.call(resMeters);
       _notifyChanged();
     }
   }
@@ -895,6 +978,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
     int decimals = 2,
     double? min,
     double? max,
+    double? stepDelta,
     bool allowNegative = false,
     required ValueChanged<double> onSubmitted,
   }) {
@@ -915,6 +999,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
           decimals: decimals,
           min: min,
           max: max,
+          stepDelta: stepDelta,
           allowNegative: allowNegative,
         );
         if (res != null) onSubmitted(res);
@@ -928,9 +1013,9 @@ class ArchitectLandscapeBar extends StatelessWidget {
     color: colors.outlineVariant,
   );
 
-  static String _formatSignedMeters(double m) {
-    if (m.abs() < 1e-4) return '±0.00 m';
-    return '${m > 0 ? "+" : ""}${m.toStringAsFixed(2)} m';
+  static String _formatSignedUnit(double v, String unitSymbol) {
+    if (v.abs() < 1e-4) return '±0.00 $unitSymbol';
+    return '${v > 0 ? "+" : ""}${v.toStringAsFixed(2)} $unitSymbol';
   }
 
   static String _terrainModeLabel(

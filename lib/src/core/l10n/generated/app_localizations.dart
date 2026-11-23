@@ -24947,6 +24947,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import failed: {error}'**
   String architectImportProjectFailed(String error);
+
+  /// Dialog title and properties label for the vertical elevation step between terrain contour lines
+  ///
+  /// In en, this message translates to:
+  /// **'Contour Interval'**
+  String get architectTerrainContourInterval;
+
+  /// Short mobile chip prefix for the contour elevation interval
+  ///
+  /// In en, this message translates to:
+  /// **'Δh'**
+  String get architectTerrainContourIntervalShort;
+
+  /// Tooltip describing the terrain contour elevation interval control
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical elevation step (Δh) between contours. 0.00 = auto-calculated after 2 contours.'**
+  String get architectTerrainContourIntervalHint;
 }
 
 class _AppLocalizationsDelegate
