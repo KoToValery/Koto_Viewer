@@ -54,6 +54,10 @@ import 'models/cantilever_analysis_models.dart';
 import 'models/seismic_analysis_models.dart';
 import 'models/structural_element.dart';
 import 'models/vertical_capacity_models.dart';
+import 'services/preliminary_check_controller.dart';
+import 'widgets/building_check_summary_sheet.dart';
+import 'widgets/element_check_panel.dart';
+import 'widgets/project_design_parameters_sheet.dart';
 import 'models/wall_axis_models.dart';
 import 'rendering/structural_2d_painter.dart';
 import 'rendering/structural_pointer_painter.dart';
@@ -502,6 +506,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   VerticalCapacityReport _verticalCapacityReport = VerticalCapacityReport.empty;
   final _spanFeedbackCache = SupportSpanFeedbackCache();
   SeismicAnalysisReport _seismicAnalysisReport = SeismicAnalysisReport.empty;
+  // Preliminary per-element checks (plate model + load rundown), run in an
+  // isolate so editing stays responsive; results arrive via the listener.
+  final _checkController = PreliminaryCheckController();
 
   @override
   void initState() {
@@ -518,6 +525,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final initialScale = widget.initialTransform?.getMaxScaleOnAxis() ?? 1.0;
     _renderScale = initialScale.clamp(0.001, 10000.0);
     _transformController.addListener(_onTransformChanged);
+    _checkController.addListener(_onChecksChanged);
 
     if (widget.bimContext != null) {
       for (final doc in widget.bimContext!.underlaysByStorey.values) {
@@ -617,8 +625,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
+  void _onChecksChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _checkController
+      ..removeListener(_onChecksChanged)
+      ..dispose();
     _scaleSettleTimer?.cancel();
     DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged,
     );
@@ -727,6 +742,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _project,
       cadUnitsPerMeter: _cadUnitsPerMeter,
     );
+    _checkController.request(_project, _cadUnitsPerMeter);
   }
 
   List<SupportSpanCheck> get _liveSupportSpanChecks {
@@ -7277,6 +7293,50 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
+  void _openBuildingCheckSummary() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => ListenableBuilder(
+        listenable: _checkController,
+        builder: (_, _) => BuildingCheckSummarySheet(
+          project: _project,
+          report: _checkController.report,
+          isRunning: _checkController.isRunning,
+          isStale: _checkController.isStale,
+          onRunFullCheck: () {
+            _checkController.requestFull(_project, _cadUnitsPerMeter);
+          },
+          onEditParameters: () {
+            Navigator.of(ctx).pop();
+            _openProjectDesignParameters();
+          },
+          onLocateElement: (storeyId, elementId, isWall) {
+            Navigator.of(ctx).pop();
+            _locateSeismicElement(storeyId, elementId, isWall);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _openProjectDesignParameters() {
+    ProjectDesignParametersSheet.show(
+      context,
+      project: _project,
+      onApply: (updated) {
+        _pushUndo();
+        setState(() {
+          _project = updated;
+          _runAnalysis();
+        });
+        _checkController.request(_project, _cadUnitsPerMeter, immediate: true);
+        _saveProject();
+      },
+    );
+  }
+
   void _openSeismicReport() {
     showModalBottomSheet(
       context: context,
@@ -7860,6 +7920,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   cantileverZones: _analysisSummary.zones,
                                   verticalReport: _verticalCapacityReport,
                                   seismicReport: _seismicAnalysisReport,
+                                  checkReport: _checkController.report,
+                                  checkStale: _checkController.isStale,
                                   showCantileverHeatmap: true,
                                   showSlabSpanOverlay: true,
                                   supportSpanChecks: _liveSupportSpanChecks,
@@ -8358,6 +8420,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         verticalCapacityReport: _verticalCapacityReport,
                         onOpenSeismicReport: _openSeismicReport,
                         seismicReport: _seismicAnalysisReport,
+                        onOpenBuildingCheck: _openBuildingCheckSummary,
+                        onOpenDesignParameters: _openProjectDesignParameters,
+                        checkReport: _checkController.report,
+                        checkRunning: _checkController.isRunning,
                         hasWallStart: _wallStartCad != null,
                         hasBeamStart: _beamStartCad != null,
                         onCustomColumnDimensions: _showCustomColumnDialog,
@@ -8795,6 +8861,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               ],
             ),
             const SizedBox(height: 8),
+            if (_selectedColumn != null || _selectedShearWall != null)
+              ElementCheckPanel(
+                utilization: _checkController.report.element(
+                  _project.activeStorey.id,
+                  (_selectedColumn?.id ?? _selectedShearWall!.id),
+                ),
+                stale: _checkController.isStale,
+                running: _checkController.isRunning,
+              ),
             // Row 2: Action Buttons (Scrollable horizontally)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,

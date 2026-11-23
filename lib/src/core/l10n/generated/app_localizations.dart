@@ -24881,6 +24881,456 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Trace contour'**
   String get architectSplineTraceReady;
+
+  /// Preliminary check: axial compression of a column or wall at ULS
+  ///
+  /// In en, this message translates to:
+  /// **'Axial load'**
+  String get checkNameColumnAxial;
+
+  /// Preliminary check: normalised axial load nu_d in the seismic situation
+  ///
+  /// In en, this message translates to:
+  /// **'Seismic axial'**
+  String get checkNameSeismicAxial;
+
+  /// Preliminary check: punching shear of the slab at a column
+  ///
+  /// In en, this message translates to:
+  /// **'Punching'**
+  String get checkNamePunching;
+
+  /// Preliminary check: long-term slab deflection
+  ///
+  /// In en, this message translates to:
+  /// **'Deflection'**
+  String get checkNameSlabDeflection;
+
+  /// Preliminary check: slab bending moment
+  ///
+  /// In en, this message translates to:
+  /// **'Slab bending'**
+  String get checkNameSlabBending;
+
+  /// Utilization up to 85 percent
+  ///
+  /// In en, this message translates to:
+  /// **'Within limit'**
+  String get checkLevelOk;
+
+  /// Utilization between 85 and 100 percent
+  ///
+  /// In en, this message translates to:
+  /// **'Near limit'**
+  String get checkLevelNear;
+
+  /// Utilization above 100 percent
+  ///
+  /// In en, this message translates to:
+  /// **'Over limit'**
+  String get checkLevelOver;
+
+  /// A check that could not be evaluated
+  ///
+  /// In en, this message translates to:
+  /// **'Not evaluated'**
+  String get checkLevelUnknown;
+
+  /// The shown check results belong to an earlier version of the drawing
+  ///
+  /// In en, this message translates to:
+  /// **'Outdated'**
+  String get checkStale;
+
+  /// Preliminary checks are being calculated
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get checkRunning;
+
+  /// Disclaimer shown with every check result
+  ///
+  /// In en, this message translates to:
+  /// **'Preliminary elastic estimate, not a code verification.'**
+  String get checkPreliminary;
+
+  /// No description provided for @checkAssumptionColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Capacity with e0 = max(h/30, 20 mm), reinforcement {ratio} %. Seismic limit ν_d ≤ {limit}.'**
+  String checkAssumptionColumn(String ratio, String limit);
+
+  /// No description provided for @checkAssumptionWall.
+  ///
+  /// In en, this message translates to:
+  /// **'Capacity with e0 = max(t/30, 20 mm), reinforcement {ratio} %. Seismic limit ν_d ≤ {limit}.'**
+  String checkAssumptionWall(String ratio, String limit);
+
+  /// No description provided for @checkAssumptionPunching.
+  ///
+  /// In en, this message translates to:
+  /// **'Control perimeter at 2d, clipped at slab edges and openings. Slab reinforcement {ratio} % assumed.'**
+  String checkAssumptionPunching(String ratio);
+
+  /// No description provided for @checkAssumptionDeflection.
+  ///
+  /// In en, this message translates to:
+  /// **'Elastic deflection × {factor} for creep and cracking, limit L/{ratio}, L = twice the distance to the nearest support.'**
+  String checkAssumptionDeflection(String factor, String ratio);
+
+  /// No description provided for @checkAssumptionBending.
+  ///
+  /// In en, this message translates to:
+  /// **'Design moment averaged over {radius} m against the section capacity of the slab.'**
+  String checkAssumptionBending(String radius);
+
+  /// No description provided for @checkUnsupportedArea.
+  ///
+  /// In en, this message translates to:
+  /// **'No support: {area} m²'**
+  String checkUnsupportedArea(String area);
+
+  /// Tooltip for a slab region that no support holds
+  ///
+  /// In en, this message translates to:
+  /// **'This part of the slab has no supports. Add columns or walls under it.'**
+  String get checkUnsupportedHint;
+
+  /// No description provided for @checkSlabReaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Slab load on this support: {value} kN'**
+  String checkSlabReaction(String value);
+
+  /// No description provided for @checkAxialTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total axial load at this level: {value} kN'**
+  String checkAxialTotal(String value);
+
+  /// No check could be evaluated for the selected element
+  ///
+  /// In en, this message translates to:
+  /// **'Not available for this element'**
+  String get checkNotAvailable;
+
+  /// Preliminary check: shear wall seismic shear V_Ed vs V_Rd
+  ///
+  /// In en, this message translates to:
+  /// **'Seismic shear'**
+  String get checkNameWallShear;
+
+  /// Preliminary check: EC8 interstorey drift limit
+  ///
+  /// In en, this message translates to:
+  /// **'Storey drift'**
+  String get checkNameStoreyDrift;
+
+  /// Preliminary check: EC8 storey torsional regularity
+  ///
+  /// In en, this message translates to:
+  /// **'Torsion'**
+  String get checkNameStoreyTorsion;
+
+  /// No description provided for @checkAssumptionWallShear.
+  ///
+  /// In en, this message translates to:
+  /// **'EC8 lateral force method with accidental torsion ±5 % and shear factor {mag}. Horizontal web steel {ratio} % assumed.'**
+  String checkAssumptionWallShear(String mag, String ratio);
+
+  /// Assumption note for interstorey drift check
+  ///
+  /// In en, this message translates to:
+  /// **'Cracked stiffness 0.5·E, EC8 §4.4.3.2 limit d_r·ν ≤ α·h.'**
+  String get checkAssumptionDrift;
+
+  /// Assumption note for storey torsion check
+  ///
+  /// In en, this message translates to:
+  /// **'Principal stiffness axes, shear-corrected walls, perimeter facades included. Limits: e0 ≤ 0.30·r and r ≥ l_s.'**
+  String get checkAssumptionTorsion;
+
+  /// Short button label to open project design parameters
+  ///
+  /// In en, this message translates to:
+  /// **'Design data'**
+  String get designParamsAction;
+
+  /// Title of the project design parameters bottom sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Project design data'**
+  String get designParamsTitle;
+
+  /// Section header for seismic inputs
+  ///
+  /// In en, this message translates to:
+  /// **'Seismic zone (EC8)'**
+  String get designParamsSeismicSection;
+
+  /// Label for reference peak ground acceleration a_gR
+  ///
+  /// In en, this message translates to:
+  /// **'Ground acceleration a_gR (g)'**
+  String get designParamsAgLabel;
+
+  /// Chip label when a_gR is not configured
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get designParamsAgNotSet;
+
+  /// Custom a_gR input label
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get designParamsAgCustom;
+
+  /// Label for EC8 soil class selector
+  ///
+  /// In en, this message translates to:
+  /// **'Soil class'**
+  String get designParamsSoilLabel;
+
+  /// Tooltip for soil class A
+  ///
+  /// In en, this message translates to:
+  /// **'Rock or rock-like ground'**
+  String get designParamsSoilTooltipA;
+
+  /// Tooltip for soil class B
+  ///
+  /// In en, this message translates to:
+  /// **'Very dense sand, gravel or stiff clay'**
+  String get designParamsSoilTooltipB;
+
+  /// Tooltip for soil class C
+  ///
+  /// In en, this message translates to:
+  /// **'Dense to medium-dense sand, gravel or stiff clay'**
+  String get designParamsSoilTooltipC;
+
+  /// Tooltip for soil class D
+  ///
+  /// In en, this message translates to:
+  /// **'Loose to medium cohesionless or soft cohesive soil'**
+  String get designParamsSoilTooltipD;
+
+  /// Tooltip for soil class E
+  ///
+  /// In en, this message translates to:
+  /// **'Alluvial surface layer (5–20 m) over rock'**
+  String get designParamsSoilTooltipE;
+
+  /// Label for EC8 building importance class
+  ///
+  /// In en, this message translates to:
+  /// **'Importance'**
+  String get designParamsImportanceLabel;
+
+  /// Label for lateral resisting structural system
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get designParamsSystemLabel;
+
+  /// Auto-inferred structural system
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get designParamsSystemAuto;
+
+  /// Shear wall structural system
+  ///
+  /// In en, this message translates to:
+  /// **'Walls'**
+  String get designParamsSystemWall;
+
+  /// Moment-resisting frame system
+  ///
+  /// In en, this message translates to:
+  /// **'Frame'**
+  String get designParamsSystemFrame;
+
+  /// Dual wall-frame structural system
+  ///
+  /// In en, this message translates to:
+  /// **'Dual'**
+  String get designParamsSystemDual;
+
+  /// Low ductility DCL system
+  ///
+  /// In en, this message translates to:
+  /// **'Low duct.'**
+  String get designParamsSystemLow;
+
+  /// Label for non-structural drift damage limit
+  ///
+  /// In en, this message translates to:
+  /// **'Drift limit'**
+  String get designParamsDriftLabel;
+
+  /// Drift limit for brittle partitions
+  ///
+  /// In en, this message translates to:
+  /// **'Brittle (0.5%)'**
+  String get designParamsDriftBrittle;
+
+  /// Drift limit for ductile partitions
+  ///
+  /// In en, this message translates to:
+  /// **'Ductile (0.75%)'**
+  String get designParamsDriftDuctile;
+
+  /// Drift limit for non-interfering partitions
+  ///
+  /// In en, this message translates to:
+  /// **'Free (1.0%)'**
+  String get designParamsDriftFree;
+
+  /// Section header for concrete grade and loads
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete & loads'**
+  String get designParamsMaterialsSection;
+
+  /// Concrete strength class label
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete'**
+  String get designParamsConcreteLabel;
+
+  /// Superimposed dead load input label
+  ///
+  /// In en, this message translates to:
+  /// **'Dead G (kN/m²)'**
+  String get designParamsDeadLabel;
+
+  /// Imposed live load input label
+  ///
+  /// In en, this message translates to:
+  /// **'Live Q (kN/m²)'**
+  String get designParamsLiveLabel;
+
+  /// Perimeter facade line load input label
+  ///
+  /// In en, this message translates to:
+  /// **'Facade (kN/m)'**
+  String get designParamsFacadeLabel;
+
+  /// Apply design parameters button
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get designParamsApply;
+
+  /// No description provided for @designParamsSpectrumSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Spectrum: {source} · q = {q}'**
+  String designParamsSpectrumSource(String source, String q);
+
+  /// Short button label to open the building check summary
+  ///
+  /// In en, this message translates to:
+  /// **'Check'**
+  String get checkBuildingAction;
+
+  /// Title of the building check summary bottom sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Building check'**
+  String get checkBuildingTitle;
+
+  /// Button to trigger fine-mesh full building check
+  ///
+  /// In en, this message translates to:
+  /// **'Full check (0.25 m)'**
+  String get checkRunFullButton;
+
+  /// No description provided for @checkFullDoneBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'0.25 m · {ms} ms'**
+  String checkFullDoneBadge(int ms);
+
+  /// No description provided for @checkLiveDoneBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'0.50 m · {ms} ms'**
+  String checkLiveDoneBadge(int ms);
+
+  /// Summary card title for columns
+  ///
+  /// In en, this message translates to:
+  /// **'Columns'**
+  String get checkSummaryColumns;
+
+  /// Summary card title for shear walls
+  ///
+  /// In en, this message translates to:
+  /// **'Walls'**
+  String get checkSummaryWalls;
+
+  /// Summary card title for slabs
+  ///
+  /// In en, this message translates to:
+  /// **'Slabs'**
+  String get checkSummarySlabs;
+
+  /// Summary card title for storey torsion
+  ///
+  /// In en, this message translates to:
+  /// **'Torsion'**
+  String get checkSummaryTorsion;
+
+  /// Prompt shown when a_gR is not configured
+  ///
+  /// In en, this message translates to:
+  /// **'Set seismic zone for wall shear & drift'**
+  String get checkSummarySeismicUnset;
+
+  /// No description provided for @checkSummaryBaseShear.
+  ///
+  /// In en, this message translates to:
+  /// **'Base shear F_b: {fb} kN · T₁: {t1} s · Mass: {mass} t'**
+  String checkSummaryBaseShear(String fb, String t1, String mass);
+
+  /// Warning when EC8 lateral force applicability criteria are exceeded
+  ///
+  /// In en, this message translates to:
+  /// **'Simplified method is indicative only — 3D modal analysis recommended.'**
+  String get checkNeeds3dWarning;
+
+  /// Advice when structural eccentricity exceeds 0.3 r
+  ///
+  /// In en, this message translates to:
+  /// **'Shift wall stiffness toward the centre of mass.'**
+  String get checkTorsionAdviceEcc;
+
+  /// Advice when torsional radius r is smaller than mass radius l_s
+  ///
+  /// In en, this message translates to:
+  /// **'Add perimeter shear walls on opposite sides to increase torsional stiffness.'**
+  String get checkTorsionAdviceFlex;
+
+  /// Heading for list of elements near or over limits
+  ///
+  /// In en, this message translates to:
+  /// **'Elements needing attention'**
+  String get checkSummaryAttentionList;
+
+  /// Message when no element exceeds 85 percent
+  ///
+  /// In en, this message translates to:
+  /// **'All evaluated elements are within preliminary limits.'**
+  String get checkSummaryAllOk;
+
+  /// Empty state for building check summary
+  ///
+  /// In en, this message translates to:
+  /// **'Place slabs, columns or walls to run checks.'**
+  String get checkSummaryNoElements;
 }
 
 class _AppLocalizationsDelegate

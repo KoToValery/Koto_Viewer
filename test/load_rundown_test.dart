@@ -78,6 +78,16 @@ void main() {
     expect(_sum(r, 'g') - _sum(noFacade, 'g'), closeTo(1.35 * 3.5 * 4 * 6.3, 1e-2));
   });
 
+  test('a storey without a slab gives no verdict instead of a self-weight percentage', () {
+    final p = StructuralProject(storeys: [
+      StoreyLevel(id: 'g', name: 'g', height: 3, columns: [_col('c', Offset.zero)]),
+    ]);
+    final r = LoadRundown.analyze(p, cadUnitsPerMeter: 1);
+    final e = r.element('g', 'c')!;
+    expect(e.governing, isNull);
+    expect(e.level, UtilizationLevel.unknown);
+  });
+
   test('same result in centimetres', () {
     StructuralProject toCm(StructuralProject p) => p.copyWith(storeys: [
       for (final s in p.storeys)
