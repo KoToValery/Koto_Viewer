@@ -4694,7 +4694,9 @@
   "architectTerrainNoUnderlayHint": "Първо импортирайте CAD подложка (DXF/DWG), за да извличате хоризонтали",
   "architectTerrainCreateBoundaryFirst": "Първо очертайте външната граница на терена",
   "architectTerrainContourElevationTitle": "Кота на хоризонтал",
+  "architectTerrainContourPropertiesTitle": "Свойства на хоризонтал",
   "architectTerrainSpotElevationTitle": "Височинна кота",
+  "architectTerrainSpotPropertiesTitle": "Свойства на височинна кота",
   "architectTerrainNoContourAtPoint": "Не е открит хоризонтал под точката",
   "architectTerrainProposedCloned": "Проектният терен е създаден от съществуващия",
   "architectSplineTraceContour": "Авто-контур",
@@ -4775,5 +4777,17 @@
   "checkTorsionAdviceFlex": "Добавете шайби по периметъра от двете страни за по-голяма усуквателна коравина.",
   "checkSummaryAttentionList": "Елементи за внимание",
   "checkSummaryAllOk": "Всички оценени елементи са в предварителните граници.",
-  "checkSummaryNoElements": "Поставете плоча, колони или шайби за проверка."
+  "checkSummaryNoElements": "Поставете плоча, колони или шайби за проверка.",
+  "architectImportProject": "Импорт на проект (ZIP)",
+  "architectImportProjectShort": "Импорт (ZIP)",
+  "architectImportProjectPreparing": "Импортиране на проектния пакет…",
+  "architectImportProjectSuccess": "Проектът е импортиран: {name}",
+  "architectImportProjectInvalidArchive": "Невалиден или повреден ZIP архив.",
+  "architectImportProjectMissingManifest": "Този архив не е валиден пакет на архитектурен проект.",
+  "architectImportProjectUnsupportedType": "Тук могат да се импортират само пакети на архитектурни проекти (.zip).",
+  "architectImportProjectIntegrityFailed": "Проверката за цялост на пакета е неуспешна или липсват файлове/подложки.",
+  "architectImportProjectFailed": "Неуспешен импорт: {error}",
+  "architectTerrainContourInterval": "Сечение на хоризонталите",
+  "architectTerrainContourIntervalShort": "Δh",
+  "architectTerrainContourIntervalHint": "Вертикална стъпка (Δh) между хоризонталите. 0.00 = автоматично след 2 хоризонтала."
 }

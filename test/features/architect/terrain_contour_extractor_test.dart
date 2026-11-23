@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_landscape_models.dart';
+import 'package:kotoview/src/features/architect/services/architect_geodetic_detector.dart';
 import 'package:kotoview/src/features/architect/services/architect_underlay_contour_extractor.dart';
 import 'package:kotoview/src/features/bim_editing/geometry/bim_coordinate_frame.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
@@ -216,6 +217,210 @@ EOF
       expect(clipped.single.closed, isFalse);
       expect(clipped.single.points.first.dx, closeTo(0.0, 1e-6));
       expect(clipped.single.points.last.dx, closeTo(10.0, 1e-6));
+    });
+
+    test('filters out bare integer parcel numbers and keeps 2-decimal elevations', () {
+      final doc = DxfDocument(
+        entities: const [
+          DxfLwPolyline(
+            layer: 'TOPO',
+            vertices: [
+              DxfPolylineVertex(x: 0, y: 0),
+              DxfPolylineVertex(x: 6, y: 0.4),
+              DxfPolylineVertex(x: 12, y: 0.8),
+              DxfPolylineVertex(x: 18, y: 1.0),
+            ],
+          ),
+          // Closer bare integer parcel ID "458" (must be ignored)
+          DxfText(
+            layer: 'CADASTRE',
+            text: '458',
+            insertPoint: Offset(6.0, 0.45),
+            height: 0.5,
+          ),
+          // Real contour elevation with 2 decimals
+          DxfText(
+            layer: 'TOPO',
+            text: '542,50',
+            insertPoint: Offset(12.0, 1.35),
+            height: 0.4,
+          ),
+        ],
+        blocks: const {},
+        layers: {'0': DxfLayer(name: '0'), 'TOPO': DxfLayer(name: 'TOPO'), 'CADASTRE': DxfLayer(name: 'CADASTRE')},
+        headerVars: const {},
+        bounds: const Rect.fromLTRB(0, 0, 20, 20),
+        entityStats: const {},
+      );
+
+      final picked = ArchitectUnderlayContourExtractor.pickAt(
+        document: doc,
+        frame: const BimCoordinateFrame(),
+        layerVisibility: const {},
+        modelPoint: const Offset(3.0, 0.2),
+        hitToleranceMeters: 0.5,
+      );
+      expect(picked, isNotNull);
+      expect(picked!.suggestedElevation, closeTo(542.50, 1e-6));
+
+      final geodetic = ArchitectGeodeticDetector.analyzeDocument(
+        doc: doc,
+        storeyId: 'storey_site',
+      );
+      expect(geodetic.contours, hasLength(1));
+      expect(geodetic.contours.single.elevation, closeTo(542.50, 1e-6));
+      expect(geodetic.spotElevations, isEmpty);
+    });
+
+    test('bridges rotated inline elevation text gaps even when other numbers are nearby and closes split loops', () {
+      final doc = DxfDocument(
+        entities: const [
+          // Open contour split by left-aligned large text "546.25" (and distracted by parcel ID "1024")
+          DxfLwPolyline(
+            layer: 'TOPO',
+            vertices: [
+              DxfPolylineVertex(x: 0, y: 0),
+              DxfPolylineVertex(x: 4, y: 0.5),
+              DxfPolylineVertex(x: 8, y: 1.0),
+            ],
+          ),
+          DxfText(
+            layer: 'CADASTRE',
+            text: '1024',
+            insertPoint: Offset(8.5, 1.5),
+            height: 0.6,
+          ),
+          // Unrelated elevation text slightly to the side (must not block the real inline gap text)
+          DxfText(
+            layer: 'TOPO',
+            text: '550.00',
+            insertPoint: Offset(9.2, 2.8),
+            height: 0.5,
+          ),
+          DxfText(
+            layer: 'TOPO',
+            text: '546.25',
+            insertPoint: Offset(8.4, 0.85),
+            height: 0.9,
+            hAlign: 0,
+            vAlign: 0,
+            rotationDeg: 7.0,
+          ),
+          DxfLwPolyline(
+            layer: 'TOPO',
+            vertices: [
+              DxfPolylineVertex(x: 13.0, y: 1.6),
+              DxfPolylineVertex(x: 17.0, y: 2.0),
+              DxfPolylineVertex(x: 21.0, y: 2.2),
+            ],
+          ),
+          // Closed contour loop broken along its bottom edge by inline text "548.00"
+          DxfLwPolyline(
+            layer: 'TOPO',
+            vertices: [
+              DxfPolylineVertex(x: 3.0, y: 12.0),
+              DxfPolylineVertex(x: 7.0, y: 12.0),
+              DxfPolylineVertex(x: 8.5, y: 15.0),
+              DxfPolylineVertex(x: 4.5, y: 18.5),
+              DxfPolylineVertex(x: 0.0, y: 15.0),
+              DxfPolylineVertex(x: -1.0, y: 12.0),
+              DxfPolylineVertex(x: 0.5, y: 12.0),
+            ],
+          ),
+          DxfText(
+            layer: 'TOPO',
+            text: '548.00',
+            insertPoint: Offset(1.0, 11.8),
+            height: 0.45,
+          ),
+        ],
+        blocks: const {},
+        layers: {'0': DxfLayer(name: '0'), 'TOPO': DxfLayer(name: 'TOPO'), 'CADASTRE': DxfLayer(name: 'CADASTRE')},
+        headerVars: const {},
+        bounds: const Rect.fromLTRB(-2, -1, 22, 20),
+        entityStats: const {},
+      );
+
+      final pickedSplit = ArchitectUnderlayContourExtractor.pickAt(
+        document: doc,
+        frame: const BimCoordinateFrame(),
+        layerVisibility: const {},
+        modelPoint: const Offset(2.0, 0.25),
+        hitToleranceMeters: 0.5,
+      );
+      expect(pickedSplit, isNotNull);
+      expect(pickedSplit!.suggestedElevation, closeTo(546.25, 1e-6));
+      expect(pickedSplit.points.first.dx, closeTo(0.0, 1e-3));
+      expect(pickedSplit.points.last.dx, closeTo(21.0, 1e-3));
+
+      final pickedLoop = ArchitectUnderlayContourExtractor.pickAt(
+        document: doc,
+        frame: const BimCoordinateFrame(),
+        layerVisibility: const {},
+        modelPoint: const Offset(8.0, 16.0),
+        hitToleranceMeters: 0.5,
+      );
+      expect(pickedLoop, isNotNull);
+      expect(pickedLoop!.closed, isTrue);
+      expect(pickedLoop.suggestedElevation, closeTo(548.00, 1e-6));
+
+      final geodetic = ArchitectGeodeticDetector.analyzeDocument(
+        doc: doc,
+        storeyId: 'storey_site',
+      );
+      expect(
+        geodetic.contours.map((c) => c.elevation),
+        containsAll([546.25, 548.0]),
+      );
+      expect(geodetic.contours.where((c) => c.elevation == 546.25), hasLength(1));
+    });
+
+    test('detectElevation=false stitches broken contours without capturing elevation', () {
+      final doc = DxfDocument(
+        entities: const [
+          DxfLwPolyline(
+            layer: 'TOPO',
+            elevation: 542.50,
+            vertices: [
+              DxfPolylineVertex(x: 0, y: 0),
+              DxfPolylineVertex(x: 5, y: 0),
+            ],
+          ),
+          DxfText(
+            layer: 'TOPO',
+            text: '542.50',
+            insertPoint: Offset(6.2, 0.0),
+            height: 0.5,
+          ),
+          DxfLwPolyline(
+            layer: 'TOPO',
+            elevation: 542.50,
+            vertices: [
+              DxfPolylineVertex(x: 8, y: 0),
+              DxfPolylineVertex(x: 14, y: 0.5),
+            ],
+          ),
+        ],
+        blocks: const {},
+        layers: {'0': DxfLayer(name: '0'), 'TOPO': DxfLayer(name: 'TOPO')},
+        headerVars: const {},
+        bounds: const Rect.fromLTRB(-1, -1, 15, 2),
+        entityStats: const {},
+      );
+
+      final pickedNoElev = ArchitectUnderlayContourExtractor.pickAt(
+        document: doc,
+        frame: const BimCoordinateFrame(),
+        layerVisibility: const {},
+        modelPoint: const Offset(2.5, 0.0),
+        hitToleranceMeters: 0.5,
+        detectElevation: false,
+      );
+      expect(pickedNoElev, isNotNull);
+      expect(pickedNoElev!.suggestedElevation, isNull);
+      // Full contour still stitched across the inline text gap!
+      expect(pickedNoElev.points.first.dx, closeTo(0.0, 1e-3));
+      expect(pickedNoElev.points.last.dx, closeTo(14.0, 1e-3));
     });
   });
 }

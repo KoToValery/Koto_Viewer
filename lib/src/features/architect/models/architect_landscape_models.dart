@@ -4,9 +4,20 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import '../../../core/l10n/generated/app_localizations.dart';
+import '../../bim_editing/properties/bim_distance_unit.dart';
 import '../services/architect_spline_geometry.dart';
 import '../services/architect_terrain_tin.dart';
 import 'architect_underlay_models.dart';
+
+/// Elevation and contour-interval display unit for terrain:
+/// uses meters for all metric projects (m/cm/mm) and feet for imperial projects (ft/in).
+BimDistanceUnit terrainElevationUnit(
+  BimDistanceUnit projectUnits, [
+  BimDistanceUnit? levelUnits,
+]) =>
+    ((levelUnits?.isImperial ?? false) || projectUnits.isImperial)
+        ? BimDistanceUnit.feet
+        : BimDistanceUnit.meters;
 
 /// State of the terrain surface: natural existing grade vs. graded proposed design.
 enum ArchitectTerrainState {
@@ -313,6 +324,8 @@ class ArchitectTerrainSurface {
   final String id;
   final ArchitectTerrainState state;
   final double datumElevation;
+  final double contourInterval;
+  final bool contourIntervalManual;
   final List<ArchitectTerrainBoundary> boundaries;
   final List<ArchitectTerrainContour> contours;
   final List<ArchitectTerrainSpot> spots;
@@ -321,6 +334,8 @@ class ArchitectTerrainSurface {
     this.id = 'terrain_surface',
     this.state = ArchitectTerrainState.existing,
     this.datumElevation = 0.0,
+    this.contourInterval = 0.0,
+    this.contourIntervalManual = false,
     this.boundaries = const [],
     this.contours = const [],
     this.spots = const [],
@@ -373,6 +388,8 @@ class ArchitectTerrainSurface {
       id: 'terrain_proposed',
       state: ArchitectTerrainState.proposed,
       datumElevation: datumElevation,
+      contourInterval: contourInterval,
+      contourIntervalManual: contourIntervalManual,
       boundaries: [
         for (var i = 0; i < boundaries.length; i++)
           boundaries[i].copyWith(id: 'prop_bnd_${stamp}_$i'),
@@ -386,6 +403,101 @@ class ArchitectTerrainSurface {
           spots[i].copyWith(id: 'prop_spot_${stamp}_$i'),
       ],
     );
+  }
+
+  /// Creates editable spot elevations ([ArchitectTerrainSpot]) at each vertex
+  /// of a newly cut terrain opening so every corner exposes and controls `h`.
+  List<ArchitectTerrainSpot> withHoleVertexSpots({
+    required String holeId,
+    required List<Offset> points,
+    double fallbackRelativeElevation = 0.0,
+  }) {
+    final existingIds = <String>{for (final s in spots) s.id};
+    final out = List<ArchitectTerrainSpot>.of(spots);
+    for (var i = 0; i < points.length; i++) {
+      final p = points[i];
+      final alreadyHasSpot = out.any(
+        (s) => (s.position - p).distanceSquared < 0.02 * 0.02,
+      );
+      if (alreadyHasSpot) continue;
+      final evaluated = evaluateElevationAt(p);
+      final rel = double.parse(
+        (evaluated ?? fallbackRelativeElevation).toStringAsFixed(4),
+      );
+      final abs = double.parse((rel + datumElevation).toStringAsFixed(4));
+      var spotId = '${holeId}_pt_$i';
+      var suffix = 1;
+      while (existingIds.contains(spotId)) {
+        spotId = '${holeId}_pt_${i}_$suffix';
+        suffix++;
+      }
+      existingIds.add(spotId);
+      out.add(
+        ArchitectTerrainSpot(
+          id: spotId,
+          position: p,
+          elevation: rel,
+          rawAbsoluteElevation: abs,
+        ),
+      );
+    }
+    return out;
+  }
+
+  /// Moves existing vertex spots along with their edited opening polygon corners.
+  List<ArchitectTerrainSpot> syncHoleVertexSpots({
+    required List<Offset> oldPolygon,
+    required List<Offset> newPolygon,
+  }) {
+    if (oldPolygon.length != newPolygon.length) return spots;
+    final movedIndices = <int>[
+      for (var i = 0; i < oldPolygon.length; i++)
+        if ((oldPolygon[i] - newPolygon[i]).distanceSquared > 1e-10) i,
+    ];
+    if (movedIndices.isEmpty) return spots;
+    return [
+      for (final s in spots)
+        () {
+          for (final i in movedIndices) {
+            if ((s.position - oldPolygon[i]).distanceSquared < 0.02 * 0.02) {
+              return s.copyWith(position: newPolygon[i]);
+            }
+          }
+          return s;
+        }(),
+    ];
+  }
+
+  /// Appends a single editable spot for an inserted vertex on a terrain hole.
+  List<ArchitectTerrainSpot> appendSpotForInsertedPoint({
+    required String spotId,
+    required Offset insertion,
+    double fallbackRelativeElevation = 0.0,
+  }) {
+    if (spots.any((s) => (s.position - insertion).distanceSquared < 0.02 * 0.02)) {
+      return spots;
+    }
+    final evaluated = evaluateElevationAt(insertion);
+    final rel = double.parse(
+      (evaluated ?? fallbackRelativeElevation).toStringAsFixed(4),
+    );
+    final abs = double.parse((rel + datumElevation).toStringAsFixed(4));
+    final existingIds = {for (final s in spots) s.id};
+    var resolvedId = spotId;
+    var suffix = 1;
+    while (existingIds.contains(resolvedId)) {
+      resolvedId = '${spotId}_$suffix';
+      suffix++;
+    }
+    return [
+      ...spots,
+      ArchitectTerrainSpot(
+        id: resolvedId,
+        position: insertion,
+        elevation: rel,
+        rawAbsoluteElevation: abs,
+      ),
+    ];
   }
 
   Rect? get bounds {
@@ -514,15 +626,16 @@ class ArchitectTerrainSurface {
     }
 
     for (final s in effective.spots) {
-      addSample(s.position, s.elevation, weightBoost: 2.0);
+      addSample(s.position, s.effectiveRelative(effective.datumElevation), weightBoost: 2.0);
       if (weightTotal >= 1e8) return weightedSum / weightTotal;
     }
 
     for (final c in effective.contours) {
       final pts = c.resolvedPolyline(samplesPerSpan: 8);
       if (pts.isEmpty) continue;
+      final relZ = c.effectiveRelative(effective.datumElevation);
       if (pts.length == 1) {
-        addSample(pts.first, c.elevation, weightBoost: 1.5);
+        addSample(pts.first, relZ, weightBoost: 1.5);
         continue;
       }
       final count = c.closed ? pts.length : pts.length - 1;
@@ -530,7 +643,7 @@ class ArchitectTerrainSurface {
         final a = pts[i];
         final b = pts[(i + 1) % pts.length];
         final closest = _closestPointOnSegment(point, a, b);
-        addSample(closest, c.elevation, weightBoost: 2.5);
+        addSample(closest, relZ, weightBoost: 2.5);
         if (weightTotal >= 1e8) return weightedSum / weightTotal;
       }
     }
@@ -745,6 +858,8 @@ class ArchitectTerrainSurface {
     String? id,
     ArchitectTerrainState? state,
     double? datumElevation,
+    double? contourInterval,
+    bool? contourIntervalManual,
     List<ArchitectTerrainBoundary>? boundaries,
     List<ArchitectTerrainContour>? contours,
     List<ArchitectTerrainSpot>? spots,
@@ -752,6 +867,9 @@ class ArchitectTerrainSurface {
     id: id ?? this.id,
     state: state ?? this.state,
     datumElevation: datumElevation ?? this.datumElevation,
+    contourInterval: contourInterval ?? this.contourInterval,
+    contourIntervalManual:
+        contourIntervalManual ?? this.contourIntervalManual,
     boundaries: boundaries ?? this.boundaries,
     contours: contours ?? this.contours,
     spots: spots ?? this.spots,
@@ -761,6 +879,8 @@ class ArchitectTerrainSurface {
     'id': id,
     'state': state.name,
     if (datumElevation.abs() > 1e-4) 'datumElevation': datumElevation,
+    if (contourInterval > 1e-4) 'contourInterval': contourInterval,
+    if (contourIntervalManual) 'contourIntervalManual': true,
     if (boundaries.isNotEmpty)
       'boundaries': boundaries.map((b) => b.toJson()).toList(),
     if (contours.isNotEmpty)
@@ -776,6 +896,9 @@ class ArchitectTerrainSurface {
           orElse: () => ArchitectTerrainState.existing,
         ),
         datumElevation: (json['datumElevation'] as num?)?.toDouble() ?? 0.0,
+        contourInterval:
+            (json['contourInterval'] as num?)?.toDouble() ?? 0.0,
+        contourIntervalManual: json['contourIntervalManual'] == true,
         boundaries: [
           for (final b in json['boundaries'] as List? ?? const [])
             if (b is Map)

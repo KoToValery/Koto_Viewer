@@ -161,5 +161,51 @@ void main() {
         expect(sampled.length, greaterThan(3));
       },
     );
+
+    test(
+      'contour tool handleTap appends draft points and commits spline contour',
+      () {
+        final tool = ArchitectLandscapeTool()
+          ..terrainState = ArchitectTerrainState.existing
+          ..contourAutoTrace = false
+          ..terrainDatumElevation = 500.0
+          ..contourAbsoluteElevation = 502.5;
+
+        var project = ArchitectProject.starterWithCatalog(
+          name: 'Contour Tool Tap Test',
+          storeyCount: 1,
+        );
+        project = project.copyWith(activeStoreyId: project.siteStorey!.id);
+
+        expect(
+          tool.handleTap(
+            toolName: 'contour',
+            worldPoint: const Offset(0, 2),
+            project: project,
+          ),
+          isNull,
+        );
+        expect(
+          tool.handleTap(
+            toolName: 'contour',
+            worldPoint: const Offset(5, 4),
+            project: project,
+          ),
+          isNull,
+        );
+        expect(tool.draftPoints, hasLength(2));
+        expect(tool.canCommit('contour'), isTrue);
+
+        final committed = tool.commitDraft(
+          toolName: 'contour',
+          project: project,
+        );
+        expect(committed, isNotNull);
+        final contour = committed!.existingTerrain.contours.single;
+        expect(contour.isSpline, isTrue);
+        expect(contour.elevation, closeTo(2.5, 1e-4));
+        expect(contour.rawAbsoluteElevation, closeTo(502.5, 1e-4));
+      },
+    );
   });
 }

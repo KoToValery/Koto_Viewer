@@ -9,6 +9,8 @@ class ArchitectUnderlayCropOverlay extends StatelessWidget {
   final Offset translation;
   final int? activeEdge;
   final bool invalid;
+  final bool canMove;
+  final bool moving;
   const ArchitectUnderlayCropOverlay({
     super.key,
     required this.polygon,
@@ -17,7 +19,25 @@ class ArchitectUnderlayCropOverlay extends StatelessWidget {
     required this.handleLength,
     this.activeEdge,
     this.invalid = false,
+    this.canMove = false,
+    this.moving = false,
   });
+
+  /// Geometric bounding-box center of the visible underlay polygon.
+  static Offset? centerPoint(List<Offset> polygon) {
+    if (polygon.isEmpty) return null;
+    var minX = polygon.first.dx;
+    var maxX = polygon.first.dx;
+    var minY = polygon.first.dy;
+    var maxY = polygon.first.dy;
+    for (final p in polygon.skip(1)) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+    return Offset((minX + maxX) / 2, (minY + maxY) / 2);
+  }
 
   @override
   Widget build(BuildContext context) =>
@@ -58,6 +78,46 @@ class _CropPainter extends CustomPainter {
           Paint()..color = Colors.white,
         );
         canvas.drawCircle(point, data.activeEdge == i ? 6 : 5, line);
+      }
+    }
+    final centerModel = data.canMove
+        ? ArchitectUnderlayCropOverlay.centerPoint(p)
+        : null;
+    if (centerModel != null) {
+      final center = screen(centerModel);
+      final radius = data.moving ? 12.0 : 10.0;
+      final strokeColor = data.moving
+          ? const Color(0xff0288d1)
+          : const Color(0xff555555);
+      final moveStroke = Paint()
+        ..color = strokeColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = data.moving ? 1.8 : 1.3;
+      canvas.drawCircle(center, radius, Paint()..color = Colors.white);
+      canvas.drawCircle(center, radius, moveStroke);
+      const arm = 5.5;
+      const tip = 2.0;
+      canvas.drawLine(
+        center - const Offset(arm, 0),
+        center + const Offset(arm, 0),
+        moveStroke,
+      );
+      canvas.drawLine(
+        center - const Offset(0, arm),
+        center + const Offset(0, arm),
+        moveStroke,
+      );
+      for (final dir in const [
+        Offset(1, 0),
+        Offset(-1, 0),
+        Offset(0, 1),
+        Offset(0, -1),
+      ]) {
+        final head = center + dir * arm;
+        final perp = Offset(-dir.dy, dir.dx) * tip;
+        final back = head - dir * tip;
+        canvas.drawLine(head, back + perp, moveStroke);
+        canvas.drawLine(head, back - perp, moveStroke);
       }
     }
   }

@@ -810,6 +810,7 @@ class Architect2dPainter extends CustomPainter {
         points: slabDraftPoints,
         candidatePoint: slabCandidatePoint,
         zoomScale: zoomScale,
+        showClosingGuide: activeTool != ArchitectTool.spline,
       );
       if (roofTool != null) {
         ArchitectRoofPainterHelper.paintDraftRoof(
@@ -1457,14 +1458,94 @@ class Architect2dPainter extends CustomPainter {
     for (final drain in _project.activeStorey.floorDrains) {
       if (drain.id == targetId) { polygon = drain.polygon; holes = drain.holes; }
     }
+    if (polygon == null && _project.activeStorey.isSite) {
+      for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+        for (final b in surface.boundaries) {
+          if (b.id == targetId && b.polygon.length >= 3) {
+            polygon = b.polygon;
+            if (!b.isHole) {
+              holes = [
+                for (final h in surface.boundaries)
+                  if (h.isHole &&
+                      h.polygon.length >= 3 &&
+                      b.containsPoint(h.polygon.first))
+                    h.polygon,
+              ];
+            }
+          }
+        }
+        for (final c in surface.contours) {
+          if (c.id == targetId && c.closed && c.points.length >= 3) {
+            polygon = c.points;
+          }
+        }
+      }
+    }
     return (polygon, holes);
+  }
+
+  List<Offset>? _openEditableTerrainContour(String targetId) {
+    if (!_project.activeStorey.isSite) return null;
+    for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+      for (final c in surface.contours) {
+        if (c.id == targetId && !c.closed && c.points.length >= 2) {
+          return c.points;
+        }
+      }
+    }
+    return null;
   }
 
   void _drawPolygonEditing(Canvas canvas) {
     final targetId = selectedElementId ?? selectedZoneId;
     if (targetId == null) return;
     final (polygon, holes) = _editablePolygonContours(targetId);
-    if (polygon == null) return;
+    if (polygon == null) {
+      final openContour = _openEditableTerrainContour(targetId);
+      if (openContour != null && newPointCandidate == null) {
+        final scale = math.max(zoomScale, 80.0);
+        const color = Color(0xFF00BCD4);
+        for (var i = 0; i + 1 < openContour.length; i++) {
+          final mid = (openContour[i] + openContour[i + 1]) / 2;
+          canvas.drawCircle(mid, 3.5 / scale, Paint()..color = const Color(0xFFFF9800));
+          if (handleOffsetLength > 0) {
+            final grip = ArchitectPolylineEditing.edgeHandle(
+              openContour,
+              i,
+              zoomScale,
+              handleOffsetLength,
+            );
+            canvas.drawLine(
+              mid,
+              grip,
+              Paint()
+                ..color = const Color(0xFFFF9800)
+                ..strokeWidth = 1.6 / scale,
+            );
+            _drawTouchGrip(canvas, grip, scale, const Color(0xFFFF9800));
+          }
+        }
+        for (var i = 0; i < openContour.length; i++) {
+          canvas.drawCircle(openContour[i], 3.5 / scale, Paint()..color = color);
+          if (handleOffsetLength <= 0) continue;
+          final handle = ArchitectPolylineEditing.handle(
+            openContour,
+            i,
+            zoomScale,
+            handleOffsetLength,
+          );
+          canvas.drawLine(
+            openContour[i],
+            handle,
+            Paint()
+              ..color = const Color(0xFF00E5FF)
+              ..strokeWidth = 1.6 / scale,
+          );
+          _drawTouchGrip(canvas, handle, scale, color);
+        }
+      }
+      return;
+    }
     final showHandles = newPointCandidate == null;
     ArchitectPolygonPainter.draw(
       canvas: canvas,
@@ -2206,23 +2287,6 @@ class Architect2dPainter extends CustomPainter {
       );
     }
 
-    if (slabDraftPoints.isNotEmpty) {
-      _drawDraftMarker(
-        canvas,
-        slabDraftPoints.first,
-        draftingScale: draftingScale,
-        isStart: true,
-      );
-      for (int i = 1; i < slabDraftPoints.length; i++) {
-        _drawDraftMarker(
-          canvas,
-          slabDraftPoints[i],
-          draftingScale: draftingScale,
-          isStart: false,
-        );
-      }
-    }
-
     if (marqueePoints.isNotEmpty) {
       ArchitectSelectionPainter.marquee(canvas, marqueePolygon, marqueePoints, zoomScale, palette,
         contained:marqueeContained,candidate:marqueeCandidate);
@@ -2272,7 +2336,7 @@ class Architect2dPainter extends CustomPainter {
     if (activeTool.isLandscapeTool && landscapeTool != null) {
       final lt = landscapeTool!;
       if (lt.pickedContourPreview != null &&
-          lt.terrainMode == ArchitectTerrainDraftMode.pickContour) {
+          lt.isPickingContour(activeTool.name)) {
         ArchitectLandscapePainterHelper.drawPickedContourPreview(
           canvas: canvas,
           candidate: lt.pickedContourPreview!,
@@ -2285,7 +2349,7 @@ class Architect2dPainter extends CustomPainter {
         cursorWorld: activeDraftEnd ?? cursorPosition,
         zoomScale: zoomScale,
         accentColor: switch (activeTool) {
-          ArchitectTool.terrain =>
+          ArchitectTool.terrain || ArchitectTool.contour =>
             lt.terrainState == ArchitectTerrainState.proposed
                 ? const Color(0xFF15803D)
                 : const Color(0xFF92400E),
@@ -2326,6 +2390,7 @@ class Architect2dPainter extends CustomPainter {
                 lt.terrainMode == ArchitectTerrainDraftMode.contour) ||
             activeTool == ArchitectTool.contour,
         isClosedSpline: lt.contourClosed,
+        canSnapToStart: lt.canCloseDraftToStart(activeTool.name),
       );
     }
     if (activeTool == ArchitectTool.column && columnPreview != null) {

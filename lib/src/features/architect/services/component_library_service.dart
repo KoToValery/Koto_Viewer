@@ -179,6 +179,41 @@ class ComponentLibraryService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Imports custom scripted definitions from a project package if they are not
+  /// already registered in this library, without changing the active component.
+  Future<int> importCustomScriptsIfMissing(List<String> scripts) async {
+    if (scripts.isEmpty) return 0;
+    await init();
+    var added = 0;
+    final previous = List<ScriptedComponentDefinition>.of(_customScripted);
+    for (final script in scripts) {
+      try {
+        final def = ParametricScriptParser.parse(script);
+        if (_standardDefinitions.any((s) => s.id == def.id) ||
+            _legacyDefinitions.containsKey(def.id) ||
+            _customScripted.any((c) => c.id == def.id)) {
+          continue;
+        }
+        _customScripted.add(def);
+        added++;
+      } catch (e) {
+        debugPrint('Skipping invalid imported component script: $e');
+      }
+    }
+    if (added == 0) return 0;
+    try {
+      await _persistCustomScripts();
+    } catch (_) {
+      _customScripted
+        ..clear()
+        ..addAll(previous);
+      rethrow;
+    }
+    ComponentGeometryCache.instance.clear();
+    notifyListeners();
+    return added;
+  }
+
   /// Deletes a custom scripted definition; standard and legacy built-in components cannot be deleted.
   Future<bool> deleteCustomScript(String id) async {
     await init();

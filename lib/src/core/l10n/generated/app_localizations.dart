@@ -24840,11 +24840,23 @@ abstract class AppLocalizations {
   /// **'Contour Elevation'**
   String get architectTerrainContourElevationTitle;
 
+  /// Dialog title when editing properties of a single selected terrain contour
+  ///
+  /// In en, this message translates to:
+  /// **'Contour properties'**
+  String get architectTerrainContourPropertiesTitle;
+
   /// No description provided for @architectTerrainSpotElevationTitle.
   ///
   /// In en, this message translates to:
   /// **'Spot Elevation'**
   String get architectTerrainSpotElevationTitle;
+
+  /// Dialog title when editing properties of a single selected terrain spot elevation
+  ///
+  /// In en, this message translates to:
+  /// **'Spot elevation properties'**
+  String get architectTerrainSpotPropertiesTitle;
 
   /// No description provided for @architectTerrainNoContourAtPoint.
   ///
@@ -25331,6 +25343,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Place slabs, columns or walls to run checks.'**
   String get checkSummaryNoElements;
+
+  /// Action label to import a full architectural project package from ZIP
+  ///
+  /// In en, this message translates to:
+  /// **'Import Project (ZIP)'**
+  String get architectImportProject;
+
+  /// Compact button label for importing an architectural project ZIP
+  ///
+  /// In en, this message translates to:
+  /// **'Import (ZIP)'**
+  String get architectImportProjectShort;
+
+  /// Progress indicator message while importing a project package
+  ///
+  /// In en, this message translates to:
+  /// **'Importing project package…'**
+  String get architectImportProjectPreparing;
+
+  /// Snackbar message when an architectural project ZIP is imported
+  ///
+  /// In en, this message translates to:
+  /// **'Project imported: {name}'**
+  String architectImportProjectSuccess(String name);
+
+  /// Error when picked file is not a valid ZIP archive
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid or corrupted ZIP archive.'**
+  String get architectImportProjectInvalidArchive;
+
+  /// Error when required project manifest files are missing in the ZIP
+  ///
+  /// In en, this message translates to:
+  /// **'This archive is not a valid architectural project package.'**
+  String get architectImportProjectMissingManifest;
+
+  /// Error when importing a non-architectural package
+  ///
+  /// In en, this message translates to:
+  /// **'Only architectural project packages (.zip) can be imported here.'**
+  String get architectImportProjectUnsupportedType;
+
+  /// Error when checksums or referenced underlay files fail validation
+  ///
+  /// In en, this message translates to:
+  /// **'Package integrity check failed or referenced assets are missing.'**
+  String get architectImportProjectIntegrityFailed;
+
+  /// Generic import failure snackbar message
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String architectImportProjectFailed(String error);
+
+  /// Dialog title and properties label for the vertical elevation step between terrain contour lines
+  ///
+  /// In en, this message translates to:
+  /// **'Contour Interval'**
+  String get architectTerrainContourInterval;
+
+  /// Short mobile chip prefix for the contour elevation interval
+  ///
+  /// In en, this message translates to:
+  /// **'Δh'**
+  String get architectTerrainContourIntervalShort;
+
+  /// Tooltip describing the terrain contour elevation interval control
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical elevation step (Δh) between contours. 0.00 = auto-calculated after 2 contours.'**
+  String get architectTerrainContourIntervalHint;
 }
 
 class _AppLocalizationsDelegate

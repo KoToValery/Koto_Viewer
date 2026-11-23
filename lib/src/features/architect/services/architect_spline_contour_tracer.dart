@@ -51,6 +51,7 @@ class ArchitectSplineContourTracer {
     DxfDocument? underlayDocument,
     BimCoordinateFrame? underlayFrame,
     Map<String, bool> underlayLayerVisibility = const {},
+    bool detectElevation = true,
   }) {
     ArchitectSplineTraceCandidate? best;
 
@@ -69,6 +70,7 @@ class ArchitectSplineContourTracer {
         layerVisibility: underlayLayerVisibility,
         modelPoint: modelPoint,
         hitToleranceMeters: hitToleranceMeters,
+        detectElevation: detectElevation,
       );
       if (picked != null && picked.points.length >= 2) {
         final anchor = picked.anchorPoint ?? modelPoint;
@@ -84,7 +86,7 @@ class ArchitectSplineContourTracer {
               anchorPoint: anchor,
               distance: (anchor - modelPoint).distance,
               source: ArchitectSplineTraceSource.underlay,
-              elevation: picked.suggestedElevation,
+              elevation: detectElevation ? picked.suggestedElevation : null,
             ),
           );
         }

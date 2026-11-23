@@ -100,6 +100,7 @@ class ArchitectPathSolid {
     Color color, {
     double contourTolerance = .002,
     bool compactCaps = false,
+    bool preserveShortEdges = false,
   }) {
     if (top - bottom < 1e-8) return const [];
     return between(
@@ -109,6 +110,7 @@ class ArchitectPathSolid {
       color,
       contourTolerance: contourTolerance,
       compactCaps: compactCaps,
+      preserveShortEdges: preserveShortEdges,
     );
   }
 
@@ -119,8 +121,13 @@ class ArchitectPathSolid {
     Color color, {
     double contourTolerance = .002,
     bool compactCaps = false,
+    bool preserveShortEdges = false,
   }) {
-    final loops = contours(path, tolerance: contourTolerance),
+    final loops = contours(
+          path,
+          tolerance: contourTolerance,
+          preserveShortEdges: preserveShortEdges,
+        ),
         tris = <Triangle3D>[];
     Vector3 v(Offset p, double z) => Vector3(p.dx, p.dy, z);
     void triangle(

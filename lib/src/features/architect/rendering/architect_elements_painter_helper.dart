@@ -1467,33 +1467,192 @@ class ArchitectElementsPainterHelper {
     required List<Offset> points,
     required Offset? candidatePoint,
     required double zoomScale,
+    bool showClosingGuide = true,
   }) {
     if (points.isEmpty) return;
 
-    final draftingScale = math.max(zoomScale, 80.0);
+    final safeScale = math.max(zoomScale, 12.0);
+    final closeThreshold = math.min(16.0 / math.max(zoomScale, 1.0), 0.20);
+    final isCloseSnap = showClosingGuide &&
+        candidatePoint != null &&
+        points.length >= 3 &&
+        (candidatePoint - points.first).distance <= closeThreshold;
+
     final linePaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..strokeWidth = 1.8 / draftingScale
+      ..color = isCloseSnap ? const Color(0xFF00E676) : const Color(0xFF00E5FF)
+      ..strokeWidth = 2.0 / safeScale
       ..style = PaintingStyle.stroke;
 
-    final vertexPaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..style = PaintingStyle.fill;
-
-    for (int i = 0; i < points.length; i++) {
-      canvas.drawCircle(points[i], 4.5 / draftingScale, vertexPaint);
-      if (i > 0) {
-        canvas.drawLine(points[i - 1], points[i], linePaint);
-      }
+    for (int i = 1; i < points.length; i++) {
+      canvas.drawLine(points[i - 1], points[i], linePaint);
     }
 
-    if (candidatePoint != null && points.isNotEmpty) {
-      final dashPaint = Paint()
-        ..color = const Color(0xFFFFD600)
-        ..strokeWidth = 1.4 / draftingScale
-        ..style = PaintingStyle.stroke;
-      canvas.drawLine(points.last, candidatePoint, dashPaint);
-      canvas.drawCircle(candidatePoint, 3.5 / draftingScale, dashPaint);
+    if (candidatePoint != null) {
+      if (isCloseSnap) {
+        canvas.drawLine(
+          points.last,
+          points.first,
+          Paint()
+            ..color = const Color(0xFF00E676)
+            ..strokeWidth = 2.4 / safeScale
+            ..style = PaintingStyle.stroke,
+        );
+      } else {
+        final activePaint = Paint()
+          ..color = const Color(0xFFFFD600)
+          ..strokeWidth = 1.8 / safeScale
+          ..style = PaintingStyle.stroke;
+        canvas.drawLine(points.last, candidatePoint, activePaint);
+
+        if (showClosingGuide &&
+            (points.length >= 3 ||
+                (points.length == 2 &&
+                    (candidatePoint - points.last).distance > 1e-4))) {
+          _drawDashedLine(
+            canvas,
+            candidatePoint,
+            points.first,
+            Paint()
+              ..color = const Color(0xCC00E5FF)
+              ..strokeWidth = 1.5 / safeScale
+              ..style = PaintingStyle.stroke,
+            safeScale,
+          );
+        }
+      }
+    } else if (showClosingGuide && points.length >= 3) {
+      _drawDashedLine(
+        canvas,
+        points.last,
+        points.first,
+        Paint()
+          ..color = const Color(0xCC00E5FF)
+          ..strokeWidth = 1.5 / safeScale
+          ..style = PaintingStyle.stroke,
+        safeScale,
+      );
+    }
+
+    for (int i = 0; i < points.length; i++) {
+      _drawSlabVertexMarker(
+        canvas,
+        points[i],
+        safeScale: safeScale,
+        isStart: i == 0,
+        isClosingTarget: i == 0 && isCloseSnap,
+      );
+    }
+
+    if (candidatePoint != null && !isCloseSnap) {
+      canvas.drawCircle(
+        candidatePoint,
+        5.5 / safeScale,
+        Paint()
+          ..color = const Color(0xCC000000)
+          ..strokeWidth = 2.0 / safeScale
+          ..style = PaintingStyle.stroke,
+      );
+      canvas.drawCircle(
+        candidatePoint,
+        4.2 / safeScale,
+        Paint()
+          ..color = const Color(0xFFFFD600)
+          ..strokeWidth = 1.8 / safeScale
+          ..style = PaintingStyle.stroke,
+      );
+      canvas.drawCircle(
+        candidatePoint,
+        1.8 / safeScale,
+        Paint()..color = const Color(0xFFFFD600),
+      );
+    }
+  }
+
+  static void _drawSlabVertexMarker(
+    Canvas canvas,
+    Offset point, {
+    required double safeScale,
+    required bool isStart,
+    required bool isClosingTarget,
+  }) {
+    if (isStart) {
+      final primary = isClosingTarget
+          ? const Color(0xFF00E676)
+          : const Color(0xFF00E5FF);
+      canvas.drawCircle(
+        point,
+        (isClosingTarget ? 13.0 : 10.5) / safeScale,
+        Paint()
+          ..color = primary.withValues(alpha: isClosingTarget ? 0.32 : 0.22)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawCircle(
+        point,
+        7.5 / safeScale,
+        Paint()
+          ..color = const Color(0xDE000000)
+          ..strokeWidth = 2.6 / safeScale
+          ..style = PaintingStyle.stroke,
+      );
+      canvas.drawCircle(
+        point,
+        6.5 / safeScale,
+        Paint()
+          ..color = primary
+          ..strokeWidth = 2.0 / safeScale
+          ..style = PaintingStyle.stroke,
+      );
+      canvas.drawCircle(
+        point,
+        4.0 / safeScale,
+        Paint()..color = primary,
+      );
+      canvas.drawCircle(
+        point,
+        1.7 / safeScale,
+        Paint()..color = Colors.white,
+      );
+      return;
+    }
+
+    canvas.drawCircle(
+      point,
+      6.0 / safeScale,
+      Paint()
+        ..color = const Color(0xDE000000)
+        ..strokeWidth = 2.4 / safeScale
+        ..style = PaintingStyle.stroke,
+    );
+    canvas.drawCircle(
+      point,
+      4.8 / safeScale,
+      Paint()..color = const Color(0xFFFFB300),
+    );
+    canvas.drawCircle(
+      point,
+      1.6 / safeScale,
+      Paint()..color = Colors.white,
+    );
+  }
+
+  static void _drawDashedLine(
+    Canvas canvas,
+    Offset p1,
+    Offset p2,
+    Paint paint,
+    double scale,
+  ) {
+    final diff = p2 - p1;
+    final totalLen = diff.distance;
+    if (totalLen <= 1e-4) return;
+    final dir = diff / totalLen;
+    final dashLen = 6.0 / scale;
+    final gapLen = 4.0 / scale;
+    double current = 0.0;
+    while (current < totalLen) {
+      final next = math.min(current + dashLen, totalLen);
+      canvas.drawLine(p1 + dir * current, p1 + dir * next, paint);
+      current += dashLen + gapLen;
     }
   }
 }

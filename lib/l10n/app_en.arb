@@ -7497,7 +7497,11 @@
   "architectTerrainNoUnderlayHint": "Import a CAD underlay (DXF/DWG) first to pick contours",
   "architectTerrainCreateBoundaryFirst": "Draw the Terrain outer boundary first",
   "architectTerrainContourElevationTitle": "Contour Elevation",
+  "architectTerrainContourPropertiesTitle": "Contour properties",
+  "@architectTerrainContourPropertiesTitle": { "description": "Dialog title when editing properties of a single selected terrain contour" },
   "architectTerrainSpotElevationTitle": "Spot Elevation",
+  "architectTerrainSpotPropertiesTitle": "Spot elevation properties",
+  "@architectTerrainSpotPropertiesTitle": { "description": "Dialog title when editing properties of a single selected terrain spot elevation" },
   "architectTerrainNoContourAtPoint": "No contour curve found under pointer",
   "architectTerrainProposedCloned": "Proposed terrain created from Existing",
   "architectSplineTraceContour": "Auto-trace",
@@ -7653,5 +7657,45 @@
   "checkSummaryAllOk": "All evaluated elements are within preliminary limits.",
   "@checkSummaryAllOk": { "description": "Message when no element exceeds 85 percent" },
   "checkSummaryNoElements": "Place slabs, columns or walls to run checks.",
-  "@checkSummaryNoElements": { "description": "Empty state for building check summary" }
+  "@checkSummaryNoElements": { "description": "Empty state for building check summary" },
+  "architectImportProject": "Import Project (ZIP)",
+  "@architectImportProject": { "description": "Action label to import a full architectural project package from ZIP" },
+  "architectImportProjectShort": "Import (ZIP)",
+  "@architectImportProjectShort": { "description": "Compact button label for importing an architectural project ZIP" },
+  "architectImportProjectPreparing": "Importing project package…",
+  "@architectImportProjectPreparing": { "description": "Progress indicator message while importing a project package" },
+  "architectImportProjectSuccess": "Project imported: {name}",
+  "@architectImportProjectSuccess": {
+    "description": "Snackbar message when an architectural project ZIP is imported",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "architectImportProjectInvalidArchive": "Invalid or corrupted ZIP archive.",
+  "@architectImportProjectInvalidArchive": { "description": "Error when picked file is not a valid ZIP archive" },
+  "architectImportProjectMissingManifest": "This archive is not a valid architectural project package.",
+  "@architectImportProjectMissingManifest": { "description": "Error when required project manifest files are missing in the ZIP" },
+  "architectImportProjectUnsupportedType": "Only architectural project packages (.zip) can be imported here.",
+  "@architectImportProjectUnsupportedType": { "description": "Error when importing a non-architectural package" },
+  "architectImportProjectIntegrityFailed": "Package integrity check failed or referenced assets are missing.",
+  "@architectImportProjectIntegrityFailed": { "description": "Error when checksums or referenced underlay files fail validation" },
+  "architectImportProjectFailed": "Import failed: {error}",
+  "@architectImportProjectFailed": {
+    "description": "Generic import failure snackbar message",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "architectTerrainContourInterval": "Contour Interval",
+  "@architectTerrainContourInterval": {
+    "description": "Dialog title and properties label for the vertical elevation step between terrain contour lines"
+  },
+  "architectTerrainContourIntervalShort": "Δh",
+  "@architectTerrainContourIntervalShort": {
+    "description": "Short mobile chip prefix for the contour elevation interval"
+  },
+  "architectTerrainContourIntervalHint": "Vertical elevation step (Δh) between contours. 0.00 = auto-calculated after 2 contours.",
+  "@architectTerrainContourIntervalHint": {
+    "description": "Tooltip describing the terrain contour elevation interval control"
+  }
 }

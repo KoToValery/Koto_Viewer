@@ -10,16 +10,19 @@ class ArchitectAngularGuides {
     required Color color,
     double referenceAngle = 0,
     double? activeAngle,
+    int divisions = 8,
   }) {
+    final step = 2 * math.pi / divisions;
     final guide = Paint()
-      ..color = color.withValues(alpha: .35)
+      ..color = color.withValues(alpha: .4)
       ..strokeWidth = 1;
-    for (var i = 0; i < 8; i++) {
-      final angle = referenceAngle + i * math.pi / 4;
+    for (var i = 0; i < divisions; i++) {
+      final angle = referenceAngle + i * step;
       final u = Offset(math.cos(angle), math.sin(angle));
       final active =
           activeAngle != null && math.cos(angle - activeAngle) > 1 - 1e-9;
-      guide.color = color.withValues(alpha: active ? .8 : .35);
+      guide.color = color.withValues(alpha: active ? .85 : .4);
+      guide.strokeWidth = active ? 1.6 : 1.0;
       // Clip before making dashes so even a far-off-screen pivot takes only
       // viewport-sized work. Keep dash phase tied to the original pivot.
       var first = 0.0, last = double.infinity;

@@ -11,7 +11,10 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import 'bim_analysis_snapshot.dart';
 import '../../structural_designer/models/structural_element.dart';
 import '../../structural_designer/services/structural_persistence_service.dart';
+import '../../architect/components/dsl/parametric_script_parser.dart';
 import '../../architect/models/architect_project.dart';
+import '../../architect/services/component_library_service.dart';
+import '../../architect/services/fenestration_library_service.dart';
 import '../models/bim_work_project.dart';
 import 'bim_project_library_service.dart';
 import 'bim_underlay_loader.dart';
@@ -21,6 +24,13 @@ import 'bim_project_asset_service.dart';
 /// Service responsible for exporting individual storey DXF drawings (with original
 /// CAD coordinates, preserved layer states, and structural BiM layers) and full-project ZIP packages.
 class BimExportService {
+  static const String architecturalPackageFormat = 'koto.bim.package';
+  static const String architecturalPackageVersion = '1.0';
+  static const String architecturalProjectType = 'architectural';
+  static const String manifestFileName = 'project.json';
+  static const String architecturalFileName = 'architectural.json';
+  static const String inventoryFileName = 'package.json';
+  static const String librariesFileName = 'libraries.json';
   /// Reuses storey alignment, units and visible layers from the established CAD
   /// export. All working CAD files are owned by this job and removed afterwards.
   static Future<File> exportStoreyDwg({
@@ -445,28 +455,40 @@ class BimExportService {
   }
 
   /// Exports an architectural BiM project package as a ZIP containing manifest,
-  /// architectural model (JSON), and all referenced underlay CAD assets.
+  /// architectural model (JSON), optional custom libraries, and all referenced
+  /// CAD/raster/PDF underlay assets.
   static Future<File> exportArchitecturalProjectZip({
     required BimWorkProject project,
     required ArchitectProject architect,
     Directory? outputDirectory,
     BimProjectLibraryService? libraryService,
+    ComponentLibraryService? componentLibrary,
+    FenestrationLibraryService? fenestrationLibrary,
   }) async {
     final lib = libraryService ?? BimProjectLibraryService.instance;
+    final compLib = componentLibrary ?? ComponentLibraryService.instance;
+    final fenestLib = fenestrationLibrary ?? FenestrationLibraryService.instance;
+    final syncedManifest = project.projectType == BimProjectType.architectural
+        ? BimProjectLibraryService.syncArchitecturalManifest(project, architect)
+        : project;
     final tempDir = outputDirectory ?? await getTemporaryDirectory();
     await tempDir.create(recursive: true);
-    final cleanProjName = project.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final rawName = syncedManifest.name.trim().isNotEmpty
+        ? syncedManifest.name.trim()
+        : 'ArchitectProject';
+    final cleanProjName = rawName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
     final archive = Archive();
     final files = <String, Map<String, Object>>{};
 
     void add(String path, List<int> bytes, String role) {
-      final name = _packagePath(path);
+      final name = validatePackagePath(path);
       final existing = files.keys
           .where((p) => p.toLowerCase() == name.toLowerCase())
           .firstOrNull;
       if (existing != null) {
-        if (files[existing]!['sha256'] == sha256.convert(bytes).toString())
+        if (files[existing]!['sha256'] == sha256.convert(bytes).toString()) {
           return;
+        }
         throw StateError('Duplicate ZIP path: $name');
       }
       archive.addFile(ArchiveFile(name, bytes.length, bytes));
@@ -484,7 +506,7 @@ class BimExportService {
       role,
     );
 
-    final root = await lib.getProjectDirectory(project.id);
+    final root = await lib.getProjectDirectory(syncedManifest.id);
     Future<String?> asset(
       String stored,
       String role, {
@@ -492,8 +514,9 @@ class BimExportService {
     }) async {
       final file = await BimProjectAssetService.resolve(root, stored);
       if (file == null) {
-        if (required)
+        if (required) {
           throw FileSystemException('Missing project asset', stored);
+        }
         return null;
       }
       final relative = BimProjectAssetService.relativePath(root, file);
@@ -503,16 +526,20 @@ class BimExportService {
 
     final portableArchitect =
         (jsonDecode(jsonEncode(architect.toJson())) as Map<String, dynamic>)
-          ..['id'] = project.id;
+          ..['id'] = syncedManifest.id
+          ..['name'] = syncedManifest.name;
     for (final value
         in (portableArchitect['cadUnderlays'] as Map? ?? {}).values) {
       final config = value as Map;
-      config['internalCopyPath'] = await asset(
-        config['internalCopyPath'] as String,
-        'underlaySource',
-      );
+      final internalCopy = config['internalCopyPath'] as String?;
+      if (internalCopy != null && internalCopy.trim().isNotEmpty) {
+        config['internalCopyPath'] = await asset(
+          internalCopy,
+          'underlaySource',
+        );
+      }
       final cache = config['kcadCachePath'] as String?;
-      final portableCache = cache == null
+      final portableCache = (cache == null || cache.trim().isEmpty)
           ? null
           : await asset(cache, 'underlayCache', required: false);
       if (portableCache == null) {
@@ -525,12 +552,15 @@ class BimExportService {
     }
     for (final value in portableArchitect['rasterUnderlays'] as List? ?? []) {
       final raster = value as Map;
-      raster['internalImagePath'] = await asset(
-        raster['internalImagePath'] as String,
-        'rasterUnderlay',
-      );
+      final imagePath = raster['internalImagePath'] as String?;
+      if (imagePath != null && imagePath.trim().isNotEmpty) {
+        raster['internalImagePath'] = await asset(
+          imagePath,
+          'rasterUnderlay',
+        );
+      }
       final pdf = raster['sourcePdfPath'] as String?;
-      final portablePdf = pdf == null
+      final portablePdf = (pdf == null || pdf.trim().isEmpty)
           ? null
           : await asset(pdf, 'pdfSource', required: false);
       if (portablePdf == null) {
@@ -540,36 +570,89 @@ class BimExportService {
       }
     }
     final portableManifest =
-        jsonDecode(jsonEncode(project.toJson())) as Map<String, dynamic>;
+        jsonDecode(jsonEncode(syncedManifest.toJson())) as Map<String, dynamic>;
     for (final value in portableManifest['storeys'] as List? ?? []) {
       final storey = value as Map;
-      if (storey['underlayFileName'] is String) {
+      final working = storey['underlayFileName'];
+      if (working is String && working.trim().isNotEmpty) {
         storey['underlayFileName'] = await asset(
-          storey['underlayFileName'] as String,
+          working,
           'underlayWorking',
         );
       }
       final processing = storey['processing'] as Map?;
       if (processing != null) {
         for (final key in ['source', 'pure', 'dxf']) {
-          if (processing[key] is String)
+          final dep = processing[key];
+          if (dep is String && dep.trim().isNotEmpty) {
             processing[key] = await asset(
-              processing[key] as String,
+              dep,
               'underlayDependency',
             );
+          }
         }
       }
     }
-    json('project.json', portableManifest, 'projectManifest');
-    json('architectural.json', portableArchitect, 'architecturalModel');
 
-    // 4. Add package inventory
-    json('package.json', {
-      'format': 'koto.bim.package',
-      'version': '1.0',
-      'projectType': 'architectural',
-      'projectId': project.id,
-      'name': project.name,
+    // Export any referenced custom scripted components or custom opening styles
+    // so imported projects work identically on another device.
+    final customComponentScripts = <String>[];
+    final customOpeningStyles = <Map<String, dynamic>>[];
+    try {
+      await compLib.init();
+      final usedComponentIds = <String>{
+        for (final s in architect.storeys)
+          for (final c in s.components) c.definitionId,
+      };
+      for (final defId in usedComponentIds) {
+        final def = compLib.findDefinition(defId);
+        if (def is ScriptedComponentDefinition) {
+          customComponentScripts.add(def.rawSourceJson);
+        }
+      }
+    } catch (_) {}
+    try {
+      await fenestLib.init();
+      final embeddedStyleIds = {
+        for (final style in architect.openingStyles) style.id,
+      };
+      final usedStyleIds = <String>{
+        for (final s in architect.storeys)
+          for (final w in s.walls) ...[
+            for (final d in w.doors)
+              if (d.style == null && d.styleId != null) d.styleId!,
+            for (final win in w.windows)
+              if (win.style == null && win.styleId != null) win.styleId!,
+          ],
+      };
+      for (final styleId in usedStyleIds) {
+        if (embeddedStyleIds.contains(styleId)) continue;
+        final style = fenestLib.getStyleById(styleId);
+        if (style != null && !style.isPreset) {
+          customOpeningStyles.add(style.toJson());
+        }
+      }
+    } catch (_) {}
+
+    if (customComponentScripts.isNotEmpty || customOpeningStyles.isNotEmpty) {
+      json(librariesFileName, {
+        if (customComponentScripts.isNotEmpty)
+          'customComponentScripts': customComponentScripts,
+        if (customOpeningStyles.isNotEmpty)
+          'customOpeningStyles': customOpeningStyles,
+      }, 'customLibraries');
+    }
+
+    json(manifestFileName, portableManifest, 'projectManifest');
+    json(architecturalFileName, portableArchitect, 'architecturalModel');
+
+    // Add package inventory
+    json(inventoryFileName, {
+      'format': architecturalPackageFormat,
+      'version': architecturalPackageVersion,
+      'projectType': architecturalProjectType,
+      'projectId': syncedManifest.id,
+      'name': syncedManifest.name,
       'createdAt': DateTime.now().toIso8601String(),
       'files': files.values.toList(),
     }, 'packageInventory');
@@ -586,6 +669,8 @@ class BimExportService {
       if (await pending.exists()) await pending.delete();
     }
   }
+
+  static String validatePackagePath(String path) => _packagePath(path);
 
   static String _packagePath(String path) {
     final value = path.replaceAll('\\', '/');

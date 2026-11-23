@@ -26,6 +26,7 @@ class BimNumericKeypad extends StatelessWidget {
     bool allowNegative = false,
     double? min,
     double? max,
+    double? stepDelta,
     String? Function(double)? validate,
     String? cancelLabel,
     String? applyLabel,
@@ -41,6 +42,7 @@ class BimNumericKeypad extends StatelessWidget {
       allowNegative: allowNegative,
       min: min,
       max: max,
+      stepDelta: stepDelta,
       validate: validate,
       cancelLabel: cancelLabel,
       applyLabel: applyLabel,
@@ -131,6 +133,7 @@ class _BimNumericInputDialog extends StatefulWidget {
   final bool allowNegative;
   final double? min;
   final double? max;
+  final double? stepDelta;
   final String? Function(double)? validate;
   final String? cancelLabel;
   final String? applyLabel;
@@ -145,6 +148,7 @@ class _BimNumericInputDialog extends StatefulWidget {
     required this.allowNegative,
     this.min,
     this.max,
+    this.stepDelta,
     this.validate,
     this.cancelLabel,
     this.applyLabel,
@@ -194,9 +198,36 @@ class _BimNumericInputDialogState extends State<_BimNumericInputDialog> {
     return v;
   }
 
+  void _nudge(double delta) {
+    final current = const BimNumericRule().parse(_controller.text) ?? 0.0;
+    var next = current + delta;
+    if (!widget.allowNegative && next < 0) next = 0.0;
+    if (widget.min != null && next < widget.min!) next = widget.min!;
+    if (widget.max != null && next > widget.max!) next = widget.max!;
+    final formatted = _trimZeros(next, widget.decimals);
+    setState(() {
+      _input = null;
+      _controller.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    });
+  }
+
+  static String _trimZeros(double v, int decimals) {
+    final fixed = v.toStringAsFixed(decimals);
+    if (!fixed.contains('.')) return fixed;
+    final trimmed = fixed.replaceAll(RegExp(r'\.?0+$'), '');
+    return trimmed.isEmpty || trimmed == '-0' ? '0' : trimmed;
+  }
+
   @override
   Widget build(BuildContext context) {
     final parsed = _parsedValue();
+    final stepDelta = widget.stepDelta;
+    final stepText = stepDelta != null && stepDelta > 0
+        ? _trimZeros(stepDelta, widget.decimals)
+        : null;
     final validationMsg = () {
       final raw = const BimNumericRule().parse(_controller.text);
       if (raw == null || !raw.isFinite) return null;
@@ -260,6 +291,36 @@ class _BimNumericInputDialogState extends State<_BimNumericInputDialog> {
                 ),
                 onChanged: (text) => setState(() => _input = text),
               ),
+              if (stepDelta != null && stepDelta > 0 && stepText != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        key: const ValueKey('bim-numeric-step-minus'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: () => _nudge(-stepDelta),
+                        child: Text('-$stepText${widget.unitLabel ?? ''}'),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: OutlinedButton(
+                        key: const ValueKey('bim-numeric-step-plus'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: () => _nudge(stepDelta),
+                        child: Text('+$stepText${widget.unitLabel ?? ''}'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
               BimNumericKeypad(
                 keyPrefix: widget.keyPrefix,

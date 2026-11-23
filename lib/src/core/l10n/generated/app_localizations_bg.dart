@@ -13725,7 +13725,14 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectTerrainContourElevationTitle => 'Кота на хоризонтал';
 
   @override
+  String get architectTerrainContourPropertiesTitle => 'Свойства на хоризонтал';
+
+  @override
   String get architectTerrainSpotElevationTitle => 'Височинна кота';
+
+  @override
+  String get architectTerrainSpotPropertiesTitle =>
+      'Свойства на височинна кота';
 
   @override
   String get architectTerrainNoContourAtPoint =>
@@ -14011,4 +14018,50 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get checkSummaryNoElements =>
       'Поставете плоча, колони или шайби за проверка.';
+
+  @override
+  String get architectImportProject => 'Импорт на проект (ZIP)';
+
+  @override
+  String get architectImportProjectShort => 'Импорт (ZIP)';
+
+  @override
+  String get architectImportProjectPreparing =>
+      'Импортиране на проектния пакет…';
+
+  @override
+  String architectImportProjectSuccess(String name) {
+    return 'Проектът е импортиран: $name';
+  }
+
+  @override
+  String get architectImportProjectInvalidArchive =>
+      'Невалиден или повреден ZIP архив.';
+
+  @override
+  String get architectImportProjectMissingManifest =>
+      'Този архив не е валиден пакет на архитектурен проект.';
+
+  @override
+  String get architectImportProjectUnsupportedType =>
+      'Тук могат да се импортират само пакети на архитектурни проекти (.zip).';
+
+  @override
+  String get architectImportProjectIntegrityFailed =>
+      'Проверката за цялост на пакета е неуспешна или липсват файлове/подложки.';
+
+  @override
+  String architectImportProjectFailed(String error) {
+    return 'Неуспешен импорт: $error';
+  }
+
+  @override
+  String get architectTerrainContourInterval => 'Сечение на хоризонталите';
+
+  @override
+  String get architectTerrainContourIntervalShort => 'Δh';
+
+  @override
+  String get architectTerrainContourIntervalHint =>
+      'Вертикална стъпка (Δh) между хоризонталите. 0.00 = автоматично след 2 хоризонтала.';
 }

@@ -8,6 +8,7 @@ import '../../bim_editing/geometry/bim_coordinate_frame.dart';
 import '../../bim_projects/services/bim_underlay_loader.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../models/architect_underlay_models.dart';
+import 'architect_underlay_contour_extractor.dart';
 
 class ArchitectGeodeticDetectionResult {
   final BimCoordinateFrame frame;
@@ -33,7 +34,7 @@ class _NumericTextCandidate {
   final Offset cadPosition;
   final Offset localPosition;
   final double value;
-  final bool hasDecimal;
+  final int decimalPlaces;
   final double rotationRad;
   final String layer;
   bool consumedByContour = false;
@@ -42,7 +43,7 @@ class _NumericTextCandidate {
     required this.cadPosition,
     required this.localPosition,
     required this.value,
-    required this.hasDecimal,
+    required this.decimalPlaces,
     required this.rotationRad,
     required this.layer,
   });
@@ -108,7 +109,9 @@ class ArchitectGeodeticDetector {
     for (final entity in doc.entities) {
       if (entity.isPaperSpace) continue;
       if (entity is DxfText && !entity.isInvisible) {
-        final parsed = _parseElevationText(entity.text);
+        final parsed = ArchitectUnderlayContourExtractor.parseElevationText(
+          entity.text,
+        );
         if (parsed != null) {
           final cadPos = entity.alignPoint ?? entity.insertPoint;
           numericTexts.add(
@@ -116,21 +119,23 @@ class ArchitectGeodeticDetector {
               cadPosition: cadPos,
               localPosition: frame.toModel(cadPos),
               value: parsed.value,
-              hasDecimal: parsed.hasDecimal,
+              decimalPlaces: parsed.decimalPlaces,
               rotationRad: (invertY ? -1 : 1) * entity.rotationDeg * math.pi / 180.0,
               layer: entity.layer,
             ),
           );
         }
       } else if (entity is DxfMText) {
-        final parsed = _parseElevationText(entity.cleanText);
+        final parsed = ArchitectUnderlayContourExtractor.parseElevationText(
+          entity.cleanText,
+        );
         if (parsed != null) {
           numericTexts.add(
             _NumericTextCandidate(
               cadPosition: entity.insertPoint,
               localPosition: frame.toModel(entity.insertPoint),
               value: parsed.value,
-              hasDecimal: parsed.hasDecimal,
+              decimalPlaces: parsed.decimalPlaces,
               rotationRad: (invertY ? -1 : 1) * entity.rotationDeg * math.pi / 180.0,
               layer: entity.layer,
             ),
@@ -148,90 +153,64 @@ class ArchitectGeodeticDetector {
       }
     }
 
-    // 2. Geometric-first contour detection
+    // 2. Geometric-first contour detection (with inline text-gap stitching)
     final rawContours = <_RawContourCandidate>[];
     final confirmedContourLayers = <String, List<double>>{};
 
-    int candidateIndex = 0;
-    for (final entity in doc.entities) {
-      if (entity.isPaperSpace) continue;
-
-      if (entity is DxfLwPolyline && entity.vertices.length >= 3) {
-        final localPts = [
-          for (final v in entity.vertices) frame.toModel(Offset(v.x, v.y)),
-        ];
-        if (!_isPlausibleContourGeometry(localPts, isClosed: entity.isClosed)) {
-          continue;
-        }
-
-        double? detectedElevation;
-        if (entity.elevation.abs() > 1e-3 &&
-            entity.elevation.abs() < 9000.0) {
-          // Signal A: Explicit 3D polyline elevation (DXF code 38)
-          detectedElevation = entity.elevation;
-        } else {
-          // Signal B: 2D topographic curve paired with tangential/adjacent numeric elevation label
-          final matchedText = _findNearestContourLabel(
-            localPts,
-            numericTexts,
-            isClosed: entity.isClosed,
-          );
-          if (matchedText != null) {
-            detectedElevation = matchedText.value;
-            matchedText.consumedByContour = true;
-          }
-        }
-
-        if (detectedElevation != null) {
-          confirmedContourLayers
-              .putIfAbsent(entity.layer, () => <double>[])
-              .add(detectedElevation);
-        }
-
-        rawContours.add(
-          _RawContourCandidate(
-            index: candidateIndex++,
-            points: localPts,
-            closed: entity.isClosed,
-            layer: entity.layer,
-            elevation: detectedElevation,
-          ),
+    final stitchedCandidates =
+        ArchitectUnderlayContourExtractor.extractStitchedContours(
+          document: doc,
+          frame: frame,
         );
-      } else if (entity is DxfSpline) {
-        final srcPts = entity.fitPoints.length >= 3
-            ? entity.fitPoints
-            : entity.controlPoints;
-        if (srcPts.length >= 3) {
-          final localPts = [for (final p in srcPts) frame.toModel(p)];
-          if (_isPlausibleContourGeometry(
-            localPts,
-            isClosed: entity.isClosed,
-          )) {
-            final matchedText = _findNearestContourLabel(
-              localPts,
-              numericTexts,
-              isClosed: entity.isClosed,
+    int candidateIndex = 0;
+    for (final cand in stitchedCandidates) {
+      if (!_isPlausibleContourGeometry(cand.points, isClosed: cand.closed)) {
+        continue;
+      }
+      final layer = cand.sourceLayer ?? '0';
+      double? detectedElevation = cand.suggestedElevation;
+      if (detectedElevation == null) {
+        final matchedText = _findNearestContourLabel(
+          cand.points,
+          numericTexts,
+          isClosed: cand.closed,
+        );
+        if (matchedText != null) {
+          detectedElevation = matchedText.value;
+          matchedText.consumedByContour = true;
+        }
+      } else {
+        for (final txt in numericTexts) {
+          if (!txt.consumedByContour &&
+              (txt.value - detectedElevation).abs() < 1e-3) {
+            final hit = ArchitectUnderlayContourExtractor.closestOnCurve(
+              cand.points,
+              txt.localPosition,
+              closed: cand.closed,
             );
-            double? elev;
-            if (matchedText != null) {
-              elev = matchedText.value;
-              matchedText.consumedByContour = true;
-              confirmedContourLayers
-                  .putIfAbsent(entity.layer, () => <double>[])
-                  .add(elev);
+            if (hit.distance <= 2.5) {
+              txt.consumedByContour = true;
+              break;
             }
-            rawContours.add(
-              _RawContourCandidate(
-                index: candidateIndex++,
-                points: localPts,
-                closed: entity.isClosed,
-                layer: entity.layer,
-                elevation: elev,
-              ),
-            );
           }
         }
       }
+
+      if (detectedElevation != null) {
+        confirmedContourLayers
+            .putIfAbsent(layer, () => <double>[])
+            .add(detectedElevation);
+      }
+
+      rawContours.add(
+        _RawContourCandidate(
+          index: candidateIndex++,
+          points: cand.points,
+          closed: cand.closed,
+          layer: layer,
+          elevation: detectedElevation,
+        ),
+      );
     }
 
     // Second pass: For unlabeled smooth curves on a layer that already has confirmed contours,
@@ -281,7 +260,7 @@ class ArchitectGeodeticDetector {
     int ptIdx = 0;
     for (final txt in numericTexts) {
       if (txt.consumedByContour) continue;
-      if (!txt.hasDecimal) continue;
+      if (txt.decimalPlaces < 2) continue;
       if (txt.value.abs() < 0.05 || txt.value.abs() > 8900.0) continue;
 
       // Check if near a survey point marker (circle/point/insert) within 1.8m,
@@ -350,27 +329,6 @@ class ArchitectGeodeticDetector {
     );
   }
 
-  static ({double value, bool hasDecimal})? _parseElevationText(String raw) {
-    var cleaned = raw.trim();
-    if (cleaned.isEmpty) return null;
-    // Strip common MTEXT formatting prefixes like \A1; or {\fArial;...}
-    cleaned = cleaned.replaceAll(RegExp(r'\\[A-Za-z0-9]+;'), '');
-    cleaned = cleaned.replaceAll(RegExp(r'[{}]'), '').trim();
-    if (cleaned.length > 14) return null;
-
-    final normalized = cleaned.replaceAll(',', '.');
-    final match = RegExp(
-      r'^([+-]?\d+(?:\.\d+)?)\s*(?:m|м)?$',
-      caseSensitive: false,
-    ).firstMatch(normalized);
-    if (match == null) return null;
-    final numStr = match.group(1)!;
-    final val = double.tryParse(numStr);
-    if (val == null || !val.isFinite) return null;
-    final hasDecimal = numStr.contains('.');
-    return (value: val, hasDecimal: hasDecimal);
-  }
-
   /// Rejects tiny symbols, orthogonal boxes/columns, and short segments.
   /// Accepts multi-vertex topographic polylines with realistic length and curvature.
   static bool _isPlausibleContourGeometry(
@@ -428,21 +386,20 @@ class ArchitectGeodeticDetector {
     required bool isClosed,
   }) {
     _NumericTextCandidate? best;
-    double bestScore = 1.35; // Max perpendicular distance in meters
+    double bestScore = 1.65; // Max weighted distance in meters
 
     for (final txt in texts) {
       if (txt.consumedByContour) continue;
-      // Elevation labels on contours are typically positive heights or decimal elevations
-      if (!txt.hasDecimal && (txt.value < 5.0 || txt.value > 4000.0)) {
-        continue;
-      }
+      // Only consider decimal elevation labels (2-3 decimals) so parcel IDs are ignored.
+      if (txt.decimalPlaces < 2) continue;
 
+      final decimalPenalty = txt.decimalPlaces == 2 ? 0.0 : 0.25;
       for (var i = 0; i < pts.length - 1; i++) {
         final p1 = pts[i];
         final p2 = pts[i + 1];
         final dist = _pointToSegmentDistance(txt.localPosition, p1, p2);
-        if (dist < bestScore) {
-          bestScore = dist;
+        if (dist <= 1.35 && dist + decimalPenalty < bestScore) {
+          bestScore = dist + decimalPenalty;
           best = txt;
         }
       }
@@ -452,8 +409,8 @@ class ArchitectGeodeticDetector {
           pts.last,
           pts.first,
         );
-        if (dist < bestScore) {
-          bestScore = dist;
+        if (dist <= 1.35 && dist + decimalPenalty < bestScore) {
+          bestScore = dist + decimalPenalty;
           best = txt;
         }
       }

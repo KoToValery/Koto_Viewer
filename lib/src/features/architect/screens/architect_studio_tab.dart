@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -7,6 +9,7 @@ import '../../bim_projects/services/architect_project_creation_helper.dart';
 import '../../bim_projects/services/bim_export_service.dart';
 import '../../bim_projects/services/bim_project_library_service.dart';
 import '../../bim_projects/services/bim_underlay_loader.dart';
+import '../../bim_projects/widgets/bim_project_import_helper.dart';
 import '../models/architect_project.dart';
 import '../widgets/architect_project_wizard_dialog.dart';
 import 'architect_workspace_screen.dart';
@@ -15,7 +18,13 @@ import 'architect_workspace_screen.dart';
 /// quick creation wizard (with storey overlays), and blank workspace entry.
 class ArchitectStudioTab extends StatefulWidget {
   final BimProjectLibraryService? libraryService;
-  const ArchitectStudioTab({super.key, this.libraryService});
+  final Future<Uint8List?> Function()? pickImportZipBytes;
+
+  const ArchitectStudioTab({
+    super.key,
+    this.libraryService,
+    this.pickImportZipBytes,
+  });
 
   @override
   State<ArchitectStudioTab> createState() => ArchitectStudioTabState();
@@ -99,6 +108,7 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
       try {
         underlays = await BimUnderlayLoader.loadAndAlign(
           project: project,
+          libraryService: _library,
           mode: BimUnderlayLoadMode.architecturalOriginal,
         );
       } catch (_) {}
@@ -197,9 +207,34 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
     }
   }
 
+  Future<void> _importProjectZip() async {
+    final result = await pickAndImportArchitecturalProject(
+      context,
+      libraryService: _library,
+      pickZipBytes: widget.pickImportZipBytes,
+    );
+    if (result == null || !mounted) return;
+    await refreshProjects();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.l10n.architectImportProjectSuccess(result.project.name),
+        ),
+        backgroundColor: const Color(0xFF00E676),
+        action: SnackBarAction(
+          label: context.l10n.bimProjectOpen,
+          textColor: Colors.black,
+          onPressed: () => _openProject(result.project),
+        ),
+      ),
+    );
+  }
+
   Future<void> _exportProjectZip(BimWorkProject project) async {
     try {
-      final archProject = await _library.loadArchitectProject(project.id);
+      final latestProject = await _library.loadProject(project.id) ?? project;
+      final archProject = await _library.loadArchitectProject(latestProject.id);
       if (archProject == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -213,8 +248,9 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
         return;
       }
       final zipFile = await BimExportService.exportArchitecturalProjectZip(
-        project: project,
+        project: latestProject,
         architect: archProject,
+        libraryService: _library,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -266,12 +302,16 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                               color: Color(0xFFFFB300),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              l10n.architectProjectsTitle,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            Expanded(
+                              child: Text(
+                                l10n.architectProjectsTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 8),
                             Text(
                               '${_projects.length}',
                               style: TextStyle(
@@ -400,7 +440,11 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                   icon: const AppIcon(AppIconId.brush, size: 16),
                   label: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text(l10n.architectBlankWorkspace),
+                    child: Text(
+                      l10n.architectBlankWorkspace,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
@@ -415,6 +459,32 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const ValueKey('architect-studio-import-zip'),
+              icon: const AppIcon(AppIconId.upload, size: 16),
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  l10n.architectImportProject,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 11,
+                  horizontal: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: _importProjectZip,
+            ),
           ),
         ],
       ),
@@ -458,21 +528,43 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
               ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              icon: const AppIcon(AppIconId.add),
-              label: Text(l10n.architectNewProject),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFB300),
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  icon: const AppIcon(AppIconId.add),
+                  label: Text(l10n.architectNewProject),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB300),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _openArchitectProjectWizard,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                OutlinedButton.icon(
+                  key: const ValueKey('architect-studio-empty-import-zip'),
+                  icon: const AppIcon(AppIconId.upload, size: 18),
+                  label: Text(l10n.architectImportProjectShort),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _importProjectZip,
                 ),
-              ),
-              onPressed: _openArchitectProjectWizard,
+              ],
             ),
           ],
         ),
@@ -598,7 +690,9 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
               ],
             ),
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -621,8 +715,7 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                     ],
                   ),
                 ),
-                if (project.hasUnderlays) ...[
-                  const SizedBox(width: 8),
+                if (project.hasUnderlays)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -641,18 +734,21 @@ class ArchitectStudioTabState extends State<ArchitectStudioTab>
                           color: Color(0xFF00B0FF),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          l10n.architectWizardStoreyOverlay,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF0091EA),
+                        Flexible(
+                          child: Text(
+                            l10n.architectWizardStoreyOverlay,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0091EA),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
               ],
             ),
             const SizedBox(height: 14),

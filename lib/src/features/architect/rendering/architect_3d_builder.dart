@@ -106,7 +106,9 @@ class Architect3dBuilder {
             w.hasRailingDesign ||
             w.system.isSpecial ||
             w.layers.isNotEmpty ||
-            w.plinth.enabled,
+            w.hasInsulation ||
+            w.plinth.enabled ||
+            w.isCurved,
       );
       final compositions = composed
           ? ArchitectWallSolids.build(
@@ -1540,9 +1542,9 @@ class Architect3dBuilder {
         }
       }
 
-      // Cut out holes and flat cutout pads
+      // Cut out holes (flat grading pads stay filled at pad.elevation)
       for (final b in activeTerrain.boundaries) {
-        if (b.polygon.length < 3 || (!b.isCutoutPad && !b.isHole)) continue;
+        if (b.polygon.length < 3 || !b.isHole) continue;
         try {
           terrainFootprint = Path.combine(
             PathOperation.difference,
@@ -2114,6 +2116,32 @@ class Architect3dBuilder {
       }),
     );
 
+    // Pre-sample grid vertices so the 3D skirt & bottom cap sit at minZ - 1.0 m
+    final zGrid = List.generate(
+      xSteps + 1,
+      (i) => List.generate(ySteps + 1, (j) {
+        final x = bounds.left + i * dx;
+        final y = bounds.top + j * dy;
+        return groundZ(Offset(x, y));
+      }),
+    );
+    double? minZ;
+    for (var i = 0; i < xSteps; i++) {
+      for (var j = 0; j < ySteps; j++) {
+        if (!contained[i][j]) continue;
+        for (final z in [
+          zGrid[i][j],
+          zGrid[i + 1][j],
+          zGrid[i + 1][j + 1],
+          zGrid[i][j + 1],
+        ]) {
+          minZ = minZ == null ? z : math.min(minZ, z);
+        }
+      }
+    }
+    const skirtDepth = 1.0;
+    final bottomZ = (minZ ?? 0.0) - skirtDepth;
+
     for (var i = 0; i < xSteps; i++) {
       for (var j = 0; j < ySteps; j++) {
         if (!contained[i][j]) continue;
@@ -2123,15 +2151,10 @@ class Architect3dBuilder {
         final y0 = bounds.top + j * dy;
         final y1 = bounds.top + (j + 1) * dy;
 
-        final p00 = Offset(x0, y0);
-        final p10 = Offset(x1, y0);
-        final p11 = Offset(x1, y1);
-        final p01 = Offset(x0, y1);
-
-        final z00 = groundZ(p00);
-        final z10 = groundZ(p10);
-        final z11 = groundZ(p11);
-        final z01 = groundZ(p01);
+        final z00 = zGrid[i][j];
+        final z10 = zGrid[i + 1][j];
+        final z11 = zGrid[i + 1][j + 1];
+        final z01 = zGrid[i][j + 1];
 
         final v00 = Vector3(x0, y0, z00);
         final v10 = Vector3(x1, y0, z10);
@@ -2142,11 +2165,18 @@ class Architect3dBuilder {
         tris.add(Triangle3D(v0: v00, v1: v10, v2: v11, color: topColor, isDoubleSided: true));
         tris.add(Triangle3D(v0: v00, v1: v11, v2: v01, color: topColor, isDoubleSided: true));
 
+        // Bottom cap at minZ - 1.0m
+        final b00 = Vector3(x0, y0, bottomZ);
+        final b10 = Vector3(x1, y0, bottomZ);
+        final b11 = Vector3(x1, y1, bottomZ);
+        final b01 = Vector3(x0, y1, bottomZ);
+        tris.add(Triangle3D(v0: b00, v1: b11, v2: b10, color: bottomColor, isDoubleSided: true));
+        tris.add(Triangle3D(v0: b00, v1: b01, v2: b11, color: bottomColor, isDoubleSided: true));
+
         // Side skirts on exposed borders & excavation hole perimeters
         void addSkirt(Vector3 topA, Vector3 topB) {
-          const skirtDepth = 0.35;
-          final botA = Vector3(topA.x, topA.y, topA.z - skirtDepth);
-          final botB = Vector3(topB.x, topB.y, topB.z - skirtDepth);
+          final botA = Vector3(topA.x, topA.y, bottomZ);
+          final botB = Vector3(topB.x, topB.y, bottomZ);
           tris.add(Triangle3D(v0: topA, v1: topB, v2: botB, color: sideColor, isDoubleSided: true));
           tris.add(Triangle3D(v0: topA, v1: botB, v2: botA, color: sideColor, isDoubleSided: true));
         }
@@ -2161,9 +2191,10 @@ class Architect3dBuilder {
     if (tris.isNotEmpty) return tris;
 
     // Fallback if cell test missed small shapes
+    final centerZ = groundZ(bounds.center);
     return _extrude(
       terrainFootprint,
-      (p) => groundZ(p) - 0.25,
+      (p) => math.min(groundZ(p), centerZ) - skirtDepth,
       (p) => groundZ(p),
       topColor,
       sideColor,

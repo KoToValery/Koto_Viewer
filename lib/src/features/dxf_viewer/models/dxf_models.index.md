@@ -28,3 +28,7 @@ from native DWG. `DxfBlock.orderedCompiled` retains source entity order when mas
 are present, including nested inserts and constant attribute templates. Both
 compiled caches are cleared by `clearCompiled` before isolate transfer.
 Explicit KCAD v6 output and `DxfDocumentTransformer` preserve the mask flag.
+
+`[TAG:DXF_M_SUBPATH_POINTS]` counts the geometry in a `DxfCompiledSubpath` as
+the block definition is batched by style. The Viewer uses that count to limit
+the memory committed to transformed paths.

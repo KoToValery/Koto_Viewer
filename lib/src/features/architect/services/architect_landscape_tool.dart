@@ -30,10 +30,42 @@ class ArchitectLandscapeTool extends ChangeNotifier {
   ArchitectTerrainDraftMode terrainMode = ArchitectTerrainDraftMode.boundary;
   double terrainElevation = 0.0;
   double terrainDatumElevation = 0.0;
+  double contourInterval = 0.0;
   double contourAbsoluteElevation = 0.0;
   bool contourClosed = false;
   bool contourMajor = false;
+  bool contourAutoTrace = true;
   ArchitectPickedContourCandidate? pickedContourPreview;
+
+  /// True when the active tool/mode picks an existing/underlay contour with the lifted pointer.
+  bool isPickingContour(String toolName) =>
+      (toolName == 'terrain' &&
+          terrainMode == ArchitectTerrainDraftMode.pickContour) ||
+      (toolName == 'contour' && contourAutoTrace && draftPoints.isEmpty);
+
+  /// True when tapping near the first draft point closes/commits the drafted loop.
+  bool canCloseDraftToStart(String toolName) => switch (toolName) {
+    'terrain' =>
+      terrainMode == ArchitectTerrainDraftMode.boundary ||
+          terrainMode == ArchitectTerrainDraftMode.pad ||
+          terrainMode == ArchitectTerrainDraftMode.hole ||
+          terrainMode == ArchitectTerrainDraftMode.contour,
+    'contour' => true,
+    'pathway' => pathwayClosed,
+    'street' => streetClosed,
+    _ => false,
+  };
+
+  /// True when drafting an orthogonal/polygonal closed boundary (not a spline contour).
+  bool isClosedPolygonDraft(String toolName) => switch (toolName) {
+    'terrain' =>
+      terrainMode == ArchitectTerrainDraftMode.boundary ||
+          terrainMode == ArchitectTerrainDraftMode.pad ||
+          terrainMode == ArchitectTerrainDraftMode.hole,
+    'pathway' => pathwayClosed,
+    'street' => streetClosed,
+    _ => false,
+  };
 
   // --- Pathway State ---
   double pathwayWidth = 1.50;
@@ -259,13 +291,29 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           return commitDraft(toolName: toolName, project: project);
         }
         if ((terrainMode == ArchitectTerrainDraftMode.boundary ||
-                terrainMode == ArchitectTerrainDraftMode.pad) &&
+                terrainMode == ArchitectTerrainDraftMode.pad ||
+                terrainMode == ArchitectTerrainDraftMode.hole) &&
             draftPoints.length >= 3 &&
             (worldPoint - draftPoints.first).distance <= closeThresholdWorld) {
           return commitDraft(toolName: toolName, project: project);
         }
+        if (terrainMode == ArchitectTerrainDraftMode.contour &&
+            draftPoints.length >= 3 &&
+            (worldPoint - draftPoints.first).distance <= closeThresholdWorld) {
+          contourClosed = true;
+          return commitDraft(toolName: toolName, project: project);
+        }
         if (terrainMode == ArchitectTerrainDraftMode.pickContour) {
           return null;
+        }
+        draftPoints.add(worldPoint);
+        return null;
+
+      case 'contour':
+        if (draftPoints.length >= 3 &&
+            (worldPoint - draftPoints.first).distance <= closeThresholdWorld) {
+          contourClosed = true;
+          return commitDraft(toolName: toolName, project: project);
         }
         draftPoints.add(worldPoint);
         return null;
@@ -352,7 +400,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           return _updateSurface(
             project,
             surface.copyWith(
-              datumElevation: terrainDatumElevation,
+              datumElevation: _resolvedDatum(project),
               boundaries: [...surface.boundaries, boundary],
             ),
           );
@@ -361,25 +409,33 @@ class ArchitectLandscapeTool extends ChangeNotifier {
             terrainMode == ArchitectTerrainDraftMode.hole ||
             terrainMode == ArchitectTerrainDraftMode.pad) {
           final isOuter = terrainMode == ArchitectTerrainDraftMode.boundary;
+          final isHole = terrainMode == ArchitectTerrainDraftMode.hole;
+          final bndId = 'terr_bnd_$nowMicros';
+          final nextSpots = isHole
+              ? surface.withHoleVertexSpots(
+                  holeId: bndId,
+                  points: pts,
+                  fallbackRelativeElevation: terrainElevation,
+                )
+              : surface.spots;
           final boundary = ArchitectTerrainBoundary(
-            id: 'terr_bnd_$nowMicros',
+            id: bndId,
             polygon: pts,
             elevation: isOuter ? 0.0 : terrainElevation,
             isCutoutPad: terrainMode == ArchitectTerrainDraftMode.pad,
-            isHole: terrainMode == ArchitectTerrainDraftMode.hole,
+            isHole: isHole,
             autoInterpolateElevation: isOuter,
           );
           return _updateSurface(
             project,
             surface.copyWith(
-              datumElevation: isOuter ? terrainDatumElevation : surface.datumElevation,
+              datumElevation: _resolvedDatum(project),
               boundaries: [...surface.boundaries, boundary],
+              spots: nextSpots,
             ),
           );
         } else if (terrainMode == ArchitectTerrainDraftMode.contour) {
-          final datum = surface.datumElevation.abs() > 1e-4
-              ? surface.datumElevation
-              : terrainDatumElevation;
+          final datum = _resolvedDatum(project);
           final effectiveElevation = contourAbsoluteElevation != 0.0
               ? (contourAbsoluteElevation - datum)
               : terrainElevation;
@@ -406,9 +462,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
 
       case 'contour':
         final surface = _targetSurface(project);
-        final datum = surface.datumElevation.abs() > 1e-4
-            ? surface.datumElevation
-            : terrainDatumElevation;
+        final datum = _resolvedDatum(project);
         final effectiveElevation = contourAbsoluteElevation != 0.0
             ? (contourAbsoluteElevation - datum)
             : terrainElevation;
@@ -421,6 +475,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
               : (effectiveElevation + datum),
           closed: contourClosed,
           isMajor: contourMajor,
+          isSpline: true,
         );
         return _updateSurface(
           project,
@@ -545,21 +600,42 @@ class ArchitectLandscapeTool extends ChangeNotifier {
         (survey.contours.isEmpty && survey.spotElevations.isEmpty)) {
       return project;
     }
-    final syncedExisting = ArchitectTerrainSurface.fromGeodeticSurvey(
+    final userDatum = project.existingTerrain.datumElevation.abs() > 1e-4
+        ? project.existingTerrain.datumElevation
+        : (project.proposedTerrain.datumElevation.abs() > 1e-4
+            ? project.proposedTerrain.datumElevation
+            : terrainDatumElevation);
+    var syncedExisting = ArchitectTerrainSurface.fromGeodeticSurvey(
       survey,
       state: ArchitectTerrainState.existing,
     );
-    final nextProposed = project.proposedTerrain.isEmpty
+    if (userDatum.abs() > 1e-4) {
+      syncedExisting = syncedExisting.withDatumElevation(userDatum);
+    }
+    var nextProposed = project.proposedTerrain.isEmpty
         ? ArchitectTerrainSurface.fromGeodeticSurvey(
             survey,
             state: ArchitectTerrainState.proposed,
           )
         : project.proposedTerrain;
+    if (userDatum.abs() > 1e-4 && project.proposedTerrain.isEmpty) {
+      nextProposed = nextProposed.withDatumElevation(userDatum);
+    }
     return project.copyWith(
       existingTerrain: syncedExisting,
       proposedTerrain: nextProposed,
       updatedAt: DateTime.now(),
     );
+  }
+
+  double _resolvedDatum(ArchitectProject project) {
+    final target = _targetSurface(project);
+    if (target.datumElevation.abs() > 1e-4) return target.datumElevation;
+    final other = terrainState == ArchitectTerrainState.existing
+        ? project.proposedTerrain
+        : project.existingTerrain;
+    if (other.datumElevation.abs() > 1e-4) return other.datumElevation;
+    return terrainDatumElevation;
   }
 
   ArchitectTerrainSurface _targetSurface(ArchitectProject project) =>
@@ -591,22 +667,38 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     );
   }
 
-  /// Updates the building ±0.00 datum elevation on [state] (and both surfaces if synced)
-  /// while preserving all contours' and spots' absolute geodetic elevations.
+  /// Updates the building ±0.00 datum elevation on both Existing and Proposed
+  /// terrain surfaces while preserving all contours' and spots' absolute geodetic elevations.
   static ArchitectProject updateSurfaceDatum(
     ArchitectProject project, {
     required ArchitectTerrainState state,
     required double newDatum,
   }) {
-    final nextExisting = state == ArchitectTerrainState.existing
-        ? project.existingTerrain.withDatumElevation(newDatum)
-        : project.existingTerrain;
-    final nextProposed = state == ArchitectTerrainState.proposed
-        ? project.proposedTerrain.withDatumElevation(newDatum)
-        : project.proposedTerrain;
+    final nextExisting = project.existingTerrain.withDatumElevation(newDatum);
+    final nextProposed = project.proposedTerrain.withDatumElevation(newDatum);
     return project.copyWith(
       existingTerrain: nextExisting,
       proposedTerrain: nextProposed,
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  static ArchitectProject updateSurfaceContourInterval(
+    ArchitectProject project, {
+    required double intervalMeters,
+    required bool manual,
+  }) {
+    final clean = intervalMeters <= 1e-4 ? 0.0 : double.parse(intervalMeters.toStringAsFixed(4));
+    final isManual = clean > 1e-4 && manual;
+    return project.copyWith(
+      existingTerrain: project.existingTerrain.copyWith(
+        contourInterval: clean,
+        contourIntervalManual: isManual,
+      ),
+      proposedTerrain: project.proposedTerrain.copyWith(
+        contourInterval: clean,
+        contourIntervalManual: isManual,
+      ),
       updatedAt: DateTime.now(),
     );
   }
@@ -961,6 +1053,10 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     ArchitectTerrainSurface surface,
     Set<String> selectedIds,
   ) {
+    final deletedHolePrefixes = [
+      for (final b in surface.boundaries)
+        if (selectedIds.contains(b.id) && b.isHole) '${b.id}_pt_',
+    ];
     return surface.copyWith(
       boundaries: surface.boundaries
           .where((b) => !selectedIds.contains(b.id))
@@ -968,7 +1064,13 @@ class ArchitectLandscapeTool extends ChangeNotifier {
       contours: surface.contours
           .where((c) => !selectedIds.contains(c.id))
           .toList(),
-      spots: surface.spots.where((s) => !selectedIds.contains(s.id)).toList(),
+      spots: surface.spots
+          .where(
+            (s) =>
+                !selectedIds.contains(s.id) &&
+                !deletedHolePrefixes.any((prefix) => s.id.startsWith(prefix)),
+          )
+          .toList(),
     );
   }
 

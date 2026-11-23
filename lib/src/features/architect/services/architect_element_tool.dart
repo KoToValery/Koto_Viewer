@@ -1043,7 +1043,7 @@ class ArchitectElementTool extends ChangeNotifier {
         yield street.id;
       }
     }
-    if (annotationProject != null) {
+    if (annotationProject != null && storey.isSite) {
       for (final surface in [
         annotationProject.proposedTerrain,
         annotationProject.existingTerrain,
@@ -1054,7 +1054,7 @@ class ArchitectElementTool extends ChangeNotifier {
           }
         }
         for (final contour in surface.contours) {
-          final pts = contour.points;
+          final pts = contour.resolvedPolyline(samplesPerSpan: 8);
           var hit = false;
           for (var i = 1; i < pts.length; i++) {
             if (_pointToSegmentDistance(point, pts[i - 1], pts[i]) <= tolerance) {

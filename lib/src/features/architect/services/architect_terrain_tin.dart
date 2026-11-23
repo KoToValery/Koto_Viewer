@@ -187,13 +187,14 @@ class ArchitectTerrainTin {
     for (final c in surface.contours) {
       final pts = c.resolvedPolyline(samplesPerSpan: 6);
       if (pts.isEmpty) continue;
-      contourPolylines.add((pts: pts, z: c.elevation));
+      final z = c.effectiveRelative(surface.datumElevation);
+      contourPolylines.add((pts: pts, z: z));
       for (final p in pts) {
-        topoSamples.add((p: p, z: c.elevation));
+        topoSamples.add((p: p, z: z));
       }
     }
     for (final s in surface.spots) {
-      topoSamples.add((p: s.position, z: s.elevation));
+      topoSamples.add((p: s.position, z: s.effectiveRelative(surface.datumElevation)));
     }
 
     final points = <_TinPoint>[];
@@ -332,9 +333,12 @@ class ArchitectTerrainTin {
       }
     }
 
-    // 4. Insert explicit spots (exact Z).
+    // 4. Insert explicit spots (exact Z relative to datum).
     for (final s in surface.spots) {
-      addOrReusePoint(s.position, s.elevation);
+      addOrReusePoint(
+        s.position,
+        s.effectiveRelative(surface.datumElevation),
+      );
     }
 
     void insertPolygonEdgeWithContourSplits({
@@ -417,6 +421,15 @@ class ArchitectTerrainTin {
     }
 
     // 7. Insert hole & cutout perimeters (split at contour & boundary crossings).
+    double? existingPointZ(Offset p) {
+      for (final pt in points) {
+        final dx = pt.x - p.dx;
+        final dy = pt.y - p.dy;
+        if (dx * dx + dy * dy <= 0.02 * 0.02) return pt.z;
+      }
+      return null;
+    }
+
     final boundarySegOffsets = [
       for (final edge in boundarySegments) (a: edge.a, b: edge.b),
     ];
@@ -426,13 +439,15 @@ class ArchitectTerrainTin {
         final b = hole[(i + 1) % hole.length];
         insertPolygonEdgeWithContourSplits(
           a: a,
-          za: topoSamples.isNotEmpty
-              ? _nearestTopoElevation(a, topoSamples)
-              : 0.0,
+          za: existingPointZ(a) ??
+              (topoSamples.isNotEmpty
+                  ? _nearestTopoElevation(a, topoSamples)
+                  : 0.0),
           b: b,
-          zb: topoSamples.isNotEmpty
-              ? _nearestTopoElevation(b, topoSamples)
-              : 0.0,
+          zb: existingPointZ(b) ??
+              (topoSamples.isNotEmpty
+                  ? _nearestTopoElevation(b, topoSamples)
+                  : 0.0),
           overwriteEnds: false,
           crossSegments: boundarySegOffsets,
         );
@@ -626,7 +641,7 @@ class ArchitectTerrainTin {
     required Color topColor,
     required Color sideColor,
     required Color bottomColor,
-    double skirtDepth = 0.35,
+    double skirtDepth = 1.0,
   }) {
     final tin = buildingCutouts.isEmpty
         ? ArchitectTerrainTin.of(surface)

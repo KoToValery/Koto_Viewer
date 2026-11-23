@@ -28,12 +28,18 @@ class _BimWriteQueue {
 /// Service responsible for managing, persisting, and querying standalone
 /// BiM Work Projects stored on the local file system.
 class BimProjectLibraryService {
-  static final _writes = _BimWriteQueue();
-  static final _publications = _BimWriteQueue();
+  static final _defaultWrites = _BimWriteQueue();
+  static final _defaultPublications = _BimWriteQueue();
+  final _BimWriteQueue _writes;
+  final _BimWriteQueue _publications;
   final Directory? _customRootDir;
 
   BimProjectLibraryService({Directory? customRootDir})
-    : _customRootDir = customRootDir;
+    : _customRootDir = customRootDir,
+      _writes = customRootDir == null ? _defaultWrites : _BimWriteQueue(),
+      _publications = customRootDir == null
+          ? _defaultPublications
+          : _BimWriteQueue();
 
   /// Default singleton instance
   static final BimProjectLibraryService instance = BimProjectLibraryService();
@@ -72,6 +78,12 @@ class BimProjectLibraryService {
 
       for (final entity in entities) {
         if (entity is Directory) {
+          final folderName = entity.uri.pathSegments
+              .where((s) => s.isNotEmpty)
+              .lastOrNull;
+          if (folderName != null && folderName.startsWith('.')) {
+            continue;
+          }
           final manifestFile = File('${entity.path}/project.json');
           if (await manifestFile.exists()) {
             try {
@@ -414,23 +426,38 @@ class BimProjectLibraryService {
         await saveArchitectProject(projectId, arch);
       }
       if (manifest == null || manifest.storeys.isEmpty) {
-        return arch.ensureSiteStorey();
+        final synced = manifest != null &&
+                manifest.projectType == BimProjectType.architectural &&
+                manifest.name.isNotEmpty
+            ? arch.copyWith(name: manifest.name)
+            : arch;
+        return synced.ensureSiteStorey();
       }
+
+      final isArchProject =
+          manifest.projectType == BimProjectType.architectural;
 
       // Sync storeys with manifest elevations
       final existingStoreys = {for (final s in arch.storeys) s.id: s};
       final syncedStoreys = manifest.storeys.map((s) {
         final existing = existingStoreys[s.storeyId];
         if (existing != null) {
+          final resolvedName = isArchProject
+              ? (existing.name.isNotEmpty
+                    ? existing.name
+                    : (s.name.isNotEmpty ? s.name : s.elevationLabel))
+              : s.elevationLabel;
           return existing.copyWith(
-            name: s.elevationLabel,
+            name: resolvedName,
             elevation: s.elevation,
             height: s.height,
           );
         }
         return ArchitectStorey(
           id: s.storeyId,
-          name: s.elevationLabel,
+          name: isArchProject && s.name.isNotEmpty
+              ? s.name
+              : s.elevationLabel,
           elevation: s.elevation,
           height: s.height,
         );
@@ -453,13 +480,113 @@ class BimProjectLibraryService {
           : (syncedStoreys.isNotEmpty ? syncedStoreys.first.id : 'default');
 
       return arch
-          .copyWith(storeys: syncedStoreys, activeStoreyId: activeId)
+          .copyWith(
+            name: isArchProject && manifest.name.isNotEmpty
+                ? manifest.name
+                : arch.name,
+            storeys: syncedStoreys,
+            activeStoreyId: activeId,
+          )
           .syncRoofElevation()
           .ensureSiteStorey();
     } catch (e) {
       debugPrint('Error loading architectural project for $projectId: $e');
       return null;
     }
+  }
+
+  /// Synchronizes an architectural [BimWorkProject] manifest with its
+  /// authoritative [ArchitectProject] model (name, building storeys, and
+  /// non-structural CAD underlay pointers) without losing underlay metadata.
+  static BimWorkProject syncArchitecturalManifest(
+    BimWorkProject manifest,
+    ArchitectProject architect, {
+    DateTime? updatedAt,
+  }) {
+    final existingById = {for (final s in manifest.storeys) s.storeyId: s};
+    final buildingStoreys = architect.storeys
+        .where((s) => s.isBuildingStorey)
+        .toList()
+      ..sort((a, b) {
+        final order = a.elevation.compareTo(b.elevation);
+        return order != 0 ? order : a.id.compareTo(b.id);
+      });
+
+    final syncedStoreys = <BimStoreyUnderlay>[];
+    for (final s in buildingStoreys) {
+      final prev = existingById[s.id];
+      final cad = architect.cadUnderlays[s.id];
+      if (prev != null) {
+        final shouldSyncCad =
+            cad != null &&
+            cad.internalCopyPath.isNotEmpty &&
+            !prev.processing.containsKey('version');
+        syncedStoreys.add(
+          prev.copyWith(
+            name: s.name.isNotEmpty ? s.name : s.elevationLabel,
+            elevation: s.elevation,
+            height: s.height,
+            sourceFileName: shouldSyncCad ? cad.fileName : prev.sourceFileName,
+            underlayFileName: shouldSyncCad
+                ? cad.internalCopyPath
+                : prev.underlayFileName,
+            processing: shouldSyncCad
+                ? {
+                    ...prev.processing,
+                    'source': cad.internalCopyPath,
+                    if (cad.kcadCachePath != null &&
+                        cad.kcadCachePath!.isNotEmpty)
+                      'pure': cad.kcadCachePath,
+                  }
+                : prev.processing,
+          ),
+        );
+      } else {
+        syncedStoreys.add(
+          BimStoreyUnderlay(
+            storeyId: s.id,
+            name: s.name.isNotEmpty ? s.name : s.elevationLabel,
+            elevation: s.elevation,
+            height: s.height,
+            sourceFileName: cad?.fileName,
+            underlayFileName:
+                cad != null && cad.internalCopyPath.isNotEmpty
+                    ? cad.internalCopyPath
+                    : null,
+            processing: cad != null && cad.internalCopyPath.isNotEmpty
+                ? {
+                    'source': cad.internalCopyPath,
+                    if (cad.kcadCachePath != null &&
+                        cad.kcadCachePath!.isNotEmpty)
+                      'pure': cad.kcadCachePath,
+                  }
+                : const {},
+          ),
+        );
+      }
+    }
+
+    final refId = manifest.referenceStoreyId != null &&
+            syncedStoreys.any((s) => s.storeyId == manifest.referenceStoreyId)
+        ? manifest.referenceStoreyId
+        : null;
+
+    return BimWorkProject(
+      id: manifest.id,
+      name: architect.name.trim().isNotEmpty
+          ? architect.name.trim()
+          : manifest.name,
+      location: manifest.location,
+      projectType: manifest.projectType,
+      createdAt: manifest.createdAt,
+      updatedAt: updatedAt ?? manifest.updatedAt,
+      storeys: syncedStoreys,
+      alignmentConfirmed: manifest.alignmentConfirmed,
+      referenceStoreyId: refId,
+      axisSeedsConsumed: manifest.axisSeedsConsumed,
+      structuralOrigin: manifest.structuralOrigin,
+      structuralUnitsPerMeter: manifest.structuralUnitsPerMeter,
+    );
   }
 
   /// Atomically saves the architectural model for [projectId].
@@ -492,9 +619,15 @@ class BimProjectLibraryService {
 
       final manifest = await loadProject(projectId);
       if (manifest != null) {
-        await _saveProjectManifestNow(
-          manifest.copyWith(updatedAt: DateTime.now()),
-        );
+        final nextManifest =
+            manifest.projectType == BimProjectType.architectural
+                ? syncArchitecturalManifest(
+                    manifest,
+                    project,
+                    updatedAt: DateTime.now(),
+                  )
+                : manifest.copyWith(updatedAt: DateTime.now());
+        await _saveProjectManifestNow(nextManifest);
       }
       return true;
     } catch (e) {
@@ -794,19 +927,82 @@ class BimProjectLibraryService {
     }
   }
 
-  /// Renames a project in its manifest.
-  Future<bool> renameProject(String projectId, String newName) async {
+  /// Renames a project in its manifest (and architectural model if applicable).
+  Future<bool> renameProject(String projectId, String newName) =>
+      _writes.run(() => _renameProjectNow(projectId, newName));
+
+  Future<bool> _renameProjectNow(String projectId, String newName) async {
     try {
+      final trimmed = newName.trim();
+      if (trimmed.isEmpty) return false;
       final manifest = await loadProject(projectId);
       if (manifest == null) return false;
-      final updated = manifest.copyWith(
-        name: newName.trim(),
-        updatedAt: DateTime.now(),
-      );
-      return await saveProjectManifest(updated);
+      final now = DateTime.now();
+      final updated = manifest.copyWith(name: trimmed, updatedAt: now);
+      if (!await _saveProjectManifestNow(updated)) return false;
+
+      if (manifest.projectType == BimProjectType.architectural) {
+        final projDir = await getProjectDirectory(projectId);
+        final archFile = File('${projDir.path}/architectural.json');
+        if (await archFile.exists()) {
+          final jsonMap =
+              jsonDecode(await archFile.readAsString()) as Map<String, dynamic>;
+          jsonMap['name'] = trimmed;
+          jsonMap['updatedAt'] = now.toIso8601String();
+          final tmpFile = File(
+            '${projDir.path}/architectural.json.tmp_${DateTime.now().microsecondsSinceEpoch}',
+          );
+          await tmpFile.writeAsString(
+            const JsonEncoder.withIndent('  ').convert(jsonMap),
+            flush: true,
+          );
+          await tmpFile.rename(archFile.path);
+        }
+      }
+      return true;
     } catch (e) {
       debugPrint('Error renaming project $projectId: $e');
       return false;
+    }
+  }
+
+  /// Atomically installs an already-validated staged directory as [projectId].
+  Future<void> installImportedProjectDirectory(
+    String projectId,
+    Directory stagingDir,
+  ) => _writes.run(() async {
+    final baseDir = await getProjectsDirectory();
+    final targetDir = Directory('${baseDir.path}/$projectId');
+    if (await targetDir.exists()) {
+      throw StateError('Target project directory already exists: $projectId');
+    }
+    try {
+      await stagingDir.rename(targetDir.path);
+    } on FileSystemException {
+      await _copyDirectoryRecursive(stagingDir, targetDir);
+      if (await stagingDir.exists()) {
+        await stagingDir.delete(recursive: true);
+      }
+    }
+  });
+
+  static Future<void> _copyDirectoryRecursive(
+    Directory source,
+    Directory destination,
+  ) async {
+    await destination.create(recursive: true);
+    await for (final entity in source.list(recursive: false)) {
+      final name = entity.uri.pathSegments
+          .where((s) => s.isNotEmpty)
+          .last;
+      if (entity is Directory) {
+        await _copyDirectoryRecursive(
+          entity,
+          Directory('${destination.path}/$name'),
+        );
+      } else if (entity is File) {
+        await entity.copy('${destination.path}/$name');
+      }
     }
   }
 }

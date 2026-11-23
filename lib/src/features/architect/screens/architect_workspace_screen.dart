@@ -52,6 +52,7 @@ import '../rendering/architect_floor_drain_painter_helper.dart';
 import '../services/architect_closed_contour.dart';
 
 import '../widgets/architect_terrain_editor.dart';
+import '../services/architect_contour_interval_predictor.dart';
 import '../services/architect_landscape_tool.dart';
 import '../services/architect_spline_contour_tracer.dart';
 import '../services/architect_underlay_contour_extractor.dart';
@@ -4302,6 +4303,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _rasterDragOriginalPos;
   ArchitectRasterUnderlay? _rasterDragOriginal, _rasterDragPreview;
   ArchitectProject? _rasterDragSource;
+  bool _draggingCadUnderlay = false;
+  Offset? _cadDragStartModel;
+  BimCoordinateFrame? _cadDragOriginalFrame;
+  ArchitectCadUnderlayConfig? _cadDragOriginalConfig, _cadDragPreview;
+  ArchitectProject? _cadDragSource;
   bool _underlayMaskDrafting = false;
   String _underlayMaskMode = 'rect'; // 'rect' or 'polygon'
   bool _underlayMaskTargetIsCad = true;
@@ -4330,15 +4336,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       raster.containsLocalPoint(point) && ArchitectUnderlayClip.contains(
           raster.hasActiveMask ? raster.maskPolygon : null, point);
 
+  bool get _canMoveSelectedUnderlay {
+    if (_isCadUnderlaySelected) {
+      final cfg = _currentCadUnderlayConfig;
+      return cfg != null && cfg.visible && _currentUnderlayDoc != null;
+    }
+    final raster = _selectedRasterId == null ? null : _selectedRasterUnderlay;
+    return raster != null && raster.visible && !raster.locked;
+  }
+
   List<Offset>? get _selectedUnderlayCrop {
-    if (!_commands.isPlan || _dragController.isActive || _draggingRasterId != null ||
+    if (!_commands.isPlan || _dragController.isActive ||
         _underlayMaskDrafting || _rasterCalibrationStep != 0 ||
         _rotationUnderlay != null) return null;
+    if (_draggingCadUnderlay && _cadDragPreview != null && _currentUnderlayDoc != null) {
+      final preview = _cadDragPreview!;
+      if (preview.hasActiveMask) return preview.maskPolygon;
+      return preview.frame(_effectiveUnderlayFrame).cornersToModel(_currentUnderlayDoc!.bounds);
+    }
+    if (_draggingRasterId != null && _rasterDragPreview != null) {
+      final preview = _rasterDragPreview!;
+      return preview.hasActiveMask ? preview.maskPolygon : preview.localCorners;
+    }
     if (_underlayCropEditor.active) return _underlayCropEditor.preview;
     if (_isCadUnderlaySelected && _currentUnderlayDoc != null) {
       final cfg = _currentCadUnderlayConfig;
       if (cfg == null) return null;
-      if (cfg?.hasActiveMask == true) return cfg!.maskPolygon;
+      if (cfg.hasActiveMask) return cfg.maskPolygon;
       return _effectiveUnderlayFrame.cornersToModel(_currentUnderlayDoc!.bounds);
     }
     final raster = _selectedRasterId == null ? null : _selectedRasterUnderlay;
@@ -4347,6 +4371,113 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return raster.hasActiveMask ? raster.maskPolygon : raster.localCorners;
     }
     return null;
+  }
+
+  bool _startUnderlayDirectDrag(Offset raw) {
+    if (_isCadUnderlaySelected) {
+      final cfg = _currentCadUnderlayConfig;
+      if (cfg == null || !cfg.visible || _currentUnderlayDoc == null) return false;
+      _draggingCadUnderlay = true;
+      _cadDragStartModel = raw;
+      _cadDragOriginalFrame = _effectiveUnderlayFrame;
+      _cadDragOriginalConfig = cfg;
+      _cadDragPreview = cfg;
+      _cadDragSource = _project;
+      _isHandleEngaged = true;
+      setState(() {});
+      return true;
+    }
+    final raster = _selectedRasterId == null ? null : _selectedRasterUnderlay;
+    if (raster == null || raster.locked || !raster.visible) return false;
+    _draggingRasterId = raster.id;
+    _rasterDragStartModel = raw;
+    _rasterDragOriginalPos = raster.position;
+    _rasterDragOriginal = raster;
+    _rasterDragPreview = raster;
+    _rasterDragSource = _project;
+    _isHandleEngaged = true;
+    setState(() {});
+    return true;
+  }
+
+  void _updateUnderlayDirectDrag(Offset rawModel) {
+    if (_draggingCadUnderlay &&
+        _cadDragStartModel != null &&
+        _cadDragOriginalFrame != null &&
+        _cadDragOriginalConfig != null) {
+      final delta = rawModel - _cadDragStartModel!;
+      final origFrame = _cadDragOriginalFrame!;
+      final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
+      final nextFrame = origFrame.placing(origFrame.origin, delta);
+      final origCfg = _cadDragOriginalConfig!;
+      _cadDragPreview = origCfg.withFrame(nextFrame, fallback: fallback).copyWith(
+        maskPolygon: origCfg.maskPolygon?.map((p) => p + delta).toList(),
+      );
+      _handleMoved = true;
+      _repaintPreview();
+      setState(() {});
+      return;
+    }
+    if (_draggingRasterId != null &&
+        _rasterDragStartModel != null &&
+        _rasterDragOriginalPos != null) {
+      final delta = rawModel - _rasterDragStartModel!;
+      final nextPos = _rasterDragOriginalPos! + delta;
+      _rasterDragPreview = _rasterDragOriginal?.copyWith(
+        position: nextPos,
+        maskPolygon: _rasterDragOriginal?.maskPolygon?.map((p) => p + delta).toList(),
+      );
+      _handleMoved = true;
+      _repaintPreview();
+      setState(() {});
+    }
+  }
+
+  void _finishUnderlayDirectDrag() {
+    if (_draggingCadUnderlay) {
+      final source = _cadDragSource;
+      final preview = _cadDragPreview;
+      final original = _cadDragOriginalConfig;
+      final moved = _handleMoved;
+      _cancelActiveDrags();
+      if (moved &&
+          preview != null &&
+          original != null &&
+          identical(source, _project) &&
+          (preview.lockedCadOriginX != original.lockedCadOriginX ||
+              preview.lockedCadOriginY != original.lockedCadOriginY)) {
+        _commands.commit(_project.copyWith(cadUnderlays: {
+          ..._project.cadUnderlays,
+          preview.storeyId: preview,
+        }));
+        _saveBiMProjectIfAttached();
+        HapticFeedback.selectionClick();
+      }
+      setState(() {});
+      _repaintPreview();
+      return;
+    }
+    if (_draggingRasterId != null) {
+      final source = _rasterDragSource;
+      final preview = _rasterDragPreview;
+      final original = _rasterDragOriginal;
+      final moved = _handleMoved;
+      _cancelActiveDrags();
+      if (moved &&
+          preview != null &&
+          original != null &&
+          identical(source, _project) &&
+          preview.position != original.position) {
+        _commands.commit(_project.copyWith(rasterUnderlays: [
+          for (final r in _project.rasterUnderlays)
+            if (r.id == preview.id) preview else r,
+        ]));
+        _saveBiMProjectIfAttached();
+        HapticFeedback.selectionClick();
+      }
+      setState(() {});
+      _repaintPreview();
+    }
   }
 
   bool _startUnderlayCrop(Offset raw) {
@@ -4363,6 +4494,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         final distance = (grip - raw).distance;
         if (distance < best) { best = distance; edge = i; }
       }
+    }
+    final center = _canMoveSelectedUnderlay
+        ? ArchitectUnderlayCropOverlay.centerPoint(polygon)
+        : null;
+    final centerDist = center == null ? double.infinity : (center - raw).distance;
+    if (centerDist <= 24 / _currentScale && (edge == null || centerDist <= best)) {
+      return _startUnderlayDirectDrag(raw);
     }
     edge ??= ArchitectPolygonDimensions.hitEdge(polygon, raw, 10 / _currentScale);
     if (edge == null || !_underlayCropEditor.startEdge(
@@ -4431,13 +4569,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           handleLength: _handleOffsetLength,
           activeEdge: _underlayCropEditor.active ? _underlayCropEditor.index : null,
           invalid: _underlayCropEditor.invalid,
+          canMove: _canMoveSelectedUnderlay,
+          moving: _draggingCadUnderlay || _draggingRasterId != null,
         );
       },
     ),
   );
 
   ArchitectCadUnderlayConfig? get _paintCadUnderlayConfig {
-    final cfg = _underlayRotationPreview?.cadUnderlayForStorey(_project.activeStoreyId) ??
+    final cfg = _cadDragPreview ??
+        _underlayRotationPreview?.cadUnderlayForStorey(_project.activeStoreyId) ??
         _currentCadUnderlayConfig;
     return cfg != null && _underlayCropEditor.active && _underlayCropCad
         ? cfg.copyWith(maskPolygon: _underlayCropEditor.preview, maskEnabled: true) : cfg;
@@ -5730,6 +5871,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _terrainDrafting = false;
 
+    _terrainSubModeActive = false;
+
     _viewDraft = null;
 
     _placingDownpipe = false;
@@ -5842,6 +5985,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _terrainDrafting = false;
 
+  bool _terrainSubModeActive = false;
+
 
 
   void _startTerrainDraft() {
@@ -5879,9 +6024,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _editingGroupId = null;
     }
 
+    final wasTerrainSubMode = _terrainSubModeActive;
+
     _cutOpeningTargetId = null;
 
     _terrainDrafting = false;
+
+    _terrainSubModeActive = false;
 
     _placingDownpipe = false;
 
@@ -5894,7 +6043,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final sameCommand = tool == ArchitectTool.select
         ? previousMode == ArchitectInteractionMode.singleSelect
-        : _activeTool == tool && previousMode != ArchitectInteractionMode.contextEdit;
+        : _activeTool == tool &&
+            previousMode != ArchitectInteractionMode.contextEdit &&
+            !(tool == ArchitectTool.terrain && wasTerrainSubMode);
     final nextTool = toggle && sameCommand ? ArchitectTool.pan : tool;
 
     _resetDimensionDraft();
@@ -5949,17 +6100,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _project.activeStorey.isBuildingStorey) {
       _commands.setPlanMode(ArchitectPlanMode.ceilingServices);
     }
-    if (nextTool.isLandscapeTool &&
-        _commands.isPlan &&
-        !_project.activeStorey.isSite) {
-      final ensured = _modelCommands.project.ensureSiteStorey();
-      final siteId = ensured.siteStorey!.id;
-      if (!identical(ensured, _modelCommands.project)) {
-        _modelCommands.commit(ensured);
+    if (nextTool.isLandscapeTool) {
+      if (nextTool == ArchitectTool.terrain &&
+          _landscapeTool.terrainMode != ArchitectTerrainDraftMode.boundary &&
+          _landscapeTool.terrainMode != ArchitectTerrainDraftMode.boundaryRect) {
+        _landscapeTool.terrainMode = ArchitectTerrainDraftMode.boundary;
       }
-      _lastViewIds[ArchitectWorkspaceView.plan] = siteId;
-      _commands.setPlanMode(ArchitectPlanMode.floor);
-      _commands.activateStorey(siteId);
+      final activeSurf = _landscapeTool.terrainState == ArchitectTerrainState.existing
+          ? _project.existingTerrain
+          : _project.proposedTerrain;
+      final otherSurf = _landscapeTool.terrainState == ArchitectTerrainState.existing
+          ? _project.proposedTerrain
+          : _project.existingTerrain;
+      final savedDatum = activeSurf.datumElevation.abs() > 1e-4
+          ? activeSurf.datumElevation
+          : otherSurf.datumElevation;
+      if (savedDatum.abs() > 1e-4) {
+        _landscapeTool.terrainDatumElevation = savedDatum;
+      }
+      final savedInterval = activeSurf.contourInterval > 1e-4
+          ? activeSurf.contourInterval
+          : otherSurf.contourInterval;
+      _landscapeTool.contourInterval = savedInterval;
+      if (_commands.isPlan && !_project.activeStorey.isSite) {
+        final ensured = _modelCommands.project.ensureSiteStorey();
+        final siteId = ensured.siteStorey!.id;
+        if (!identical(ensured, _modelCommands.project)) {
+          _modelCommands.commit(ensured);
+        }
+        _lastViewIds[ArchitectWorkspaceView.plan] = siteId;
+        _commands.setPlanMode(ArchitectPlanMode.floor);
+        _commands.activateStorey(siteId);
+      }
     }
     if (nextTool.usesComponent) {
       final library = ComponentLibraryService.instance;
@@ -5997,6 +6169,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _selectedSectionRoofId = null;
 
     _isZoneTableSelected = false;
+
+    _isCadUnderlaySelected = false;
+    _selectedRasterId = null;
 
     });
   }
@@ -6626,8 +6801,53 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ? _project.activeStorey.slabs.where((s) => s.id == _selectedElementId).firstOrNull
       : null;
 
+  ArchitectTerrainBoundary? get _selectedTerrainBoundary {
+    if (_effectiveSelection.length != 1 || !_project.activeStorey.isSite) {
+      return null;
+    }
+    final id = _selectedElementId;
+    if (id == null) return null;
+    for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+      for (final b in surface.boundaries) {
+        if (b.id == id) return b;
+      }
+    }
+    return null;
+  }
+
+  ArchitectTerrainContour? get _selectedTerrainContour {
+    if (_effectiveSelection.length != 1 || !_project.activeStorey.isSite) {
+      return null;
+    }
+    final id = _selectedElementId;
+    if (id == null) return null;
+    for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+      for (final c in surface.contours) {
+        if (c.id == id) return c;
+      }
+    }
+    return null;
+  }
+
+  ArchitectTerrainSpot? get _selectedTerrainSpot {
+    if (_effectiveSelection.length != 1 || !_project.activeStorey.isSite) {
+      return null;
+    }
+    final id = _selectedElementId;
+    if (id == null) return null;
+    for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
+      for (final s in surface.spots) {
+        if (s.id == id) return s;
+      }
+    }
+    return null;
+  }
+
   bool get _hatchOrSlabSelected =>
-      _selectedHatch != null || _selectedSlab != null || _selectedCeiling != null;
+      _selectedHatch != null ||
+      _selectedSlab != null ||
+      _selectedCeiling != null ||
+      _selectedTerrainBoundary != null;
 
   ArchitectPolygonEdgeMode get _effectivePolygonEdgeMode => _hatchOrSlabSelected
       ? _polygonPull ? ArchitectPolygonEdgeMode.pull
@@ -6652,7 +6872,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   int? get _selectedPolygonHoleIndex {
     final id = _selectedElementId ?? _selectedZoneId;
     if (id == null || _polygonContourElementId != id || _polygonContourIndex <= 0) return null;
-    final host = CutArchitectContourOpening.target(_project.activeStorey, id);
+    final host = CutArchitectContourOpening.targetInProject(_project, id);
     final index = _polygonContourIndex - 1;
     return host != null && index < host.$2.length ? index : null;
   }
@@ -6660,7 +6880,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _selectPolygonContour(Offset point) {
     final id = _selectedElementId ?? _selectedZoneId;
     if (id == null || _effectiveSelection.length > 1) return;
-    final host = CutArchitectContourOpening.target(_project.activeStorey, id);
+    final host = CutArchitectContourOpening.targetInProject(_project, id);
     if (host == null) return;
     final ring = ArchitectPolygonEditor.hitContour(host.$1, host.$2,
         point, _currentScale, offsetLengthPx: _handleOffsetLength,
@@ -8306,6 +8526,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _cancelActiveDrags();
     _resetWallDraft();
+    _elementTool.cancelSlabDrafting();
 
     setState(() {
 
@@ -9119,6 +9340,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _draggingRasterId != null ||
 
+      _draggingCadUnderlay ||
+
       _groupDragIds.isNotEmpty;
 
 
@@ -9774,27 +9997,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
 
-    if (_activeTool == ArchitectTool.rasterUnderlay &&
-        _rasterCalibrationStep == 0) {
-      final rasters = _project.rasterUnderlaysForStorey(
-        _project.activeStorey.id,
-      );
-      for (final r in rasters.reversed) {
-        if (_rasterUnderlayContains(r, rawModel)) {
-          setState(() => _selectedRasterId = r.id);
-          if (!r.locked) {
-            _draggingRasterId = r.id;
-            _rasterDragStartModel = rawModel;
-            _rasterDragOriginalPos = r.position;
-            _rasterDragOriginal = r;
-            _rasterDragSource = _project;
-            _isHandleEngaged = true;
-          }
-          return;
-        }
-      }
-    }
-
     if (_offsetOptions != null) {
 
       _previewOffset(_screenToModel(_placementPosition(event.localPosition)));
@@ -10054,7 +10256,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    final polygon = _selectedPolygon;
+    final polygon = _selectedTerrainContour?.closed == false
+        ? null
+        : _selectedPolygon;
 
     final isDirectContour =
 
@@ -10278,25 +10482,70 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     final polyline = _selectedPolyline ?? _selectedSpline;
-    if (polyline != null && !_moveSelection && !_mirrorActive && _offsetOptions == null && _chamferFilletSourceId == null &&
-        !_splitActive && _newPointTargetId == null) {
-      final points = polyline.linePoints;
-      final edgeHit = polyline.type == CadPrimitiveType.spline ? null : ArchitectPolylineEditing.hitEdge(points,rawModel,_currentScale,_handleOffsetLength);
-      final hit = edgeHit ?? ArchitectPolylineEditing.hit(
-          points, rawModel, _currentScale, _handleOffsetLength,
-      );
+    final openContour =
+        polyline == null && _selectedTerrainContour?.closed == false
+            ? _selectedTerrainContour
+            : null;
+    final polyPoints = polyline?.linePoints ?? openContour?.points;
+    final polyElementId = polyline?.id ?? openContour?.id;
+    final polyIsSpline = polyline?.type == CadPrimitiveType.spline ||
+        openContour?.isSpline == true;
+    if (polyPoints != null &&
+        polyElementId != null &&
+        !_moveSelection &&
+        !_mirrorActive &&
+        _offsetOptions == null &&
+        _chamferFilletSourceId == null &&
+        !_splitActive &&
+        _newPointTargetId == null) {
+      final points = polyPoints;
+      final edgeHit = polyIsSpline && openContour == null
+          ? null
+          : ArchitectPolylineEditing.hitEdge(
+              points,
+              rawModel,
+              _currentScale,
+              _handleOffsetLength,
+            );
+      final hit = edgeHit ??
+          ArchitectPolylineEditing.hit(
+            points,
+            rawModel,
+            _currentScale,
+            _handleOffsetLength,
+          );
       if (hit != null) {
         final (index, isOffset) = hit;
-        _polylineEdgeDrag=edgeHit!=null;
-        final point = _polylineEdgeDrag ? (points[index]+points[index+1])/2 : points[index];
-        final handle = !isOffset ? point : _polylineEdgeDrag
-          ? ArchitectPolylineEditing.edgeHandle(points,index,_currentScale,_handleOffsetLength)
-          : ArchitectPolylineEditing.handle(points,index,_currentScale,_handleOffsetLength);
+        _polylineEdgeDrag = edgeHit != null;
+        final point = _polylineEdgeDrag
+            ? (points[index] + points[index + 1]) / 2
+            : points[index];
+        final handle = !isOffset
+            ? point
+            : _polylineEdgeDrag
+                ? ArchitectPolylineEditing.edgeHandle(
+                    points,
+                    index,
+                    _currentScale,
+                    _handleOffsetLength,
+                  )
+                : ArchitectPolylineEditing.handle(
+                    points,
+                    index,
+                    _currentScale,
+                    _handleOffsetLength,
+                  );
         _polylineVertexIndex = index;
         _wallDragStart = !_polylineEdgeDrag && index == 0;
-        _wallEndpointOriginal = ArchitectWall(id: polyline.id,
-          startPoint: _polylineEdgeDrag ? points[index] : points[index == 0 ? 0 : index - 1],
-          endPoint: _polylineEdgeDrag ? point : points[index == 0 ? 1 : index], thickness: .001,
+        _wallEndpointOriginal = ArchitectWall(
+          id: polyElementId,
+          startPoint: _polylineEdgeDrag
+              ? points[index]
+              : points[index == 0 ? 0 : index - 1],
+          endPoint: _polylineEdgeDrag
+              ? point
+              : points[index == 0 ? 1 : index],
+          thickness: .001,
         );
         _wallEndpointIsOffset = isOffset;
         _wallEndpointDisplacement = handle - point;
@@ -10838,6 +11087,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_handlePointerDown != null && !_handleMoved &&
           (event.localPosition - _handlePointerDown!).distance < 6) return;
       _updateUnderlayCrop(_screenToModel(event.localPosition));
+      return;
+    }
+    if (_draggingCadUnderlay || _draggingRasterId != null) {
+      if (_handlePointerDown != null && !_handleMoved &&
+          (event.localPosition - _handlePointerDown!).distance < 6) return;
+      _updateUnderlayDirectDrag(_screenToModel(event.localPosition));
       return;
     }
     if (_dragController.isActive) {
@@ -12135,18 +12390,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    if (_draggingRasterId != null &&
-        _rasterDragStartModel != null &&
-        _rasterDragOriginalPos != null) {
-      final delta = rawModel - _rasterDragStartModel!;
-      final nextPos = _rasterDragOriginalPos! + delta;
-      setState(() {
-        _rasterDragPreview = _rasterDragOriginal?.copyWith(position: nextPos,
-          maskPolygon: _rasterDragOriginal?.maskPolygon?.map((p) => p + delta).toList());
-      });
-      return;
-    }
-
     if (_activeTool == ArchitectTool.rasterUnderlay &&
         _rasterCalibrationStep > 0) {
       _cursorModel = rawModel;
@@ -12619,17 +12862,43 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       try {
 
         final polylineIndex = _polylineVertexIndex;
-        final polyline = _elementMoveOriginal!.activeStorey.cadPrimitives
+        final sourceProj = _elementMoveOriginal!;
+        final polyline = sourceProj.activeStorey.cadPrimitives
             .where((p) => p.id == original.id &&
                 (p.type == CadPrimitiveType.polyline || p.type == CadPrimitiveType.spline),
             ).firstOrNull;
+        final openContour = polyline == null && sourceProj.activeStorey.isSite
+            ? [sourceProj.proposedTerrain, sourceProj.existingTerrain]
+                .expand((s) => s.contours)
+                .where((c) => c.id == original.id && !c.closed)
+                .firstOrNull
+            : null;
         _elementMovePreview = polylineIndex != null && polyline != null
             ? UpdateArchitectPolyline(
                 storeyId: _project.activeStoreyId, elementId: original.id,
                 points: _polylineEdgeDrag ? ArchitectPolylineEditing.moveEdge(polyline.linePoints,polylineIndex,
                   snap.point-(polyline.linePoints[polylineIndex]+polyline.linePoints[polylineIndex+1])/2)
                   : ArchitectPolylineEditing.moveVertex(polyline.linePoints,polylineIndex,snap.point),
-              ).apply(_elementMoveOriginal!)
+              ).apply(sourceProj)
+            : polylineIndex != null && openContour != null
+            ? UpdateArchitectPolygon(
+                storeyId: _project.activeStoreyId,
+                elementId: original.id,
+                polygon: _polylineEdgeDrag
+                    ? ArchitectPolylineEditing.moveEdge(
+                        openContour.points,
+                        polylineIndex,
+                        snap.point -
+                            (openContour.points[polylineIndex] +
+                                    openContour.points[polylineIndex + 1]) /
+                                2,
+                      )
+                    : ArchitectPolylineEditing.moveVertex(
+                        openContour.points,
+                        polylineIndex,
+                        snap.point,
+                      ),
+              ).apply(sourceProj)
             : _linearCommand(
 
           UpdateArchitectWall(
@@ -13475,54 +13744,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _cursorModel = pt;
 
     } else if (_activeTool.isLandscapeTool) {
-      if (_activeTool == ArchitectTool.terrain &&
-          _landscapeTool.terrainMode == ArchitectTerrainDraftMode.pickContour) {
-        final doc = _currentUnderlayDoc;
-        final frame = _effectiveUnderlayFrame;
-        final candidate = (doc != null && frame != null)
-            ? ArchitectUnderlayContourExtractor.pickAt(
-                document: doc,
-                frame: frame,
-                layerVisibility: _effectiveUnderlayLayerVisibility,
-                modelPoint: rawModel,
-                hitToleranceMeters: math.max(24.0 / _currentScale, 0.45),
-              )
-            : null;
+      if (_landscapeTool.isPickingContour(_activeTool.name)) {
+        final candidate = _resolvePickedTerrainContour(rawModel);
         _landscapeTool.setPickedContourPreview(candidate);
         _cursorModel = candidate?.anchorPoint ?? rawModel;
         _activeSnapLabel = candidate == null
             ? null
-            : (candidate.suggestedElevation != null
-                  ? '${candidate.suggestedElevation!.toStringAsFixed(2)} m'
-                  : context.l10n.architectTerrainModePickContour);
+            : context.l10n.architectTerrainModePickContour;
         _activeMagneticGuides = [];
-      } else if (_landscapeTool.isDrafting) {
-        final anchor = _landscapeTool.draftPoints.last;
-        final snap = _snapElement(
-          rawModel,
-          anchor: anchor,
-          tolerancePixels: _touchInput ? 18 : 12,
-        );
-        final orthoPerp =
-            _landscapeTool.terrainMode == ArchitectTerrainDraftMode.boundaryRect
-            ? null
-            : ArchitectLandscapeTool.resolveDraftSnapping(
-                points: _landscapeTool.draftPoints,
-                rawPoint: snap.isSnapped ? snap.point : rawModel,
-                toleranceMeters: math.max(16.0 / _currentScale, 0.30),
-              );
-        final finalPoint =
-            (orthoPerp != null && orthoPerp.$2 != null) ? orthoPerp.$1 : snap.point;
-        _cursorModel = finalPoint;
-        _activeSnapLabel = orthoPerp?.$2 ?? snap.snapLabel;
-        _activeMagneticGuides = (orthoPerp != null && orthoPerp.$3.isNotEmpty)
-            ? orthoPerp.$3
-            : snap.magneticGuides;
       } else {
-        final snap = _snapElement(rawModel);
-        _cursorModel = snap.point;
-        _activeSnapLabel = snap.snapLabel;
-        _activeMagneticGuides = snap.magneticGuides;
+        final resolved = _resolveLandscapeDraftPoint(
+          rawModel,
+          tolerancePixels: _landscapeTool.isDrafting
+              ? (_touchInput ? 18 : 12)
+              : null,
+        );
+        _cursorModel = resolved.point;
+        _activeSnapLabel = resolved.snapLabel;
+        _activeMagneticGuides = resolved.magneticGuides;
       }
 
     } else if (_activeTool == ArchitectTool.door ||
@@ -13714,6 +13953,79 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  double get _landscapeCloseRadius =>
+      ((_touchInput ? 22.0 : 16.0) / _currentScale).clamp(0.20, 1.50);
+
+  ({Offset point, String? snapLabel, List<(Offset, Offset)> magneticGuides})
+  _resolveLandscapeDraftPoint(Offset rawModel, {double? tolerancePixels}) {
+    final points = _landscapeTool.draftPoints;
+    if (points.length >= 3 &&
+        _landscapeTool.canCloseDraftToStart(_activeTool.name) &&
+        (rawModel - points.first).distance <= _landscapeCloseRadius) {
+      return (
+        point: points.first,
+        snapLabel: context.l10n.architectZonePointSnapStart,
+        magneticGuides: const [],
+      );
+    }
+
+    final anchor = points.lastOrNull;
+    final snap = _snapElement(
+      rawModel,
+      anchor: anchor,
+      tolerancePixels: tolerancePixels,
+    );
+    if (anchor == null ||
+        (_activeTool == ArchitectTool.terrain &&
+            _landscapeTool.terrainMode ==
+                ArchitectTerrainDraftMode.boundaryRect)) {
+      return (
+        point: snap.point,
+        snapLabel: snap.snapLabel,
+        magneticGuides: snap.magneticGuides,
+      );
+    }
+
+    final midpointSnap =
+        snap.snapLabel == 'Midpoint' ||
+        snap.snapLabel == 'Midpoint alignment';
+    if (points.length >= 3 &&
+        !midpointSnap &&
+        _landscapeTool.isClosedPolygonDraft(_activeTool.name)) {
+      final closure =
+          BimContourDraftingGeometry.calculatePolygonClosureOrthoSnap(
+            points: points,
+            raw: snap.isSnapped ? snap.point : rawModel,
+            tolerance: math.max(16.0 / _currentScale, 0.30),
+          );
+      if (closure.isSnapped) {
+        return (
+          point: closure.point,
+          snapLabel: context.l10n.snapAlignPoint1,
+          magneticGuides: closure.magneticGuides,
+        );
+      }
+    }
+
+    final orthoPerp = ArchitectLandscapeTool.resolveDraftSnapping(
+      points: points,
+      rawPoint: snap.isSnapped ? snap.point : rawModel,
+      toleranceMeters: math.max(16.0 / _currentScale, 0.30),
+    );
+    if (orthoPerp.$2 != null) {
+      return (
+        point: orthoPerp.$1,
+        snapLabel: orthoPerp.$2,
+        magneticGuides: orthoPerp.$3,
+      );
+    }
+    return (
+      point: snap.point,
+      snapLabel: snap.snapLabel,
+      magneticGuides: snap.magneticGuides,
+    );
+  }
+
   Offset _resolveSlabPoint(Offset raw) =>
 
       _resolveContourPoint(_elementTool.slabDraftPoints, raw);
@@ -13856,6 +14168,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_underlayCropEditor.active) {
       if (_handleMoved) _updateUnderlayCrop(_screenToModel(event.localPosition));
       _finishUnderlayCrop();
+      _handlePointerDown = null;
+      return;
+    }
+    if (_draggingCadUnderlay || _draggingRasterId != null) {
+      if (_handleMoved) _updateUnderlayDirectDrag(_screenToModel(event.localPosition));
+      _finishUnderlayDirectDrag();
       _handlePointerDown = null;
       return;
     }
@@ -14265,28 +14583,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _draggingRasterId = null;
     _rasterDragStartModel = null;
     _rasterDragOriginalPos = null;
+    _draggingCadUnderlay = false;
+    _cadDragStartModel = null;
+    _cadDragOriginalFrame = null;
+    _cadDragOriginalConfig = null;
+    _cadDragPreview = null;
+    _cadDragSource = null;
 
   }
 
 
 
   void _commitActiveHandleDrag(Offset screenPos) {
-
-    if (_draggingRasterId != null) {
-      final source = _rasterDragSource;
-      final preview = _rasterDragPreview, original = _rasterDragOriginal;
-      _cancelActiveDrags();
-      if (preview != null && original != null && identical(source, _project) &&
-          preview.position != original.position) {
-        _commands.commit(_project.copyWith(rasterUnderlays: [
-          for (final r in _project.rasterUnderlays)
-            if (r.id == preview.id) preview else r,
-        ]));
-        _saveBiMProjectIfAttached();
-      }
-      HapticFeedback.selectionClick();
-      return;
-    }
 
     if (_isDraggingRoofKnuckle) {
       _isDraggingRoofKnuckle = false;
@@ -16126,6 +16434,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
+    if (_activeTool == ArchitectTool.cadUnderlay) {
+      if (_cadUnderlayContains(rawModel)) {
+        if (!_isCadUnderlaySelected || _selectedRasterId != null) {
+          setState(() {
+            _isCadUnderlaySelected = true;
+            _selectedRasterId = null;
+          });
+          HapticFeedback.selectionClick();
+        }
+      } else if (_isCadUnderlaySelected || _selectedRasterId != null) {
+        setState(() {
+          _isCadUnderlaySelected = false;
+          _selectedRasterId = null;
+        });
+      }
+      return;
+    }
+
     if (_activeTool == ArchitectTool.rasterUnderlay) {
       if (_rasterCalibrationStep > 0) {
         unawaited(_handleRasterCalibrationTap(rawModel));
@@ -16136,10 +16462,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
       for (final r in rasters.reversed) {
         if (_rasterUnderlayContains(r, rawModel)) {
-          setState(() => _selectedRasterId = r.id);
+          setState(() {
+            _selectedRasterId = r.id;
+            _isCadUnderlaySelected = false;
+          });
           HapticFeedback.selectionClick();
           return;
         }
+      }
+      if (_selectedRasterId != null || _isCadUnderlaySelected) {
+        setState(() {
+          _selectedRasterId = null;
+          _isCadUnderlaySelected = false;
+        });
       }
       return;
     }
@@ -16455,44 +16790,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    // 9b. In Landscape tools (Terrain, Pathway, Vegetation, Site Fence)
+    // 9b. In Landscape tools (Terrain, Contour, Pathway, Vegetation, Site Fence, Street)
     if (_activeTool.isLandscapeTool) {
-      if (_activeTool == ArchitectTool.terrain &&
-          _landscapeTool.terrainMode == ArchitectTerrainDraftMode.pickContour) {
+      if (_landscapeTool.isPickingContour(_activeTool.name)) {
         final l = context.l10n;
-        final doc = _currentUnderlayDoc;
-        final frame = _effectiveUnderlayFrame;
-        if (doc == null || frame == null) {
-          _landscapeTool.setPickedContourPreview(null);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.architectTerrainNoUnderlayHint)),
-          );
-          return;
-        }
-        final activeSurface =
-            _landscapeTool.terrainState == ArchitectTerrainState.existing
-            ? _project.existingTerrain
-            : _project.proposedTerrain;
-        if (!activeSurface.hasOuterBoundary) {
-          _landscapeTool.setPickedContourPreview(null);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.architectTerrainCreateBoundaryFirst)),
-          );
-          return;
-        }
         final candidate =
             _landscapeTool.pickedContourPreview ??
-            ArchitectUnderlayContourExtractor.pickAt(
-              document: doc,
-              frame: frame,
-              layerVisibility: _effectiveUnderlayLayerVisibility,
-              modelPoint: rawModel,
-              hitToleranceMeters: math.max(24.0 / _currentScale, 0.45),
-            );
+            _resolvePickedTerrainContour(rawModel);
         _landscapeTool.setPickedContourPreview(null);
         if (candidate == null) {
+          final hasUnderlay =
+              _currentUnderlayDoc != null && _effectiveUnderlayFrame != null;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.architectTerrainNoContourAtPoint)),
+            SnackBar(
+              content: Text(
+                hasUnderlay
+                    ? l.architectTerrainNoContourAtPoint
+                    : l.architectTerrainNoUnderlayHint,
+              ),
+            ),
           );
           return;
         }
@@ -16500,43 +16816,33 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return;
       }
 
-      if (!_landscapeTool.isDrafting) {
-        final hitId = ArchitectLandscapeTool.hitTestLandscapeElement(
-          project: _project,
-          storey: _project.activeStorey,
-          worldPoint: rawModel,
-          hitTolerance: math.max(22.0 / _currentScale, 0.35),
-        );
-        if (hitId != null) {
-          _selectAt(rawModel, toggle: _multiSelect);
-          return;
-        }
-      }
-
-      final anchor = _landscapeTool.draftPoints.lastOrNull;
-      final snap = _snapElement(rawModel, anchor: anchor);
       if (_activeTool == ArchitectTool.terrain &&
           _landscapeTool.terrainMode == ArchitectTerrainDraftMode.spot) {
-        _promptAndCommitSpot(snap.point);
+        final spotPoint = _snapElement(rawModel).point;
+        _promptAndCommitSpot(spotPoint);
         return;
       }
 
-      final orthoPerp =
-          (anchor != null &&
-              _landscapeTool.terrainMode !=
-                  ArchitectTerrainDraftMode.boundaryRect)
-          ? ArchitectLandscapeTool.resolveDraftSnapping(
-              points: _landscapeTool.draftPoints,
-              rawPoint: snap.isSnapped ? snap.point : rawModel,
-              toleranceMeters: math.max(16.0 / _currentScale, 0.30),
-            )
-          : null;
-      final pt = (orthoPerp?.$2 != null) ? orthoPerp!.$1 : snap.point;
+      final resolved = _resolveLandscapeDraftPoint(rawModel);
+      final pt = resolved.point;
+      final closeRadius = _landscapeCloseRadius;
+      final isManualContour =
+          (_activeTool == ArchitectTool.contour &&
+              !_landscapeTool.contourAutoTrace) ||
+          (_activeTool == ArchitectTool.terrain &&
+              _landscapeTool.terrainMode == ArchitectTerrainDraftMode.contour);
+      if (isManualContour &&
+          _landscapeTool.draftPoints.length >= 3 &&
+          (pt - _landscapeTool.draftPoints.first).distance <= closeRadius) {
+        _landscapeTool.contourClosed = true;
+        _promptAndCommitManualContour();
+        return;
+      }
       final nextProject = _landscapeTool.handleTap(
         toolName: _activeTool.name,
         worldPoint: pt,
         project: _project,
-        closeThresholdWorld: math.min(18.0 / _currentScale, 0.35),
+        closeThresholdWorld: closeRadius,
       );
       if (nextProject != null) {
         setState(() {
@@ -19292,9 +19598,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
-    final storey = (_elementMovePreview ?? _project).activeStorey;
+    final previewProject = _elementMovePreview ?? _project;
+    final storey = previewProject.activeStorey;
     final holeIndex = _selectedPolygonHoleIndex;
-    final host = CutArchitectContourOpening.target(storey, targetId);
+    final host = CutArchitectContourOpening.targetInProject(
+      previewProject,
+      targetId,
+    );
     if (holeIndex != null && host != null && holeIndex < host.$2.length) {
       return host.$2[holeIndex];
     }
@@ -19331,6 +19641,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       if (zone.id == targetId) return zone.polygon;
 
+    }
+
+    if (storey.isSite) {
+      for (final surface in [
+        previewProject.proposedTerrain,
+        previewProject.existingTerrain,
+      ]) {
+        for (final b in surface.boundaries) {
+          if (b.id == targetId && b.polygon.length >= 3) return b.polygon;
+        }
+        for (final c in surface.contours) {
+          if (c.id == targetId && c.closed && c.points.length >= 3) {
+            return c.points;
+          }
+        }
+      }
     }
 
     return null;
@@ -21019,7 +21345,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   bool _onSelectionHold(Offset screenPoint) {
-    if (_placingComponent) return false;
+    if (_placingComponent || _cutOpeningTargetId != null) return false;
     if (_marqueeTool.isDrafting || _curvingEdgeElementId != null) return false;
 
     if (_wallCutIds.isNotEmpty ||
@@ -21134,7 +21460,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _onContextHold(Offset screenPoint) {
     _dismissTouchCandidates();
-    if (_marqueeTool.isDrafting || _curvingEdgeElementId != null ||
+    if (_cutOpeningTargetId != null ||
+        _marqueeTool.isDrafting ||
+        _curvingEdgeElementId != null ||
         _underlayBusy || _underlayMaskDrafting || _rasterCalibrationStep != 0 ||
         _underlayCropEditor.active || _draggingRasterId != null) return false;
 
@@ -22755,7 +23083,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_effectiveSelection.length <= 1 &&
 
-        CutArchitectContourOpening.target(storey, elementId) != null &&
+        CutArchitectContourOpening.targetInProject(_project, elementId) != null &&
 
         _commands.view == ArchitectWorkspaceView.plan) {
 
@@ -22771,7 +23099,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (!items.any((it) => it.action == ArchitectRadialAction.newPoint) &&
 
-        InsertArchitectElementPoint.pathOf(storey, elementId) != null) {
+        InsertArchitectElementPoint.pathOf(storey, elementId, project: _project) != null) {
 
       items.add(
 
@@ -22836,7 +23164,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (initialPick != null) _selectPolygonContour(initialPick);
     final holeIndex = _selectedPolygonHoleIndex;
     final source = _project.activeStorey;
-    final path = InsertArchitectElementPoint.pathOf(source, id, holeIndex: holeIndex,
+    final path = InsertArchitectElementPoint.pathOf(
+      source,
+      id,
+      holeIndex: holeIndex,
+      project: _project,
     );
     if (path == null || path.points.length < 2) {
       _cancelGeometryCommand();
@@ -22857,10 +23189,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _activeSnapLabel = null;
     });
     final seed = initialPick ?? InsertArchitectElementPoint.locate(
-      source, id, (path.points[0] + path.points[1]) / 2,
-      atMidpoint: true, holeIndex: holeIndex,
+      source,
+      id,
+      (path.points[0] + path.points[1]) / 2,
+      atMidpoint: true,
+      holeIndex: holeIndex,
+      project: _project,
     )!.point;
-    final hit = InsertArchitectElementPoint.locate(source, id, seed, holeIndex: holeIndex,
+    final hit = InsertArchitectElementPoint.locate(
+      source,
+      id,
+      seed,
+      holeIndex: holeIndex,
+      project: _project,
     )!;
     final wall = source.walls.where((w) => w.id == id).firstOrNull;
     final edge = path.points[(hit.edge + 1) % path.points.length] - path.points[hit.edge];
@@ -22927,6 +23268,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _newPointTargetId!,
       holeIndex: _newPointHoleIndex,
+      project: _project,
 
     );
 
@@ -23512,8 +23854,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final wasValid = _newPointValid;
     _newPointCandidate = candidate;
     _newPointValid = InsertArchitectElementPoint.canInsert(
-      _newPointSource ?? _project.activeStorey, _newPointTargetId!, candidate,
+      _newPointSource ?? _project.activeStorey,
+      _newPointTargetId!,
+      candidate,
       holeIndex: _newPointHoleIndex,
+      project: _project,
     );
     _newPointLeaderLine = (candidate, candidate + _newPointGripOffset / _currentScale,
     );
@@ -23603,6 +23948,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       targetId,
       holeIndex: holeIndex,
+      project: _project,
 
     );
 
@@ -24602,6 +24948,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _selectAt(Offset point, {
     bool invalidateGesture = true, bool toggle = false,
   }) {
+    if (_cutOpeningTargetId != null) return false;
     if (_touchInput && invalidateGesture) {
       final ids = _touchHits(point);
       setState(() => _touchCandidates = ids.length > 1
@@ -24870,12 +25217,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     HapticFeedback.selectionClick();
 
     _selectPolygonContour(point);
-    if (_hatchOrSlabSelected && !_multiSelect) {
+    if ((_hatchOrSlabSelected || _selectedTerrainContour?.closed == true) &&
+        !_multiSelect) {
       setState(() {
         _enterPolygonEditing(id);
-        _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
-          _selectedPolygon!, point, 18 / _currentScale,
-        );
+        final selectedPoly = _selectedPolygon;
+        _polygonSelectedEdge = selectedPoly == null
+            ? null
+            : ArchitectPolygonDimensions.hitEdge(
+                selectedPoly, point, 18 / _currentScale,
+              );
       });
     }
     return true;
@@ -25999,9 +26350,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (ids.length == 1) {
       if (_project.activeStorey.isSite) {
-        final state = ArchitectLandscapeTool.terrainStateOf(_project, ids.single);
+        final singleId = ids.single;
+        final state = ArchitectLandscapeTool.terrainStateOf(_project, singleId);
         if (state != null) {
-          _showTerrainProperties(ids.single, state);
+          final surface = state == ArchitectTerrainState.existing
+              ? _project.existingTerrain
+              : _project.proposedTerrain;
+          final contour = surface.contours
+              .where((c) => c.id == singleId)
+              .firstOrNull;
+          if (contour != null) {
+            _showContourProperties(singleId, state, contour, surface.datumElevation);
+            return;
+          }
+          final spot = surface.spots
+              .where((s) => s.id == singleId)
+              .firstOrNull;
+          if (spot != null) {
+            _showSpotProperties(singleId, state, spot, surface.datumElevation);
+            return;
+          }
+          _showTerrainProperties(singleId, state);
           return;
         }
       }
@@ -27697,7 +28066,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _selectedZoneId = zone.id;
           _zoneTool.startEditingZone(zone);
         }
-        if (_hatchOrSlabSelected) _enterPolygonEditing(ids.single);
+        if (_hatchOrSlabSelected || _selectedTerrainContour?.closed == true) {
+          _enterPolygonEditing(ids.single);
+        }
       }
       // Area selection remains in the explicitly chosen Multi mode.
       _selectionCyclePoint = null;
@@ -28541,7 +28912,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       components: storey.components.where((c) => !ids.contains(c.id)).toList(),
     );
 
-    final nextProject = _project
+    var nextProject = _project
         .updateActiveStorey(nextStorey)
         .copyWithGridAxes(
           _project.gridAxes.where((a) => !ids.contains(a.id)).toList(),
@@ -28550,6 +28921,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           sections: _project.sections.where((s) => !ids.contains(s.id)).toList(),
           elevations: _project.elevations.where((e) => !ids.contains(e.id)).toList(),
         );
+    nextProject = ArchitectLandscapeTool.deleteSelected(
+      project: nextProject,
+      selectedIds: ids,
+    );
 
     _commands.commit(nextProject);
 
@@ -30945,7 +31320,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           );
         }
-        if (InsertArchitectElementPoint.pathOf(storey, ids.single) != null) {
+        if (InsertArchitectElementPoint.pathOf(storey, ids.single, project: _project) != null) {
           actions.add(
             action(
               'architect-selection-new-point',
@@ -32850,9 +33225,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _saveBiMProjectIfAttached();
                   },
                   onOpenDecorativeStudio: () => _openDecorativeStudio(),
-                  landscapeBar: _activeTool.isLandscapeTool
+                  selectedTerrain: _selectedTerrainBoundary != null ||
+                      _selectedTerrainSpot != null ||
+                      _selectedTerrainContour != null,
+                  landscapeBar: (_activeTool.isLandscapeTool ||
+                          _selectedTerrainBoundary != null ||
+                          _selectedTerrainSpot != null ||
+                          _selectedTerrainContour != null)
                       ? ArchitectLandscapeBar(
-                          activeTool: _activeTool,
+                          activeTool: (_selectedTerrainBoundary != null ||
+                                  _selectedTerrainSpot != null)
+                              ? ArchitectTool.terrain
+                              : (_selectedTerrainContour != null
+                                  ? ArchitectTool.contour
+                                  : _activeTool),
                           landscapeTool: _landscapeTool,
                           project: _project,
                           onChanged: () {
@@ -32863,8 +33249,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           onCreateProposedFromExisting:
                               _createProposedTerrainFromExisting,
                           onDatumUpdated: _updateTerrainDatum,
+                          onContourIntervalUpdated:
+                              _updateTerrainContourInterval,
                           hasSelectedContourOrSpot:
                               _hasSelectedTerrainContourOrSpot,
+                          hasSelectedTerrain: _selectedTerrainBoundary != null ||
+                              _selectedTerrainSpot != null,
+                          terrainSubModeActive: _terrainSubModeActive,
+                          onTerrainModeSelected: _handleTerrainModeSelected,
                           onEditSelectedElevation: _editSelectedTerrainElevation,
                           onCommitDraft: _commitLandscapeDraft,
                           onUndoPoint: () {
@@ -34196,27 +34588,162 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  ArchitectPickedContourCandidate? _resolvePickedTerrainContour(
+    Offset rawModel,
+  ) {
+    final hitTol = math.max(24.0 / _currentScale, 0.45);
+    final doc = _currentUnderlayDoc;
+    final frame = _effectiveUnderlayFrame;
+    if (doc != null && frame != null) {
+      final fromUnderlay = ArchitectUnderlayContourExtractor.pickAt(
+        document: doc,
+        frame: frame,
+        layerVisibility: _effectiveUnderlayLayerVisibility,
+        modelPoint: rawModel,
+        hitToleranceMeters: hitTol,
+        detectElevation: false,
+      );
+      if (fromUnderlay != null && fromUnderlay.points.length >= 2) {
+        final simplified = ArchitectSplineContourTracer.simplifyForSpline(
+          fromUnderlay.points,
+          closed: fromUnderlay.closed,
+          toleranceMeters: 0.008,
+          maxPoints: 96,
+        );
+        return ArchitectPickedContourCandidate(
+          points: simplified.length >= 2 ? simplified : fromUnderlay.points,
+          closed: fromUnderlay.closed,
+          suggestedElevation: null,
+          sourceLayer: fromUnderlay.sourceLayer,
+          anchorPoint: fromUnderlay.anchorPoint,
+        );
+      }
+    }
+    final traced = ArchitectSplineContourTracer.traceAt(
+      project: _project,
+      modelPoint: rawModel,
+      hitToleranceMeters: hitTol,
+      underlayDocument: doc,
+      underlayFrame: frame,
+      underlayLayerVisibility: _effectiveUnderlayLayerVisibility,
+      detectElevation: false,
+    );
+    if (traced != null && traced.points.length >= 2) {
+      return ArchitectPickedContourCandidate(
+        points: traced.points,
+        closed: traced.closed,
+        suggestedElevation: null,
+        anchorPoint: traced.anchorPoint,
+      );
+    }
+    return null;
+  }
+
+  double _resolvedTerrainDatumFor(ArchitectTerrainState state) {
+    final surface = state == ArchitectTerrainState.existing
+        ? _project.existingTerrain
+        : _project.proposedTerrain;
+    if (surface.datumElevation.abs() > 1e-4) return surface.datumElevation;
+    final other = state == ArchitectTerrainState.existing
+        ? _project.proposedTerrain
+        : _project.existingTerrain;
+    if (other.datumElevation.abs() > 1e-4) return other.datumElevation;
+    return _landscapeTool.terrainDatumElevation;
+  }
+
+  double _resolvedContourIntervalMetersFor(ArchitectTerrainState state) {
+    final surface = state == ArchitectTerrainState.existing
+        ? _project.existingTerrain
+        : _project.proposedTerrain;
+    if (surface.contourInterval > 1e-4) return surface.contourInterval;
+    final other = state == ArchitectTerrainState.existing
+        ? _project.proposedTerrain
+        : _project.existingTerrain;
+    if (other.contourInterval > 1e-4) return other.contourInterval;
+    if (_landscapeTool.contourInterval > 1e-4) {
+      return _landscapeTool.contourInterval;
+    }
+    return ArchitectContourIntervalPredictor.inferIntervalMeters(
+          surface.contours,
+          datumElevation: _resolvedTerrainDatumFor(state),
+        ) ??
+        0.0;
+  }
+
+  Future<double?> _showContourElevationDialog({
+    required ArchitectTerrainState state,
+    required List<Offset> candidatePoints,
+    required bool candidateClosed,
+  }) async {
+    final l = context.l10n;
+    final surface = state == ArchitectTerrainState.existing
+        ? _project.existingTerrain
+        : _project.proposedTerrain;
+    final elevUnit = terrainElevationUnit(_project.units, _project.levelUnits);
+    final stepMeters = _resolvedContourIntervalMetersFor(state);
+    final predictedAbsMeters =
+        ArchitectContourIntervalPredictor.predictNextAbsoluteElevation(
+      surface: surface,
+      candidatePoints: candidatePoints,
+      candidateClosed: candidateClosed,
+      fallbackAbsoluteElevation: _landscapeTool.contourAbsoluteElevation,
+      explicitIntervalMeters: stepMeters > 1e-4 ? stepMeters : null,
+    );
+    final stepDisplay = stepMeters > 1e-4 ? elevUnit.toUnit(stepMeters) : null;
+    final pickedInUnit = await BimNumericKeypad.showInputDialog(
+      context,
+      title: l.architectTerrainContourElevationTitle,
+      initialText: formatArchitectNumericValue(
+        elevUnit.toUnit(predictedAbsMeters),
+        decimals: 3,
+      ),
+      unitLabel: elevUnit.symbol,
+      decimals: 3,
+      stepDelta: stepDisplay,
+      allowNegative: true,
+    );
+    if (!mounted || pickedInUnit == null) return null;
+    return elevUnit.fromUnit(pickedInUnit);
+  }
+
+  ArchitectProject _withAutoInferredInterval(
+    ArchitectProject proj,
+    ArchitectTerrainState state,
+  ) {
+    final target = state == ArchitectTerrainState.existing
+        ? proj.existingTerrain
+        : proj.proposedTerrain;
+    if (target.contourIntervalManual) return proj;
+    final inferred = ArchitectContourIntervalPredictor.inferIntervalMeters(
+      target.contours,
+      datumElevation: _resolvedTerrainDatumFor(state),
+    );
+    if (inferred == null || inferred <= 1e-4) return proj;
+    _landscapeTool.contourInterval = inferred;
+    final nextTarget = target.copyWith(contourInterval: inferred);
+    final other = state == ArchitectTerrainState.existing
+        ? proj.proposedTerrain
+        : proj.existingTerrain;
+    final nextOther = (!other.contourIntervalManual && other.contourInterval <= 1e-4)
+        ? other.copyWith(contourInterval: inferred)
+        : other;
+    return state == ArchitectTerrainState.existing
+        ? proj.copyWith(existingTerrain: nextTarget, proposedTerrain: nextOther)
+        : proj.copyWith(proposedTerrain: nextTarget, existingTerrain: nextOther);
+  }
+
   Future<void> _promptAndCommitPickedContour(
     ArchitectPickedContourCandidate candidate,
   ) async {
-    final l = context.l10n;
     final state = _landscapeTool.terrainState;
     final surface = state == ArchitectTerrainState.existing
         ? _project.existingTerrain
         : _project.proposedTerrain;
-    final datum = surface.datumElevation.abs() > 1e-4
-        ? surface.datumElevation
-        : _landscapeTool.terrainDatumElevation;
-    final initialAbs =
-        candidate.suggestedElevation ?? _landscapeTool.contourAbsoluteElevation;
-
-    final pickedAbs = await BimNumericKeypad.showInputDialog(
-      context,
-      title: l.architectTerrainContourElevationTitle,
-      initialText: formatArchitectNumericValue(initialAbs, decimals: 3),
-      unitLabel: 'm',
-      decimals: 3,
-      allowNegative: true,
+    final datum = _resolvedTerrainDatumFor(state);
+    final pickedAbs = await _showContourElevationDialog(
+      state: state,
+      candidatePoints: candidate.points,
+      candidateClosed: candidate.closed,
     );
     if (!mounted || pickedAbs == null) return;
 
@@ -34228,29 +34755,46 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (clippedPieces.isEmpty) return;
 
     final rel = double.parse((pickedAbs - datum).toStringAsFixed(4));
+    final intervalMeters = _resolvedContourIntervalMetersFor(state);
+    final majorStep = intervalMeters > 1e-4 ? intervalMeters * 5.0 : 5.0;
+    final isMajorAuto =
+        _landscapeTool.contourMajor ||
+        ((pickedAbs / majorStep) - (pickedAbs / majorStep).roundToDouble())
+                .abs() <
+            1e-3;
     final stamp = DateTime.now().microsecondsSinceEpoch;
-    final added = <ArchitectTerrainContour>[
-      for (var i = 0; i < clippedPieces.length; i++)
-        if (clippedPieces[i].points.length >= 2)
+    final added = <ArchitectTerrainContour>[];
+    for (var i = 0; i < clippedPieces.length; i++) {
+      final pts = ArchitectSplineContourTracer.simplifyForSpline(
+        clippedPieces[i].points,
+        closed: clippedPieces[i].closed,
+        toleranceMeters: 0.008,
+        maxPoints: 96,
+      );
+      if (pts.length >= 2) {
+        added.add(
           ArchitectTerrainContour(
             id: 'terr_cnt_${stamp}_$i',
-            points: clippedPieces[i].points,
+            points: pts,
             elevation: rel,
             rawAbsoluteElevation: pickedAbs,
             closed: clippedPieces[i].closed,
-            isMajor: _landscapeTool.contourMajor,
-            isSpline: false,
+            isMajor: isMajorAuto,
+            isSpline: true,
           ),
-    ];
+        );
+      }
+    }
     if (added.isEmpty) return;
 
     final nextSurface = surface.copyWith(
       datumElevation: datum,
       contours: [...surface.contours, ...added],
     );
-    final nextProject = state == ArchitectTerrainState.existing
+    var nextProject = state == ArchitectTerrainState.existing
         ? _project.copyWith(existingTerrain: nextSurface, updatedAt: DateTime.now())
         : _project.copyWith(proposedTerrain: nextSurface, updatedAt: DateTime.now());
+    nextProject = _withAutoInferredInterval(nextProject, state);
 
     setState(() {
       _landscapeTool.contourAbsoluteElevation = pickedAbs;
@@ -34263,35 +34807,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _promptAndCommitManualContour() async {
-    final l = context.l10n;
     final state = _landscapeTool.terrainState;
-    final surface = state == ArchitectTerrainState.existing
-        ? _project.existingTerrain
-        : _project.proposedTerrain;
-    final datum = surface.datumElevation.abs() > 1e-4
-        ? surface.datumElevation
-        : _landscapeTool.terrainDatumElevation;
-    final initialAbs = _landscapeTool.contourAbsoluteElevation;
-
-    final pickedAbs = await BimNumericKeypad.showInputDialog(
-      context,
-      title: l.architectTerrainContourElevationTitle,
-      initialText: formatArchitectNumericValue(initialAbs, decimals: 3),
-      unitLabel: 'm',
-      decimals: 3,
-      allowNegative: true,
+    final datum = _resolvedTerrainDatumFor(state);
+    final pickedAbs = await _showContourElevationDialog(
+      state: state,
+      candidatePoints: List<Offset>.of(_landscapeTool.draftPoints),
+      candidateClosed: _landscapeTool.contourClosed,
     );
-    if (!mounted || pickedAbs == null) return;
+    if (!mounted || pickedAbs == null) {
+      _landscapeTool.contourClosed = false;
+      return;
+    }
 
     _landscapeTool.contourAbsoluteElevation = pickedAbs;
     _landscapeTool.terrainElevation = pickedAbs - datum;
-    final nextProject = _landscapeTool.commitDraft(
+    var nextProject = _landscapeTool.commitDraft(
       toolName: _activeTool.name,
       project: _project,
     );
+    _landscapeTool.contourClosed = false;
     if (nextProject != null) {
+      nextProject = _withAutoInferredInterval(nextProject, state);
       setState(() {
-        _commands.commit(nextProject, applyDraftingDefaults: true);
+        _commands.commit(nextProject!, applyDraftingDefaults: true);
       });
       _saveBiMProjectIfAttached();
       HapticFeedback.mediumImpact();
@@ -34304,20 +34842,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final surface = state == ArchitectTerrainState.existing
         ? _project.existingTerrain
         : _project.proposedTerrain;
-    final datum = surface.datumElevation.abs() > 1e-4
-        ? surface.datumElevation
-        : _landscapeTool.terrainDatumElevation;
+    final datum = _resolvedTerrainDatumFor(state);
+    final elevUnit = terrainElevationUnit(_project.units, _project.levelUnits);
     final initialAbs = _landscapeTool.contourAbsoluteElevation;
 
-    final pickedAbs = await BimNumericKeypad.showInputDialog(
+    final pickedInUnit = await BimNumericKeypad.showInputDialog(
       context,
       title: l.architectTerrainSpotElevationTitle,
-      initialText: formatArchitectNumericValue(initialAbs, decimals: 3),
-      unitLabel: 'm',
+      initialText: formatArchitectNumericValue(
+        elevUnit.toUnit(initialAbs),
+        decimals: 3,
+      ),
+      unitLabel: elevUnit.symbol,
       decimals: 3,
       allowNegative: true,
     );
-    if (!mounted || pickedAbs == null) return;
+    if (!mounted || pickedInUnit == null) return;
+    final pickedAbs = elevUnit.fromUnit(pickedInUnit);
 
     final rel = double.parse((pickedAbs - datum).toStringAsFixed(4));
     final spot = ArchitectTerrainSpot(
@@ -34367,49 +34908,456 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
-  Future<void> _showTerrainProperties(String id, ArchitectTerrainState initial) async {
+  Future<void> _showContourProperties(
+    String id,
+    ArchitectTerrainState initialState,
+    ArchitectTerrainContour contour,
+    double datum,
+  ) async {
     final document = _modelCommands.project;
     final l = context.l10n;
-    var selected = initial;
-    final result = await showArchitectProperties<ArchitectTerrainState>(
+    final initialAbs = contour.effectiveAbsolute(datum);
+    var absElev = initialAbs;
+    var isMajor = contour.isMajor;
+    var isClosed = contour.closed;
+    var selectedState = initialState;
+
+    final result = await showArchitectProperties<
+      ({double elevation, bool isMajor, bool closed, ArchitectTerrainState state})
+    >(
       context: context,
       onInsets: _insetProperties,
       builder: (context) => StatefulBuilder(
-        builder: (context, update) => architectAlertDialog(
-          key: const ValueKey('architect-terrain-properties'),
-          title: Text(l.architectTerrainPropertiesTitle),
-          content: RadioGroup<ArchitectTerrainState>(
-            groupValue: selected,
-            onChanged: (value) {
-              if (value != null) update(() => selected = value);
-            },
-            child: Column(
+        builder: (context, update) {
+          final changed =
+              (absElev - initialAbs).abs() > 1e-4 ||
+              isMajor != contour.isMajor ||
+              isClosed != contour.closed ||
+              selectedState != initialState;
+          return architectAlertDialog(
+            key: const ValueKey('architect-terrain-properties'),
+            title: Text(l.architectTerrainContourPropertiesTitle),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    key: const ValueKey('architect-contour-prop-elevation'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.height_rounded),
+                    title: Text(l.architectTerrainContourElevationTitle),
+                    subtitle: datum.abs() > 1e-4
+                        ? Text(
+                            '${l.architectTerrainRelativeElevation}: ${(absElev - datum).toStringAsFixed(2)} m',
+                          )
+                        : null,
+                    trailing: Text(
+                      '${absElev.toStringAsFixed(2)} m',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onTap: () async {
+                      final picked = await BimNumericKeypad.showInputDialog(
+                        context,
+                        title: l.architectTerrainContourElevationTitle,
+                        initialText: formatArchitectNumericValue(
+                          absElev,
+                          decimals: 3,
+                        ),
+                        unitLabel: 'm',
+                        decimals: 3,
+                        allowNegative: true,
+                      );
+                      if (picked != null) {
+                        update(() => absElev = picked);
+                      }
+                    },
+                  ),
+                  SwitchListTile(
+                    key: const ValueKey('architect-contour-prop-major'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l.architectTerrainContourMajor),
+                    value: isMajor,
+                    onChanged: (v) => update(() => isMajor = v),
+                  ),
+                  SwitchListTile(
+                    key: const ValueKey('architect-contour-prop-closed'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l.architectTerrainContourClosed),
+                    value: isClosed,
+                    onChanged: (v) => update(() => isClosed = v),
+                  ),
+                  const Divider(height: 16),
+                  RadioGroup<ArchitectTerrainState>(
+                    groupValue: selectedState,
+                    onChanged: (value) {
+                      if (value != null) update(() => selectedState = value);
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        RadioListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: ArchitectTerrainState.existing,
+                          title: Text(l.architectTerrainStateExisting),
+                        ),
+                        RadioListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: ArchitectTerrainState.proposed,
+                          title: Text(l.architectTerrainStateProposed),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l.cancel),
+              ),
+              FilledButton(
+                onPressed: !changed
+                    ? null
+                    : () => Navigator.pop(
+                        context,
+                        (
+                          elevation: absElev,
+                          isMajor: isMajor,
+                          closed: isClosed,
+                          state: selectedState,
+                        ),
+                      ),
+                child: Text(l.applyAction),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (!mounted ||
+        result == null ||
+        !identical(document, _modelCommands.project) ||
+        _effectiveSelection.singleOrNull != id) {
+      return;
+    }
+
+    final currentSurface = initialState == ArchitectTerrainState.existing
+        ? _project.existingTerrain
+        : _project.proposedTerrain;
+    final rel = double.parse(
+      (result.elevation - currentSurface.datumElevation).toStringAsFixed(4),
+    );
+    final updatedSurface = currentSurface.copyWith(
+      contours: [
+        for (final c in currentSurface.contours)
+          c.id == id
+              ? c.copyWith(
+                  elevation: rel,
+                  rawAbsoluteElevation: result.elevation,
+                  isMajor: result.isMajor,
+                  closed: result.closed,
+                )
+              : c,
+      ],
+    );
+    var updatedProject = initialState == ArchitectTerrainState.existing
+        ? _project.copyWith(
+            existingTerrain: updatedSurface,
+            updatedAt: DateTime.now(),
+          )
+        : _project.copyWith(
+            proposedTerrain: updatedSurface,
+            updatedAt: DateTime.now(),
+          );
+    var finalId = id;
+    if (result.state != initialState) {
+      final moved = ArchitectLandscapeTool.changeTerrainState(
+        updatedProject,
+        id,
+        result.state,
+      );
+      if (moved != null) {
+        updatedProject = moved.project;
+        finalId = moved.elementId;
+      }
+    }
+    setState(() {
+      if (finalId != id) {
+        _selectionIds
+          ..remove(id)
+          ..add(finalId);
+        _selectedElementId = finalId;
+      }
+      _loadTerrainProperties(updatedProject, finalId);
+      _commands.commit(updatedProject);
+    });
+    _saveBiMProjectIfAttached();
+  }
+
+  Future<void> _showSpotProperties(
+    String id,
+    ArchitectTerrainState initialState,
+    ArchitectTerrainSpot spot,
+    double datum,
+  ) async {
+    final document = _modelCommands.project;
+    final l = context.l10n;
+    final initialAbs = spot.effectiveAbsolute(datum);
+    var absElev = initialAbs;
+    var selectedState = initialState;
+
+    final result = await showArchitectProperties<
+      ({double elevation, ArchitectTerrainState state})
+    >(
+      context: context,
+      onInsets: _insetProperties,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) {
+          final changed =
+              (absElev - initialAbs).abs() > 1e-4 ||
+              selectedState != initialState;
+          return architectAlertDialog(
+            key: const ValueKey('architect-terrain-properties'),
+            title: Text(l.architectTerrainSpotPropertiesTitle),
+            content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                RadioListTile(
-                  value: ArchitectTerrainState.existing,
-                  title: Text(l.architectTerrainStateExisting),
+                ListTile(
+                  key: const ValueKey('architect-spot-prop-elevation'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.height_rounded),
+                  title: Text(l.architectTerrainSpotElevationTitle),
+                  trailing: Text(
+                    '${absElev.toStringAsFixed(2)} m',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () async {
+                    final picked = await BimNumericKeypad.showInputDialog(
+                      context,
+                      title: l.architectTerrainSpotElevationTitle,
+                      initialText: formatArchitectNumericValue(
+                        absElev,
+                        decimals: 3,
+                      ),
+                      unitLabel: 'm',
+                      decimals: 3,
+                      allowNegative: true,
+                    );
+                    if (picked != null) {
+                      update(() => absElev = picked);
+                    }
+                  },
                 ),
-                RadioListTile(
-                  value: ArchitectTerrainState.proposed,
-                  title: Text(l.architectTerrainStateProposed),
+                const Divider(height: 16),
+                RadioGroup<ArchitectTerrainState>(
+                  groupValue: selectedState,
+                  onChanged: (value) {
+                    if (value != null) update(() => selectedState = value);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RadioListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: ArchitectTerrainState.existing,
+                        title: Text(l.architectTerrainStateExisting),
+                      ),
+                      RadioListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: ArchitectTerrainState.proposed,
+                        title: Text(l.architectTerrainStateProposed),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
-            FilledButton(
-              onPressed: selected == initial ? null : () => Navigator.pop(context, selected),
-              child: Text(l.applyAction),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l.cancel),
+              ),
+              FilledButton(
+                onPressed: !changed
+                    ? null
+                    : () => Navigator.pop(
+                        context,
+                        (elevation: absElev, state: selectedState),
+                      ),
+                child: Text(l.applyAction),
+              ),
+            ],
+          );
+        },
       ),
     );
-    if (!mounted || result == null || !identical(document, _modelCommands.project) ||
+    if (!mounted ||
+        result == null ||
+        !identical(document, _modelCommands.project) ||
+        _effectiveSelection.singleOrNull != id) {
+      return;
+    }
+
+    final currentSurface = initialState == ArchitectTerrainState.existing
+        ? _project.existingTerrain
+        : _project.proposedTerrain;
+    final rel = double.parse(
+      (result.elevation - currentSurface.datumElevation).toStringAsFixed(4),
+    );
+    final updatedSurface = currentSurface.copyWith(
+      spots: [
+        for (final s in currentSurface.spots)
+          s.id == id
+              ? s.copyWith(
+                  elevation: rel,
+                  rawAbsoluteElevation: result.elevation,
+                )
+              : s,
+      ],
+    );
+    var updatedProject = initialState == ArchitectTerrainState.existing
+        ? _project.copyWith(
+            existingTerrain: updatedSurface,
+            updatedAt: DateTime.now(),
+          )
+        : _project.copyWith(
+            proposedTerrain: updatedSurface,
+            updatedAt: DateTime.now(),
+          );
+    var finalId = id;
+    if (result.state != initialState) {
+      final moved = ArchitectLandscapeTool.changeTerrainState(
+        updatedProject,
+        id,
+        result.state,
+      );
+      if (moved != null) {
+        updatedProject = moved.project;
+        finalId = moved.elementId;
+      }
+    }
+    setState(() {
+      if (finalId != id) {
+        _selectionIds
+          ..remove(id)
+          ..add(finalId);
+        _selectedElementId = finalId;
+      }
+      _loadTerrainProperties(updatedProject, finalId);
+      _commands.commit(updatedProject);
+    });
+    _saveBiMProjectIfAttached();
+  }
+
+  Future<void> _showTerrainProperties(String id, ArchitectTerrainState initial) async {
+    final document = _modelCommands.project;
+    final l = context.l10n;
+    final elevUnit = terrainElevationUnit(document.units, document.levelUnits);
+    final initialIntervalMeters = _resolvedContourIntervalMetersFor(initial);
+    var selected = initial;
+    var intervalMeters = initialIntervalMeters;
+    final result = await showArchitectProperties<
+        ({ArchitectTerrainState state, double intervalMeters})>(
+      context: context,
+      onInsets: _insetProperties,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) {
+          final changed =
+              selected != initial ||
+              (intervalMeters - initialIntervalMeters).abs() > 1e-4;
+          final displayInterval = elevUnit.toUnit(intervalMeters);
+          return architectAlertDialog(
+            key: const ValueKey('architect-terrain-properties'),
+            title: Text(l.architectTerrainPropertiesTitle),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioGroup<ArchitectTerrainState>(
+                  groupValue: selected,
+                  onChanged: (value) {
+                    if (value != null) update(() => selected = value);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RadioListTile(
+                        value: ArchitectTerrainState.existing,
+                        title: Text(l.architectTerrainStateExisting),
+                      ),
+                      RadioListTile(
+                        value: ArchitectTerrainState.proposed,
+                        title: Text(l.architectTerrainStateProposed),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 12),
+                ListTile(
+                  key: const ValueKey('architect-terrain-prop-interval'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.unfold_more_rounded),
+                  title: Text(l.architectTerrainContourInterval),
+                  trailing: Text(
+                    '${displayInterval.toStringAsFixed(2)} ${elevUnit.symbol}',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () async {
+                    final picked = await BimNumericKeypad.showInputDialog(
+                      context,
+                      title: l.architectTerrainContourInterval,
+                      initialText: displayInterval.toStringAsFixed(2),
+                      unitLabel: elevUnit.symbol,
+                      decimals: 3,
+                      min: 0.0,
+                      allowNegative: false,
+                    );
+                    if (picked != null) {
+                      final meters = elevUnit.fromUnit(picked);
+                      update(
+                        () => intervalMeters =
+                            meters <= 1e-4 ? 0.0 : double.parse(meters.toStringAsFixed(4)),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l.cancel),
+              ),
+              FilledButton(
+                onPressed: !changed
+                    ? null
+                    : () => Navigator.pop(
+                        context,
+                        (state: selected, intervalMeters: intervalMeters),
+                      ),
+                child: Text(l.applyAction),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (!mounted ||
+        result == null ||
+        !identical(document, _modelCommands.project) ||
         _effectiveSelection.singleOrNull != id) return;
-    _setTerrainState(result);
+    if ((result.intervalMeters - initialIntervalMeters).abs() > 1e-4) {
+      _updateTerrainContourInterval(result.intervalMeters);
+    }
+    if (result.state != initial) {
+      _setTerrainState(result.state);
+    }
   }
 
   void _setTerrainState(ArchitectTerrainState state) {
@@ -34429,6 +35377,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _commands.commit(changed.project);
     });
     _saveBiMProjectIfAttached();
+  }
+
+  void _handleTerrainModeSelected(ArchitectTerrainDraftMode mode) {
+    setState(() {
+      _landscapeTool.terrainMode = mode;
+      _landscapeTool.clearDraft();
+      final isBoundaryDraft =
+          mode == ArchitectTerrainDraftMode.boundary ||
+          mode == ArchitectTerrainDraftMode.boundaryRect;
+      if (isBoundaryDraft) {
+        _terrainSubModeActive = false;
+      } else {
+        _terrainSubModeActive = true;
+        _selectionIds.clear();
+        _selectedElementId = null;
+        _polygonEditId = null;
+        _polygonSelectedEdge = null;
+        _polygonContourElementId = null;
+        _polygonContourIndex = 0;
+        _polygonEditor.cancel();
+        _activeTool = ArchitectTool.terrain;
+        if (_commands.isPlan &&
+            !_project.activeStorey.isSite &&
+            _project.siteStorey != null) {
+          final ensured = _modelCommands.project.ensureSiteStorey();
+          if (!identical(ensured, _modelCommands.project)) {
+            _modelCommands.commit(ensured);
+          }
+          _commands.activateStorey(ensured.siteStorey!.id);
+        }
+      }
+    });
+    _landscapeTool.notifyChanged();
+    _repaintPreview();
   }
 
   bool get _hasSelectedTerrainContourOrSpot {
@@ -34470,6 +35452,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _saveBiMProjectIfAttached();
   }
 
+  void _updateTerrainContourInterval(double intervalMeters) {
+    final next = ArchitectLandscapeTool.updateSurfaceContourInterval(
+      _project,
+      intervalMeters: intervalMeters,
+      manual: intervalMeters > 1e-4,
+    );
+    setState(() {
+      _landscapeTool.contourInterval = intervalMeters;
+      _commands.commit(next);
+    });
+    _saveBiMProjectIfAttached();
+  }
+
   Future<void> _editSelectedTerrainElevation() async {
     final id = _selectedElementId;
     if (id == null) return;
@@ -34483,21 +35478,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (contour == null && spot == null) return;
 
     final datum = surface.datumElevation;
+    final elevUnit = terrainElevationUnit(_project.units, _project.levelUnits);
     final currentAbs = contour != null
         ? contour.effectiveAbsolute(datum)
         : spot!.effectiveAbsolute(datum);
+    final stepMeters = contour != null ? _resolvedContourIntervalMetersFor(state) : 0.0;
+    final stepDisplay = stepMeters > 1e-4 ? elevUnit.toUnit(stepMeters) : null;
     final l = context.l10n;
-    final picked = await BimNumericKeypad.showInputDialog(
+    final pickedInUnit = await BimNumericKeypad.showInputDialog(
       context,
       title: contour != null
           ? l.architectTerrainContourElevationTitle
           : l.architectTerrainSpotElevationTitle,
-      initialText: formatArchitectNumericValue(currentAbs, decimals: 3),
-      unitLabel: 'm',
+      initialText: formatArchitectNumericValue(
+        elevUnit.toUnit(currentAbs),
+        decimals: 3,
+      ),
+      unitLabel: elevUnit.symbol,
       decimals: 3,
+      stepDelta: stepDisplay,
       allowNegative: true,
     );
-    if (!mounted || picked == null) return;
+    if (!mounted || pickedInUnit == null) return;
+    final picked = elevUnit.fromUnit(pickedInUnit);
 
     final rel = double.parse((picked - datum).toStringAsFixed(4));
     final nextSurface = surface.copyWith(
@@ -34649,8 +35652,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               surfChanged = true;
               return b.copyWith(
                 elevation: _landscapeTool.terrainElevation,
-                isFlatPad: _landscapeTool.terrainMode == ArchitectTerrainDraftMode.pad,
-                isHole: _landscapeTool.terrainMode == ArchitectTerrainDraftMode.hole,
               );
             }()
           else
@@ -34689,10 +35690,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             s,
       ];
 
-      final datumChanged = (surf.datumElevation - _landscapeTool.terrainDatumElevation).abs() > 1e-4;
-      if (surfChanged || datumChanged) {
+      if (surfChanged) {
         final nextSurf = surf.copyWith(
-          datumElevation: _landscapeTool.terrainDatumElevation,
           boundaries: nextBnd,
           contours: nextCnt,
           spots: nextSpots,
@@ -35152,7 +36151,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         onToolHoldStart: _beginPlacementHold,
 
-        onSelectionHold: _stairDraft == null && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSelectionHold: _stairDraft == null && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null
 
             ? (screenPoint) {
                 final hadSelection = _selectedElementId != null;
@@ -35165,9 +36164,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             : null,
 
-        onSecondaryTap: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onSecondaryTap: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null
             ? _onContextHold : null,
-        onContextHold: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+        onContextHold: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null
 
             ? _onContextHold
 
@@ -35245,7 +36244,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   painter: ArchitectUnderlayPainter(
                     palette: _canvasPalette,
                     document: _currentUnderlayDoc,
-                    frame: _underlayRotationPreview == null
+                    frame: _underlayRotationPreview == null && _cadDragPreview == null
                         ? _effectiveUnderlayFrame
                         : _paintCadUnderlayConfig?.frame(_effectiveUnderlayFrame) ??
                             _effectiveUnderlayFrame,
@@ -35467,11 +36466,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           (_splitActive ? _splitPoint1 : null);
 
                       final isPickingContour =
-                          _activeTool == ArchitectTool.terrain &&
-                          _landscapeTool.terrainMode ==
-                              ArchitectTerrainDraftMode.pickContour;
-                      final pickedElev =
-                          _landscapeTool.pickedContourPreview?.suggestedElevation;
+                          _activeTool.isLandscapeTool &&
+                          _landscapeTool.isPickingContour(_activeTool.name);
                       final isTracingSpline =
                           _activeTool == ArchitectTool.spline && _splineTraceMode;
                       final tracedElev = _splineTracePreview?.elevation;
@@ -35479,9 +36475,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           _draftStart != null &&
                           _curvedDraftTool;
                       final liveDim = isPickingContour
-                          ? (pickedElev != null
-                                ? 'Z = ${pickedElev.toStringAsFixed(2)} m'
-                                : _landscapeTool.pickedContourPreview != null
+                          ? (_landscapeTool.pickedContourPreview != null
                                 ? context.l10n.architectTerrainModePickContour
                                 : null)
                           : isTracingSpline

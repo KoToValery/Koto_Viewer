@@ -189,6 +189,7 @@ class ArchitectToolPalette extends StatefulWidget {
   final bool showDecorativeOnPlan;
   final ValueChanged<bool>? onShowDecorativeOnPlanChanged;
   final VoidCallback? onOpenDecorativeStudio;
+  final bool selectedTerrain;
   final Widget? landscapeBar;
 
   const ArchitectToolPalette({
@@ -309,6 +310,7 @@ class ArchitectToolPalette extends StatefulWidget {
     this.showDecorativeOnPlan = false,
     this.onShowDecorativeOnPlanChanged,
     this.onOpenDecorativeStudio,
+    this.selectedTerrain = false,
     this.landscapeBar,
   });
 
@@ -503,7 +505,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   widget.selectedWindow != null ||
                   widget.selectedColumn != null ||
                   widget.selectedBeam != null ||
-                  widget.selectedStair != null) ...[
+                  widget.selectedStair != null ||
+                  widget.selectedTerrain) ...[
                 // Contextual Sub-bar for Active Tool parameters or Selection
                 if (widget.selectedDoor != null ||
                     activeTool == ArchitectTool.door)
@@ -517,6 +520,8 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                   _buildBeamSubBar(context)
                 else if (widget.selectedStair != null)
                   _buildStairSubBar(context)
+                else if (widget.selectedTerrain && widget.landscapeBar != null)
+                  widget.landscapeBar!
                 else if (activeTool == ArchitectTool.zone)
                   _buildZoneSubBar(context)
                 else if (activeTool == ArchitectTool.wall)

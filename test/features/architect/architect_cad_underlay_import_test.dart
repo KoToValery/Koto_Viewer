@@ -16,6 +16,7 @@ import 'package:kotoview/src/features/architect/services/architect_drag_controll
 import 'package:kotoview/src/features/architect/services/architect_underlay_service.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_underlay_bar.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_underlay_crop_overlay.dart';
 import 'package:kotoview/src/features/bim_editing/geometry/bim_coordinate_frame.dart';
 import 'package:kotoview/src/features/bim_editing/interaction/bim_viewport_controller.dart';
 import 'package:kotoview/src/features/bim_projects/services/architect_project_creation_helper.dart';
@@ -731,4 +732,122 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'CAD underlay central handle drags directly and tap outside deselects right after import',
+    (tester) async {
+      final source = File('${temp.path}/direct_drag.dxf')
+        ..writeAsStringSync(_dxf(12000));
+      final picker = _Picker(source);
+      final previousPaths = PathProviderPlatform.instance;
+      FilePicker.platform = picker;
+      PathProviderPlatform.instance = _Paths(temp.path);
+      addTearDown(() {
+        PathProviderPlatform.instance = previousPaths;
+      });
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final model = ArchitectCommandController(_project());
+      addTearDown(model.dispose);
+      final l = lookupAppLocalizations(const Locale('en'));
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ArchitectWorkspaceScreen(commandController: model),
+        ),
+      );
+      await tester.pumpAndSettle();
+      tester
+          .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
+          .onToolChanged(ArchitectTool.cadUnderlay);
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ArchitectCadUnderlayBar),
+          matching: find.text(l.architectUnderlayAdd),
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find
+            .byKey(const ValueKey('architect-cad-import-size'))
+            .evaluate()
+            .isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(FilledButton, l.architectCadImportAccept),
+      );
+      await _pumpUntil(tester, () => model.project.cadUnderlays['ground'] != null);
+      await tester.pumpAndSettle();
+
+      final cropFinder = find.byKey(const ValueKey('architect-underlay-crop'));
+      expect(cropFinder, findsOneWidget);
+      final cropOverlay = tester.widget<ArchitectUnderlayCropOverlay>(cropFinder);
+      expect(cropOverlay.canMove, isTrue);
+
+      ArchitectUnderlayPainter painter() => tester
+          .widgetList<CustomPaint>(find.byType(CustomPaint))
+          .map((widget) => widget.painter)
+          .whereType<ArchitectUnderlayPainter>()
+          .first;
+
+      final underlayPaintFinder = find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is ArchitectUnderlayPainter,
+      );
+      final canvasOrigin = tester.getTopLeft(underlayPaintFinder);
+      final viewport = painter().viewport;
+      final beforeCfg = model.project.cadUnderlays['ground']!;
+      final centerModel = ArchitectUnderlayCropOverlay.centerPoint(
+        cropOverlay.polygon,
+      )!;
+      final centerScreen = canvasOrigin + viewport.toScreen(centerModel);
+      final dragTargetScreen =
+          canvasOrigin + viewport.toScreen(centerModel + const Offset(2, 1));
+      final drag = await tester.startGesture(centerScreen);
+      await drag.moveTo(dragTargetScreen);
+      await tester.pump();
+      await drag.up();
+      await tester.pumpAndSettle();
+
+      final movedCfg = model.project.cadUnderlays['ground']!;
+      expect(
+        movedCfg.lockedCadOriginX,
+        closeTo(
+          (beforeCfg.lockedCadOriginX ?? 0) - 2 * movedCfg.unitsPerMeter!,
+          1e-6,
+        ),
+      );
+      expect(
+        movedCfg.lockedCadOriginY,
+        closeTo(
+          (beforeCfg.lockedCadOriginY ?? 0) + 1 * movedCfg.unitsPerMeter!,
+          1e-6,
+        ),
+      );
+
+      // Tapping outside the CAD underlay immediately deselects it.
+      final bounds = painter().frame.rectToModel(painter().document!.bounds);
+      final canvasSize = tester.getSize(underlayPaintFinder);
+      final outsideLocal = Offset(canvasSize.width * 0.75, 110);
+      expect(bounds.contains(viewport.toModel(outsideLocal)), isFalse);
+      await tester.tapAt(canvasOrigin + outsideLocal);
+      await tester.pumpAndSettle();
+      expect(cropFinder, findsNothing);
+
+      // Tapping back inside reselects it.
+      final insideScreen = canvasOrigin + viewport.toScreen(bounds.center);
+      await tester.tapAt(insideScreen);
+      await tester.pumpAndSettle();
+      expect(cropFinder, findsOneWidget);
+
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

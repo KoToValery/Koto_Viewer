@@ -2155,40 +2155,129 @@ class CutArchitectContourOpening extends ArchitectModelCommand {
     return null;
   }
 
+  /// Locates a host polygon and its existing openings across both the active
+  /// storey elements and (on the site storey) terrain boundaries.
+  static (List<Offset>, List<List<Offset>>)? targetInProject(
+    ArchitectProject project,
+    String id,
+  ) {
+    final inStorey = target(project.activeStorey, id);
+    if (inStorey != null) return inStorey;
+    if (!project.activeStorey.isSite) return null;
+    for (final surface in [project.proposedTerrain, project.existingTerrain]) {
+      for (final b in surface.boundaries) {
+        if (b.id == id && !b.isHole) {
+          final holes = <List<Offset>>[
+            for (final h in surface.boundaries)
+              if (h.isHole &&
+                  h.polygon.length >= 3 &&
+                  b.containsPoint(h.polygon.first))
+                h.polygon,
+          ];
+          return (b.polygon, holes);
+        }
+      }
+    }
+    return null;
+  }
+
   @override
   ArchitectProject apply(ArchitectProject project) {
     final s = ArchitectModelCommand.storey(project, storeyId);
-    final host = target(s, elementId);
-    if (host == null || !ArchitectContour.canAdd(host.$1, host.$2, polygon)) {
-      throw ArgumentError(
-        'Opening must be strictly inside the host, without overlapping another opening',
+    final inStorey = target(s, elementId);
+    if (inStorey != null) {
+      if (!ArchitectContour.canAdd(inStorey.$1, inStorey.$2, polygon)) {
+        throw ArgumentError(
+          'Opening must be strictly inside the host, without overlapping another opening',
+        );
+      }
+      final holes = [...inStorey.$2, List<Offset>.unmodifiable(polygon)];
+      return ArchitectModelCommand.replace(
+        project,
+        s.copyWith(
+          floorDrains: [
+            for (final p in s.floorDrains)
+              p.id == elementId ? p.copyWith(holes: holes) : p,
+          ],
+          slabs: [
+            for (final p in s.slabs)
+              p.id == elementId ? p.copyWith(holes: holes) : p,
+          ],
+          ceilings: [
+            for (final p in s.ceilings)
+              p.id == elementId ? p.copyWith(holes: holes) : p,
+          ],
+          roofs: [
+            for (final p in s.roofs)
+              p.id == elementId ? p.copyWith(holes: holes) : p,
+          ],
+          cadPrimitives: [
+            for (final p in s.cadPrimitives)
+              p.id == elementId ? p.copyWith(holes: holes) : p,
+          ],
+        ),
       );
     }
-    final holes = [...host.$2, List<Offset>.unmodifiable(polygon)];
-    return ArchitectModelCommand.replace(
-      project,
-      s.copyWith(
-        floorDrains: [
-          for (final p in s.floorDrains)
-            p.id == elementId ? p.copyWith(holes: holes) : p,
-        ],
-        slabs: [
-          for (final p in s.slabs)
-            p.id == elementId ? p.copyWith(holes: holes) : p,
-        ],
-        ceilings: [
-          for (final p in s.ceilings)
-            p.id == elementId ? p.copyWith(holes: holes) : p,
-        ],
-        roofs: [
-          for (final p in s.roofs)
-            p.id == elementId ? p.copyWith(holes: holes) : p,
-        ],
-        cadPrimitives: [
-          for (final p in s.cadPrimitives)
-            p.id == elementId ? p.copyWith(holes: holes) : p,
-        ],
-      ),
+
+    if (s.isSite) {
+      for (final (surface, isProposed) in [
+        (project.proposedTerrain, true),
+        (project.existingTerrain, false),
+      ]) {
+        final bnd = surface.boundaries
+            .where((b) => b.id == elementId && !b.isHole)
+            .firstOrNull;
+        if (bnd == null) continue;
+        final holes = <List<Offset>>[
+          for (final h in surface.boundaries)
+            if (h.isHole &&
+                h.polygon.length >= 3 &&
+                bnd.containsPoint(h.polygon.first))
+              h.polygon,
+        ];
+        if (!ArchitectContour.canAdd(bnd.polygon, holes, polygon)) {
+          throw ArgumentError(
+            'Opening must be strictly inside the host, without overlapping another opening',
+          );
+        }
+        final existingIds = {for (final b in surface.boundaries) b.id};
+        var holeIdx = 1;
+        var holeId = '${elementId}_hole_$holeIdx';
+        while (existingIds.contains(holeId)) {
+          holeIdx++;
+          holeId = '${elementId}_hole_$holeIdx';
+        }
+        final nextSpots = surface.withHoleVertexSpots(
+          holeId: holeId,
+          points: polygon,
+          fallbackRelativeElevation: bnd.elevation,
+        );
+        final nextSurface = surface.copyWith(
+          boundaries: [
+            ...surface.boundaries,
+            ArchitectTerrainBoundary(
+              id: holeId,
+              polygon: List<Offset>.unmodifiable(polygon),
+              elevation: bnd.elevation,
+              isHole: true,
+            ),
+          ],
+          spots: nextSpots,
+        );
+        return isProposed
+            ? project.copyWith(
+                proposedTerrain: nextSurface,
+                updatedAt: DateTime.now(),
+              )
+            : project.copyWith(
+                existingTerrain: nextSurface,
+                updatedAt: DateTime.now(),
+              );
+      }
+    }
+
+    throw ArgumentError(
+      'Opening must be strictly inside the host, without overlapping another opening',
     );
   }
 }
@@ -2579,12 +2668,74 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
       final bnd = surface.boundaries.where((b) => b.id == elementId).firstOrNull;
       if (bnd != null) {
         final clean = ArchitectPolygonGeometry.clean(this.polygon);
-        if (!ArchitectPolygonGeometry.valid(clean)) throw ArgumentError('Invalid terrain boundary contour');
+        if (!ArchitectPolygonGeometry.valid(clean)) {
+          throw ArgumentError('Invalid terrain boundary contour');
+        }
+        final containedHoles = bnd.isHole
+            ? const <ArchitectTerrainBoundary>[]
+            : [
+                for (final h in surface.boundaries)
+                  if (h.isHole &&
+                      h.polygon.length >= 3 &&
+                      bnd.containsPoint(h.polygon.first))
+                    h,
+              ];
+        if (holeIndex case final int index) {
+          if (index < 0 || index >= containedHoles.length) {
+            throw ArgumentError('Unknown contour opening');
+          }
+          final updatedHolePolygons = <List<Offset>>[
+            for (var i = 0; i < containedHoles.length; i++)
+              i == index ? clean : containedHoles[i].polygon,
+          ];
+          if (!ArchitectContour.valid(bnd.polygon, updatedHolePolygons)) {
+            throw ArgumentError(
+              'Opening would cross its host or another opening',
+            );
+          }
+          final targetHole = containedHoles[index];
+          final targetHoleId = targetHole.id;
+          final nextSurface = surface.copyWith(
+            boundaries: [
+              for (final b in surface.boundaries)
+                b.id == targetHoleId
+                    ? b.copyWith(polygon: List.unmodifiable(clean))
+                    : b,
+            ],
+            spots: surface.syncHoleVertexSpots(
+              oldPolygon: targetHole.polygon,
+              newPolygon: clean,
+            ),
+          );
+          return isProposed
+              ? project.copyWith(
+                  proposedTerrain: nextSurface,
+                  updatedAt: DateTime.now(),
+                )
+              : project.copyWith(
+                  existingTerrain: nextSurface,
+                  updatedAt: DateTime.now(),
+                );
+        }
+        if (containedHoles.isNotEmpty &&
+            !ArchitectContour.valid(clean, [
+              for (final h in containedHoles) h.polygon,
+            ])) {
+          throw ArgumentError('Contour would cross an opening');
+        }
         final nextSurface = surface.copyWith(
           boundaries: [
             for (final b in surface.boundaries)
-              b.id == elementId ? b.copyWith(polygon: List.unmodifiable(clean)) : b,
+              b.id == elementId
+                  ? b.copyWith(polygon: List.unmodifiable(clean))
+                  : b,
           ],
+          spots: bnd.isHole
+              ? surface.syncHoleVertexSpots(
+                  oldPolygon: bnd.polygon,
+                  newPolygon: clean,
+                )
+              : surface.spots,
         );
         return isProposed
             ? project.copyWith(
@@ -2783,6 +2934,7 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     Offset pick, {
     bool atMidpoint = false,
     int? holeIndex,
+    ArchitectProject? project,
   }) {
     if (!pick.dx.isFinite || !pick.dy.isFinite) return null;
     final wall = holeIndex == null
@@ -2792,7 +2944,7 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
       final ratio = atMidpoint ? .5 : wall.arc!.parameter(pick).clamp(0.0, 1.0);
       return (point: wall.referencePointAt(ratio), edge: 0, ratio: ratio);
     }
-    final path = pathOf(storey, id, holeIndex: holeIndex);
+    final path = pathOf(storey, id, holeIndex: holeIndex, project: project);
     if (path == null) return null;
     final hit = BimLineGeometry.insertion(
       path.points,
@@ -2815,9 +2967,10 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     String id,
     Offset point, {
     int? holeIndex,
+    ArchitectProject? project,
   }) {
-    final hit = locate(storey, id, point, holeIndex: holeIndex);
-    final path = pathOf(storey, id, holeIndex: holeIndex);
+    final hit = locate(storey, id, point, holeIndex: holeIndex, project: project);
+    final path = pathOf(storey, id, holeIndex: holeIndex, project: project);
     if (hit == null ||
         path == null ||
         path.points.any((p) => (p - hit.point).distance < .001)) {
@@ -2848,9 +3001,12 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     ArchitectStorey storey,
     String id, {
     int? holeIndex,
+    ArchitectProject? project,
   }) {
     if (holeIndex != null) {
-      final host = CutArchitectContourOpening.target(storey, id);
+      final host = project != null
+          ? CutArchitectContourOpening.targetInProject(project, id)
+          : CutArchitectContourOpening.target(storey, id);
       if (host == null || holeIndex < 0 || holeIndex >= host.$2.length)
         return null;
       return (points: host.$2[holeIndex], closed: true, width: 0);
@@ -2902,6 +3058,20 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
         return (points: [d.lineStart, d.lineEnd], closed: false, width: 0);
       }
     }
+    if (project != null && storey.isSite) {
+      for (final surface in [project.proposedTerrain, project.existingTerrain]) {
+        for (final b in surface.boundaries) {
+          if (b.id == id && b.polygon.length >= 3) {
+            return (points: b.polygon, closed: true, width: 0);
+          }
+        }
+        for (final c in surface.contours) {
+          if (c.id == id && c.points.length >= 2) {
+            return (points: c.points, closed: c.closed, width: 0);
+          }
+        }
+      }
+    }
     return null;
   }
 
@@ -2909,7 +3079,7 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     ArchitectModelCommand.point(point);
     final storey = ArchitectModelCommand.storey(project, storeyId);
-    final path = pathOf(storey, elementId, holeIndex: holeIndex);
+    final path = pathOf(storey, elementId, holeIndex: holeIndex, project: project);
     if (path == null) throw ArgumentError('Element has no editable path');
     // The pick identifies the segment; midpoint insertion ignores its distance
     // along that segment and works equally for open paths and closing edges.
@@ -2919,20 +3089,70 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
       point,
       atMidpoint: atMidpoint,
       holeIndex: holeIndex,
+      project: project,
     );
     if (hit == null) throw ArgumentError('Element has no editable segment');
     final insertion = hit.point;
-    if (!canInsert(storey, elementId, insertion, holeIndex: holeIndex)) {
+    if (!canInsert(storey, elementId, insertion, holeIndex: holeIndex, project: project)) {
       throw ArgumentError('Point already exists or segment is too short');
     }
     if (path.closed) {
       final points = List<Offset>.of(path.points)
         ..insert(hit.edge + 1, insertion);
-      return UpdateArchitectPolygon(
+      final updated = UpdateArchitectPolygon(
         storeyId: storeyId,
         elementId: elementId,
         polygon: points,
         holeIndex: holeIndex,
+      ).apply(project);
+      if (storey.isSite) {
+        for (final isProposed in [true, false]) {
+          final beforeSurface =
+              isProposed ? project.proposedTerrain : project.existingTerrain;
+          final afterSurface =
+              isProposed ? updated.proposedTerrain : updated.existingTerrain;
+          final targetBnd = beforeSurface.boundaries
+              .where((b) => b.id == elementId)
+              .firstOrNull;
+          if (targetBnd != null && (holeIndex != null || targetBnd.isHole)) {
+            final idx = holeIndex;
+            final spotHostId = idx != null
+                ? () {
+                    final holes = beforeSurface.boundaries
+                        .where(
+                          (h) =>
+                              h.isHole &&
+                              h.polygon.length >= 3 &&
+                              targetBnd.containsPoint(h.polygon.first),
+                        )
+                        .toList();
+                    return idx < holes.length ? holes[idx].id : elementId;
+                  }()
+                : targetBnd.id;
+            final nextSpots = afterSurface.appendSpotForInsertedPoint(
+              spotId: '${spotHostId}_pt_$newElementId',
+              insertion: insertion,
+              fallbackRelativeElevation:
+                  beforeSurface.evaluateElevationAt(insertion) ??
+                  targetBnd.elevation,
+            );
+            final nextSurface = afterSurface.copyWith(spots: nextSpots);
+            return isProposed
+                ? updated.copyWith(proposedTerrain: nextSurface)
+                : updated.copyWith(existingTerrain: nextSurface);
+          }
+        }
+      }
+      return updated;
+    }
+    if (storey.isSite &&
+        [project.proposedTerrain, project.existingTerrain].any(
+          (s) => s.contours.any((c) => c.id == elementId),
+        )) {
+      return UpdateArchitectPolygon(
+        storeyId: storeyId,
+        elementId: elementId,
+        polygon: List.of(path.points)..insert(hit.edge + 1, insertion),
       ).apply(project);
     }
     if (storey.cadPrimitives.any(

@@ -1,9 +1,11 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_elements.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.dart';
+import 'package:kotoview/src/features/architect/services/architect_landscape_tool.dart';
 import 'package:kotoview/src/features/architect/services/architect_terrain_tin.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/models/mesh_3d.dart';
 
@@ -292,6 +294,162 @@ void main() {
               cx > 6.01 && cx < 13.99 && cy > 6.01 && cy < 13.99;
           expect(insideSlab, isFalse);
         }
+      },
+    );
+
+    test(
+      '450..480m contours with ±0.00 datum at 460m shift both surfaces to -10..+20m and 3D skirt is 1m below minZ',
+      () async {
+        final base = ArchitectProject.starterWithCatalog(
+          name: 'Datum 460 3D Test',
+          storeyCount: 1,
+        ).copyWith(
+          existingTerrain: const ArchitectTerrainSurface(
+            state: ArchitectTerrainState.existing,
+            contours: [
+              ArchitectTerrainContour(
+                id: 'c450',
+                points: [Offset(0, 0), Offset(30, 0)],
+                elevation: 450.0,
+                rawAbsoluteElevation: 450.0,
+              ),
+              ArchitectTerrainContour(
+                id: 'c460',
+                points: [Offset(0, 10), Offset(30, 10)],
+                elevation: 460.0,
+                rawAbsoluteElevation: 460.0,
+              ),
+              ArchitectTerrainContour(
+                id: 'c480',
+                points: [Offset(0, 30), Offset(30, 30)],
+                elevation: 480.0,
+                rawAbsoluteElevation: 480.0,
+              ),
+            ],
+          ),
+          proposedTerrain: const ArchitectTerrainSurface(
+            state: ArchitectTerrainState.proposed,
+            contours: [
+              ArchitectTerrainContour(
+                id: 'p450',
+                points: [Offset(0, 0), Offset(30, 0)],
+                elevation: 450.0,
+                rawAbsoluteElevation: 450.0,
+              ),
+              ArchitectTerrainContour(
+                id: 'p480',
+                points: [Offset(0, 30), Offset(30, 30)],
+                elevation: 480.0,
+                rawAbsoluteElevation: 480.0,
+              ),
+            ],
+          ),
+        );
+
+        final shifted = ArchitectLandscapeTool.updateSurfaceDatum(
+          base,
+          state: ArchitectTerrainState.existing,
+          newDatum: 460.0,
+        );
+
+        expect(shifted.existingTerrain.datumElevation, closeTo(460.0, 1e-6));
+        expect(shifted.proposedTerrain.datumElevation, closeTo(460.0, 1e-6));
+        expect(shifted.existingTerrain.evaluateElevationAt(const Offset(15, 0)), closeTo(-10.0, 1e-3));
+        expect(shifted.existingTerrain.evaluateElevationAt(const Offset(15, 10)), closeTo(0.0, 1e-3));
+        expect(shifted.existingTerrain.evaluateElevationAt(const Offset(15, 30)), closeTo(20.0, 1e-3));
+        expect(shifted.proposedTerrain.evaluateElevationAt(const Offset(15, 0)), closeTo(-10.0, 1e-3));
+        expect(shifted.proposedTerrain.evaluateElevationAt(const Offset(15, 30)), closeTo(20.0, 1e-3));
+
+        final sources = <Triangle3D, String>{};
+        await Architect3dBuilder.buildProjectMeshAsync(
+          shifted,
+          sources: sources,
+        );
+        final terrainTris = sources.entries
+            .where((e) => e.value == 'terrain_proposed')
+            .map((e) => e.key)
+            .toList();
+        expect(terrainTris, isNotEmpty);
+
+        var minZ = double.infinity;
+        var maxZ = double.negativeInfinity;
+        for (final tri in terrainTris) {
+          for (final v in [tri.v0, tri.v1, tri.v2]) {
+            minZ = math.min(minZ, v.z);
+            maxZ = math.max(maxZ, v.z);
+          }
+        }
+        // Relief is 30m (-10..+20) + 1m downwards for solid volume (-11m..+20m = 31m)
+        expect(maxZ, closeTo(20.0, 1e-3));
+        expect(minZ, closeTo(-11.0, 1e-3));
+        expect(maxZ - minZ, closeTo(31.0, 1e-3));
+      },
+    );
+
+    test(
+      'Spot Z uses effectiveRelative(datum) in TIN vertices and Flat pad flattens cleanly without cutting holes',
+      () async {
+        const surface = ArchitectTerrainSurface(
+          state: ArchitectTerrainState.proposed,
+          datumElevation: 460.0,
+          boundaries: [
+            ArchitectTerrainBoundary(
+              id: 'outer',
+              polygon: [
+                Offset(0, 0),
+                Offset(20, 0),
+                Offset(20, 20),
+                Offset(0, 20),
+              ],
+              autoInterpolateElevation: true,
+            ),
+            ArchitectTerrainBoundary(
+              id: 'pad1',
+              polygon: [
+                Offset(12, 12),
+                Offset(18, 12),
+                Offset(18, 18),
+                Offset(12, 18),
+              ],
+              elevation: 2.5,
+              isFlatPad: true,
+            ),
+          ],
+          contours: [
+            ArchitectTerrainContour(
+              id: 'c_low',
+              points: [Offset(0, 2), Offset(20, 2)],
+              elevation: 0.0,
+              rawAbsoluteElevation: 458.0,
+            ),
+            ArchitectTerrainContour(
+              id: 'c_high',
+              points: [Offset(0, 18), Offset(20, 18)],
+              elevation: 0.0,
+              rawAbsoluteElevation: 464.0,
+            ),
+          ],
+          spots: [
+            ArchitectTerrainSpot(
+              id: 'spot1',
+              position: Offset(5, 10),
+              // Even with stale relative elevation, rawAbsoluteElevation=463.5 at datum=460 => +3.5m
+              elevation: 0.0,
+              rawAbsoluteElevation: 463.5,
+            ),
+          ],
+        );
+
+        final tin = ArchitectTerrainTin.build(surface);
+        expect(tin, isNotNull);
+        expect(
+          tin!.evaluateElevationAt(const Offset(5, 10)),
+          closeTo(3.5, 1e-3),
+        );
+        expect(
+          tin.evaluateElevationAt(const Offset(15, 15)),
+          closeTo(2.5, 1e-3),
+        );
       },
     );
   });

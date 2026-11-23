@@ -58,14 +58,19 @@ class _RotationState extends State<ArchitectRotationOverlay> {
         // on a long reference ray, while remaining usable near the pivot.
         final radius =
             (widget.toScreen(point) - widget.toScreen(pivot)).distance;
-        angle = snap.isSnapped || widget.alignReferenceToAxes
-            ? raw
-            : ArchitectRotation.snapAngle(
-                raw,
-                tolerance: math
-                    .atan2(10, radius)
-                    .clamp(math.pi / 180, math.pi / 30),
-              );
+        final tol = math
+            .atan2(10, radius)
+            .clamp(math.pi / 180, math.pi / 30);
+        if (snap.isSnapped) {
+          angle = raw;
+        } else if (widget.alignReferenceToAxes) {
+          final startAngle = math.atan2(start.dy, start.dx);
+          final world = startAngle + raw;
+          final nearest = (world / (math.pi / 2)).round() * (math.pi / 2);
+          angle = (nearest - world).abs() <= tol ? nearest - startAngle : raw;
+        } else {
+          angle = ArchitectRotation.snapAngle(raw, tolerance: tol);
+        }
       }
     });
     if (stage == 2) widget.onPreview(pivot, angle);
@@ -142,6 +147,7 @@ class _RotationState extends State<ArchitectRotationOverlay> {
                 angle: angle,
                 stage: stage,
                 color: Theme.of(context).colorScheme.primary,
+                alignReferenceToAxes: widget.alignReferenceToAxes,
               ),
             ),
           ),
@@ -270,6 +276,7 @@ class _RotationPainter extends CustomPainter {
   final double angle;
   final int stage;
   final Color color;
+  final bool alignReferenceToAxes;
   _RotationPainter({
     required this.pivot,
     this.reference,
@@ -277,6 +284,7 @@ class _RotationPainter extends CustomPainter {
     required this.angle,
     required this.stage,
     required this.color,
+    this.alignReferenceToAxes = false,
   });
   @override
   void paint(Canvas canvas, Size size) {
@@ -287,12 +295,24 @@ class _RotationPainter extends CustomPainter {
     final ray = reference == null ? const Offset(1, 0) : reference! - pivot;
     final start = math.atan2(ray.dy, ray.dx);
     if (stage > 0) {
+      final double? activeAngle;
+      if (stage == 2) {
+        activeAngle = start + angle;
+      } else if (alignReferenceToAxes &&
+          target != null &&
+          (target! - pivot).distance > 1e-8) {
+        activeAngle = math.atan2(target!.dy - pivot.dy, target!.dx - pivot.dx);
+      } else {
+        activeAngle = null;
+      }
       ArchitectAngularGuides.paint(
         canvas,
         size,
         pivot: pivot,
         color: color,
-        referenceAngle: start,
+        referenceAngle: alignReferenceToAxes ? 0 : start,
+        activeAngle: activeAngle,
+        divisions: alignReferenceToAxes ? 4 : 8,
       );
     }
     final ink = Paint()

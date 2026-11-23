@@ -5,6 +5,7 @@ import '../models/dxf_models.dart';
 /// An efficient 2D Spatial Index using Quadtree for high-performance CAD entity queries
 /// and viewport culling on drawings with 10,000+ to 200,000+ entities.
 class DxfQuadTree {
+  static const _maxWorkEstimateChecks = 12000;
   final Rect bounds;
   final int maxDepth;
   final int maxItemsPerNode;
@@ -99,6 +100,35 @@ class DxfQuadTree {
     }
 
     return results;
+  }
+
+  /// Estimates viewport work without allocating the result set. Finding too
+  /// many candidates to inspect also counts as expensive viewport work.
+  bool reachesWorkBudget(
+    Rect searchBounds,
+    int budget,
+    int Function(DxfEntity) cost,
+  ) {
+    var remainingChecks = _maxWorkEstimateChecks;
+    for (final entity in unindexedEntities) {
+      budget -= cost(entity);
+      if (budget <= 0 || --remainingChecks == 0) return true;
+    }
+
+    bool visit(DxfQuadTreeNode node) {
+      if (!node.bounds.overlaps(searchBounds)) return false;
+      for (final item in node.items) {
+        if (--remainingChecks == 0) return true;
+        if (item.box.overlaps(searchBounds)) {
+          budget -= cost(item.entity);
+          if (budget <= 0) return true;
+        }
+      }
+      return !node.isLeaf &&
+          (visit(node.nw!) || visit(node.ne!) || visit(node.sw!) || visit(node.se!));
+    }
+
+    return visit(root);
   }
 }
 
