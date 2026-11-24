@@ -70,6 +70,59 @@ void main() {
     },
   );
 
+  test('keeps one complete fit picture within the region limit', () {
+    const bounds = Rect.fromLTWH(0, 0, 1000, 1000);
+    const detail = Rect.fromLTWH(300, 400, 200, 100);
+    final cache = DxfViewportPictureCache();
+    addTearDown(cache.dispose);
+
+    DxfViewportPicture obtain(
+      Rect viewport,
+      double scale, {
+      int revision = 0,
+    }) => cache.obtain(
+      content: revision,
+      viewport: viewport,
+      drawingBounds: bounds,
+      scale: scale,
+      retainFitPicture: true,
+      record: (canvas, region, _) => canvas.drawRect(region, Paint()),
+    );
+
+    final fit = obtain(bounds, 1);
+    final oldestDetail = obtain(detail, 2);
+    for (var scale = 3.0; scale < 10.0; scale++) {
+      obtain(detail, scale);
+    }
+    expect(cache.recordings, 9);
+    expect(obtain(bounds, 1), same(fit));
+    expect(cache.recordings, 9);
+    expect(obtain(detail, 2), isNot(same(oldestDetail)));
+    expect(obtain(bounds, 1, revision: 1), isNot(same(fit)));
+  });
+
+  test('a partial recording at fit scale follows regular eviction', () {
+    const bounds = Rect.fromLTWH(0, 0, 1000, 1000);
+    const detail = Rect.fromLTWH(300, 400, 200, 100);
+    final cache = DxfViewportPictureCache();
+    addTearDown(cache.dispose);
+
+    DxfViewportPicture obtain(double scale) => cache.obtain(
+      content: 'drawing',
+      viewport: detail,
+      drawingBounds: bounds,
+      scale: scale,
+      retainFitPicture: true,
+      record: (canvas, region, _) => canvas.drawRect(region, Paint()),
+    );
+
+    final partialFit = obtain(1);
+    for (var scale = 2.0; scale < 10.0; scale++) {
+      obtain(scale);
+    }
+    expect(obtain(1), isNot(same(partialFit)));
+  });
+
   test('retains block paths by their complete scene transform', () {
     final block = DxfBlock(
       name: 'detail',

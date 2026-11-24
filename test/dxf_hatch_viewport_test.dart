@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_painter.dart';
+import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_viewport_picture_cache.dart';
 
 const _size = Size(400, 400);
 const _bounds = Rect.fromLTWH(0, 0, 1000, 1000);
@@ -68,6 +69,8 @@ Picture _record(
   Rect? visible,
   String layout = 'Model',
   bool interactiveHatches = false,
+  bool hideOverviewHatches = false,
+  DxfViewportPictureCache? viewportPictures,
   double zoom = _zoom,
 }) {
   final recorder = PictureRecorder();
@@ -84,6 +87,8 @@ Picture _record(
     activeLayout: layout,
     showGrid: false,
     interactiveHatches: interactiveHatches,
+    hideOverviewHatches: hideOverviewHatches,
+    viewportPictures: viewportPictures,
   ).paint(canvas, _size);
   return recorder.endRecording();
 }
@@ -127,6 +132,74 @@ void _expectSameVisibleDrawing(Uint8List actual, Uint8List expected) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('Model fit hides ordinary hatches in the drawing and inserts', () async {
+    final hatch = _hatch(extent: 220, hole: false);
+    final doc = _document(
+      [hatch, const DxfInsert(blockName: 'B', insertPoint: Offset(450, 0))],
+      blocks: {'B': DxfBlock(name: 'B', entities: [hatch])},
+    );
+    final cache = DxfViewportPictureCache();
+    addTearDown(cache.dispose);
+    final empty = await _pixels(_record(_document([]), zoom: 1));
+
+    final standard = await _pixels(
+      _record(doc, zoom: 1, visible: _bounds, viewportPictures: cache),
+    );
+    expect(standard, isNot(equals(empty)));
+    final overview = await _pixels(
+      _record(
+        doc,
+        zoom: 1,
+        visible: _bounds,
+        viewportPictures: cache,
+        hideOverviewHatches: true,
+      ),
+    );
+    expect(overview, empty);
+
+    final detail = await _pixels(
+      _record(
+        doc,
+        zoom: 2,
+        visible: _bounds,
+        viewportPictures: cache,
+        hideOverviewHatches: true,
+      ),
+    );
+    expect(detail, isNot(equals(empty)));
+    expect(detail, await _pixels(_record(doc, zoom: 2, visible: _bounds)));
+  });
+
+  test('Model fit keeps solid and translucent fills and wipeout masks', () async {
+    final doc = _document(const [
+      DxfHatch(
+        boundaryPaths: [[Offset(30, 30), Offset(230, 30), Offset(230, 230), Offset(30, 230)]],
+      ),
+      DxfHatch(
+        isSolid: false,
+        transparency: .20,
+        boundaryPaths: [[Offset(300, 30), Offset(500, 30), Offset(500, 230), Offset(300, 230)]],
+      ),
+      DxfLine(p1: Offset(100, 600), p2: Offset(900, 600), lineWeight: .6),
+      DxfHatch(
+        isSolid: false,
+        isWipeout: true,
+        boundaryPaths: [[Offset(400, 500), Offset(600, 500), Offset(600, 700), Offset(400, 700)]],
+      ),
+    ]);
+
+    final expected = await _pixels(_record(doc, zoom: 1));
+    final actual = await _pixels(
+      _record(doc, zoom: 1, hideOverviewHatches: true),
+    );
+    expect(actual, expected);
+    expect(actual[(324 * 400 + 76) * 4], lessThan(245));
+    expect(actual[(324 * 400 + 166) * 4], lessThan(245));
+    expect(actual[(166 * 400 + 100) * 4], lessThan(245));
+    final backgroundRed = (DxfCanvasTheme.paperWhite.bgColor.toARGB32() >> 16) & 0xff;
+    expect(actual[(166 * 400 + 200) * 4], backgroundRed);
+  });
 
   test(
     'viewport hatch preserves dash phase, dots and boundary holes',
@@ -201,6 +274,12 @@ void main() {
         ),
       ),
       await _pixels(_record(doc, layout: 'Sheet')),
+    );
+    expect(
+      await _pixels(
+        _record(doc, layout: 'Sheet', zoom: 1, hideOverviewHatches: true),
+      ),
+      await _pixels(_record(doc, layout: 'Sheet', zoom: 1)),
     );
   });
 

@@ -102,6 +102,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   bool _showGrid = true;
   double _currentScale = 1.0;
   double _renderScale = 1.0;
+  Matrix4 _settledTransform = Matrix4.identity();
   Offset _currentCadCoord = Offset.zero;
   final ValueNotifier<double> _hudScale = ValueNotifier(1.0);
   final ValueNotifier<Offset> _hudCadCoord = ValueNotifier(Offset.zero);
@@ -280,6 +281,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if (!mounted || _isGestureActive || _isWheelScrolling || _middlePanStart != null) return;
     _motionWorkSample.stop();
     _motionPreview.value = DxfViewportMotion.idle;
+    final transform = _transformController.value;
+    if (_settledTransform == transform) return;
+    _settledTransform = transform.clone();
     setState(() {
       _renderScale = _currentScale;
     });
@@ -1211,10 +1215,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   // === SECTION: CANVAS GESTURES, MOUSE WHEEL & KEYBOARD ===
 
   void _handlePointerSignal(PointerSignalEvent event) {
-    if (event is PointerScrollEvent) {
+    if (event is PointerScrollEvent && event.scrollDelta.dy != 0) {
       _isGestureActive = false;
       _isWheelScrolling = true;
-      _updateMotionPreview();
       _transformSettleTimer?.cancel();
       _wheelSettleTimer?.cancel();
       _wheelSettleTimer = Timer(const Duration(milliseconds: 100), () {
@@ -2266,7 +2269,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                           scaleEnabled: true,
                           scaleFactor: 350.0,
                           trackpadScrollCausesScale: true,
-                          minScale: 0.001,
+                          minScale: _activeLayout == 'Model' ? 1.0 : 0.001,
                           maxScale: 1000.0,
                           boundaryMargin: const EdgeInsets.all(double.infinity),
                           onInteractionStart: (details) {
@@ -2312,6 +2315,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                                     annotations: const [], // Rendered crisply on screen-space overlay above InteractiveViewer
                                     visibleCadRect: _getVisibleCadRect(),
                                     interactiveHatches: true,
+                                    hideOverviewHatches: true,
                                     viewportPictures: _viewportPictures,
                                     motionPreview: _motionPreview,
                                     revision: _layerRevision,

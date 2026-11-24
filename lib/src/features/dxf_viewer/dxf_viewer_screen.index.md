@@ -28,14 +28,11 @@ The navigation canvas opts in to `DxfPainter.interactiveHatches` for bounded
 pattern work in the Model and Paper views. The viewport transform and input
 routing still use the same `InteractiveViewer` and pointer handlers.
 
-`[TAG:VIEWPORT_PICTURE_CACHE]` reuses the full-Model raster during expensive
-camera motion, up to the magnification limit. `_updateMotionPreview` samples
-the visible region through `DxfQuadTree.reachesWorkBudget`, weighing blocks
-and patterned hatches more than simple entities. `_syncCanvasAfterTransform`
-restores the retained vector layer after input settles.
-
-`[TAG:VIEWPORT_PICTURE_CACHE]` owns the retained vector drawings and advances the
-layer revision after visibility and lineweight mutations. Selection and snap
-markers paint above the retained drawing in an independent repaint boundary.
-Broad Model-space gestures can display a single scene texture prepared while
-idle. The settled canvas uses the vector recording at the current zoom band.
+`[TAG:VIEWPORT_PICTURE_CACHE]` owns the retained drawings and layer revision.
+Model zoom stops at the scale used by `_fitToScreen`; panning and Paper zoom
+keep their established behavior. `_updateMotionPreview` samples the visible
+region through `DxfQuadTree.reachesWorkBudget` to select the full-Model raster
+for heavy motion. `_syncCanvasAfterTransform` restores the vector layer and
+rebuilds the viewport only after a camera change. The main painter opts in
+to suppressing ordinary hatches at the Model fit scale. Selection and snap
+markers paint above the CAD layer in an independent repaint boundary.

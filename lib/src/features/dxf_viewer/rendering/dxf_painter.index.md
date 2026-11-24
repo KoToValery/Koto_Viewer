@@ -21,8 +21,9 @@
 buffered CAD region covers the new viewport at the same scale band. The
 Viewer supplies the cache and layer revision. Other painter callers use the
 direct path. `_paintOverlays` also supports the Viewer overlay boundary.
-The cache can prepare one bounded raster image for motion in dense Model views.
-It belongs to the same content key and is discarded when that content changes.
+The cache retains a full Model fit-to-screen picture within the existing cache
+budget. It can prepare one bounded raster image for motion in dense Model views.
+Both belong to the same content key and are discarded when that content changes.
 
 `[TAG:BLOCK_SCENE_PATHS]` retains compiled Model-space block paths after their
 complete affine placement. `DxfViewportBlockPaths` belongs to the picture
@@ -48,6 +49,11 @@ and paper viewports use the same scene coordinates. Callers without
 `_renderSinglePatternLineFamily` batches dash/line contours into one stroke per
 family. Raster parity, holes, transformed blocks, paper views and bounded
 recording work are covered by `test/dxf_hatch_viewport_test.dart`.
+`[TAG:HATCH_OVERVIEW_VISIBILITY]` skips ordinary patterned hatches before path
+recording when the Model Viewer sets `hideOverviewHatches` and renders near fit.
+The same rule applies inside blocks. Solid and explicit translucent fills and
+wipeout masks still draw. Detail zoom and paper or export callers retain their
+existing hatch policy.
 `[TAG:HATCH_INTERACTIVE_BUDGET]` preflights line families and dash cycles per
 hatch and per paint. `DxfViewerScreen` opts in through `interactiveHatches`.
 Expensive patterns use a light fill on their original even-odd boundary.

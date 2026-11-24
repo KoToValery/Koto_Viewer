@@ -27,6 +27,7 @@ import 'dxf_viewport_picture_cache.dart';
 //   [TAG:PAINTER_TEXT_SCALE] Resolve drawing origin once for scaled styles
 // [SEC-06-HATCH] [TAG:PAINTER_HATCH] Solids, hatches & pattern fills
 //   [TAG:HATCH_VIEWPORT_WORK] Buffered scene bounds limit hatch pattern work
+//   [TAG:HATCH_OVERVIEW_VISIBILITY] Hide ordinary patterns near Model fit
 //   [TAG:HATCH_INTERACTIVE_BUDGET] Bound pattern detail in the Viewer
 //   [TAG:PAINTER_WIPEOUT] Background masks retain source draw order
 // [SEC-07-BLOCKS] [TAG:PAINTER_BLOCKS] Blocks & INSERT entities expansion
@@ -210,6 +211,8 @@ class DxfPainter extends CustomPainter {
   final Rect? visibleCadRect;
   /// Allow a lightweight preview of costly hatch patterns in the Viewer.
   final bool interactiveHatches;
+  /// Omit ordinary patterned hatches in the Model Viewer near fit to screen.
+  final bool hideOverviewHatches;
   final DxfViewportPictureCache? viewportPictures;
   final DxfViewportBlockPaths? _blockPaths;
   final ValueListenable<DxfViewportMotion>? motionPreview;
@@ -249,6 +252,7 @@ class DxfPainter extends CustomPainter {
     this.settings = const DxfDisplaySettings(),
     this.visibleCadRect,
     this.interactiveHatches = false,
+    this.hideOverviewHatches = false,
     this.viewportPictures,
     DxfViewportBlockPaths? blockPaths,
     this.motionPreview,
@@ -278,7 +282,7 @@ class DxfPainter extends CustomPainter {
     if (reuseDrawing) {
       final content = (
         document, revision, theme, activeLayout, size, settings, showGrid,
-        interactiveHatches, entityFilter, originalStyleLayers,
+        interactiveHatches, hideOverviewHatches, entityFilter, originalStyleLayers,
         drawingColorOverride, drawingStrokeWidthOverride, modelPlacement,
         modelLayerOverrides,
       );
@@ -298,6 +302,8 @@ class DxfPainter extends CustomPainter {
           viewport: viewport,
           drawingBounds: document.layoutBounds[activeLayout] ?? document.bounds,
           scale: currentScale,
+          retainFitPicture: activeLayout == 'Model' &&
+              motionPreview != null && modelPlacement == null,
           record: (target, region, scale) => DxfPainter(
             document: document,
             theme: theme,
@@ -305,6 +311,7 @@ class DxfPainter extends CustomPainter {
             currentScale: scale,
             visibleCadRect: region,
             interactiveHatches: interactiveHatches,
+            hideOverviewHatches: hideOverviewHatches,
             blockPaths: activeLayout == 'Model' ? cache.blockPaths : null,
             settings: settings,
             showGrid: showGrid,
@@ -574,6 +581,7 @@ class DxfPainter extends CustomPainter {
     for (final entity in entitiesToDraw) {
       try {
         if (modelPlacement != null && entity.isPaperSpace) continue;
+        if (_isOverviewHatchHidden(entity)) continue;
         if (entityFilter != null && !entityFilter!(entity)) {
           continue;
         }
@@ -2049,6 +2057,14 @@ class DxfPainter extends CustomPainter {
     canvas.drawPath(path, strokePaint);
   }
 
+  // --- SUBSECTION: [TAG:HATCH_OVERVIEW_VISIBILITY] Hide ordinary patterns near Model fit ---
+  bool get _omitOverviewHatches => hideOverviewHatches &&
+      activeLayout == 'Model' && modelPlacement == null && currentScale <= 1.04;
+
+  bool _isOverviewHatchHidden(DxfEntity entity) => _omitOverviewHatches &&
+      entity is DxfHatch && !entity.isSolid && !entity.isWipeout &&
+      entity.transparency == null;
+
   void _renderHatch(
     Canvas canvas,
     DxfHatch hatch,
@@ -2578,6 +2594,7 @@ class DxfPainter extends CustomPainter {
           }
 
           for (final child in compiled.otherEntities) {
+            if (_isOverviewHatchHidden(child)) continue;
             if (entityFilter != null && !entityFilter!(child)) continue;
             final layerName = _modelLayer(child.layer, effectiveLayer);
             final childLayer = layers[layerName];
@@ -2679,6 +2696,7 @@ class DxfPainter extends CustomPainter {
     if (dim.blockName != null && blocks.containsKey(dim.blockName)) {
       final block = blocks[dim.blockName]!;
       for (final e in block.entities) {
+        if (_isOverviewHatchHidden(e)) continue;
         DxfEntity entityToDraw = e;
         // Dimension MText is drawn as defined in the block.
         
@@ -4123,6 +4141,7 @@ class DxfPainter extends CustomPainter {
         oldDelegate.snapResult != snapResult ||
         oldDelegate.showGrid != showGrid ||
         oldDelegate.interactiveHatches != interactiveHatches ||
+        oldDelegate.hideOverviewHatches != hideOverviewHatches ||
         oldDelegate.viewportPictures != viewportPictures ||
         oldDelegate.motionPreview != motionPreview ||
         oldDelegate.overlaysOnly != overlaysOnly ||
@@ -4141,6 +4160,8 @@ class DxfPainter extends CustomPainter {
             viewport, DxfViewportPictureCache.recordingScale(currentScale),
           );
     }
+
+    if (oldDelegate._omitOverviewHatches != _omitOverviewHatches) return true;
 
     // Zoom-Out & Fit-to-screen Hardware Transform Optimization:
     // When zoomed out (scale <= 1.05) and visibleCadRect is null (all document entities

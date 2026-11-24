@@ -16,6 +16,7 @@ class DxfViewportPictureCache {
   final _regions = <DxfViewportPicture>[];
   final blockPaths = DxfViewportBlockPaths();
   Object? _content;
+  DxfViewportPicture? _fitPicture;
   int _estimatedBytes = 0;
   Timer? _overviewTimer;
   Image? _overview;
@@ -91,17 +92,24 @@ class DxfViewportPictureCache {
     required Rect drawingBounds,
     required double scale,
     required void Function(Canvas canvas, Rect region, double scale) record,
+    bool retainFitPicture = false,
   }) {
     if (_content != content) {
       dispose();
       _content = content;
     }
     final band = recordingScale(scale);
+    final isFullFit =
+        retainFitPicture &&
+        band == 1.0 &&
+        !drawingBounds.isEmpty &&
+        viewport.intersect(drawingBounds) == drawingBounds;
     for (var i = _regions.length - 1; i >= 0; i--) {
       final entry = _regions[i];
       if (entry.covers(viewport, band)) {
         _regions.removeAt(i);
         _regions.add(entry);
+        if (isFullFit) _fitPicture = entry;
         return entry;
       }
     }
@@ -121,12 +129,19 @@ class DxfViewportPictureCache {
       record(Canvas(recorder), viewport, band);
       final entry = DxfViewportPicture._(recorder.endRecording(), region, band);
       _regions.add(entry);
+      if (isFullFit) _fitPicture = entry;
       _estimatedBytes += entry._bytes;
       recordings++;
       while (_regions.length > 1 &&
           (_regions.length > _maxRegions ||
               _estimatedBytes > _maxEstimatedBytes)) {
-        final evicted = _regions.removeAt(0);
+        // Keep the fit picture in the same budget. When only it and the new
+        // picture remain, prefer the picture the current frame needs.
+        final oldestIsFit = identical(_regions.first, _fitPicture);
+        final evicted = _regions.removeAt(
+          oldestIsFit && _regions.length > 2 ? 1 : 0,
+        );
+        if (identical(evicted, _fitPicture)) _fitPicture = null;
         _estimatedBytes -= evicted._bytes;
         evicted.picture.dispose();
       }
@@ -147,6 +162,7 @@ class DxfViewportPictureCache {
       entry.picture.dispose();
     }
     _regions.clear();
+    _fitPicture = null;
     blockPaths.clear();
     _estimatedBytes = 0;
     _content = null;
