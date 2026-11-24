@@ -38,11 +38,17 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Viewport routing & gesture arbitration | `BimEditingViewport`, `_viewportDragging`, `_handlePointerDown`, `_moveViewportTool`, `_releaseViewportTool`, `_beginViewportHold`, `_cancelViewportTool` | Shared viewport ownership, pan lock via `isDraggingHandle`, hold-to-place, cancel cleanup |
 | Element placement & polygon drafting | `_selectTool`, `_handleTapUp`, `_commitPlacement`, `_commitOpeningTap`, `_closeSlabPolygon`, `_closeOpeningPolygon` | Tool preset state, snap/alignment preview in `Structural2dPainter`, commit, `_pushUndo`, `_saveProject` |
 | Selected-element contextual dock actions | `_buildContextualElementBottomDock`, `_deleteSelectedColumn`, `_rotateSelectedWall`, `_updateOpeningTypeInStorey`, `_deleteSelectedGridAxis` | Selection state (`_selectedColumn`, `_selectedShearWall`, `_selectedBeam`, `_selectedOpening`, `_selectedGridAxis`), dock actions, undo/save |
+| Selected column and wall sizes | `[TAG:STRUCT_SUPPORT_SIZE]`, `_buildSelectedSizeButton`, `_buildSelectedColumnSizes`, `_buildSelectedWallSizes`, `_resizeSelectedColumn`, `_resizeSelectedWall` | Dock buttons open `BimNumericKeypad.showInputDialog`, the same dialog used for architectural numeric edits. Accepted values update the active storey through `_updateActiveStorey` and enter undo history. |
 | Interactive move & duplicate drag sessions | `_startDuplicateDrag`, `_commitDuplicateDrag`, `_startMovingSelectedColumn`, `_startMovingSelectedWall`, `_startMovingOpening`, `_confirmCurrentMove`, `_cancelCurrentMove`, `_buildFloatingMoveBottomBar` | Session start, live move preview, viewport drag lock, confirm/cancel floating bar, undo/save |
 | Multi-step slab contour correction | `_startSlabCorrection`, `_pushSlabCorrectionUndo`, `_undoSlabCorrection`, `_cancelSlabCorrection`, `_saveSlabCorrection`, `_buildSlabCorrectionBottomBar`, `_updateSlabVertexDrag`, `_updateEdgeExtrusion` | Isolated editing state (`_editingSlab`), vertex/edge extrusion drag, dedicated correction bar, save/cancel |
 | Offset drag & numeric input | `_startAxisOffsetDragMode`, `_startColumnOffsetDragMode`, `_updateAxisOffsetDrag`, `_updateColumnOffsetDrag`, `_showGridAxisOffsetDialog`, `_showColumnOffsetDialog` | Interactive drag preview combined with exact distance dialog |
 
 ## 4. Cross-cutting state and owners
+
+`StoreyManagerSheet`, the fixed dark overflow menu, and preset dialogs use
+`structuralDarkMenuTheme` so their Material controls have readable colors
+independent of the application theme. The underlay filter matches its controls
+to the sheet's own surface.
 
 `[TAG:STRUCT_DWG_EXPORT]` / `_showExportDialog` reuses the CAD export/share
 sheet. In a BIM project it delegates to `bimContext.onExport`; standalone DWG

@@ -794,15 +794,15 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                   value: 'clear_cp',
                   child: Row(
                     children: [
-                      const AppIcon(
+                      AppIcon(
                         AppIconId.close,
                         size: 20,
-                        color: Colors.orangeAccent,
+                        color: theme.colorScheme.error,
                       ),
                       const SizedBox(width: 10),
                       Text(
                         l10n.clear,
-                        style: const TextStyle(color: Colors.orangeAccent),
+                        style: TextStyle(color: theme.colorScheme.error),
                       ),
                     ],
                   ),

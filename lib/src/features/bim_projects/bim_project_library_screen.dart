@@ -71,27 +71,12 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
     return _projects;
   }
 
-  void _openNewProjectWizard() {
-    if (_filterType == 'architectural') {
-      _openArchitectProjectWizard();
-      return;
-    }
+  void _openStructuralProjectWizard() {
     BimNewProjectWizard.show(
       context,
       onProjectCreatedWithProject: (newProject) {
         _loadProjects();
-        if (newProject.projectType == BimProjectType.architectural &&
-            newProject.isAligned) {
-          _openProject(newProject);
-        } else {
-          Navigator.of(context)
-              .push(
-                MaterialPageRoute(
-                  builder: (_) => BimAlignmentScreen(project: newProject),
-                ),
-              )
-              .then((_) => _loadProjects());
-        }
+        _openAlignment(newProject);
       },
     );
   }
@@ -363,15 +348,27 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final createArchitectural = _filterType == 'architectural';
+    final newProjectLabel = createArchitectural
+        ? l10n.architectWizardTitle
+        : l10n.structuralNewProject;
+    final openProjectWizard = createArchitectural
+        ? _openArchitectProjectWizard
+        : _openStructuralProjectWizard;
 
     return Scaffold(
       backgroundColor: const Color(0xFF121216),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A22),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         title: Text(
           l10n.bimProjectLibraryTitle,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: [
           IconButton(
@@ -382,8 +379,8 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
           ),
           IconButton(
             icon: const AppIcon(AppIconId.add),
-            tooltip: l10n.bimProjectNew,
-            onPressed: _openNewProjectWizard,
+            tooltip: newProjectLabel,
+            onPressed: openProjectWizard,
           ),
         ],
       ),
@@ -426,22 +423,20 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: _filterType == 'architectural'
+        backgroundColor: createArchitectural
             ? const Color(0xFFCE93D8)
             : const Color(0xFF00E5FF),
         foregroundColor: Colors.black,
         icon: AppIcon.fromMaterial(
-          _filterType == 'architectural'
+          createArchitectural
               ? Icons.auto_awesome_rounded
               : Icons.add_rounded,
         ),
         label: Text(
-          _filterType == 'architectural'
-              ? l10n.architectWizardTitle
-              : l10n.bimProjectNew,
+          newProjectLabel,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        onPressed: _openNewProjectWizard,
+        onPressed: openProjectWizard,
       ),
     );
   }
@@ -495,7 +490,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                 children: [
                   ElevatedButton.icon(
                     icon: const AppIcon(AppIconId.add),
-                    label: Text(l10n.bimProjectNew),
+                    label: Text(l10n.structuralNewProject),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00E5FF),
                       foregroundColor: Colors.black,
@@ -507,7 +502,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    onPressed: _openNewProjectWizard,
+                    onPressed: _openStructuralProjectWizard,
                   ),
                   OutlinedButton.icon(
                     key: const ValueKey('bim-library-empty-import-zip'),

@@ -2,6 +2,7 @@ import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/structural_element.dart';
+import 'structural_menu_theme.dart';
 
 /// Bottom sheet dialog for managing building storeys, floor heights,
 /// ArchiCAD-style Trace Reference (ghost story), and duplicating typical floors.
@@ -30,7 +31,12 @@ class StoreyManagerSheet extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Theme(
+    data: structuralDarkMenuTheme(context),
+    child: Builder(builder: _buildSheet),
+  );
+
+  Widget _buildSheet(BuildContext context) {
     return Material(
       color: const Color(0xFF1E1E1E),
       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -109,32 +115,7 @@ class StoreyManagerSheet extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  SegmentedButton<GhostStoreyMode>(
-                    segments: [
-                      ButtonSegment(
-                        value: GhostStoreyMode.none,
-                        label: Text(context.l10n.traceRefNone),
-                      ),
-                      ButtonSegment(
-                        value: GhostStoreyMode.below,
-                        label: Text(context.l10n.traceRefBelow),
-                        icon: const AppIcon(AppIconId.down, size: 16),
-                      ),
-                      ButtonSegment(
-                        value: GhostStoreyMode.above,
-                        label: Text(context.l10n.traceRefAbove),
-                        icon: const AppIcon(AppIconId.up, size: 16),
-                      ),
-                    ],
-                    selected: {project.ghostMode},
-                    onSelectionChanged: (set) => onGhostModeChanged(set.first),
-                    style: ButtonStyle(
-                      visualDensity: VisualDensity.compact,
-                      textStyle: WidgetStateProperty.all(
-                        const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
+                  _buildTraceReferenceSelector(context),
                 ],
               ),
             ),
@@ -315,6 +296,43 @@ class StoreyManagerSheet extends StatelessWidget {
           ],
         ),
       ),
+      ),
+    );
+  }
+
+  Widget _buildTraceReferenceSelector(BuildContext context) {
+    var selection = project.ghostMode;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: StatefulBuilder(
+        builder: (context, update) => SegmentedButton<GhostStoreyMode>(
+          segments: [
+            ButtonSegment(
+              value: GhostStoreyMode.none,
+              label: Text(context.l10n.traceRefNone),
+            ),
+            ButtonSegment(
+              value: GhostStoreyMode.below,
+              label: Text(context.l10n.traceRefBelow),
+              icon: const AppIcon(AppIconId.down, size: 16),
+            ),
+            ButtonSegment(
+              value: GhostStoreyMode.above,
+              label: Text(context.l10n.traceRefAbove),
+              icon: const AppIcon(AppIconId.up, size: 16),
+            ),
+          ],
+          selected: {selection},
+          onSelectionChanged: (values) {
+            update(() => selection = values.single);
+            onGhostModeChanged(selection);
+          },
+          style: const ButtonStyle(
+            visualDensity: VisualDensity.compact,
+            padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+            textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 12)),
+          ),
+        ),
       ),
     );
   }

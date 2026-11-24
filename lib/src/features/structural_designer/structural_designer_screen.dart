@@ -20,6 +20,8 @@ import '../bim_editing/interaction/bim_drag_session.dart';
 import '../bim_editing/interaction/bim_polygon_editor.dart';
 import '../bim_editing/interaction/bim_transform_navigation.dart';
 import '../bim_editing/widgets/bim_editing_viewport.dart';
+import '../bim_editing/properties/bim_distance_unit.dart';
+import '../bim_editing/widgets/bim_numeric_keypad.dart';
 import 'dart:math' as math;
 import '../bim_projects/services/bim_underlay_conversion_service.dart';
 import 'package:flutter/gestures.dart';
@@ -71,6 +73,7 @@ import 'services/slab_opening_placement.dart';
 import 'services/slab_edit_validation.dart';
 import 'widgets/slab_edge_offset_dialog.dart';
 import 'widgets/structural_offset_dialog.dart';
+import 'widgets/structural_menu_theme.dart';
 import 'widgets/storey_manager_sheet.dart';
 import '../dxf_viewer/widgets/dxf_layer_sheet.dart';
 import '../dxf_viewer/widgets/dxf_entity_context_sheet.dart';
@@ -91,6 +94,7 @@ import 'widgets/vertical_capacity_sheet.dart';
 // [SEC-03-XFORM] [TAG:STRUCT_XFORM] Coordinate transformations & matrix viewport
 // [SEC-04-HITS] [TAG:STRUCT_HITS] Hit testing & selection helpers
 // [SEC-05-ACTIONS] [TAG:STRUCT_ACTIONS] Element actions (columns, walls, beams)
+//   [TAG:STRUCT_SUPPORT_SIZE] Selected column and wall sizes
 // [SEC-06-OPENINGS] [TAG:STRUCT_OPENINGS] Openings & grid axes management
 // [SEC-07-SLABS] [TAG:STRUCT_SLABS] Slab correction & polygon editing
 // [SEC-08-POINTER] [TAG:STRUCT_POINTER] Pointer gestures & interaction controller
@@ -1986,6 +1990,42 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.selectionClick();
   }
 
+  // --- SUBSECTION: [TAG:STRUCT_SUPPORT_SIZE] Selected column and wall sizes ---
+
+  void _resizeSelectedColumn(
+    StructuralColumn source,
+    StructuralColumn updated,
+  ) {
+    if (!identical(_selectedColumn, source)) return;
+    final active = _project.activeStorey;
+    final index = active.columns.indexOf(source);
+    if (index < 0) return;
+    final columns = List<StructuralColumn>.of(active.columns)
+      ..[index] = updated;
+    _pushUndo();
+    _selectedColumn = updated;
+    _columnMirrorBase = null;
+    _columnMirrorCycle = 0;
+    _updateActiveStorey(active.copyWith(columns: columns));
+    HapticFeedback.selectionClick();
+  }
+
+  void _resizeSelectedWall(
+    StructuralShearWall source,
+    StructuralShearWall updated,
+  ) {
+    if (!identical(_selectedShearWall, source)) return;
+    final active = _project.activeStorey;
+    final index = active.shearWalls.indexOf(source);
+    if (index < 0) return;
+    final walls = List<StructuralShearWall>.of(active.shearWalls)
+      ..[index] = updated;
+    _pushUndo();
+    _selectedShearWall = updated;
+    _updateActiveStorey(active.copyWith(shearWalls: walls));
+    HapticFeedback.selectionClick();
+  }
+
   // === SECTION: OPENINGS & GRID AXES MANAGEMENT ===
 
   void _deleteSelectedOpening() {
@@ -2534,6 +2574,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _startColumnOffsetDragMode(element, distance);
   }
 
+  void _showDarkPresetDialog(WidgetBuilder builder) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => Theme(
+        data: structuralDarkMenuTheme(context),
+        child: Builder(builder: builder),
+      ),
+    );
+  }
+
   void _showCustomColumnDialog() {
     final double widthCm = (_currentColumnPreset.width * 100).roundToDouble();
     final double heightCm = (_currentColumnPreset.height * 100).roundToDouble();
@@ -2541,9 +2591,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final wCtrl = TextEditingController(text: widthCm.toInt().toString());
     final hCtrl = TextEditingController(text: heightCm.toInt().toString());
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
+    _showDarkPresetDialog(
+      (ctx) => StatefulBuilder(
         builder: (ctx, setDlgState) => AlertDialog(
           backgroundColor: const Color(0xFF1E1E24),
           title: Text(context.l10n.columnDimensionsTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
@@ -2641,9 +2690,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
     final tCtrl = TextEditingController(text: (_currentWallThickness * 100).toInt().toString(),
     );
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
+    _showDarkPresetDialog(
+      (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
         title: Text(context.l10n.customWallDimensions, style: const TextStyle(color: Colors.white, fontSize: 16),
         ),
@@ -2702,9 +2750,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
     final dCtrl = TextEditingController(text: (_currentBeamDepth * 100).toInt().toString(),
     );
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
+    _showDarkPresetDialog(
+      (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
         title: Text(context.l10n.beamDimensionsTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
         ),
@@ -2766,9 +2813,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final double initialThickness = _editingSlab?.thickness ?? _currentSlabThickness;
     final tCtrl = TextEditingController(text: (initialThickness * 100).toInt().toString(),
     );
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
+    _showDarkPresetDialog(
+      (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
         title: Text(context.l10n.slabThicknessTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
         ),
@@ -2850,9 +2896,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _showCustomAxisDialog() {
     final nameCtrl = TextEditingController(text: _currentAxisName);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
+    _showDarkPresetDialog(
+      (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
         title: Text(context.l10n.axisNameTitle, style: const TextStyle(color: Colors.white, fontSize: 16),
         ),
@@ -7718,6 +7763,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       ],
     );
 
+    final themedMoreMenu = Theme(
+      data: structuralDarkMenuTheme(context),
+      child: moreMenu,
+    );
     if (!isCompact) {
       return [
         layersButton,
@@ -7726,7 +7775,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         undoButton,
         exportButton,
         viewport3dButton,
-        moreMenu,
+        themedMoreMenu,
         const SizedBox(width: 4),
       ];
     }
@@ -7738,7 +7787,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       filterButton,
       undoButton,
       viewport3dButton,
-      moreMenu,
+      themedMoreMenu,
       const SizedBox(width: 4),
     ];
   }
@@ -8461,6 +8510,162 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   // === SECTION: CONTEXTUAL BOTTOM DOCKS & ACTION BARS ===
 
+  Widget _buildSelectedSizeButton({
+    required double size,
+    required String label,
+    required Color color,
+    required ValueChanged<double> onApply,
+    double? minSize,
+    double? maxSize,
+    String prefix = '',
+  }) {
+    const unit = BimDistanceUnit.centimeters;
+    const decimals = 3;
+    final scale = _cadUnitsPerMeter;
+    final value = BimDistanceUnit.trimZeros(
+      unit.toUnit(size / scale).toStringAsFixed(decimals),
+    );
+    return Tooltip(
+      message: label,
+      child: TextButton(
+        style: TextButton.styleFrom(
+          foregroundColor: color,
+          minimumSize: const Size(32, 36),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          textStyle: const TextStyle(
+            fontSize: 13,
+            decoration: TextDecoration.underline,
+          ),
+        ),
+        onPressed: () async {
+          final storey = _project.activeStorey;
+          final picked = await BimNumericKeypad.showInputDialog(
+            context,
+            title: label,
+            initialText: value,
+            unitLabel: unit.symbol,
+            decimals: decimals,
+            min: minSize == null
+                ? 0.001
+                : math.max(0.001, unit.toUnit(minSize / scale)),
+            max: maxSize == null ? null : unit.toUnit(maxSize / scale),
+          );
+          if (!mounted ||
+              picked == null ||
+              picked <= 0 ||
+              picked == double.tryParse(value) ||
+              !identical(storey, _project.activeStorey)) {
+            return;
+          }
+          final updatedSize = unit.fromUnit(picked) * scale;
+          if (updatedSize.isFinite && updatedSize > 0) onApply(updatedSize);
+        },
+        child: Text('$prefix$value'),
+      ),
+    );
+  }
+
+  List<Widget> _buildSelectedColumnSizes(StructuralColumn column, Color color) {
+    final l = context.l10n;
+    if (column.shape == ColumnShape.circular) {
+      return [
+        _buildSelectedSizeButton(
+          size: column.width,
+          label: l.propertiesDiameter,
+          color: color,
+          prefix: 'Ø',
+          onApply: (size) => _resizeSelectedColumn(
+            column,
+            column.copyWith(width: size, height: size),
+          ),
+        ),
+      ];
+    }
+
+    final rotated =
+        math.sin(column.rotationRad).abs() > math.cos(column.rotationRad).abs();
+    final isLShape = column.shape == ColumnShape.lShape;
+    // Match the effective thickness used by StructuralColumn.polygonVertices.
+    final maxThickness = math.min(column.width, column.height) * 0.9;
+    final thickness = isLShape
+        ? math.min(column.thickness, maxThickness)
+        : null;
+    final minLegSize = thickness == null ? null : thickness / 0.9;
+    return [
+      _buildSelectedSizeButton(
+        size: rotated ? column.height : column.width,
+        label: l.architectShapeWidth,
+        color: color,
+        minSize: minLegSize,
+        onApply: (size) => _resizeSelectedColumn(
+          column,
+          column.copyWith(
+            width: rotated ? null : size,
+            height: rotated ? size : null,
+            thickness: thickness,
+          ),
+        ),
+      ),
+      const Text('×', style: TextStyle(color: Colors.white70)),
+      _buildSelectedSizeButton(
+        size: rotated ? column.width : column.height,
+        label: l.architectShapeHeight,
+        color: color,
+        minSize: minLegSize,
+        onApply: (size) => _resizeSelectedColumn(
+          column,
+          column.copyWith(
+            width: rotated ? size : null,
+            height: rotated ? null : size,
+            thickness: thickness,
+          ),
+        ),
+      ),
+      if (thickness != null) ...[
+        const Text('/', style: TextStyle(color: Colors.white70)),
+        _buildSelectedSizeButton(
+          size: thickness,
+          label: l.architectWallQuickThickness,
+          color: color,
+          maxSize: maxThickness,
+          onApply: (size) =>
+              _resizeSelectedColumn(column, column.copyWith(thickness: size)),
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _buildSelectedWallSizes(StructuralShearWall wall, Color color) {
+    final l = context.l10n;
+    final axis = wall.end - wall.start;
+    final direction = wall.length == 0
+        ? const Offset(1, 0)
+        : axis / wall.length;
+    final length = _buildSelectedSizeButton(
+      size: wall.length,
+      label: l.propLengthL,
+      color: color,
+      onApply: (size) => _resizeSelectedWall(
+        wall,
+        wall.copyWith(end: wall.start + direction * size),
+      ),
+    );
+    final thickness = _buildSelectedSizeButton(
+      size: wall.thickness,
+      label: l.architectWallQuickThickness,
+      color: color,
+      onApply: (size) =>
+          _resizeSelectedWall(wall, wall.copyWith(thickness: size)),
+    );
+    final vertical = direction.dy.abs() > direction.dx.abs();
+    return [
+      vertical ? thickness : length,
+      const Text('×', style: TextStyle(color: Colors.white70)),
+      vertical ? length : thickness,
+    ];
+  }
+
   Widget _buildContextualElementBottomDock(BuildContext context) {
     if (!_hasSelectedElement || _isMovingColumn || _isMovingShearWall || _isMovingOpening || _isPlacingWithHold || _isEditingSlab) {
       return const SizedBox.shrink();
@@ -8468,7 +8673,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     final Color primaryColor;
     final String title;
-    final String subtitle;
+    String? subtitle;
+    List<Widget>? sizeButtons;
     final VoidCallback onDeselect;
     final VoidCallback? onRename;
     final List<Widget> actionButtons = [];
@@ -8476,16 +8682,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_selectedColumn != null) {
       final col = _selectedColumn!;
       primaryColor = const Color(0xFFFFB300);
-      final rotated = math.sin(col.rotationRad).abs() > math.cos(col.rotationRad).abs();
-      final int wCm = ((rotated ? col.height : col.width) / _cadUnitsPerMeter * 100).round();
-      final int hCm = ((rotated ? col.width : col.height) / _cadUnitsPerMeter * 100).round();
-      final String dimStr = col.shape == ColumnShape.lShape
-          ? 'Г $wCm x $hCm / 25 cm'
-          : col.shape == ColumnShape.circular
-              ? 'Ø$wCm cm'
-              : '$wCm x $hCm cm';
       title = col.displayName;
-      subtitle = dimStr;
+      sizeButtons = _buildSelectedColumnSizes(col, primaryColor);
       onDeselect = () => setState(() {
         _selectedColumn = null;
         _columnMirrorBase = null;
@@ -8526,12 +8724,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     } else if (_selectedShearWall != null) {
       final wall = _selectedShearWall!;
       primaryColor = const Color(0xFF00E5FF);
-      final double lengthM = wall.length / _cadUnitsPerMeter;
-      final int thickCm = (wall.thickness / _cadUnitsPerMeter * 100).round();
       title = wall.displayName.isNotEmpty ? wall.displayName : context.l10n.shearWallTitle;
-      final lengthCm = (lengthM * 100).round();
-      final vertical = math.sin(wall.angleRad).abs() > math.cos(wall.angleRad).abs();
-      subtitle = vertical ? '$thickCm x $lengthCm cm' : '$lengthCm x $thickCm cm';
+      sizeButtons = _buildSelectedWallSizes(wall, primaryColor);
       onDeselect = () => setState(() => _selectedShearWall = null);
       onRename = _renameSelectedWall;
 
@@ -8815,12 +9009,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+                Flexible(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (onRename != null) ...[
@@ -8838,15 +9035,30 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 ],
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    '•  $subtitle',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  flex: 2,
+                  child: sizeButtons != null
+                      ? SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              ...sizeButtons,
+                              const SizedBox(width: 2),
+                              const Text(
+                                'cm',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Text(
+                          '•  $subtitle',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                 ),
                 InkWell(
                   onTap: onDeselect,

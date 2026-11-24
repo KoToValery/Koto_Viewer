@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../dxf_viewer/models/dxf_color_table.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
+import 'structural_menu_theme.dart';
 
 /// Modal bottom sheet allowing the structural engineer to arbitrarily customize which
 /// CAD layers are included in the Underlay Filter ("Филтър подложка").
@@ -34,13 +35,24 @@ class UnderlayFilterConfigSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => UnderlayFilterConfigSheet(
-        document: document,
-        activeFilterLayers: activeFilterLayers,
-        onFilterLayersChanged: onFilterLayersChanged,
-        onResetToAuto: onResetToAuto,
-        isDark: isDark,
-      ),
+      builder: (context) {
+        final sheet = UnderlayFilterConfigSheet(
+          document: document,
+          activeFilterLayers: activeFilterLayers,
+          onFilterLayersChanged: onFilterLayersChanged,
+          onResetToAuto: onResetToAuto,
+          isDark: isDark,
+        );
+        final theme = Theme.of(context);
+        return Theme(
+          data: isDark
+              ? structuralDarkMenuTheme(context)
+              : theme.brightness == Brightness.light
+              ? theme
+              : ThemeData.light(useMaterial3: theme.useMaterial3),
+          child: sheet,
+        );
+      },
     );
   }
 

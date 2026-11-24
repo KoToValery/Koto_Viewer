@@ -5,10 +5,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/bim_work_project.dart';
-import '../services/architect_project_creation_helper.dart';
 import '../services/bim_project_library_service.dart';
 import '../services/bim_underlay_picker_helper.dart';
-import '../../architect/widgets/architect_project_wizard_dialog.dart';
 import 'bim_elevation_dialog.dart';
 
 class _StoreyDraft {
@@ -33,7 +31,7 @@ class _StoreyDraft {
   String get elevationLabel => BimStoreyUnderlay.formatElevation(elevation);
 }
 
-/// Modal / screen wizard for configuring and creating a new standalone BiM Project.
+/// Wizard for configuring and creating a new structural project.
 class BimNewProjectWizard extends StatefulWidget {
   final Future<File?> Function(BuildContext)? underlayPicker;
   final Future<BimConversionResult> Function(
@@ -45,11 +43,8 @@ class BimNewProjectWizard extends StatefulWidget {
   final VoidCallback? onProjectCreated;
   final ValueChanged<BimWorkProject>? onProjectCreatedWithProject;
 
-  final BimProjectType initialProjectType;
-
   const BimNewProjectWizard({
     super.key,
-    this.initialProjectType = BimProjectType.structural,
     this.onProjectCreated,
     this.underlayPicker,
     this.underlayConverter,
@@ -58,7 +53,6 @@ class BimNewProjectWizard extends StatefulWidget {
 
   static Future<void> show(
     BuildContext context, {
-    BimProjectType initialProjectType = BimProjectType.structural,
     VoidCallback? onProjectCreated,
     ValueChanged<BimWorkProject>? onProjectCreatedWithProject,
   }) {
@@ -67,7 +61,6 @@ class BimNewProjectWizard extends StatefulWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => BimNewProjectWizard(
-        initialProjectType: initialProjectType,
         onProjectCreated: onProjectCreated,
         onProjectCreatedWithProject: onProjectCreatedWithProject,
       ),
@@ -86,14 +79,12 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
   final double _floorHeight = 2.80;
   bool _isCreating = false;
   int _nextStoreyId = 0;
-  late BimProjectType _selectedProjectType;
 
   final List<_StoreyDraft> _storeys = [];
 
   @override
   void initState() {
     super.initState();
-    _selectedProjectType = widget.initialProjectType;
     _generateDefaultStoreys();
   }
 
@@ -131,15 +122,6 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
 
   bool get _canCreate {
     if (_isCreating || _storeys.isEmpty) return false;
-    if (_selectedProjectType == BimProjectType.architectural) {
-      return _storeys.every(
-        (d) =>
-            d.pickedFile == null ||
-            (d.converted != null &&
-                d.error == null &&
-                d.stage == BimConversionStage.ready),
-      );
-    }
     return _storeys.every(
       (d) =>
           d.converted != null &&
@@ -261,7 +243,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
         name: _nameController.text.trim(),
         location: _locationController.text.trim(),
         storeys: storeyUnderlays,
-        projectType: _selectedProjectType,
+        projectType: BimProjectType.structural,
       );
 
       pendingProjectId = project.id;
@@ -307,34 +289,6 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
     }
   }
 
-  Future<void> _openArchitectWizardFromHere() async {
-    BimWorkProject? bimProject;
-    await ArchitectProjectWizardDialog.show(
-      context,
-      initialProjectName: _nameController.text.trim().isNotEmpty
-          ? _nameController.text.trim()
-          : null,
-      onCreate: (archProject, underlays) async {
-        final created = await createArchitectWorkProject(
-          library: BimProjectLibraryService.instance,
-          archProject: archProject,
-          underlays: underlays,
-          location: _locationController.text.trim(),
-        );
-        bimProject = created.$1;
-        return created.$2;
-      },
-    );
-    if (bimProject == null || !mounted) return;
-
-    Navigator.of(context).pop();
-    if (widget.onProjectCreatedWithProject != null) {
-      widget.onProjectCreatedWithProject!(bimProject!);
-    } else {
-      widget.onProjectCreated?.call();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -376,7 +330,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          l10n.bimProjectNew,
+                          l10n.structuralNewProject,
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -433,225 +387,6 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 18),
-
-                        // Project Type Selector
-                        Text(
-                          l10n.bimProjectType,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            // Structural Card
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => setState(() => _selectedProjectType = BimProjectType.structural,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: _selectedProjectType == BimProjectType.structural
-                                        ? theme.colorScheme.primary.withValues(alpha: 0.15,
-                                          )
-                                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _selectedProjectType == BimProjectType.structural
-                                          ? theme.colorScheme.primary
-                                          : theme.colorScheme.outlineVariant,
-                                      width: _selectedProjectType == BimProjectType.structural ? 1.8 : 1.0,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          AppIcon(
-                                            AppIconId.building,
-                                            size: 20,
-                                            color: _selectedProjectType == BimProjectType.structural
-                                                ? theme.colorScheme.primary
-                                                : theme.colorScheme.onSurfaceVariant,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              l10n.bimProjectStructural,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 13,
-                                                color: _selectedProjectType == BimProjectType.structural
-                                                    ? theme.colorScheme.onSurface
-                                                    : theme.colorScheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        l10n.bimProjectStructuralDesc,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            // Architectural Card
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => setState(() => _selectedProjectType = BimProjectType.architectural,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: _selectedProjectType == BimProjectType.architectural
-                                        ? theme.colorScheme.tertiary.withValues(alpha: 0.18,
-                                          )
-                                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _selectedProjectType == BimProjectType.architectural
-                                          ? theme.colorScheme.tertiary
-                                          : theme.colorScheme.outlineVariant,
-                                      width: _selectedProjectType == BimProjectType.architectural ? 1.8 : 1.0,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          AppIcon(
-                                            AppIconId.measureAngle,
-                                            size: 20,
-                                            color: _selectedProjectType == BimProjectType.architectural
-                                                ? theme.colorScheme.tertiary
-                                                : theme.colorScheme.onSurfaceVariant,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              l10n.bimProjectArchitectural,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 13,
-                                                color: _selectedProjectType == BimProjectType.architectural
-                                                    ? theme.colorScheme.onSurface
-                                                    : theme.colorScheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        l10n.bimProjectArchitecturalDesc,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_selectedProjectType == BimProjectType.architectural) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.tertiary.withValues(alpha: 0.12,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: theme.colorScheme.tertiary.withValues(alpha: 0.4,
-                                ),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.auto_awesome_rounded,
-                                  color: theme.colorScheme.tertiary,
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        l10n.architectWizardTitle,
-                                        style: TextStyle(
-                                          color: theme.colorScheme.onSurface,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        l10n.architectWizardSubtitle,
-                                        style: TextStyle(
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: theme.colorScheme.tertiary,
-                                    foregroundColor: Colors.black,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                  onPressed: _openArchitectWizardFromHere,
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      l10n.architectLaunchWizard,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                         const SizedBox(height: 20),
 
                         // Storeys & Underlays Header

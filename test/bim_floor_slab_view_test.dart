@@ -314,6 +314,19 @@ void main() {
         find.descendant(of: find.byType(AppBar), matching: find.text('+2.80')),
       );
       await tester.pumpAndSettle();
+      final traceControl = find.byType(SegmentedButton<GhostStoreyMode>);
+      final traceColors = Theme.of(tester.element(traceControl)).colorScheme;
+      double contrast(Color foreground, Color background) =>
+          (foreground.computeLuminance() + 0.05) /
+          (background.computeLuminance() + 0.05);
+      expect(
+        contrast(traceColors.onSurface, const Color(0xFF2A2A2A)),
+        greaterThan(4.5),
+      );
+      expect(
+        contrast(traceColors.onSecondaryContainer, traceColors.secondaryContainer),
+        greaterThan(4.5),
+      );
       await tester.tap(
         find.descendant(
           of: find.byType(StoreyManagerSheet),
@@ -321,6 +334,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(
+        tester.widget<SegmentedButton<GhostStoreyMode>>(traceControl).selected,
+        {GhostStoreyMode.below},
+      );
       await tester.tap(
         find.descendant(
           of: find.byType(StoreyManagerSheet),

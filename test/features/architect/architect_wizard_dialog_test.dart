@@ -170,19 +170,15 @@ void main() {
       },
     );
     testWidgets(
-      'BIM project type text uses the $brightness surface foreground',
+      'New project wizard shows only the structural flow in $brightness mode',
       (tester) async {
         await tester.pumpWidget(
           app(const BimNewProjectWizard(), brightness: brightness),
         );
         await tester.pumpAndSettle();
-        final title = find.text('Structural BiM');
-        expect(title, findsOneWidget);
-        final context = tester.element(title);
-        expect(
-          tester.widget<Text>(title).style!.color,
-          Theme.of(context).colorScheme.onSurface,
-        );
+        expect(find.text('New Structural Project'), findsOneWidget);
+        expect(find.text('Project Type'), findsNothing);
+        expect(find.text('Architectural BiM'), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );

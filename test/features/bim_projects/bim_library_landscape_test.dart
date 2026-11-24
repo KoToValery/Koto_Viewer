@@ -35,7 +35,7 @@ void main() {
       tester.view.physicalSize = const Size(791.6, 358.9);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      final button = find.widgetWithText(ElevatedButton, l.bimProjectNew);
+      final button = find.widgetWithText(ElevatedButton, l.structuralNewProject);
       await tester.ensureVisible(button);
       await tester.pumpAndSettle();
       final viewport = tester.getRect(find.byType(SingleChildScrollView));
@@ -76,7 +76,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      final button = find.widgetWithText(ElevatedButton, l.bimProjectNew);
+      final button = find.widgetWithText(ElevatedButton, l.structuralNewProject);
       await tester.ensureVisible(button);
       await tester.pumpAndSettle();
       expect(button.hitTestable(), findsOneWidget);

@@ -437,7 +437,9 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
         backgroundColor: const Color(0xFF121216),
         appBar: AppBar(
           backgroundColor: const Color(0xFF1A1A22),
-          title: Text(_project.name),
+          foregroundColor: Colors.white,
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: Text(_project.name, style: const TextStyle(color: Colors.white)),
         ),
         body: Center(
           child: Padding(
@@ -521,6 +523,9 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                     Tooltip(
                       message: context.l10n.bimUnderlayReviewCompleteTooltip,
                       child: TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.amberAccent,
+                        ),
                         onPressed: _markUnderlaysReviewed,
                         child: Text(
                           context.l10n.bimUnderlayReviewCompleteAction,
