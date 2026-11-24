@@ -29,7 +29,7 @@ import '../services/component_geometry_cache.dart';
 import '../services/component_library_service.dart';
 import '../services/architect_service_geometry.dart';
 import '../services/architect_decorative_geometry.dart';
-import '../services/architect_terrain_tin.dart';
+import '../services/architect_terrain_composite.dart';
 import 'architect_fence_3d_mesh.dart';
 
 // TOC: buildProjectMesh, [TAG:ROOF_DIAGONAL_TIMBER], buildRoofBody,
@@ -1510,80 +1510,84 @@ class Architect3dBuilder {
     void Function(String id, int from) mark,
   ) {
     double groundZ(Offset p, double fallback) =>
-        project.proposedTerrain.evaluateElevationAt(p) ??
-        project.existingTerrain.evaluateElevationAt(p) ??
+        ArchitectTerrainComposite.evaluateFinalElevationAt(project, p) ??
         fallback;
 
-    // 1. Proposed (or Existing fallback) Terrain 2.5D Surface
-    final activeTerrain = project.proposedTerrain.isNotEmpty
-        ? project.proposedTerrain
-        : project.existingTerrain;
-    if (project.isLayerVisible(ArchitectLayer.terrainProposedLayerId) &&
-        activeTerrain.isNotEmpty) {
-      var terrainFootprint = Path();
-      final hasOuterBoundaries = activeTerrain.boundaries
-          .any((b) => b.polygon.length >= 3 && !b.isCutoutPad && !b.isHole);
-
-      if (hasOuterBoundaries) {
-        for (final b in activeTerrain.boundaries) {
-          if (b.polygon.length < 3 || b.isCutoutPad || b.isHole) continue;
-          terrainFootprint = Path.combine(
-            PathOperation.union,
-            terrainFootprint,
-            Path()..addPolygon(b.polygon, true),
-          );
-        }
-      } else {
-        // Automatic domain recognition from contours and spot elevations
-        final rawBounds = activeTerrain.bounds;
-        if (rawBounds != null && !rawBounds.isEmpty) {
-          final domainRect = rawBounds.inflate(3.5);
-          terrainFootprint = Path()..addRect(domainRect);
-        }
-      }
-
-      // Cut out holes (flat grading pads stay filled at pad.elevation)
-      for (final b in activeTerrain.boundaries) {
-        if (b.polygon.length < 3 || !b.isHole) continue;
-        try {
-          terrainFootprint = Path.combine(
-            PathOperation.difference,
-            terrainFootprint,
-            Path()..addPolygon(b.polygon, true),
-          );
-        } catch (_) {}
-      }
-
-      // Cut out ground-floor slabs so terrain does not poke into building interior
+    // 1. Single Final Composite Terrain 2.5D Surface (Existing clipped outside
+    //    Proposed modification zones ∪ Proposed inside, minus building cutouts).
+    final useExisting =
+        project.isLayerVisible(ArchitectLayer.terrainExistingLayerId) &&
+        project.existingTerrain.isNotEmpty;
+    final useProposed =
+        project.isLayerVisible(ArchitectLayer.terrainProposedLayerId) &&
+        project.proposedTerrain.isNotEmpty;
+    if (useExisting || useProposed) {
+      // Collect ground-floor slabs so terrain does not poke into building interior
       final buildingCutouts = <List<Offset>>[];
       for (final s in project.storeys) {
         if (!s.isBuildingStorey || s.elevation.abs() > 0.6) continue;
         for (final slab in s.slabs) {
           if (slab.polygon.length >= 3) {
             buildingCutouts.add(slab.polygon);
-            try {
-              terrainFootprint = Path.combine(
-                PathOperation.difference,
-                terrainFootprint,
-                Path()..addPolygon(slab.polygon, true),
-              );
-            } catch (_) {}
           }
         }
       }
 
-      if (!terrainFootprint.getBounds().isEmpty) {
-        final first = allTris.length;
-        final tinTris = ArchitectTerrainTin.buildMesh3D(
-          activeTerrain,
-          buildingCutouts: buildingCutouts,
-          topColor: const Color(0xFF7FA66C),
-          sideColor: const Color(0xFF8B6F4E),
-          bottomColor: const Color(0xFF6E553A),
-        );
-        if (tinTris.isNotEmpty) {
-          allTris.addAll(tinTris);
+      final first = allTris.length;
+      final tinTris = ArchitectTerrainComposite.buildCompositeMesh3D(
+        project,
+        buildingCutouts: buildingCutouts,
+        topColor: const Color(0xFF7FA66C),
+        sideColor: const Color(0xFF8B6F4E),
+        bottomColor: const Color(0xFF6E553A),
+        retainingWallColor: const Color(0xFF9E9A92),
+        respectLayerVisibility: true,
+      );
+      if (tinTris.isNotEmpty) {
+        allTris.addAll(tinTris);
+        mark('terrain_proposed', first);
+      } else {
+        final fallbackSurface = useProposed
+            ? project.proposedTerrain
+            : project.existingTerrain;
+        var terrainFootprint = Path();
+        final hasOuterBoundaries = fallbackSurface.boundaries
+            .any((b) => b.polygon.length >= 3 && !b.isCutoutPad && !b.isHole);
+        if (hasOuterBoundaries) {
+          for (final b in fallbackSurface.boundaries) {
+            if (b.polygon.length < 3 || b.isCutoutPad || b.isHole) continue;
+            terrainFootprint = Path.combine(
+              PathOperation.union,
+              terrainFootprint,
+              Path()..addPolygon(b.polygon, true),
+            );
+          }
         } else {
+          final rawBounds = fallbackSurface.bounds;
+          if (rawBounds != null && !rawBounds.isEmpty) {
+            terrainFootprint = Path()..addRect(rawBounds.inflate(3.5));
+          }
+        }
+        for (final b in fallbackSurface.boundaries) {
+          if (b.polygon.length < 3 || !b.isHole) continue;
+          try {
+            terrainFootprint = Path.combine(
+              PathOperation.difference,
+              terrainFootprint,
+              Path()..addPolygon(b.polygon, true),
+            );
+          } catch (_) {}
+        }
+        for (final cutout in buildingCutouts) {
+          try {
+            terrainFootprint = Path.combine(
+              PathOperation.difference,
+              terrainFootprint,
+              Path()..addPolygon(cutout, true),
+            );
+          } catch (_) {}
+        }
+        if (!terrainFootprint.getBounds().isEmpty) {
           allTris.addAll(
             _buildTopographicTerrainMesh3D(
               terrainFootprint: terrainFootprint,
@@ -1593,8 +1597,8 @@ class Architect3dBuilder {
               bottomColor: const Color(0xFF6E553A),
             ),
           );
+          mark('terrain_proposed', first);
         }
-        mark('terrain_proposed', first);
       }
     }
 

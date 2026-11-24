@@ -14064,4 +14064,19 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectTerrainContourIntervalHint =>
       'Вертикална стъпка (Δh) между хоризонталите. 0.00 = автоматично след 2 хоризонтала.';
+
+  @override
+  String get architectTerrainEdgeTransition => 'Преход по границата';
+
+  @override
+  String get architectTerrainEdgeMatchExisting => 'Съвпада със съществуващ';
+
+  @override
+  String get architectTerrainEdgeSlope => 'Откос';
+
+  @override
+  String get architectTerrainEdgeRetainingWall => 'Подпорна стена';
+
+  @override
+  String get architectTerrainSlopeRatio => 'Наклон на откоса (1:H)';
 }

@@ -7697,5 +7697,25 @@
   "architectTerrainContourIntervalHint": "Vertical elevation step (Δh) between contours. 0.00 = auto-calculated after 2 contours.",
   "@architectTerrainContourIntervalHint": {
     "description": "Tooltip describing the terrain contour elevation interval control"
+  },
+  "architectTerrainEdgeTransition": "Edge transition",
+  "@architectTerrainEdgeTransition": {
+    "description": "Properties label for how a proposed terrain boundary or flat pad joins existing terrain"
+  },
+  "architectTerrainEdgeMatchExisting": "Match existing",
+  "@architectTerrainEdgeMatchExisting": {
+    "description": "Edge transition option where boundary perimeter matches existing terrain elevations"
+  },
+  "architectTerrainEdgeSlope": "Batter slope",
+  "@architectTerrainEdgeSlope": {
+    "description": "Edge transition option that generates a sloped embankment or cut batter to daylight"
+  },
+  "architectTerrainEdgeRetainingWall": "Retaining wall",
+  "@architectTerrainEdgeRetainingWall": {
+    "description": "Edge transition option that forms a vertical step or retaining wall along the perimeter"
+  },
+  "architectTerrainSlopeRatio": "Slope ratio (1:H)",
+  "@architectTerrainSlopeRatio": {
+    "description": "Horizontal-to-vertical batter slope ratio parameter"
   }
 }

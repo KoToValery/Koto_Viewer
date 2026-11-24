@@ -35276,75 +35276,154 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final l = context.l10n;
     final elevUnit = terrainElevationUnit(document.units, document.levelUnits);
     final initialIntervalMeters = _resolvedContourIntervalMetersFor(initial);
+    final initialSurface = initial == ArchitectTerrainState.existing
+        ? document.existingTerrain
+        : document.proposedTerrain;
+    final targetBoundary = initialSurface.boundaries
+        .where((b) => b.id == id && !b.isHole)
+        .firstOrNull;
+    final initialTransition = targetBoundary?.effectiveEdgeTransition;
+    final initialSlopeRatio = targetBoundary?.slopeRatio ?? 1.5;
+
     var selected = initial;
     var intervalMeters = initialIntervalMeters;
+    var edgeTransition = initialTransition;
+    var slopeRatio = initialSlopeRatio;
+
     final result = await showArchitectProperties<
-        ({ArchitectTerrainState state, double intervalMeters})>(
+        ({
+          ArchitectTerrainState state,
+          double intervalMeters,
+          ArchitectTerrainEdgeTransition? edgeTransition,
+          double slopeRatio,
+        })>(
       context: context,
       onInsets: _insetProperties,
       builder: (context) => StatefulBuilder(
         builder: (context, update) {
+          final showEdgeTransition =
+              targetBoundary != null &&
+              selected == ArchitectTerrainState.proposed;
           final changed =
               selected != initial ||
-              (intervalMeters - initialIntervalMeters).abs() > 1e-4;
+              (intervalMeters - initialIntervalMeters).abs() > 1e-4 ||
+              (showEdgeTransition &&
+                  (edgeTransition != initialTransition ||
+                      (slopeRatio - initialSlopeRatio).abs() > 1e-4));
           final displayInterval = elevUnit.toUnit(intervalMeters);
           return architectAlertDialog(
             key: const ValueKey('architect-terrain-properties'),
             title: Text(l.architectTerrainPropertiesTitle),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RadioGroup<ArchitectTerrainState>(
-                  groupValue: selected,
-                  onChanged: (value) {
-                    if (value != null) update(() => selected = value);
-                  },
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      RadioListTile(
-                        value: ArchitectTerrainState.existing,
-                        title: Text(l.architectTerrainStateExisting),
-                      ),
-                      RadioListTile(
-                        value: ArchitectTerrainState.proposed,
-                        title: Text(l.architectTerrainStateProposed),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 12),
-                ListTile(
-                  key: const ValueKey('architect-terrain-prop-interval'),
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.unfold_more_rounded),
-                  title: Text(l.architectTerrainContourInterval),
-                  trailing: Text(
-                    '${displayInterval.toStringAsFixed(2)} ${elevUnit.symbol}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  RadioGroup<ArchitectTerrainState>(
+                    groupValue: selected,
+                    onChanged: (value) {
+                      if (value != null) update(() => selected = value);
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        RadioListTile(
+                          value: ArchitectTerrainState.existing,
+                          title: Text(l.architectTerrainStateExisting),
+                        ),
+                        RadioListTile(
+                          value: ArchitectTerrainState.proposed,
+                          title: Text(l.architectTerrainStateProposed),
+                        ),
+                      ],
                     ),
                   ),
-                  onTap: () async {
-                    final picked = await BimNumericKeypad.showInputDialog(
-                      context,
-                      title: l.architectTerrainContourInterval,
-                      initialText: displayInterval.toStringAsFixed(2),
-                      unitLabel: elevUnit.symbol,
-                      decimals: 3,
-                      min: 0.0,
-                      allowNegative: false,
-                    );
-                    if (picked != null) {
-                      final meters = elevUnit.fromUnit(picked);
-                      update(
-                        () => intervalMeters =
-                            meters <= 1e-4 ? 0.0 : double.parse(meters.toStringAsFixed(4)),
+                  if (showEdgeTransition && edgeTransition != null) ...[
+                    const Divider(height: 12),
+                    Text(
+                      l.architectTerrainEdgeTransition,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      key: const ValueKey('architect-terrain-prop-edge-transition'),
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        for (final mode in ArchitectTerrainEdgeTransition.values)
+                          ChoiceChip(
+                            key: ValueKey('architect-terrain-edge-${mode.name}'),
+                            label: Text(mode.label(l)),
+                            selected: edgeTransition == mode,
+                            onSelected: (_) =>
+                                update(() => edgeTransition = mode),
+                          ),
+                      ],
+                    ),
+                    if (edgeTransition == ArchitectTerrainEdgeTransition.slope)
+                      ListTile(
+                        key: const ValueKey('architect-terrain-prop-slope-ratio'),
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.change_history_rounded),
+                        title: Text(l.architectTerrainSlopeRatio),
+                        trailing: Text(
+                          '1:${slopeRatio.toStringAsFixed(2)}',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        onTap: () async {
+                          final picked = await BimNumericKeypad.showInputDialog(
+                            context,
+                            title: l.architectTerrainSlopeRatio,
+                            initialText: slopeRatio.toStringAsFixed(2),
+                            decimals: 2,
+                            min: 0.1,
+                            allowNegative: false,
+                          );
+                          if (picked != null && picked >= 0.1) {
+                            update(
+                              () => slopeRatio = picked.clamp(0.1, 20.0),
+                            );
+                          }
+                        },
+                      ),
+                  ],
+                  const Divider(height: 12),
+                  ListTile(
+                    key: const ValueKey('architect-terrain-prop-interval'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.unfold_more_rounded),
+                    title: Text(l.architectTerrainContourInterval),
+                    trailing: Text(
+                      '${displayInterval.toStringAsFixed(2)} ${elevUnit.symbol}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onTap: () async {
+                      final picked = await BimNumericKeypad.showInputDialog(
+                        context,
+                        title: l.architectTerrainContourInterval,
+                        initialText: displayInterval.toStringAsFixed(2),
+                        unitLabel: elevUnit.symbol,
+                        decimals: 3,
+                        min: 0.0,
+                        allowNegative: false,
                       );
-                    }
-                  },
-                ),
-              ],
+                      if (picked != null) {
+                        final meters = elevUnit.fromUnit(picked);
+                        update(
+                          () => intervalMeters =
+                              meters <= 1e-4 ? 0.0 : double.parse(meters.toStringAsFixed(4)),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -35356,7 +35435,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ? null
                     : () => Navigator.pop(
                         context,
-                        (state: selected, intervalMeters: intervalMeters),
+                        (
+                          state: selected,
+                          intervalMeters: intervalMeters,
+                          edgeTransition: edgeTransition,
+                          slopeRatio: slopeRatio,
+                        ),
                       ),
                 child: Text(l.applyAction),
               ),
@@ -35369,12 +35453,58 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         result == null ||
         !identical(document, _modelCommands.project) ||
         _effectiveSelection.singleOrNull != id) return;
+
+    var updatedProject = _project;
+    var finalId = id;
     if ((result.intervalMeters - initialIntervalMeters).abs() > 1e-4) {
-      _updateTerrainContourInterval(result.intervalMeters);
+      updatedProject = ArchitectLandscapeTool.updateSurfaceContourInterval(
+        updatedProject,
+        intervalMeters: result.intervalMeters,
+        manual: result.intervalMeters > 1e-4,
+      );
+      _landscapeTool.contourInterval = result.intervalMeters;
     }
     if (result.state != initial) {
-      _setTerrainState(result.state);
+      final moved = ArchitectLandscapeTool.changeTerrainState(
+        updatedProject,
+        id,
+        result.state,
+      );
+      if (moved != null) {
+        updatedProject = moved.project;
+        finalId = moved.elementId;
+      }
     }
+    if (targetBoundary != null &&
+        result.state == ArchitectTerrainState.proposed &&
+        result.edgeTransition != null) {
+      final nextProposed = updatedProject.proposedTerrain.copyWith(
+        boundaries: [
+          for (final b in updatedProject.proposedTerrain.boundaries)
+            b.id == finalId
+                ? b.copyWith(
+                    edgeTransition: result.edgeTransition,
+                    slopeRatio: result.slopeRatio,
+                  )
+                : b,
+        ],
+      );
+      updatedProject = updatedProject.copyWith(
+        proposedTerrain: nextProposed,
+        updatedAt: DateTime.now(),
+      );
+    }
+    setState(() {
+      if (finalId != id) {
+        _selectionIds
+          ..remove(id)
+          ..add(finalId);
+        _selectedElementId = finalId;
+      }
+      _loadTerrainProperties(updatedProject, finalId);
+      _commands.commit(updatedProject);
+    });
+    _saveBiMProjectIfAttached();
   }
 
   void _setTerrainState(ArchitectTerrainState state) {

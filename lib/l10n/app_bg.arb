@@ -4789,5 +4789,10 @@
   "architectImportProjectFailed": "Неуспешен импорт: {error}",
   "architectTerrainContourInterval": "Сечение на хоризонталите",
   "architectTerrainContourIntervalShort": "Δh",
-  "architectTerrainContourIntervalHint": "Вертикална стъпка (Δh) между хоризонталите. 0.00 = автоматично след 2 хоризонтала."
+  "architectTerrainContourIntervalHint": "Вертикална стъпка (Δh) между хоризонталите. 0.00 = автоматично след 2 хоризонтала.",
+  "architectTerrainEdgeTransition": "Преход по границата",
+  "architectTerrainEdgeMatchExisting": "Съвпада със съществуващ",
+  "architectTerrainEdgeSlope": "Откос",
+  "architectTerrainEdgeRetainingWall": "Подпорна стена",
+  "architectTerrainSlopeRatio": "Наклон на откоса (1:H)"
 }

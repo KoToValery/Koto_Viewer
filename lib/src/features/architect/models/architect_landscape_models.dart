@@ -56,6 +56,25 @@ enum ArchitectTerrainDraftMode {
   };
 }
 
+/// How the outer perimeter of a proposed terrain zone or flat grading pad joins
+/// the surrounding existing terrain surface.
+enum ArchitectTerrainEdgeTransition {
+  /// Boundary perimeter automatically inherits exact elevation from existing terrain.
+  matchExisting,
+
+  /// Sloped embankment/cut batter (1:H horizontal:vertical) out to daylight on existing terrain.
+  slope,
+
+  /// Vertical retaining step/wall between proposed and existing elevations along the perimeter.
+  retainingWall;
+
+  String label(AppLocalizations l) => switch (this) {
+    matchExisting => l.architectTerrainEdgeMatchExisting,
+    slope => l.architectTerrainEdgeSlope,
+    retainingWall => l.architectTerrainEdgeRetainingWall,
+  };
+}
+
 /// Closed boundary, cutout hole, or flat grading pad polygon in a 2.5D terrain surface.
 class ArchitectTerrainBoundary {
   final String id;
@@ -65,6 +84,8 @@ class ArchitectTerrainBoundary {
   final bool isFlatPad;
   final bool isHole;
   final bool autoInterpolateElevation;
+  final ArchitectTerrainEdgeTransition? edgeTransition;
+  final double slopeRatio;
 
   const ArchitectTerrainBoundary({
     required this.id,
@@ -75,9 +96,20 @@ class ArchitectTerrainBoundary {
     bool? isCutoutPad,
     this.isHole = false,
     this.autoInterpolateElevation = false,
+    this.edgeTransition,
+    this.slopeRatio = 1.5,
   }) : isFlatPad = isCutoutPad ?? isFlatPad;
 
   bool get isCutoutPad => isHole || isFlatPad;
+
+  /// Effective edge transition: Flat pads and explicit-elevation boundaries
+  /// default to vertical retaining step (with option to switch to batter slope),
+  /// while auto-interpolated outer boundaries match existing terrain.
+  ArchitectTerrainEdgeTransition get effectiveEdgeTransition =>
+      edgeTransition ??
+      ((isFlatPad || !autoInterpolateElevation)
+          ? ArchitectTerrainEdgeTransition.retainingWall
+          : ArchitectTerrainEdgeTransition.matchExisting);
 
   double vertexElevationAt(int index) {
     if (vertexElevations != null &&
@@ -126,6 +158,8 @@ class ArchitectTerrainBoundary {
     bool? isFlatPad,
     bool? isHole,
     bool? autoInterpolateElevation,
+    ArchitectTerrainEdgeTransition? edgeTransition,
+    double? slopeRatio,
   }) => ArchitectTerrainBoundary(
     id: id ?? this.id,
     polygon: polygon ?? this.polygon,
@@ -135,6 +169,8 @@ class ArchitectTerrainBoundary {
     isHole: isHole ?? this.isHole,
     autoInterpolateElevation:
         autoInterpolateElevation ?? this.autoInterpolateElevation,
+    edgeTransition: edgeTransition ?? this.edgeTransition,
+    slopeRatio: slopeRatio ?? this.slopeRatio,
   );
 
   Map<String, dynamic> toJson() => {
@@ -147,6 +183,8 @@ class ArchitectTerrainBoundary {
     if (isFlatPad) 'isFlatPad': true,
     if (isHole) 'isHole': true,
     if (autoInterpolateElevation) 'autoInterpolateElevation': true,
+    if (edgeTransition != null) 'edgeTransition': edgeTransition!.name,
+    if ((slopeRatio - 1.5).abs() > 1e-4) 'slopeRatio': slopeRatio,
   };
 
   factory ArchitectTerrainBoundary.fromJson(Map<String, dynamic> json) =>
@@ -167,6 +205,15 @@ class ArchitectTerrainBoundary {
         isFlatPad: json['isFlatPad'] == true,
         isHole: json['isHole'] == true,
         autoInterpolateElevation: json['autoInterpolateElevation'] == true,
+        edgeTransition: json['edgeTransition'] is String
+            ? ArchitectTerrainEdgeTransition.values
+                .where((e) => e.name == json['edgeTransition'])
+                .firstOrNull
+            : null,
+        slopeRatio: ((json['slopeRatio'] as num?)?.toDouble() ?? 1.5).clamp(
+          0.1,
+          20.0,
+        ),
       );
 }
 

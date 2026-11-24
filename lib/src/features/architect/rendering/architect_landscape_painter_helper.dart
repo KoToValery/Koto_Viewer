@@ -7,6 +7,7 @@ import '../models/architect_project.dart';
 import '../services/architect_landscape_tool.dart';
 import '../services/architect_overhang_detector.dart';
 import '../services/architect_spline_geometry.dart';
+import '../services/architect_terrain_composite.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_hatch_geometry.dart';
 import 'architect_overhang_painter_helper.dart';
@@ -42,8 +43,53 @@ class ArchitectLandscapePainterHelper {
     required Set<String> selectedIds,
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
   }) {
-    if (project.isLayerVisible(ArchitectLayer.terrainExistingLayerId) &&
-        !project.existingTerrain.isEmpty) {
+    final showExisting =
+        project.isLayerVisible(ArchitectLayer.terrainExistingLayerId) &&
+        project.existingTerrain.isNotEmpty;
+    final showProposed =
+        project.isLayerVisible(ArchitectLayer.terrainProposedLayerId) &&
+        project.proposedTerrain.isNotEmpty;
+    final zones = showProposed
+        ? ArchitectTerrainComposite.resolveModificationZones(project)
+        : const <ArchitectTerrainModificationZone>[];
+
+    if (showExisting) {
+      var clipped = false;
+      if (showProposed && zones.isNotEmpty) {
+        final exBounds = project.existingTerrain.bounds;
+        if (exBounds != null && !exBounds.isEmpty) {
+          var zoneUnion = Path();
+          for (final z in zones) {
+            if (z.outerPolygon.length < 3) continue;
+            final zp = _polygonPath(z.outerPolygon, closed: true);
+            try {
+              zoneUnion = Path.combine(PathOperation.union, zoneUnion, zp);
+            } catch (_) {
+              zoneUnion.addPath(zp, Offset.zero);
+            }
+          }
+          if (!zoneUnion.getBounds().isEmpty) {
+            final clipOuter = Path()..addRect(exBounds.inflate(50.0));
+            Path clipOutside;
+            try {
+              clipOutside = Path.combine(
+                PathOperation.difference,
+                clipOuter,
+                zoneUnion,
+              );
+            } catch (_) {
+              clipOutside = Path()
+                ..fillType = PathFillType.evenOdd
+                ..addRect(exBounds.inflate(50.0))
+                ..addPath(zoneUnion, Offset.zero);
+            }
+            canvas.save();
+            canvas.clipPath(clipOutside);
+            clipped = true;
+          }
+        }
+      }
+
       _drawTerrainSurface(
         canvas: canvas,
         project: project,
@@ -53,10 +99,13 @@ class ArchitectLandscapePainterHelper {
         isProposed: false,
         palette: palette,
       );
+
+      if (clipped) {
+        canvas.restore();
+      }
     }
 
-    if (project.isLayerVisible(ArchitectLayer.terrainProposedLayerId) &&
-        !project.proposedTerrain.isEmpty) {
+    if (showProposed) {
       _drawTerrainSurface(
         canvas: canvas,
         project: project,
@@ -66,6 +115,42 @@ class ArchitectLandscapePainterHelper {
         isProposed: true,
         palette: palette,
       );
+
+      // Draw daylight toe/crest rings and batter hachures for sloped boundaries/pads
+      final slopePaint = Paint()
+        ..color = const Color(0xFF2E6B3E).withValues(alpha: 0.72)
+        ..strokeWidth = 1.1 / zoomScale
+        ..style = PaintingStyle.stroke;
+      final tickPaint = Paint()
+        ..color = const Color(0xFF2E6B3E).withValues(alpha: 0.50)
+        ..strokeWidth = 0.85 / zoomScale
+        ..style = PaintingStyle.stroke;
+      for (final z in zones) {
+        if (!z.hasDaylightRing) continue;
+        _drawDashedPath(
+          canvas,
+          _polygonPath(z.outerPolygon, closed: true),
+          slopePaint,
+          dashLength: 0.45,
+          gapLength: 0.25,
+        );
+        final n = math.min(z.innerPolygon.length, z.outerPolygon.length);
+        for (var i = 0; i < n; i++) {
+          final aIn = z.innerPolygon[i];
+          final bIn = z.innerPolygon[(i + 1) % n];
+          final aOut = z.outerPolygon[i];
+          final bOut = z.outerPolygon[(i + 1) % n];
+          final edgeLen = (bIn - aIn).distance;
+          final steps = (edgeLen / 1.2).clamp(2, 24).round();
+          for (var k = 0; k < steps; k++) {
+            final t = (k + 0.5) / steps;
+            final pIn = Offset.lerp(aIn, bIn, t)!;
+            final pOut = Offset.lerp(aOut, bOut, t)!;
+            final pHalf = Offset.lerp(pIn, pOut, k.isEven ? 0.85 : 0.48)!;
+            canvas.drawLine(pIn, pHalf, tickPaint);
+          }
+        }
+      }
     }
   }
 

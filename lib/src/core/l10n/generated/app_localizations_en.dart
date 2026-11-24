@@ -14013,4 +14013,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectTerrainContourIntervalHint =>
       'Vertical elevation step (Δh) between contours. 0.00 = auto-calculated after 2 contours.';
+
+  @override
+  String get architectTerrainEdgeTransition => 'Edge transition';
+
+  @override
+  String get architectTerrainEdgeMatchExisting => 'Match existing';
+
+  @override
+  String get architectTerrainEdgeSlope => 'Batter slope';
+
+  @override
+  String get architectTerrainEdgeRetainingWall => 'Retaining wall';
+
+  @override
+  String get architectTerrainSlopeRatio => 'Slope ratio (1:H)';
 }

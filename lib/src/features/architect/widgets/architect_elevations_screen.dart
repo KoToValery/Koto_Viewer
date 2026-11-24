@@ -677,19 +677,27 @@ class ArchitectFacadePainter extends CustomPainter {
           ..strokeWidth = 1.3,
       );
     }
-    if (geometry.existingTerrain.length >= 2) {
-      final exPath = (Path()..addPolygon(geometry.existingTerrain, false))
-          .transform(matrix.storage);
+    final existingSegments = geometry.existingTerrainSegments.isNotEmpty
+        ? geometry.existingTerrainSegments
+        : (geometry.existingTerrain.length >= 2
+              ? [geometry.existingTerrain]
+              : const <List<Offset>>[]);
+    if (existingSegments.isNotEmpty) {
       final dashPaint = Paint()
         ..color = stroke.withValues(alpha: 0.72)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.05;
-      for (final metric in exPath.computeMetrics()) {
-        for (var s = 0.0; s < metric.length; s += 13.0) {
-          canvas.drawPath(
-            metric.extractPath(s, math.min(s + 8.0, metric.length)),
-            dashPaint,
-          );
+      for (final seg in existingSegments) {
+        if (seg.length < 2) continue;
+        final exPath = (Path()..addPolygon(seg, false))
+            .transform(matrix.storage);
+        for (final metric in exPath.computeMetrics()) {
+          for (var s = 0.0; s < metric.length; s += 13.0) {
+            canvas.drawPath(
+              metric.extractPath(s, math.min(s + 8.0, metric.length)),
+              dashPaint,
+            );
+          }
         }
       }
     }

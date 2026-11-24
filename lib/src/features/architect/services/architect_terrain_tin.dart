@@ -159,10 +159,22 @@ class ArchitectTerrainTin {
   }
 
   /// Builds a TIN from [surface], optionally subtracting [extraCutouts]
-  /// (such as ground-floor building slabs) when generating the 3D terrain solid.
+  /// (such as ground-floor building slabs or proposed grading zones) when
+  /// generating the 3D terrain solid or composite surface.
+  ///
+  /// - [boundaryElevationAt]: optional exact Z lookup used for outer boundary
+  ///   vertices whose elevation should match an underlying surface (e.g. a local
+  ///   proposed zone stitching seamlessly to existing terrain).
+  /// - [cutoutElevationAt]: optional exact Z lookup used for [extraCutouts] and
+  ///   hole perimeter vertices so cutting out a region preserves exact slopes.
+  /// - [seamSplitSegments]: optional cross-segments used to split boundary and
+  ///   cutout edges at shared seam intersections.
   static ArchitectTerrainTin? build(
     ArchitectTerrainSurface surface, {
     List<List<Offset>> extraCutouts = const [],
+    double? Function(Offset)? boundaryElevationAt,
+    double? Function(Offset)? cutoutElevationAt,
+    List<({Offset a, Offset b})> seamSplitSegments = const [],
   }) {
     if (surface.isEmpty) return null;
 
@@ -221,20 +233,27 @@ class ArchitectTerrainTin {
     }
 
     // 2. Determine outer boundary polygons + corner Z.
-    final outerPolysWithZ = <List<({Offset p, double z})>>[];
+    final outerPolysWithZ =
+        <({List<({Offset p, double z})> verts, bool matchBase})>[];
     if (outerBoundaries.isNotEmpty) {
       for (final bnd in outerBoundaries) {
         final poly = bnd.polygon;
+        final matchBase =
+            boundaryElevationAt != null &&
+            bnd.effectiveEdgeTransition ==
+                ArchitectTerrainEdgeTransition.matchExisting;
         final useAuto = bnd.autoInterpolateElevation && topoSamples.isNotEmpty;
         final withZ = <({Offset p, double z})>[];
         for (var i = 0; i < poly.length; i++) {
           final v = poly[i];
-          final z = useAuto
-              ? _nearestTopoElevation(v, topoSamples)
-              : bnd.vertexElevationAt(i);
+          final matchedZ = matchBase ? boundaryElevationAt(v) : null;
+          final z = matchedZ ??
+              (useAuto
+                  ? _nearestTopoElevation(v, topoSamples)
+                  : bnd.vertexElevationAt(i));
           withZ.add((p: v, z: z));
         }
-        outerPolysWithZ.add(withZ);
+        outerPolysWithZ.add((verts: withZ, matchBase: matchBase));
       }
     } else {
       final b = surface.bounds;
@@ -246,27 +265,38 @@ class ArchitectTerrainTin {
           rect.bottomRight,
           rect.bottomLeft,
         ];
-        outerPolysWithZ.add([
-          for (final c in corners)
-            (
-              p: c,
-              z: topoSamples.isNotEmpty
-                  ? _nearestTopoElevation(c, topoSamples)
-                  : 0.0,
-            ),
-        ]);
+        outerPolysWithZ.add((
+          verts: [
+            for (final c in corners)
+              (
+                p: c,
+                z: boundaryElevationAt?.call(c) ??
+                    (topoSamples.isNotEmpty
+                        ? _nearestTopoElevation(c, topoSamples)
+                        : 0.0),
+              ),
+          ],
+          matchBase: boundaryElevationAt != null,
+        ));
       }
     }
 
     // 3. Collect boundary, flat-pad, and hole perimeter segments so every
     //    contour crossing creates shared exact PSLG junction vertices.
     final boundarySegments =
-        <({Offset a, Offset b, double za, double zb})>[];
-    for (final poly in outerPolysWithZ) {
+        <({Offset a, Offset b, double za, double zb, bool matchBase})>[];
+    for (final entry in outerPolysWithZ) {
+      final poly = entry.verts;
       for (var i = 0; i < poly.length; i++) {
         final curr = poly[i];
         final next = poly[(i + 1) % poly.length];
-        boundarySegments.add((a: curr.p, b: next.p, za: curr.z, zb: next.z));
+        boundarySegments.add((
+          a: curr.p,
+          b: next.p,
+          za: curr.z,
+          zb: next.z,
+          matchBase: entry.matchBase,
+        ));
       }
     }
     final padSegments = <({Offset a, Offset b, double z})>[];
@@ -348,6 +378,7 @@ class ArchitectTerrainTin {
       required double zb,
       required bool overwriteEnds,
       double? forcedZ,
+      double? Function(Offset)? splitElevationAt,
       List<({Offset a, Offset b})> crossSegments = const [],
     }) {
       final splits = <({double t, Offset p, double z, bool overwrite})>[
@@ -367,12 +398,15 @@ class ArchitectTerrainTin {
       for (final seg in crossSegments) {
         final hit = _properSegmentIntersection(a, b, seg.a, seg.b);
         if (hit != null && hit.t > 1e-4 && hit.t < 1.0 - 1e-4) {
-          final interpZ = forcedZ ?? (za + (zb - za) * hit.t);
+          final interpZ =
+              forcedZ ??
+              splitElevationAt?.call(hit.point) ??
+              (za + (zb - za) * hit.t);
           splits.add((
             t: hit.t,
             p: hit.point,
             z: interpZ,
-            overwrite: forcedZ != null,
+            overwrite: forcedZ != null || splitElevationAt != null,
           ));
         }
       }
@@ -387,7 +421,11 @@ class ArchitectTerrainTin {
       }
     }
 
-    // 5. Insert outer boundary edges, splitting along contour & hole crossings.
+    // 5. Insert outer boundary edges, splitting along contour, hole & seam crossings.
+    final outerCrossSegments = [
+      ...holeSegments,
+      ...seamSplitSegments,
+    ];
     for (final edge in boundarySegments) {
       // Never overwrite an exact contour/spot vertex with an interpolated boundary corner.
       insertPolygonEdgeWithContourSplits(
@@ -396,7 +434,8 @@ class ArchitectTerrainTin {
         b: edge.b,
         zb: edge.zb,
         overwriteEnds: false,
-        crossSegments: holeSegments,
+        splitElevationAt: edge.matchBase ? boundaryElevationAt : null,
+        crossSegments: outerCrossSegments,
       );
     }
 
@@ -416,11 +455,12 @@ class ArchitectTerrainTin {
           zb: pad.elevation,
           overwriteEnds: true,
           forcedZ: pad.elevation,
+          crossSegments: seamSplitSegments,
         );
       }
     }
 
-    // 7. Insert hole & cutout perimeters (split at contour & boundary crossings).
+    // 7. Insert hole & cutout perimeters (split at contour, boundary & seam crossings).
     double? existingPointZ(Offset p) {
       for (final pt in points) {
         final dx = pt.x - p.dx;
@@ -430,8 +470,9 @@ class ArchitectTerrainTin {
       return null;
     }
 
-    final boundarySegOffsets = [
+    final holeCrossSegments = [
       for (final edge in boundarySegments) (a: edge.a, b: edge.b),
+      ...seamSplitSegments,
     ];
     for (final hole in holePolygons) {
       for (var i = 0; i < hole.length; i++) {
@@ -440,16 +481,19 @@ class ArchitectTerrainTin {
         insertPolygonEdgeWithContourSplits(
           a: a,
           za: existingPointZ(a) ??
+              cutoutElevationAt?.call(a) ??
               (topoSamples.isNotEmpty
                   ? _nearestTopoElevation(a, topoSamples)
                   : 0.0),
           b: b,
           zb: existingPointZ(b) ??
+              cutoutElevationAt?.call(b) ??
               (topoSamples.isNotEmpty
                   ? _nearestTopoElevation(b, topoSamples)
                   : 0.0),
           overwriteEnds: false,
-          crossSegments: boundarySegOffsets,
+          splitElevationAt: cutoutElevationAt,
+          crossSegments: holeCrossSegments,
         );
       }
     }
@@ -486,7 +530,9 @@ class ArchitectTerrainTin {
     if (triIndices.isEmpty) return null;
 
     // 9. Keep triangles inside outer polygons and outside holes/cutouts.
-    final outerPolys = [for (final p in outerPolysWithZ) [for (final v in p) v.p]];
+    final outerPolys = [
+      for (final p in outerPolysWithZ) [for (final v in p.verts) v.p],
+    ];
     final keptTriangles = <ArchitectTinTriangle>[];
     final uniqueEdgeKeys = <_EdgeKey>{};
     final uniqueEdges = <_EdgeSegment>[];
@@ -643,18 +689,50 @@ class ArchitectTerrainTin {
     required Color bottomColor,
     double skirtDepth = 1.0,
   }) {
+    final baseTin = ArchitectTerrainTin.of(surface);
     final tin = buildingCutouts.isEmpty
-        ? ArchitectTerrainTin.of(surface)
-        : ArchitectTerrainTin.build(surface, extraCutouts: buildingCutouts);
+        ? baseTin
+        : ArchitectTerrainTin.build(
+            surface,
+            extraCutouts: buildingCutouts,
+            cutoutElevationAt: baseTin?.evaluateElevationAt,
+          );
     if (tin == null || tin.triangles.isEmpty) return const [];
+    return buildSolidFromTriangles(
+      tin.triangles,
+      topColor: topColor,
+      sideColor: sideColor,
+      bottomColor: bottomColor,
+      skirtDepth: skirtDepth,
+    );
+  }
 
-    var minZ = tin.triangles.first.za;
-    for (final t in tin.triangles) {
+  /// Builds a single watertight 3D terrain solid from [triangles] (which may be
+  /// a single TIN or a composite Existing + Proposed TIN without overlapping XY
+  /// triangles).
+  ///
+  /// Shared interior edges cancel automatically so no duplicate internal skirts
+  /// are emitted; when opposite directed seam edges have differing Z (such as a
+  /// vertical retaining step or flat pad perimeter), an exact vertical retaining
+  /// wall quad is stitched between the two elevations.
+  static List<Triangle3D> buildSolidFromTriangles(
+    List<ArchitectTinTriangle> triangles, {
+    required Color topColor,
+    required Color sideColor,
+    required Color bottomColor,
+    Color? retainingWallColor,
+    double skirtDepth = 1.0,
+  }) {
+    if (triangles.isEmpty) return const [];
+
+    var minZ = triangles.first.za;
+    for (final t in triangles) {
       if (t.za < minZ) minZ = t.za;
       if (t.zb < minZ) minZ = t.zb;
       if (t.zc < minZ) minZ = t.zc;
     }
     final bottomZ = minZ - skirtDepth;
+    final wallColor = retainingWallColor ?? sideColor;
 
     final out = <Triangle3D>[];
     final directedEdges = <String, ({Offset a, double za, Offset b, double zb})>{};
@@ -662,16 +740,64 @@ class ArchitectTerrainTin {
     String ptKey(Offset p) =>
         '${(p.dx * 1000).round()},${(p.dy * 1000).round()}';
 
-    void trackEdge(Offset a, double za, Offset b, double zb) {
-      final ka = ptKey(a);
-      final kb = ptKey(b);
-      final reverseKey = '$kb->$ka';
-      if (directedEdges.remove(reverseKey) == null) {
-        directedEdges['$ka->$kb'] = (a: a, za: za, b: b, zb: zb);
+    void addVerticalFace(
+      Offset p0,
+      double zTop0,
+      double zBot0,
+      Offset p1,
+      double zTop1,
+      double zBot1,
+      Color color,
+    ) {
+      final aTop = Vector3(p0.dx, p0.dy, zTop0);
+      final bTop = Vector3(p1.dx, p1.dy, zTop1);
+      final aBot = Vector3(p0.dx, p0.dy, zBot0);
+      final bBot = Vector3(p1.dx, p1.dy, zBot1);
+      if ((zTop0 - zBot0).abs() > 1e-4) {
+        out.add(Triangle3D(v0: aTop, v1: aBot, v2: bTop, color: color));
+      }
+      if ((zTop1 - zBot1).abs() > 1e-4) {
+        out.add(Triangle3D(v0: bTop, v1: aBot, v2: bBot, color: color));
       }
     }
 
-    for (final tri in tin.triangles) {
+    void trackEdge(Offset a, double za, Offset b, double zb) {
+      final ka = ptKey(a);
+      final kb = ptKey(b);
+      if (ka == kb) return;
+      final reverseKey = '$kb->$ka';
+      final rev = directedEdges.remove(reverseKey);
+      if (rev == null) {
+        directedEdges['$ka->$kb'] = (a: a, za: za, b: b, zb: zb);
+        return;
+      }
+      // Opposite edge rev ran (b -> a), so rev.zb is at `a` and rev.za is at `b`.
+      final dA = za - rev.zb;
+      final dB = zb - rev.za;
+      if (dA.abs() <= 1e-3 && dB.abs() <= 1e-3) return;
+
+      if (dA >= -1e-4 && dB >= -1e-4) {
+        // Left side of (a -> b) is higher: wall faces right of (a -> b).
+        addVerticalFace(a, za, rev.zb, b, zb, rev.za, wallColor);
+      } else if (dA <= 1e-4 && dB <= 1e-4) {
+        // Right side (rev: b -> a) is higher: wall faces right of (b -> a).
+        addVerticalFace(b, rev.za, zb, a, rev.zb, za, wallColor);
+      } else {
+        // Cut-to-fill crossing along this single seam edge: split cleanly at d == 0.
+        final t = (dA / (dA - dB)).clamp(0.0, 1.0);
+        final m = Offset(a.dx + (b.dx - a.dx) * t, a.dy + (b.dy - a.dy) * t);
+        final zm = za + (zb - za) * t;
+        if (dA > 0) {
+          addVerticalFace(a, za, rev.zb, m, zm, zm, wallColor);
+          addVerticalFace(b, rev.za, zb, m, zm, zm, wallColor);
+        } else {
+          addVerticalFace(m, zm, zm, b, zb, rev.za, wallColor);
+          addVerticalFace(m, zm, zm, a, rev.zb, za, wallColor);
+        }
+      }
+    }
+
+    for (final tri in triangles) {
       final vaTop = Vector3(tri.a.dx, tri.a.dy, tri.za);
       final vbTop = Vector3(tri.b.dx, tri.b.dy, tri.zb);
       final vcTop = Vector3(tri.c.dx, tri.c.dy, tri.zc);
@@ -688,12 +814,15 @@ class ArchitectTerrainTin {
     }
 
     for (final edge in directedEdges.values) {
-      final aTop = Vector3(edge.a.dx, edge.a.dy, edge.za);
-      final bTop = Vector3(edge.b.dx, edge.b.dy, edge.zb);
-      final aBot = Vector3(edge.a.dx, edge.a.dy, bottomZ);
-      final bBot = Vector3(edge.b.dx, edge.b.dy, bottomZ);
-      out.add(Triangle3D(v0: aTop, v1: aBot, v2: bTop, color: sideColor));
-      out.add(Triangle3D(v0: bTop, v1: aBot, v2: bBot, color: sideColor));
+      addVerticalFace(
+        edge.a,
+        edge.za,
+        bottomZ,
+        edge.b,
+        edge.zb,
+        bottomZ,
+        sideColor,
+      );
     }
 
     return out;

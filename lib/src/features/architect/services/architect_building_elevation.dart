@@ -11,6 +11,7 @@ import '../models/architect_section_visibility.dart';
 import '../rendering/architect_3d_builder.dart';
 import '../rendering/architect_landscape_painter_helper.dart';
 import 'architect_elevation_symbols.dart';
+import 'architect_terrain_composite.dart';
 
 /// Vector hidden-surface removal, independent of screen resolution. Coplanar
 /// triangles (including separate wall segments/storeys) are united before any
@@ -23,6 +24,7 @@ class ArchitectBuildingElevation {
   final List<ArchitectElevationSlope> slopes;
   final List<Offset> terrain;
   final List<Offset> existingTerrain;
+  final List<List<Offset>> existingTerrainSegments;
   const ArchitectBuildingElevation(
     this.faces,
     this.bounds, {
@@ -31,6 +33,7 @@ class ArchitectBuildingElevation {
     this.slopes = const [],
     this.terrain = const [],
     this.existingTerrain = const [],
+    this.existingTerrainSegments = const [],
   });
 
   static ArchitectBuildingElevation build(
@@ -446,20 +449,34 @@ class ArchitectBuildingElevation {
         view,
       );
     }
-    final existingPts = !isSectionBackground &&
-            project != null &&
-            project.isLayerVisible(ArchitectLayer.terrainExistingLayerId)
-        ? _sampleTerrainAlongView(project.existingTerrain, view)
+    List<List<Offset>> existingDiffSegments = const [];
+    List<Offset> points = view.terrain;
+    if (!isSectionBackground && project != null && view.length > 1e-4) {
+      final sliced = ArchitectTerrainComposite.sliceCompositeProfiles(
+        existing: project.existingTerrain,
+        proposed: project.proposedTerrain,
+        start: view.start,
+        end: view.end,
+        existingVisible: project.isLayerVisible(
+          ArchitectLayer.terrainExistingLayerId,
+        ),
+        proposedVisible: project.isLayerVisible(
+          ArchitectLayer.terrainProposedLayerId,
+        ),
+        stationShift: -view.length / 2,
+        includeUnderExcluded: false,
+        overrideFinalProfile: view.terrain.isNotEmpty ? view.terrain : null,
+      );
+      existingDiffSegments = sliced.existingDiffSegments;
+      if (points.isEmpty) {
+        points = _flattenMonotonicElevationPoints(sliced.finalSegments);
+      }
+    }
+    final existingPts = existingDiffSegments.isNotEmpty
+        ? existingDiffSegments.first
         : const <Offset>[];
-    final points = view.terrain.isNotEmpty
-        ? view.terrain
-        : (!isSectionBackground &&
-                  project != null &&
-                  project.isLayerVisible(ArchitectLayer.terrainProposedLayerId)
-              ? _sampleTerrainAlongView(project.proposedTerrain, view)
-              : const <Offset>[]);
     if (points.isEmpty) {
-      if (existingPts.isEmpty) return baseGeometry;
+      if (existingDiffSegments.isEmpty) return baseGeometry;
       return ArchitectBuildingElevation(
         baseGeometry.faces,
         baseGeometry.bounds,
@@ -467,6 +484,7 @@ class ArchitectBuildingElevation {
         operations: baseGeometry.operations,
         slopes: baseGeometry.slopes,
         existingTerrain: existingPts,
+        existingTerrainSegments: existingDiffSegments,
       );
     }
     validateTerrain(points);
@@ -531,23 +549,26 @@ class ArchitectBuildingElevation {
       ],
       terrain: ground,
       existingTerrain: existingPts,
+      existingTerrainSegments: existingDiffSegments,
     );
   }
 
-  static List<Offset> _sampleTerrainAlongView(
-    ArchitectTerrainSurface surface,
-    ArchitectElevation view,
+  static List<Offset> _flattenMonotonicElevationPoints(
+    List<List<Offset>> segments,
   ) {
-    if (surface.isEmpty || view.length <= 1e-4) return const [];
-    final segments = surface.sliceProfileSegments(view.start, view.end);
-    if (segments.isEmpty) return const [];
-    final half = view.length / 2;
     final pts = <Offset>[];
     for (final seg in segments) {
       for (final p in seg) {
-        final shifted = Offset(p.dx - half, p.dy);
-        if (pts.isEmpty || shifted.dx - pts.last.dx >= 0.01) {
-          pts.add(shifted);
+        if (pts.isEmpty) {
+          pts.add(p);
+          continue;
+        }
+        final dx = p.dx - pts.last.dx;
+        if (dx >= 0.002) {
+          pts.add(p);
+        } else if (dx >= -1e-4 && (p.dy - pts.last.dy).abs() > 0.005) {
+          // Preserve sharp vertical retaining steps while keeping X strictly monotonic.
+          pts.add(Offset(pts.last.dx + 0.002, p.dy));
         }
       }
     }
@@ -596,8 +617,10 @@ class ArchitectBuildingElevation {
         }
 
         final groundZ =
-            project.proposedTerrain.evaluateElevationAt(veg.position) ??
-            project.existingTerrain.evaluateElevationAt(veg.position) ??
+            ArchitectTerrainComposite.evaluateFinalElevationAt(
+              project,
+              veg.position,
+            ) ??
             storey.elevation;
         final plantPaths =
             ArchitectLandscapePainterHelper.buildElevationPlantPaths(
@@ -642,6 +665,7 @@ class ArchitectBuildingElevation {
       slopes: geometry.slopes,
       terrain: geometry.terrain,
       existingTerrain: geometry.existingTerrain,
+      existingTerrainSegments: geometry.existingTerrainSegments,
     );
   }
 

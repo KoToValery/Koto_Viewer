@@ -33,6 +33,7 @@ import '../rendering/architect_path_solid.dart';
 import '../rendering/architect_wall_solids.dart';
 import '../rendering/architect_railing_geometry.dart';
 import 'architect_roof_geometry.dart';
+import 'architect_terrain_composite.dart';
 import 'architect_slab_geometry.dart';
 import 'architect_ceiling_geometry.dart';
 import 'architect_stair_section.dart';
@@ -1778,66 +1779,65 @@ class ArchitectBuildingSection {
       regions: regions,
     );
 
-    // Slice Existing Terrain (passes continuously through the building!)
+    // Slice composite final terrain (solid + earth hatch) and filtered existing
+    // terrain (dashed ONLY where elevation differs or under building/cutout).
     final existingTerrainPath = Path();
-    if (project.isLayerVisible(ArchitectLayer.terrainExistingLayerId) &&
-        !project.existingTerrain.isEmpty) {
-      final exSegments = project.existingTerrain.sliceProfileSegments(
-        cut.start,
-        cut.end,
-        excludedIntervals: const [],
-      );
-      for (final seg in exSegments) {
-        if (seg.length < 2) continue;
-        existingTerrainPath.moveTo(seg.first.dx, seg.first.dy);
-        for (int i = 1; i < seg.length; i++) {
-          existingTerrainPath.lineTo(seg[i].dx, seg[i].dy);
-        }
+    final proposedTerrainPath = Path();
+    var proposedHatchBand = Path();
+    final terrainProfile = ArchitectTerrainComposite.sliceCompositeProfiles(
+      existing: project.existingTerrain,
+      proposed: project.proposedTerrain,
+      start: cut.start,
+      end: cut.end,
+      existingVisible: project.isLayerVisible(
+        ArchitectLayer.terrainExistingLayerId,
+      ),
+      proposedVisible: project.isLayerVisible(
+        ArchitectLayer.terrainProposedLayerId,
+      ),
+      excludedIntervals: buildingIntervals,
+      includeUnderExcluded: true,
+    );
+
+    for (final seg in terrainProfile.existingDiffSegments) {
+      if (seg.length < 2) continue;
+      existingTerrainPath.moveTo(seg.first.dx, seg.first.dy);
+      for (int i = 1; i < seg.length; i++) {
+        existingTerrainPath.lineTo(seg[i].dx, seg[i].dy);
       }
     }
 
-    // Slice Proposed Terrain (terminates at left building wall & resumes at right building wall!)
-    final proposedTerrainPath = Path();
-    var proposedHatchBand = Path();
-    if (project.isLayerVisible(ArchitectLayer.terrainProposedLayerId) &&
-        !project.proposedTerrain.isEmpty) {
-      final propSegments = project.proposedTerrain.sliceProfileSegments(
-        cut.start,
-        cut.end,
-        excludedIntervals: buildingIntervals,
-      );
-      for (final seg in propSegments) {
-        if (seg.length < 2) continue;
-        proposedTerrainPath.moveTo(seg.first.dx, seg.first.dy);
-        for (int i = 1; i < seg.length; i++) {
-          proposedTerrainPath.lineTo(seg[i].dx, seg[i].dy);
+    for (final seg in terrainProfile.finalSegments) {
+      if (seg.length < 2) continue;
+      proposedTerrainPath.moveTo(seg.first.dx, seg.first.dy);
+      for (int i = 1; i < seg.length; i++) {
+        proposedTerrainPath.lineTo(seg[i].dx, seg[i].dy);
+      }
+      final bandPoly = <Offset>[
+        ...seg,
+        for (final p in seg.reversed) Offset(p.dx, p.dy - 0.35),
+      ];
+      final segBand = Path()..addPolygon(bandPoly, true);
+      try {
+        proposedHatchBand = Path.combine(
+          PathOperation.union,
+          proposedHatchBand,
+          segBand,
+        );
+      } catch (_) {}
+    }
+    if (!proposedHatchBand.getBounds().isEmpty) {
+      for (final r in regions) {
+        if (!r.path.getBounds().overlaps(proposedHatchBand.getBounds())) {
+          continue;
         }
-        final bandPoly = <Offset>[
-          ...seg,
-          for (final p in seg.reversed) Offset(p.dx, p.dy - 0.35),
-        ];
-        final segBand = Path()..addPolygon(bandPoly, true);
         try {
           proposedHatchBand = Path.combine(
-            PathOperation.union,
+            PathOperation.difference,
             proposedHatchBand,
-            segBand,
+            r.path,
           );
         } catch (_) {}
-      }
-      if (!proposedHatchBand.getBounds().isEmpty) {
-        for (final r in regions) {
-          if (!r.path.getBounds().overlaps(proposedHatchBand.getBounds())) {
-            continue;
-          }
-          try {
-            proposedHatchBand = Path.combine(
-              PathOperation.difference,
-              proposedHatchBand,
-              r.path,
-            );
-          } catch (_) {}
-        }
       }
     }
 
@@ -2277,8 +2277,7 @@ class ArchitectBuildingSection {
     if (!project.isLayerVisible(ArchitectLayer.pathwayLayerId)) return;
     double groundZAt(double s, double fallbackZ) {
       final pt = cut.pointAt(s);
-      return project.proposedTerrain.evaluateElevationAt(pt) ??
-          project.existingTerrain.evaluateElevationAt(pt) ??
+      return ArchitectTerrainComposite.evaluateFinalElevationAt(project, pt) ??
           fallbackZ;
     }
 

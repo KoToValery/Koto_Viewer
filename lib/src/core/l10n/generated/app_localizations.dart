@@ -25415,6 +25415,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Vertical elevation step (Δh) between contours. 0.00 = auto-calculated after 2 contours.'**
   String get architectTerrainContourIntervalHint;
+
+  /// Properties label for how a proposed terrain boundary or flat pad joins existing terrain
+  ///
+  /// In en, this message translates to:
+  /// **'Edge transition'**
+  String get architectTerrainEdgeTransition;
+
+  /// Edge transition option where boundary perimeter matches existing terrain elevations
+  ///
+  /// In en, this message translates to:
+  /// **'Match existing'**
+  String get architectTerrainEdgeMatchExisting;
+
+  /// Edge transition option that generates a sloped embankment or cut batter to daylight
+  ///
+  /// In en, this message translates to:
+  /// **'Batter slope'**
+  String get architectTerrainEdgeSlope;
+
+  /// Edge transition option that forms a vertical step or retaining wall along the perimeter
+  ///
+  /// In en, this message translates to:
+  /// **'Retaining wall'**
+  String get architectTerrainEdgeRetainingWall;
+
+  /// Horizontal-to-vertical batter slope ratio parameter
+  ///
+  /// In en, this message translates to:
+  /// **'Slope ratio (1:H)'**
+  String get architectTerrainSlopeRatio;
 }
 
 class _AppLocalizationsDelegate
