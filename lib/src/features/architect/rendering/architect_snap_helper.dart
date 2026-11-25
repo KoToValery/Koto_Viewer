@@ -103,6 +103,7 @@ class ArchitectSnapHelper {
   static BimSnapKind _kind(String label) => switch (label) {
     'Endpoint' ||
     'Vertex' ||
+    'Point' ||
     'Axis endpoint' ||
     'Door jamb' ||
     'Window jamb' => BimSnapKind.endpoint,

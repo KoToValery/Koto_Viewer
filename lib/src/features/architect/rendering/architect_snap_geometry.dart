@@ -1,4 +1,5 @@
 import '../services/architect_ellipse_geometry.dart';
+import '../services/architect_overhang_detector.dart';
 import '../services/architect_roof_junctions.dart';
 import 'architect_panel_roof_geometry.dart';
 import 'architect_path_solid.dart';
@@ -8,7 +9,6 @@ import 'dart:ui';
 import '../../bim_editing/scene/bim_point_index.dart';
 import '../../bim_editing/scene/bim_bounds_index.dart';
 import '../models/architect_column.dart';
-import '../models/architect_wall_arc.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../../bim_editing/geometry/bim_line_geometry.dart';
@@ -40,7 +40,10 @@ class ArchitectSnapGeometry {
           project,
           wallCoresOnly: true,
         ))
-      : (_cache[project] ??= ArchitectSnapGeometry._(project));
+      : (_cache[project] ??= ArchitectSnapGeometry._(
+          project,
+          wallCoresOnly: false,
+        ));
 
   ArchitectSnapGeometry._(
     ArchitectProject project, {
@@ -117,18 +120,97 @@ class ArchitectSnapGeometry {
       }
     }
 
+    void polyline(
+      List<Offset> points,
+      String owner, {
+      bool closed = false,
+      bool includeMidpoint = true,
+    }) {
+      if (points.isEmpty) return;
+      if (closed && points.length >= 3) {
+        for (var i = 0; i < points.length; i++) {
+          edge(
+            points[i],
+            points[(i + 1) % points.length],
+            owner,
+            includeMidpoint: includeMidpoint,
+          );
+        }
+        return;
+      }
+      for (var i = 0; i < points.length; i++) {
+        point(points[i], 'Vertex', owner);
+        if (i > 0) {
+          edge(
+            points[i - 1],
+            points[i],
+            owner,
+            includeMidpoint: includeMidpoint,
+          );
+        }
+      }
+    }
+
+    void offsetBody(
+      List<Offset> points,
+      double halfWidth,
+      String owner, {
+      bool closed = false,
+    }) {
+      if (points.length < 2 || halfWidth <= 1e-4) return;
+      final left = ArchitectPathway.offsetChain(
+        points,
+        halfWidth,
+        closed: closed,
+      );
+      final right = ArchitectPathway.offsetChain(
+        points,
+        -halfWidth,
+        closed: closed,
+      );
+      if (closed) {
+        if (left.length >= 3) polygon(left, owner);
+        if (right.length >= 3) polygon(right, owner);
+      } else {
+        final poly = [...left, ...right.reversed];
+        if (poly.length >= 3) polygon(poly, owner);
+      }
+    }
+
     final floor = project.activeStorey;
     final activeIdx = project.storeys.indexWhere((s) => s.id == floor.id);
+    final siteBuildingStorey = floor.isSite
+        ? (project.groundBuildingStorey ??
+              project.storeys
+                  .where(
+                    (s) =>
+                        s.isBuildingStorey &&
+                        s.elevation >= -0.5 - 1e-4 &&
+                        (s.walls.isNotEmpty ||
+                            s.slabs.isNotEmpty ||
+                            s.columns.isNotEmpty ||
+                            s.beams.isNotEmpty ||
+                            s.stairs.isNotEmpty ||
+                            s.openings.isNotEmpty ||
+                            s.zones.isNotEmpty),
+                  )
+                  .fold<ArchitectStorey?>(
+                    null,
+                    (best, s) =>
+                        best == null || s.elevation < best.elevation ? s : best,
+                  ) ??
+              project.highestWallStorey)
+        : null;
     var referenceWalls = floor.walls.isNotEmpty
         ? floor.walls
         : (floor.isRoof
               ? (project.highestWallStorey?.walls ?? const [])
               : (floor.isSite
-                    ? (project.groundBuildingStorey?.walls ?? const [])
+                    ? (siteBuildingStorey?.walls ?? const [])
                     : (activeIdx > 0
                           ? project.storeys[activeIdx - 1].walls
                           : floor.walls)));
-    if (wallCoresOnly) {
+    if (wallCoresOnly && !floor.isSite) {
       referenceWalls = ArchitectWallGeometry.coreWalls(referenceWalls);
     } else {
       referenceWalls = ArchitectWallGeometry.planWalls(referenceWalls);
@@ -293,13 +375,22 @@ class ArchitectSnapGeometry {
     for (final s in joined.edges) {
       edges.add((a: s.$1, b: s.$2, owner: '@wall-joints'));
     }
-    for (final zone in floor.zones) {
-      polygon(zone.polygon, zone.id);
-    }
-    for (final slab in floor.slabs) {
-      polygon(slab.polygon, slab.id);
-      for (final h in slab.holes) {
-        polygon(h, slab.id);
+    final structuralStoreys = <ArchitectStorey>[
+      floor,
+      if (floor.isSite &&
+          siteBuildingStorey != null &&
+          siteBuildingStorey.id != floor.id)
+        siteBuildingStorey,
+    ];
+    for (final storey in structuralStoreys) {
+      for (final zone in storey.zones) {
+        polygon(zone.polygon, zone.id);
+      }
+      for (final slab in storey.slabs) {
+        polygon(slab.polygon, slab.id);
+        for (final h in slab.holes) {
+          polygon(h, slab.id);
+        }
       }
     }
     final roofStoreys = <ArchitectStorey>[
@@ -325,23 +416,103 @@ class ArchitectSnapGeometry {
       }(),
     ];
     if (floor.isSite) {
-      for (final surface in [project.existingTerrain, project.proposedTerrain]) {
+      if (siteBuildingStorey != null) {
+        for (final overhang in ArchitectOverhangDetector.detectSiteOverhangs(
+          project,
+          siteBuildingStorey,
+        )) {
+          if (overhang.polygon.length >= 3) {
+            polygon(overhang.polygon, overhang.id);
+          }
+        }
+      }
+      final terrainSurfaces = [
+        if (project.isLayerVisible(ArchitectLayer.terrainExistingLayerId))
+          project.existingTerrain,
+        if (project.isLayerVisible(ArchitectLayer.terrainProposedLayerId))
+          project.proposedTerrain,
+      ];
+      for (final surface in terrainSurfaces) {
         for (final b in surface.boundaries) {
           polygon(b.polygon, b.id);
         }
         for (final c in surface.contours) {
-          if (c.closed) {
-            polygon(c.points, c.id);
-          } else {
-            for (var i = 0; i < c.points.length; i++) {
-              point(c.points[i], 'Vertex', c.id);
-              if (i > 0) edge(c.points[i - 1], c.points[i], c.id);
+          if (c.isSpline && c.points.length >= 3) {
+            for (final p in c.points) {
+              point(p, 'Vertex', c.id);
             }
+            final sampled = c.resolvedPolyline(samplesPerSpan: 8);
+            final segCount = c.closed ? sampled.length : sampled.length - 1;
+            for (var i = 0; i < segCount; i++) {
+              final a = sampled[i];
+              final b = sampled[(i + 1) % sampled.length];
+              if ((b - a).distanceSquared >= 1e-16) {
+                edges.add((a: a, b: b, owner: c.id));
+              }
+            }
+          } else {
+            polyline(c.points, c.id, closed: c.closed);
           }
         }
         for (final sp in surface.spots) {
           point(sp.position, 'Point', sp.id);
         }
+      }
+    }
+    for (final pathway in floor.pathways) {
+      if (pathway.points.isEmpty ||
+          !project.isElementVisible(pathway.id, ArchitectLayer.pathwayLayerId)) {
+        continue;
+      }
+      polyline(pathway.points, pathway.id, closed: pathway.closed);
+      if (!pathway.closed && pathway.pavingPolygon.length >= 3) {
+        polygon(pathway.pavingPolygon, pathway.id);
+      }
+      for (final curb in [pathway.leftCurbPolygon, pathway.rightCurbPolygon]) {
+        if (curb.length >= 3) polygon(curb, pathway.id);
+      }
+    }
+    for (final street in floor.streets) {
+      if (street.points.isEmpty ||
+          !project.isElementVisible(street.id, ArchitectLayer.streetLayerId)) {
+        continue;
+      }
+      polyline(street.points, street.id, closed: street.closed);
+      for (final poly in [
+        street.roadwayPolygon,
+        street.leftCurbPolygon,
+        street.rightCurbPolygon,
+        street.leftSidewalkPolygon,
+        street.rightSidewalkPolygon,
+      ]) {
+        if (poly.length >= 3) polygon(poly, street.id);
+      }
+    }
+    for (final fence in floor.siteFences) {
+      if (fence.points.isEmpty ||
+          !project.isElementVisible(fence.id, ArchitectLayer.pathwayLayerId)) {
+        continue;
+      }
+      polyline(fence.points, fence.id, closed: fence.closed);
+      offsetBody(
+        fence.points,
+        fence.thickness * 0.5,
+        fence.id,
+        closed: fence.closed,
+      );
+      for (final (pierCenter, _) in fence.pierPositions) {
+        point(pierCenter, 'Center', fence.id);
+      }
+    }
+    for (final veg in floor.vegetation) {
+      if (!project.isElementVisible(veg.id, ArchitectLayer.vegetationLayerId)) {
+        continue;
+      }
+      if (veg.isHedge) {
+        polyline(veg.hedgePoints, veg.id);
+        offsetBody(veg.hedgePoints, veg.hedgeWidth * 0.5, veg.id);
+      } else {
+        circle(veg.position, veg.crownDiameter * 0.5, veg.id);
       }
     }
     for (final roofStorey in roofStoreys) {
@@ -385,35 +556,38 @@ class ArchitectSnapGeometry {
         }
       }
     }
-    for (final opening in floor.openings) {
-      polygon(opening.boundary, opening.id);
-    }
-    for (final beam in floor.beams) {
-      edge(beam.startPoint, beam.endPoint, beam.id);
-      polygon(beam.polygonCorners, beam.id);
-    }
-    for (final stair in floor.stairs) {
-      if (stair.design == null) {
-        edge(stair.startPoint, stair.endPoint, stair.id);
+    for (final storey in structuralStoreys) {
+      for (final opening in storey.openings) {
+        polygon(opening.boundary, opening.id);
       }
-      for (final footprint in stair.plan.footprints) {
-        polygon(footprint, stair.id);
+      for (final beam in storey.beams) {
+        edge(beam.startPoint, beam.endPoint, beam.id);
+        polygon(beam.polygonCorners, beam.id);
       }
-    }
-    for (final column in floor.columns) {
-      if (column.shape == ColumnShape.circular) {
-        circle(column.position, column.width / 2, column.id);
-      } else {
-        final angle = column.rotationDeg * math.pi / 180;
-        final u = Offset(math.cos(angle), math.sin(angle)) * column.width / 2;
-        final v = Offset(-math.sin(angle), math.cos(angle)) * column.depth / 2;
-        polygon([
-          column.position - u - v,
-          column.position + u - v,
-          column.position + u + v,
-          column.position - u + v,
-        ], column.id);
-        point(column.position, 'Center', column.id);
+      for (final stair in storey.stairs) {
+        if (stair.design == null) {
+          edge(stair.startPoint, stair.endPoint, stair.id);
+        }
+        for (final footprint in stair.plan.footprints) {
+          polygon(footprint, stair.id);
+        }
+      }
+      for (final column in storey.columns) {
+        if (column.shape == ColumnShape.circular) {
+          circle(column.position, column.width / 2, column.id);
+        } else {
+          final angle = column.rotationDeg * math.pi / 180;
+          final u = Offset(math.cos(angle), math.sin(angle)) * column.width / 2;
+          final v =
+              Offset(-math.sin(angle), math.cos(angle)) * column.depth / 2;
+          polygon([
+            column.position - u - v,
+            column.position + u - v,
+            column.position + u + v,
+            column.position - u + v,
+          ], column.id);
+          point(column.position, 'Center', column.id);
+        }
       }
     }
     for (final primitive in floor.cadPrimitives) {

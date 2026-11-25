@@ -11740,6 +11740,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    final wallCoresOnly =
+        !(_activeTool.isLandscapeTool || (source ?? _project).activeStorey.isSite);
     final snap = anchor == null
 
         ? ArchitectSnapHelper.snapFree(
@@ -11755,6 +11757,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             magnetic: _magnetEnabled,
 
             alignment: true,
+
+            wallCoresOnly: wallCoresOnly,
 
             underlay: _currentUnderlayDoc,
 
@@ -11779,6 +11783,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             magnetic: _magnetEnabled,
 
             alignment: true,
+
+            wallCoresOnly: wallCoresOnly,
 
             underlay: _currentUnderlayDoc,
 
@@ -12736,6 +12742,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             magnetic: _magnetEnabled,
 
             alignment: true,
+
+            wallCoresOnly: !baseProject.activeStorey.isSite,
 
             excludedIds: {_polygonEditor.elementId!},
 
@@ -14153,16 +14161,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
     }
 
-    final midpointSnap =
-        snap.snapLabel == 'Midpoint' ||
-        snap.snapLabel == 'Midpoint alignment';
+    final isAngleOnlySnap =
+        snap.angleDeg != null && !(snap.snapLabel?.startsWith('Axis ') ?? false);
+    if (snap.isSnapped && !isAngleOnlySnap) {
+      return (
+        point: snap.point,
+        snapLabel: snap.snapLabel,
+        magneticGuides: snap.magneticGuides,
+      );
+    }
+
+    if (!_magnetEnabled) {
+      return (
+        point: snap.point,
+        snapLabel: snap.snapLabel,
+        magneticGuides: snap.magneticGuides,
+      );
+    }
+
     if (points.length >= 3 &&
-        !midpointSnap &&
         _landscapeTool.isClosedPolygonDraft(_activeTool.name)) {
       final closure =
           BimContourDraftingGeometry.calculatePolygonClosureOrthoSnap(
             points: points,
-            raw: snap.isSnapped ? snap.point : rawModel,
+            raw: rawModel,
             tolerance: math.max(16.0 / _currentScale, 0.30),
           );
       if (closure.isSnapped) {
@@ -14176,7 +14198,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final orthoPerp = ArchitectLandscapeTool.resolveDraftSnapping(
       points: points,
-      rawPoint: snap.isSnapped ? snap.point : rawModel,
+      rawPoint: rawModel,
       toleranceMeters: math.max(16.0 / _currentScale, 0.30),
     );
     if (orthoPerp.$2 != null) {
@@ -16993,7 +17015,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return;
       }
 
-      final resolved = _resolveLandscapeDraftPoint(rawModel);
+      final resolved = _resolveLandscapeDraftPoint(
+        rawModel,
+        tolerancePixels: _landscapeTool.isDrafting
+            ? (_touchInput ? 18 : 12)
+            : null,
+      );
       final pt = resolved.point;
       final closeRadius = _landscapeCloseRadius;
       final isManualContour =
