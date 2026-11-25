@@ -7826,5 +7826,13 @@
   "architectUnderlayShareGround": "Show on storeys ≤ ±0.00",
   "@architectUnderlayShareGround": {
     "description": "Toggle sharing the Site Plan CAD underlay onto ground/basement storeys"
+  },
+  "architectWallMoveExactDistance": "Exact distance",
+  "@architectWallMoveExactDistance": {
+    "description": "Tooltip and label for entering exact move distance after dragging a wall"
+  },
+  "architectWallMoveExactDistanceHint": "Distance from the pre-drag position along the move direction. Use ± to reverse.",
+  "@architectWallMoveExactDistanceHint": {
+    "description": "Helper text inside the exact distance dialog after dragging a wall"
   }
 }

@@ -25655,6 +25655,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show on storeys ≤ ±0.00'**
   String get architectUnderlayShareGround;
+
+  /// Tooltip and label for entering exact move distance after dragging a wall
+  ///
+  /// In en, this message translates to:
+  /// **'Exact distance'**
+  String get architectWallMoveExactDistance;
+
+  /// Helper text inside the exact distance dialog after dragging a wall
+  ///
+  /// In en, this message translates to:
+  /// **'Distance from the pre-drag position along the move direction. Use ± to reverse.'**
+  String get architectWallMoveExactDistanceHint;
 }
 
 class _AppLocalizationsDelegate

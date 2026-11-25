@@ -116,6 +116,7 @@ import '../services/architect_new_point_measure.dart';
 import '../services/architect_wall_library.dart';
 import '../widgets/architect_new_point_overlay.dart';
 import '../widgets/architect_new_point_distance_dialog.dart';
+import '../widgets/architect_wall_move_exact_chip.dart';
 
 
 import '../services/architect_wall_compositions.dart';
@@ -1894,6 +1895,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _activeMagneticGuides = [];
 
     _activeSnapLabel = null;
+
+    _lastWallMoveRefinement = null;
+    _wallMoveDisplacementLine = null;
 
   }
 
@@ -6088,6 +6092,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _marqueeTool.cancel();
 
     }
+    if (_lastWallMoveRefinement != null &&
+        !identical(_lastWallMoveRefinement!.committedProject, _commands.documentProject)) {
+      _lastWallMoveRefinement = null;
+    }
 
     if (!_commands.isPlan || _editingGroup == null) _editingGroupId = null;
 
@@ -7989,6 +7997,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   int _offsetEpoch = 0;
 
+  _WallMoveRefinement? _lastWallMoveRefinement;
+  (Offset, Offset)? _wallMoveDisplacementLine;
+  bool _wallMoveExactDialogOpen = false;
+
   bool _mirrorIsDuplicate = false;
   bool _mirrorReview = false;
   Offset? _mirrorDirection;
@@ -9279,6 +9291,265 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _transverseMove = true;
       _moveSelection = true;
     });
+  }
+
+  Offset _snapWallMoveDelta(
+    Offset delta,
+    Set<String> ids, {
+    required bool allowElementSnap,
+  }) {
+    _activeMagneticGuides = [];
+    _activeSnapLabel = null;
+    final alignment = ArchitectWallAlignment.move(
+      _linearEditWalls,
+      ids,
+      delta,
+      _currentScale,
+      parallelOnly: _transverseMove,
+      coreOnly: true,
+    );
+    var result = alignment.$1;
+    if (allowElementSnap) {
+      final snapDelta = _snapMovingElements(result, ids);
+      if ((snapDelta - result).distance > 1e-4 || _activeSnapLabel != null) {
+        return snapDelta;
+      }
+    }
+    if (alignment.$2.isNotEmpty) {
+      _activeMagneticGuides = alignment.$2;
+      _activeSnapLabel = 'Alignment';
+      return result;
+    }
+    if (!_transverseMove && _elementMoveStart != null) {
+      final dirSnap = ArchitectSnapHelper.snapDirection(
+        anchor: _elementMoveStart!,
+        delta: result,
+        radius: math.min(18.0 / math.max(_currentScale, 1e-4), 0.35),
+        scale: _currentScale,
+      );
+      if (dirSnap.isSnapped) {
+        _activeSnapLabel = dirSnap.snapLabel;
+        _activeMagneticGuides = dirSnap.magneticGuides;
+        return dirSnap.point;
+      }
+    }
+    return result;
+  }
+
+  _WallMoveRefinement? get _activeWallMoveRefinement {
+    final r = _lastWallMoveRefinement;
+    if (r == null) return null;
+    if (!_commands.isPlan ||
+        _is3DView ||
+        _printPreview ||
+        _dragController.isActive ||
+        _commandPreview != null ||
+        _isActivelyDraggingHandle ||
+        _offsetOptions != null ||
+        _polygonDistanceOpen ||
+        _wallMoveExactDialogOpen ||
+        r.storeyId != _project.activeStoreyId ||
+        !r.elementIds.any(
+          (id) => _effectiveSelection.contains(id) || _selectedElementId == id,
+        ) ||
+        !identical(_commands.documentProject, r.committedProject)) {
+      return null;
+    }
+    return r;
+  }
+
+  void _recordWallMoveRefinement({
+    required ArchitectProject beforeProject,
+    required Set<String> elementIds,
+    required Offset delta,
+    required int undoSteps,
+  }) {
+    if (!_commands.isPlan || delta.distance <= 1e-4) return;
+    if (!beforeProject.activeStorey.walls.any((w) => elementIds.contains(w.id))) {
+      return;
+    }
+    final committed = _commands.documentProject;
+    final movedWalls = committed.activeStorey.walls
+        .where((w) => elementIds.contains(w.id))
+        .toList();
+    if (movedWalls.isEmpty) return;
+    var anchorSum = Offset.zero;
+    for (final w in movedWalls) {
+      anchorSum += w.centerPointAt(0.5);
+    }
+    final anchorModel = anchorSum / movedWalls.length.toDouble();
+    setState(() {
+      _lastWallMoveRefinement = _WallMoveRefinement(
+        beforeProject: beforeProject,
+        committedProject: committed,
+        storeyId: committed.activeStoreyId,
+        elementIds: Set<String>.of(elementIds),
+        delta: delta,
+        anchorModel: anchorModel,
+        undoSteps: math.max(1, undoSteps),
+      );
+    });
+  }
+
+  Future<void> _openWallMoveExactDistanceDialog() async {
+    final refinement = _activeWallMoveRefinement;
+    if (refinement == null || _wallMoveExactDialogOpen || !mounted) return;
+    final origDist = refinement.delta.distance;
+    if (origDist < 1e-6) return;
+    final dir = refinement.delta / origDist;
+    final source = refinement.beforeProject;
+    final committed = refinement.committedProject;
+    final unit = source.units;
+    final initialUnit = double.parse(
+      unit.toUnit(origDist).toStringAsFixed(source.distanceDecimals),
+    );
+    var meters = unit.fromUnit(initialUnit);
+    final anchorBefore = refinement.anchorModel - refinement.delta;
+
+    ArchitectProject? computeAt(double distMeters) {
+      if (!distMeters.isFinite || distMeters.abs() < 1e-4) return null;
+      final nextDelta = dir * distMeters;
+      try {
+        final moved = refinement.elementIds.length == 1
+            ? MoveArchitectElement(
+                storeyId: refinement.storeyId,
+                elementId: refinement.elementIds.single,
+                delta: nextDelta,
+              ).apply(source)
+            : MoveArchitectElements(
+                storeyId: refinement.storeyId,
+                elementIds: refinement.elementIds,
+                delta: nextDelta,
+              ).apply(source);
+        return ArchitectDimensionChain.resolve(moved);
+      } on ArgumentError {
+        return null;
+      }
+    }
+
+    var candidate = computeAt(meters);
+
+    void preview() {
+      candidate = computeAt(meters);
+      _commands.editPreview = candidate;
+      _wallMoveDisplacementLine = candidate == null
+          ? null
+          : (anchorBefore, anchorBefore + dir * meters);
+      _repaintPreview();
+    }
+
+    setState(() => _wallMoveExactDialogOpen = true);
+    preview();
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, dialogSetState) => Dialog(
+            alignment: Alignment.bottomCenter,
+            insetPadding: const EdgeInsets.all(12),
+            constraints: const BoxConstraints(maxWidth: 280),
+            backgroundColor: Colors.transparent,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Material(
+                    color: Theme.of(dialogContext).colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Text(
+                        context.l10n.architectWallMoveExactDistanceHint,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ArchitectShapeDimensionPanel(
+                    key: const ValueKey('wall-move-exact-keypad'),
+                    values: [initialUnit],
+                    labels: [context.l10n.architectEdgeDistance],
+                    unit: unit.symbol,
+                    decimals: source.distanceDecimals,
+                    minimum: -double.infinity,
+                    signed: true,
+                    canSave: candidate != null &&
+                        identical(committed, _commands.documentProject),
+                    onChanged: (_, value) {
+                      meters = unit.fromUnit(value);
+                      preview();
+                      dialogSetState(() {});
+                    },
+                    onSave: () {
+                      final next = candidate;
+                      if (next == null ||
+                          !identical(committed, _commands.documentProject)) {
+                        return;
+                      }
+                      _commands.editPreview = null;
+                      _wallMoveDisplacementLine = null;
+                      if ((meters - origDist).abs() >= 1e-6) {
+                        for (var i = 0;
+                            i < refinement.undoSteps && _modelCommands.canUndo;
+                            i++) {
+                          _modelCommands.undo();
+                        }
+                        _commands.commit(next);
+                        _saveBiMProjectIfAttached();
+                        _syncAutoZones(_commands.documentProject.activeStorey);
+                      }
+                      _lastWallMoveRefinement = null;
+                      Navigator.of(dialogContext).pop();
+                    },
+                    onCancel: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _commands.editPreview = null;
+          _wallMoveDisplacementLine = null;
+          _wallMoveExactDialogOpen = false;
+        });
+        _repaintPreview();
+      }
+    }
+  }
+
+  Widget _buildWallMoveExactChip() {
+    final refinement = _activeWallMoveRefinement;
+    if (refinement == null) return const SizedBox.shrink();
+    return AnimatedBuilder(
+      animation: _viewport,
+      builder: (context, _) {
+        final screenPos = _viewport.toScreen(refinement.anchorModel);
+        final canvasSize = _viewport.size;
+        final maxLeft = math.max(8.0, canvasSize.width - 176.0);
+        final maxTop = math.max(8.0, canvasSize.height - 48.0);
+        final pos = Offset(
+          (screenPos.dx + 12).clamp(8.0, maxLeft).toDouble(),
+          (screenPos.dy - 44).clamp(8.0, maxTop).toDouble(),
+        );
+        final rawDeg =
+            (math.atan2(refinement.delta.dy, refinement.delta.dx) * 180 / math.pi + 360) %
+                360;
+        final roundedDeg = rawDeg.round() % 360;
+        final isDiagonal45 =
+            roundedDeg % 90 == 45 && (rawDeg - rawDeg.round()).abs() < 0.25;
+        return ArchitectWallMoveExactChip(
+          distanceText: _project.formatLength(refinement.delta.distance),
+          angleText: isDiagonal45 ? '$roundedDeg°' : null,
+          position: pos,
+          onEdit: _openWallMoveExactDistanceDialog,
+          onDismiss: () => setState(() => _lastWallMoveRefinement = null),
+        );
+      },
+    );
   }
 
   Offset _constrainMoveDelta(Offset delta, Set<String> ids) {
@@ -13480,34 +13751,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       delta = _constrainMoveDelta(delta, _groupDragIds);
 
       if (_magnetEnabled &&
-
-          _linearEditWalls.any(
-
-            (w) => _groupDragIds.contains(w.id))) {
-
-        final alignment = ArchitectWallAlignment.move(
-
-          _linearEditWalls,
-
-          _groupDragIds,
-
+          _linearEditWalls.any((w) => _groupDragIds.contains(w.id))) {
+        delta = _snapWallMoveDelta(
           delta,
-
-          _currentScale,
-
-          parallelOnly: _transverseMove,
-          coreOnly: true,
-
+          _groupDragIds,
+          allowElementSnap: false,
         );
-
-        delta = alignment.$1;
-
-        _activeMagneticGuides = alignment.$2;
-
       } else {
-
         delta = _snapMovingElements(delta, _groupDragIds);
-
       }
 
       delta = _constrainMoveDelta(delta, _groupDragIds);
@@ -13611,36 +13862,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
 
       if (selectedWall != null && _magnetEnabled) {
-
-        final alignment = ArchitectWallAlignment.move(
-
-          _linearEditWalls,
-
-          {selectedWall.id},
-
+        delta = _snapWallMoveDelta(
           delta,
-
-          _currentScale,
-
-          parallelOnly: _transverseMove,
-          coreOnly: true,
-
+          {selectedWall.id},
+          allowElementSnap: true,
         );
-
-        delta = alignment.$1;
-
-        final snapDelta = _snapMovingElements(delta, {selectedWall.id});
-
-        if ((snapDelta - delta).distance > 1e-4) {
-
-          delta = snapDelta;
-
-        } else {
-
-          _activeMagneticGuides = [..._activeMagneticGuides, ...alignment.$2];
-
-        }
-
       } else if (hostedOpeningWall != null) {
 
         if ((rawModel - _elementMoveStart!).distance < 1e-6) {
@@ -15009,6 +15235,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _activeSnapLabel = null;
 
+    _lastWallMoveRefinement = null;
+    _wallMoveDisplacementLine = null;
+
     if (_axisTool.isDraggingHandle ||
 
         _axisTool.isMovingAxis ||
@@ -15291,6 +15520,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _draggingElementId != null) {
 
+      final hadWholeElementDrag =
+          _wallEndpointOriginal == null &&
+          _drainDragOriginal == null &&
+          _stairHandleOriginal == null &&
+          (_groupDragIds.isNotEmpty || _draggingElementId != null);
+      final movedIds = hadWholeElementDrag
+          ? (_groupDragIds.isNotEmpty
+                ? Set<String>.of(_groupDragIds)
+                : {_draggingElementId!})
+          : const <String>{};
+      final sourceBeforeDrag = _elementMoveOriginal;
+      final movedDelta = _elementMoveDelta;
+      final undoBeforeCommit = _modelCommands.undoCount;
+
       final preview = _finishElementMove(
 
         changed:
@@ -15317,6 +15560,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _saveBiMProjectIfAttached();
 
           _syncAutoZones(preview.activeStorey);
+          if (hadWholeElementDrag &&
+              sourceBeforeDrag != null &&
+              movedDelta != null &&
+              movedDelta.distance > 1e-4) {
+            _recordWallMoveRefinement(
+              beforeProject: sourceBeforeDrag,
+              elementIds: movedIds,
+              delta: movedDelta,
+              undoSteps: _modelCommands.undoCount - undoBeforeCommit,
+            );
+          }
         }
 
       }
@@ -27765,6 +28019,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final target = _dragController.currentPointModel;
     if (target == null) return;
 
+    ArchitectProject? wallMoveBefore;
+    Set<String> wallMoveIds = const {};
+    Offset? wallMoveDelta;
+    final undoBeforeDragCommit = _modelCommands.undoCount;
+
     if (_dragController.isUnderlay) {
       final storeyId = _dragController.storeyId;
       if (_dragController.isCadUnderlay) {
@@ -27805,12 +28064,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     } else {
       if (_elementMovePreview != null) {
+        wallMoveBefore = _elementMoveOriginal;
+        wallMoveIds = Set<String>.of(_dragController.elementIds);
+        wallMoveDelta = _dragController.deltaModel;
         _commands.commit(_elementMovePreview!);
         _saveBiMProjectIfAttached();
       }
     }
 
     _cancelDragPlacement();
+    if (wallMoveBefore != null &&
+        wallMoveDelta != null &&
+        wallMoveDelta.distance > 1e-4) {
+      _recordWallMoveRefinement(
+        beforeProject: wallMoveBefore,
+        elementIds: wallMoveIds,
+        delta: wallMoveDelta,
+        undoSteps: _modelCommands.undoCount - undoBeforeDragCommit,
+      );
+    }
   }
 
   void _cancelDragPlacement() {
@@ -34502,6 +34774,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       ),
                     if (_dragController.isActive && !_is3DView)
                       _buildDragFloatingOverlay(),
+                    if (_activeWallMoveRefinement != null)
+                      _buildWallMoveExactChip(),
                     if (!_is3DView &&
                         !_placingWithHold &&
                         (_hasStagedColumnPlacement ||
@@ -39087,6 +39361,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _activeSnapLabel = null;
 
+    _lastWallMoveRefinement = null;
+    _wallMoveDisplacementLine = null;
+
   });
 
 
@@ -40179,7 +40456,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     polygonEditInvalid: _polygonEditor.invalid,
     polygonEditHoleIndex: _selectedPolygonHoleIndex,
 
-    polygonLeaderLine: _polygonEditor.leaderLine ?? _polygonDisplacementLine,
+    polygonLeaderLine: _polygonEditor.leaderLine ??
+        _polygonDisplacementLine ??
+        _wallMoveDisplacementLine,
 
     handleOffsetLength: _handleOffsetLength,
 
@@ -40275,4 +40554,24 @@ extension _ArchitectLineEndCapL10n on ArchitectLineEndCap {
     ArchitectLineEndCap.dotOpen => l.architectLineCapDotOpen,
     ArchitectLineEndCap.tick => l.architectLineCapTick,
   };
+}
+
+class _WallMoveRefinement {
+  final ArchitectProject beforeProject;
+  final ArchitectProject committedProject;
+  final String storeyId;
+  final Set<String> elementIds;
+  final Offset delta;
+  final Offset anchorModel;
+  final int undoSteps;
+
+  const _WallMoveRefinement({
+    required this.beforeProject,
+    required this.committedProject,
+    required this.storeyId,
+    required this.elementIds,
+    required this.delta,
+    required this.anchorModel,
+    required this.undoSteps,
+  });
 }

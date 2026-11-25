@@ -188,6 +188,47 @@ class ArchitectSnapHelper {
     return best ?? ArchitectSnapResult(point: delta);
   }
 
+  /// Snaps a whole-element move vector [delta] to cardinal (0°/90°) or 45°
+  /// diagonal guide lines relative to [anchor] when within angular and lateral tolerance.
+  static ArchitectSnapResult snapDirection({
+    required Offset anchor,
+    required Offset delta,
+    double radius = 0.25,
+    double scale = 1.0,
+    bool allowDiagonals = true,
+  }) {
+    if (delta.distance < 1e-4) return ArchitectSnapResult(point: delta);
+    final angle = math.atan2(delta.dy, delta.dx);
+    final maxLateral = math.max(radius, 0.35);
+    final overshoot = math.max(0.6, 48.0 / math.max(scale, 1e-4));
+    final steps = allowDiagonals
+        ? const [math.pi / 2, math.pi / 4]
+        : const [math.pi / 2];
+
+    for (final step in steps) {
+      final target = (angle / step).round() * step;
+      final u = Offset(math.cos(target), math.sin(target));
+      final distAlong = _dot(delta, u);
+      if (distAlong <= 1e-4) continue;
+      final snappedDelta = u * distAlong;
+      final threshold = step == math.pi / 2 ? math.pi / 15 : math.pi / 30;
+      if ((angle - target).abs() <= threshold &&
+          (snappedDelta - delta).distance <= maxLateral) {
+        final degrees = (target * 180 / math.pi + 360) % 360;
+        final guideStart = anchor - u * (overshoot * 0.5);
+        final guideEnd = anchor + snappedDelta + u * overshoot;
+        return ArchitectSnapResult(
+          point: snappedDelta,
+          isSnapped: true,
+          snapLabel: '${degrees.round()}°',
+          angleDeg: degrees,
+          magneticGuides: [(guideStart, guideEnd)],
+        );
+      }
+    }
+    return ArchitectSnapResult(point: delta);
+  }
+
   static ArchitectSnapResult _resolve({
     required Offset raw,
     Offset? anchor,

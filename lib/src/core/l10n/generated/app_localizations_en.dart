@@ -14143,4 +14143,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectUnderlayShareGround => 'Show on storeys ≤ ±0.00';
+
+  @override
+  String get architectWallMoveExactDistance => 'Exact distance';
+
+  @override
+  String get architectWallMoveExactDistanceHint =>
+      'Distance from the pre-drag position along the move direction. Use ± to reverse.';
 }

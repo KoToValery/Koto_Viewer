@@ -14193,4 +14193,11 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectUnderlayShareGround => 'Покажи на етажи ≤ ±0.00';
+
+  @override
+  String get architectWallMoveExactDistance => 'Точно разстояние';
+
+  @override
+  String get architectWallMoveExactDistanceHint =>
+      'Разстояние от началната позиция по посоката на преместване. С ± обръщате посоката.';
 }

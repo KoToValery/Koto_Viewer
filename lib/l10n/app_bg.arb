@@ -4829,5 +4829,7 @@
   "architectSheetOrientationProjectNorth": "Проектен север",
   "architectSheetOrientationTrueNorth": "Истински север",
   "architectSheetOrientationCustom": "По избор",
-  "architectUnderlayShareGround": "Покажи на етажи ≤ ±0.00"
+  "architectUnderlayShareGround": "Покажи на етажи ≤ ±0.00",
+  "architectWallMoveExactDistance": "Точно разстояние",
+  "architectWallMoveExactDistanceHint": "Разстояние от началната позиция по посоката на преместване. С ± обръщате посоката."
 }
