@@ -11366,9 +11366,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    // Direct endpoint grab on unselected wall or beam (auto-selects and starts point drag)
+    // Direct endpoint grab on unselected wall or beam (touch or Select tool only;
+    // mouse clicks in drawing tools start drafting from the snapped endpoint).
 
-    if (_linearHandleTool &&
+    if ((_touchInput || _activeTool == ArchitectTool.select) &&
+
+        _linearHandleTool &&
 
         _selectedLinearElement == null &&
 
@@ -16501,7 +16504,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         !_blocksElementPickOrContextMenu &&
 
-        !(_touchInput && _placingWithHold) &&
+        _touchInput && !_placingWithHold &&
 
         _effectiveSelection.isEmpty &&
 
@@ -17216,10 +17219,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         _draftEnd = _snapElement(rawModel).point;
 
-        unawaited(_editWallArcDimension(
-          dimension: ArchitectArcDimension.sagitta,
-          commitDraft: true,
-        ));
+        if (!_touchInput) {
+          _commitWallArc();
+        } else {
+          unawaited(_editWallArcDimension(
+            dimension: ArchitectArcDimension.sagitta,
+            commitDraft: true,
+          ));
+        }
 
         return;
 
@@ -17261,24 +17268,39 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
         if (!_viewMarkerTool) _orientWallReference(snap.point);
 
-        if ((snap.point - _draftStart!).distance >= .001 &&
-            !_viewMarkerTool) {
+        if ((snap.point - _draftStart!).distance >= .001) {
 
-          setState(() {
+          if (_touchInput && _wallPrecisionMode && !_viewMarkerTool) {
 
-            _draftEnd = snap.point;
+            setState(() {
 
-            _activeSnapLabel = snap.snapLabel;
+              _draftEnd = snap.point;
 
-            _wallDirectionLocked = true;
+              _activeSnapLabel = snap.snapLabel;
 
-            _wallPanelAnchor = (_draftStart! + snap.point) / 2;
+              _wallDirectionLocked = true;
 
-          });
+              _wallPanelAnchor = (_draftStart! + snap.point) / 2;
 
-        } else if ((snap.point - _draftStart!).distance >= .001) {
+            });
 
-          _commitCurrentWallSegment(snap.point);
+          } else if (_curvedDraftTool) {
+
+            setState(() {
+
+              _draftEnd = snap.point;
+
+              _activeSnapLabel = snap.snapLabel;
+
+            });
+
+            _beginDraftArcShaping();
+
+          } else {
+
+            _commitCurrentWallSegment(snap.point);
+
+          }
 
         }
 
@@ -18953,7 +18975,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-  void _finishChainedWall() {
+  void _finishChainedWall({bool selectChain = true}) {
     final chainIds = Set<String>.from(_liveDraftChainIds);
     if (_polylineDraftId != null) {
       chainIds.add(_polylineDraftId!);
@@ -18963,7 +18985,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     setState(() {
       _resetWallDraft();
-      if (chainIds.isNotEmpty) {
+      if (selectChain && chainIds.isNotEmpty) {
         _selectionIds
           ..clear()
           ..addAll(chainIds);
@@ -22165,6 +22187,153 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
 
+
+  bool get _hasActiveDraft {
+    if (_linearDraftTool) {
+      return _draftStart != null ||
+          _wallArcEnd != null ||
+          _wallDirectionLocked ||
+          _liveDraftChainIds.isNotEmpty ||
+          _polylineDraftId != null;
+    }
+    if (_activeTool == ArchitectTool.beam ||
+        _activeTool == ArchitectTool.opening ||
+        _activeTool == ArchitectTool.stair ||
+        _activeTool == ArchitectTool.cadRect ||
+        _activeTool == ArchitectTool.cadCircle ||
+        _activeTool == ArchitectTool.cadEllipse ||
+        _activeTool == ArchitectTool.leader ||
+        _activeTool == ArchitectTool.measure) {
+      return _draftStart != null ||
+          _pendingShape != null ||
+          _ellipseDraft.center != null;
+    }
+    if (_activeTool == ArchitectTool.slab ||
+        _activeTool == ArchitectTool.ceiling ||
+        _activeTool == ArchitectTool.hatch ||
+        _activeTool == ArchitectTool.floorDrain ||
+        _activeTool == ArchitectTool.mask ||
+        _activeTool == ArchitectTool.spline ||
+        _cutOpeningTargetId != null) {
+      return _elementTool.slabDraftPoints.isNotEmpty ||
+          _cutOpeningTargetId != null;
+    }
+    if (_activeTool == ArchitectTool.zone && _zoneTool.isDrafting) return true;
+    if (_activeTool == ArchitectTool.roof && _roofTool.isDrafting) return true;
+    if (_activeTool == ArchitectTool.axis && _axisTool.isDrafting) return true;
+    if (_activeTool == ArchitectTool.dimension &&
+        (_draftStart != null ||
+            _dimensionDraft != null ||
+            _dimensionAnchors.isNotEmpty)) {
+      return true;
+    }
+    if (_activeTool.isLandscapeTool && _landscapeTool.isDrafting) return true;
+    if (_underlayMaskDrafting) return true;
+    if (_activeTool == ArchitectTool.select && _marqueeTool.isDrafting) {
+      return true;
+    }
+    return false;
+  }
+
+  bool get _canFinishActiveDraft {
+    if (_linearDraftTool) {
+      return _liveDraftChainIds.isNotEmpty ||
+          _polylineDraftId != null ||
+          _wallDirectionLocked ||
+          _wallArcEnd != null;
+    }
+    if (_activeTool == ArchitectTool.select && _marqueeTool.isDrafting) {
+      return _marqueeTool.points.length >= 3;
+    }
+    return _canConfirmDraft;
+  }
+
+  void _finishActiveDraft() {
+    if (_linearDraftTool) {
+      if (_wallArcEnd != null) {
+        _commitWallArc();
+        if (_cadPolylineMode && _polylineDraftId != null) {
+          _finishChainedWall(selectChain: false);
+        }
+      } else if (_wallDirectionLocked && _draftEnd != null) {
+        _commitCurrentWallSegment(_draftEnd!, continueChain: false);
+      } else {
+        _finishChainedWall(selectChain: false);
+      }
+      return;
+    }
+    if (_activeTool == ArchitectTool.select && _marqueeTool.isDrafting) {
+      _commitMarquee();
+      return;
+    }
+    _onConfirmDraft();
+  }
+
+  Future<void> _showDraftContextMenu(Offset screenPoint) async {
+    final l = context.l10n;
+    final box = context.findRenderObject() as RenderBox?;
+    final globalPos = box?.localToGlobal(screenPoint) ?? screenPoint;
+    final canFinish = _canFinishActiveDraft;
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPos.dx,
+        globalPos.dy,
+        globalPos.dx,
+        globalPos.dy,
+      ),
+      items: [
+        if (canFinish)
+          PopupMenuItem<String>(
+            key: const ValueKey('architect-draft-menu-finish'),
+            value: 'finish',
+            child: Row(
+              children: [
+                const AppIcon(
+                  AppIconId.confirm,
+                  size: 18,
+                  color: Color(0xFF16A34A),
+                ),
+                const SizedBox(width: 8),
+                Text(l.architectDimensionFinish),
+              ],
+            ),
+          ),
+        PopupMenuItem<String>(
+          key: const ValueKey('architect-draft-menu-cancel'),
+          value: 'cancel',
+          child: Row(
+            children: [
+              const AppIcon(
+                AppIconId.close,
+                size: 18,
+                color: Colors.redAccent,
+              ),
+              const SizedBox(width: 8),
+              Text(l.cancel),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (!mounted || action == null) return;
+    if (action == 'finish') {
+      _finishActiveDraft();
+    } else if (action == 'cancel') {
+      _cancelDrafting();
+    }
+  }
+
+  bool _onViewportSecondaryTap(Offset screenPoint) {
+    if (_hasActiveDraft) {
+      unawaited(_showDraftContextMenu(screenPoint));
+      return true;
+    }
+    if (_cutOpeningTargetId != null || _blocksElementPickOrContextMenu) {
+      return false;
+    }
+    return _onContextHold(screenPoint);
+  }
 
   bool _onContextHold(Offset screenPoint) {
     _dismissTouchCandidates();
@@ -36664,7 +36833,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Rect? get _draftCancelRect {
 
-    if (_hasDistanceDraftPanel) return null;
+    if (_hasDistanceDraftPanel || !_touchInput) return null;
 
     final anchor = _draftCancelAnchor;
 
@@ -37038,8 +37207,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             : null,
 
-        onSecondaryTap: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null && !_blocksElementPickOrContextMenu
-            ? _onContextHold : null,
+        onSecondaryTap: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null
+            ? _onViewportSecondaryTap : null,
         onContextHold: _stairDraft == null && !_placingComponent && !_dragController.isActive && _chamferFilletSourceId == null && _offsetOptions == null && _duplicateMove == null && _newPointTargetId == null && _pendingDetachWallIds == null && _wallAttachSourceId == null && _cutOpeningTargetId == null && !_blocksElementPickOrContextMenu
 
             ? _onContextHold

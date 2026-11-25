@@ -249,7 +249,12 @@ Toolbar and palette shape changes retain the chain, and switching back to a
 straight segment during shaping restores the fixed chord for exact review.
 All labels/tooltips use ARB messages. Placement continues through
 `_placeDraftSegment`, `CreateArchitectWall`, command history and the existing save
-path. Regression coverage: `architect_wall_core_snapping_test.dart` and
+path. With mouse (`!_touchInput`), clicking an existing wall/endpoint in a drawing
+tool starts drafting from the snapped point instead of selecting it, the second
+click commits the segment directly (or starts arc shaping when curved), and
+`_onViewportSecondaryTap` / `_showDraftContextMenu` replaces floating draft
+confirm/cancel discs with a Finish / Cancel menu during active drafts. Regression
+coverage: `architect_wall_core_snapping_test.dart` and
 `architect_wall_drafting_controls_test.dart` and `architect_arc_exact_placement_test.dart`.
 
 `_setWallReferenceLine` and wall properties use

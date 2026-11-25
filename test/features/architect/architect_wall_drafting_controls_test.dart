@@ -14,6 +14,7 @@ import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.d
 import 'package:kotoview/src/features/architect/rendering/architect_wall_layers.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_radial_menu.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_wall_reference_control.dart';
 import 'architect_wall_core_snapping_test.dart' as core_snapping;
@@ -334,7 +335,7 @@ void main() {
       for (final hold
           in kind == PointerDeviceKind.touch ? [false, true] : [false]) {
         testWidgets(
-          'After $stop, $kind hold=$hold selects an existing wall without placement',
+          'After $stop, $kind hold=$hold handles clicking an existing wall',
           (tester) async {
             final model = editing.seeded(
               const ArchitectStorey(id: 's', name: '', walls: [source]),
@@ -355,7 +356,16 @@ void main() {
             if (hold) await tester.pump(const Duration(milliseconds: 600));
             await gesture.up();
             await tester.pumpAndSettle();
-            expectIdleSelection(tester, source.id);
+            if (kind == PointerDeviceKind.mouse && stop == 'wall-end') {
+              // Mouse clicks in an idle Wall tool start a new wall from the snapped point.
+              expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+              expect(
+                workspace.overlay(tester).activeDraftStart,
+                source.centerPointAt(.5),
+              );
+            } else {
+              expectIdleSelection(tester, source.id);
+            }
             expect(model.project.toJson(), original);
             expect(model.undoCount, undo);
             expect(tester.takeException(), isNull);
@@ -484,6 +494,180 @@ void main() {
       expect(workspace.overlay(tester).activeDraftEnd, a.coreCenterStart);
       expect(find.byKey(const ValueKey('wall-length-input')), findsOneWidget);
       expect(model.undoCount, undo);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Mouse drafting starts on existing wall body/endpoint, commits on 2nd click, and finishes/cancels via right-click',
+    (tester) async {
+      final model = editing.seeded(
+        const ArchitectStorey(id: 's', name: '', walls: [source]),
+      );
+      addTearDown(model.dispose);
+      await open(tester, model);
+
+      Future<void> mouseClick(
+        Offset worldPoint, {
+        int buttons = kPrimaryButton,
+      }) async {
+        final g = await tester.startGesture(
+          workspace.screen(tester, worldPoint),
+          kind: PointerDeviceKind.mouse,
+          buttons: buttons,
+        );
+        await g.up();
+        await tester.pumpAndSettle();
+      }
+
+      // 1. Left-click on an existing wall endpoint starts a new wall (does not select/drag source).
+      await mouseClick(source.endPoint);
+      expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+      expect(workspace.overlay(tester).activeDraftStart, source.endPoint);
+      expect(
+        find.byKey(const ValueKey('architect-draft-cancel')),
+        findsNothing,
+      );
+
+      // Right-click after point 1 shows Cancel only and cancels cleanly.
+      await mouseClick(const Offset(1, 1), buttons: kSecondaryMouseButton);
+      expect(
+        find.byKey(const ValueKey('architect-draft-menu-finish')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-draft-menu-cancel')),
+        findsOneWidget,
+      );
+      await command(tester, 'architect-draft-menu-cancel');
+      expect(workspace.overlay(tester).activeDraftStart, isNull);
+      expect(model.project.activeStorey.walls, hasLength(1));
+
+      // 2. In default single-line mode, left-click on existing wall face starts drafting and 2nd click commits directly.
+      await mouseClick(source.centerPointAt(.5));
+      expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+      expect(
+        workspace.overlay(tester).activeDraftStart,
+        source.centerPointAt(.5),
+      );
+      await mouseClick(const Offset(0, 1));
+      expect(model.project.activeStorey.walls, hasLength(2));
+      expect(find.byKey(const ValueKey('wall-length-input')), findsNothing);
+      expect(workspace.overlay(tester).activeDraftStart, isNull);
+
+      // 3. In chained mode, 2nd & 3rd left-clicks continue the chain; right-click Finish ends cleanly.
+      await command(tester, 'wall-chain-toggle');
+      await mouseClick(const Offset(0, 1));
+      expect(
+        (workspace.overlay(tester).activeDraftStart! - const Offset(0, 1))
+            .distance,
+        lessThan(1e-6),
+      );
+      await mouseClick(const Offset(2, 1));
+      expect(model.project.activeStorey.walls, hasLength(3));
+      expect(
+        (workspace.overlay(tester).activeDraftStart! - const Offset(2, 1))
+            .distance,
+        lessThan(1e-6),
+      );
+      await mouseClick(const Offset(2, 2));
+      expect(model.project.activeStorey.walls, hasLength(4));
+      expect(
+        (workspace.overlay(tester).activeDraftStart! - const Offset(2, 2))
+            .distance,
+        lessThan(1e-6),
+      );
+
+      // Right-click mid-chain shows Finish & Cancel; Finish closes chain without leaving selection.
+      await mouseClick(const Offset(3, 2), buttons: kSecondaryMouseButton);
+      expect(
+        find.byKey(const ValueKey('architect-draft-menu-finish')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-draft-menu-cancel')),
+        findsOneWidget,
+      );
+      await command(tester, 'architect-draft-menu-finish');
+      expect(workspace.overlay(tester).activeDraftStart, isNull);
+      expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+      expect(model.project.activeStorey.walls, hasLength(4));
+
+      // Immediately clicking another existing wall starts a new wall chain.
+      await mouseClick(source.startPoint);
+      expect(workspace.overlay(tester).activeDraftStart, source.startPoint);
+      expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+
+      // Esc cancels the pending start, then right-click on idle existing wall opens radial menu.
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).activeDraftStart, isNull);
+      await mouseClick(
+        source.centerPointAt(.5),
+        buttons: kSecondaryMouseButton,
+      );
+      expect(find.byType(ArchitectRadialMenu), findsOneWidget);
+      expect(workspace.overlay(tester).selectedElementIds, {source.id});
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Mouse slab drafting uses right-click Finish/Cancel without floating checkmark or X',
+    (tester) async {
+      final model = editing.seeded(
+        const ArchitectStorey(id: 's', name: '', walls: [source]),
+      );
+      addTearDown(model.dispose);
+      await open(tester, model);
+      await editing.selectTool(tester, 'slab');
+
+      Future<void> mouseClick(
+        Offset worldPoint, {
+        int buttons = kPrimaryButton,
+      }) async {
+        final g = await tester.startGesture(
+          workspace.screen(tester, worldPoint),
+          kind: PointerDeviceKind.mouse,
+          buttons: buttons,
+        );
+        await g.up();
+        await tester.pumpAndSettle();
+      }
+
+      // First click on an existing wall starts the slab contour instead of selecting the wall.
+      await mouseClick(source.startPoint);
+      expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+      expect(workspace.overlay(tester).slabDraftPoints, hasLength(1));
+      expect(
+        find.byKey(const ValueKey('architect-draft-cancel')),
+        findsNothing,
+      );
+
+      await mouseClick(source.endPoint);
+      await mouseClick(const Offset(3, 2));
+      expect(workspace.overlay(tester).slabDraftPoints, hasLength(3));
+      expect(
+        find.byKey(const ValueKey('architect-draft-cancel')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-draft-confirm')),
+        findsNothing,
+      );
+
+      await mouseClick(const Offset(0, 2), buttons: kSecondaryMouseButton);
+      expect(
+        find.byKey(const ValueKey('architect-draft-menu-finish')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-draft-menu-cancel')),
+        findsOneWidget,
+      );
+      await command(tester, 'architect-draft-menu-finish');
+      expect(model.project.activeStorey.slabs, hasLength(1));
+      expect(workspace.overlay(tester).slabDraftPoints, isEmpty);
       expect(tester.takeException(), isNull);
     },
   );
