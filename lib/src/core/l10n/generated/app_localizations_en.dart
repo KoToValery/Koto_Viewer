@@ -13304,17 +13304,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectUnderlayOriginalLineweights => 'Original lineweights';
 
   @override
-  String get architectUnderlayRotationStart =>
-      'Pick the first end of the edge or enter an angle';
+  String get architectUnderlayRotationStart => 'Pick segment start';
 
   @override
-  String get architectUnderlayRotationEnd => 'Pick the other end of the edge';
+  String get architectUnderlayRotationEnd => 'Pick segment end';
+
+  @override
+  String get architectUnderlayAlignAuto => 'Auto';
 
   @override
   String get architectUnderlayAlignHorizontal => 'Horizontal';
 
   @override
   String get architectUnderlayAlignVertical => 'Vertical';
+
+  @override
+  String get architectUnderlayRotatePlus90 => '+90°';
+
+  @override
+  String architectUnderlayRotationReview(String angle) {
+    return 'Aligned ($angle°) — review and apply';
+  }
+
+  @override
+  String get architectUnderlayKindGeodetic => 'Geodetic';
+
+  @override
+  String get architectUnderlayKindTechnical => 'Technical';
+
+  @override
+  String get architectUnderlayDisciplineLabel => 'Discipline';
+
+  @override
+  String get architectUnderlayDisciplineGeneral => 'General';
+
+  @override
+  String get architectUnderlayDisciplineStructural => 'Structural';
+
+  @override
+  String get architectUnderlayDisciplinePlumbing => 'Plumbing';
+
+  @override
+  String get architectUnderlayDisciplineElectrical => 'Electrical';
+
+  @override
+  String get architectUnderlayDisciplineHvac => 'HVAC';
+
+  @override
+  String get architectUnderlayDisciplineArchitectural => 'Architectural';
+
+  @override
+  String get architectUnderlayChooseCad => 'Select technical CAD underlay';
+
+  @override
+  String get architectUnderlayAddGeodeticTooltip =>
+      'Add geodetic survey underlay for Site Plan';
+
+  @override
+  String get architectUnderlayAddTechnicalTooltip =>
+      'Add technical underlay (Structural, Plumbing, Electrical, etc.)';
 
   @override
   String get architectStoreyManagerTitle => 'Storeys';

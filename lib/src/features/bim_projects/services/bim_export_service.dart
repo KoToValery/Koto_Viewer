@@ -528,8 +528,10 @@ class BimExportService {
         (jsonDecode(jsonEncode(architect.toJson())) as Map<String, dynamic>)
           ..['id'] = syncedManifest.id
           ..['name'] = syncedManifest.name;
-    for (final value
-        in (portableArchitect['cadUnderlays'] as Map? ?? {}).values) {
+    for (final value in [
+      ...(portableArchitect['cadUnderlays'] as Map? ?? {}).values,
+      ...(portableArchitect['technicalCadUnderlays'] as List? ?? []),
+    ]) {
       final config = value as Map;
       final internalCopy = config['internalCopyPath'] as String?;
       if (internalCopy != null && internalCopy.trim().isNotEmpty) {

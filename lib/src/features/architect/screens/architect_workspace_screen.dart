@@ -552,7 +552,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       ArchitectPublicationSources(
 
-        underlays: _showUnderlay ? _underlaysByStorey : const {},
+        underlays: _showUnderlay ? _cadDocMapForPublication : const {},
 
         frame: _restoredUnderlayFrame ?? widget.underlayFrame,
 
@@ -2223,7 +2223,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           (_acceptsAnySelection || _isElementAllowedForTool(id, _activeTool)),
     );
     if (_acceptsAnySelection && _commands.isPlan) {
-      if (_cadUnderlayContains(point)) {
+      final cadConfigs = _project.effectiveCadUnderlaysForStorey(
+        _project.activeStorey.id,
+      );
+      if (cadConfigs.isNotEmpty) {
+        for (final cfg in cadConfigs.reversed) {
+          if (_cadUnderlayConfigContains(cfg, point)) {
+            final id = 'underlay_cad:${cfg.effectiveId}';
+            if (!hits.contains(id)) hits.add(id);
+          }
+        }
+      } else if (_cadUnderlayContains(point)) {
         if (!hits.contains('underlay_cad')) {
           hits.add('underlay_cad');
         }
@@ -2343,7 +2353,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             axis.id,
         ?_hitSection(point),
         ?_hitElevation(point),
-        if (_cadUnderlayContains(point))
+        for (final cfg
+            in _project.effectiveCadUnderlaysForStorey(_project.activeStorey.id).reversed)
+          if (_cadUnderlayConfigContains(cfg, point))
+            'underlay_cad:${cfg.effectiveId}',
+        if (_project.effectiveCadUnderlaysForStorey(_project.activeStorey.id).isEmpty &&
+            _cadUnderlayContains(point))
           'underlay_cad',
         for (final r in _project.rasterUnderlaysForStorey(_project.activeStorey.id))
           if (_rasterUnderlayContains(r, point))
@@ -4272,8 +4287,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // --- SUBSECTION: [TAG:UNDERLAY_TOOLS] CAD Xref & Raster Underlay State & Handlers ---
   // Underlays
   Map<String, DxfDocument> _underlaysByStorey = {};
+  final Map<String, DxfDocument> _underlaysById = {};
+  String? _selectedCadUnderlayId;
   final _cadRevisionDocs = <(String, String, String?), DxfDocument>{};
   Map<String, ArchitectCadUnderlayConfig> _knownCadConfigs = const {};
+  List<ArchitectCadUnderlayConfig> _knownTechCadConfigs = const [];
+
+  DxfDocument? _docForCadConfig(ArchitectCadUnderlayConfig cfg) =>
+      _underlaysById[cfg.effectiveId] ??
+      _underlaysByStorey[cfg.storeyId] ??
+      _cadRevisionDocs[_cadRevisionKey(cfg)];
+
+  Map<String, DxfDocument> get _cadDocMapForPublication => {
+    ..._underlaysByStorey,
+    ..._underlaysById,
+  };
 
   (String, String, String?) _cadRevisionKey(ArchitectCadUnderlayConfig cfg) =>
       (_underlayOwnerId, cfg.internalCopyPath, cfg.kcadCachePath);
@@ -4285,7 +4313,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _cadRevisionDocs.remove(revision);
     _cadRevisionDocs[revision] = document;
     // Older history entries still resolve their project-owned files on demand.
-    final limit = _project.cadUnderlays.length + 4;
+    final limit =
+        _project.cadUnderlays.length + _project.technicalCadUnderlays.length + 4;
     while (_cadRevisionDocs.length > limit) {
       _cadRevisionDocs.remove(_cadRevisionDocs.keys.first);
     }
@@ -4294,26 +4323,46 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // A historical project selects the matching source revision as well as its frame.
   void _syncCadRevisionHistory() {
     final next = _project.cadUnderlays;
-    if (identical(next, _knownCadConfigs)) return;
-    final old = _knownCadConfigs;
+    final nextTech = _project.technicalCadUnderlays;
+    if (identical(next, _knownCadConfigs) &&
+        identical(nextTech, _knownTechCadConfigs)) {
+      return;
+    }
+    final oldById = {
+      for (final c in _knownCadConfigs.values) c.effectiveId: c,
+      for (final c in _knownTechCadConfigs) c.effectiveId: c,
+    };
+    final nextById = {
+      for (final c in next.values) c.effectiveId: c,
+      for (final c in nextTech) c.effectiveId: c,
+    };
     _knownCadConfigs = next;
-    for (final key in old.keys) {
-      if (!next.containsKey(key)) {
-        _underlaysByStorey.remove(key);
-        _unavailableUnderlayStoreys.remove(key);
+    _knownTechCadConfigs = nextTech;
+    for (final entry in oldById.entries) {
+      if (!nextById.containsKey(entry.key)) {
+        _underlaysById.remove(entry.key);
+        if (!next.containsKey(entry.value.storeyId)) {
+          _underlaysByStorey.remove(entry.value.storeyId);
+          _unavailableUnderlayStoreys.remove(entry.value.storeyId);
+        }
       }
     }
     var restore = false;
-    for (final entry in next.entries) {
-      final previous = old[entry.key];
-      final revision = _cadRevisionKey(entry.value);
+    for (final cfg in nextById.values) {
+      final previous = oldById[cfg.effectiveId];
+      final revision = _cadRevisionKey(cfg);
+      final isPrimary = next[cfg.storeyId]?.effectiveId == cfg.effectiveId;
       if (previous != null && _cadRevisionKey(previous) == revision) continue;
       final cached = _cadRevisionDocs[revision];
       if (cached != null) {
-        _underlaysByStorey[entry.key] = cached;
-        _unavailableUnderlayStoreys.remove(entry.key);
-      } else if (entry.value.internalCopyPath.isNotEmpty || entry.value.kcadCachePath != null) {
-        _underlaysByStorey.remove(entry.key);
+        _underlaysById[cfg.effectiveId] = cached;
+        if (isPrimary) {
+          _underlaysByStorey[cfg.storeyId] = cached;
+          _unavailableUnderlayStoreys.remove(cfg.storeyId);
+        }
+      } else if (cfg.internalCopyPath.isNotEmpty || cfg.kcadCachePath != null) {
+        _underlaysById.remove(cfg.effectiveId);
+        if (isPrimary) _underlaysByStorey.remove(cfg.storeyId);
         restore = true;
       }
     }
@@ -4356,7 +4405,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _underlayCropCad = false;
   String get _underlayOwnerId => widget.bimProject?.id ?? _project.id;
 
+  bool _cadUnderlayConfigContains(ArchitectCadUnderlayConfig cfg, Offset point) {
+    if (!_showUnderlay || !_commands.isPlan || !cfg.visible) return false;
+    if (!_project.isLayerVisible(ArchitectLayer.cadUnderlayLayerId)) return false;
+    final doc = _docForCadConfig(cfg);
+    if (doc == null) return false;
+    final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
+    final frame = cfg.frame(fallback);
+    final mask = cfg.hasActiveMask ? cfg.maskPolygon : null;
+    return doc.bounds.contains(frame.toCad(point)) &&
+        ArchitectUnderlayClip.contains(mask, point);
+  }
+
+  ArchitectCadUnderlayConfig? _hitCadUnderlayConfig(Offset point) {
+    final configs = _project.effectiveCadUnderlaysForStorey(
+      _project.activeStorey.id,
+    );
+    for (final cfg in configs.reversed) {
+      if (_cadUnderlayConfigContains(cfg, point)) return cfg;
+    }
+    return null;
+  }
+
   bool _cadUnderlayContains(Offset point) {
+    if (_hitCadUnderlayConfig(point) != null) return true;
     final doc = _currentUnderlayDoc;
     return doc != null &&
         doc.bounds.contains(_effectiveUnderlayFrame.toCad(point)) &&
@@ -4479,10 +4551,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           identical(source, _project) &&
           (preview.lockedCadOriginX != original.lockedCadOriginX ||
               preview.lockedCadOriginY != original.lockedCadOriginY)) {
-        _commands.commit(_project.copyWith(cadUnderlays: {
-          ..._project.cadUnderlays,
-          preview.storeyId: preview,
-        }));
+        _commands.commit(_project.withCadUnderlayUpdated(preview));
         _saveBiMProjectIfAttached();
         HapticFeedback.selectionClick();
       }
@@ -4574,12 +4643,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         polygon == null || !changed) { setState(() {}); return; }
     if (!valid) { _operationError(); setState(() {}); return; }
     if (isCad) {
-      final cfg = _project.cadUnderlays[storeyId];
+      final cfg = _project.cadUnderlayById(storeyId!, _selectedCadUnderlayId);
       if (cfg != null) {
-        _commands.commit(_project.copyWith(cadUnderlays: {
-          ..._project.cadUnderlays,
-          storeyId!: cfg.copyWith(maskPolygon: List.of(polygon), maskEnabled: true),
-        }));
+        _commands.commit(
+          _project.withCadUnderlayUpdated(
+            cfg.copyWith(maskPolygon: List.of(polygon), maskEnabled: true),
+          ),
+        );
       }
     } else {
       _commands.commit(_project.copyWith(rasterUnderlays: [
@@ -4611,11 +4681,68 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   );
 
   ArchitectCadUnderlayConfig? get _paintCadUnderlayConfig {
-    final cfg = _cadDragPreview ??
-        _underlayRotationPreview?.effectiveCadUnderlayForStorey(_project.activeStoreyId) ??
-        _currentCadUnderlayConfig;
+    final rotated =
+        _underlayRotationPreview?.cadUnderlayById(
+          _project.activeStoreyId,
+          _selectedCadUnderlayId,
+        ) ??
+        _underlayRotationPreview?.effectiveCadUnderlayForStorey(
+          _project.activeStoreyId,
+        );
+    final cfg = _cadDragPreview ?? rotated ?? _currentCadUnderlayConfig;
     return cfg != null && _underlayCropEditor.active && _underlayCropCad
         ? cfg.copyWith(maskPolygon: _underlayCropEditor.preview, maskEnabled: true) : cfg;
+  }
+
+  List<ArchitectCadRenderLayer> get _extraCadRenderLayers {
+    if (!_showUnderlay || !_commands.isPlan) return const [];
+    if (!_project.isLayerVisible(ArchitectLayer.cadUnderlayLayerId)) {
+      return const [];
+    }
+    final activeProject = _underlayRotationPreview ?? _project;
+    final activeId = _paintCadUnderlayConfig?.effectiveId;
+    final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
+    final result = <ArchitectCadRenderLayer>[];
+    for (final cfg in activeProject.effectiveCadUnderlaysForStorey(
+      _project.activeStorey.id,
+    )) {
+      if (cfg.effectiveId == activeId || !cfg.visible) continue;
+      final doc = _docForCadConfig(cfg);
+      if (doc == null) continue;
+      result.add(
+        ArchitectCadRenderLayer(
+          document: doc,
+          frame: cfg.frame(fallback),
+          visibility: cfg.layerOverrides,
+          config: cfg,
+        ),
+      );
+    }
+    return result;
+  }
+
+  List<ArchitectExtraSnapUnderlay> get _extraSnapUnderlays {
+    if (!_showUnderlay || !_commands.isPlan) return const [];
+    if (!_project.isLayerVisible(ArchitectLayer.cadUnderlayLayerId)) {
+      return const [];
+    }
+    final activeId = _currentCadUnderlayConfig?.effectiveId;
+    final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
+    final result = <ArchitectExtraSnapUnderlay>[];
+    for (final cfg in _project.effectiveCadUnderlaysForStorey(
+      _project.activeStorey.id,
+    )) {
+      if (cfg.effectiveId == activeId || !cfg.visible) continue;
+      final doc = _docForCadConfig(cfg);
+      if (doc == null) continue;
+      result.add((
+        document: doc,
+        frame: cfg.frame(fallback),
+        visibility: cfg.layerOverrides,
+        mask: cfg.hasActiveMask ? cfg.maskPolygon : null,
+      ));
+    }
+    return result;
   }
 
   List<ArchitectRasterUnderlay> get _paintRasterUnderlays => [
@@ -4646,6 +4773,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   });
 
   ArchitectCadUnderlayConfig? get _currentCadUnderlayConfig =>
+      _project.cadUnderlayById(_project.activeStorey.id, _selectedCadUnderlayId) ??
       _project.effectiveCadUnderlayForStorey(_project.activeStorey.id);
 
   BimCoordinateFrame get _effectiveUnderlayFrame {
@@ -4663,10 +4791,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     final cfg = _currentCadUnderlayConfig;
     if (cfg != null && !cfg.visible) return null;
+    if (cfg != null) {
+      final byId = _underlaysById[cfg.effectiveId];
+      if (byId != null) return byId;
+    }
     final ownerId =
         _project.effectiveCadUnderlayOwnerId(_project.activeStorey.id) ??
         _project.activeStorey.id;
-    return _underlaysByStorey[ownerId];
+    return _underlaysByStorey[ownerId] ?? _underlaysByStorey[_project.activeStorey.id];
   }
 
   ArchitectRasterUnderlay? get _selectedRasterUnderlay {
@@ -4688,23 +4820,42 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     for (final storey in _project.excludedInheritedCadStoreys) {
       if (!configs.containsKey(storey)) _underlaysByStorey.remove(storey);
     }
-    for (final entry in configs.entries) {
-      final storeyId = entry.key, cfg = entry.value;
-      if (!loadInherited && _underlaysByStorey.containsKey(storeyId)) continue;
+    final allConfigs = <ArchitectCadUnderlayConfig>[
+      ...configs.values,
+      ..._project.technicalCadUnderlays,
+    ];
+    for (final cfg in allConfigs) {
+      final storeyId = cfg.storeyId;
+      final isPrimary = configs[storeyId]?.effectiveId == cfg.effectiveId;
+      if (!loadInherited && _underlaysById.containsKey(cfg.effectiveId)) continue;
+      if (!loadInherited && isPrimary && _underlaysByStorey.containsKey(storeyId)) {
+        continue;
+      }
       if (cfg.internalCopyPath.isEmpty && (cfg.kcadCachePath?.isEmpty ?? true) &&
-          _underlaysByStorey.containsKey(storeyId)) continue;
+          (_underlaysById.containsKey(cfg.effectiveId) ||
+              (isPrimary && _underlaysByStorey.containsKey(storeyId)))) {
+        continue;
+      }
       final revision = _cadRevisionKey(cfg);
       final doc = _cadRevisionDocs[revision] ?? await ArchitectUnderlayService.instance
           .loadSavedCadUnderlay(cfg, projectId: ownerId);
       if (!current()) return;
-      if (_project.cadUnderlays[storeyId] != cfg) continue;
+      final stillPresent =
+          _project.cadUnderlayById(storeyId, cfg.effectiveId) == cfg;
+      if (!stillPresent) continue;
       setState(() {
         if (doc == null) {
-          _underlaysByStorey.remove(storeyId);
-          _unavailableUnderlayStoreys.add(storeyId);
+          _underlaysById.remove(cfg.effectiveId);
+          if (isPrimary) {
+            _underlaysByStorey.remove(storeyId);
+            _unavailableUnderlayStoreys.add(storeyId);
+          }
         } else {
-          _underlaysByStorey[storeyId] = doc;
-          _unavailableUnderlayStoreys.remove(storeyId);
+          _underlaysById[cfg.effectiveId] = doc;
+          if (isPrimary) {
+            _underlaysByStorey[storeyId] = doc;
+            _unavailableUnderlayStoreys.remove(storeyId);
+          }
           _cacheCadRevision(revision, doc);
         }
       });
@@ -4775,6 +4926,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Future<void> _replaceCadUnderlay() => _loadExternalUnderlayForStorey(
     storeyId: _project.activeStoreyId,
+    replaceCurrent: true,
   );
 
   // --- SUBSECTION: [TAG:CAD_UNDERLAY_IMPORT] Choose and publish an underlay ---
@@ -4782,17 +4934,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     required String storeyId,
     bool refresh = false,
     bool includeRaster = false,
+    bool replaceCurrent = false,
   }) async {
     if (_underlayBusy || !mounted) return;
     final ownerId = _underlayOwnerId;
-    final existing = _project.cadUnderlays[storeyId];
+    final isSitePlan =
+        _project.storeys.where((s) => s.id == storeyId).firstOrNull?.isSite ??
+        false;
+    final existing = (isSitePlan || refresh || replaceCurrent)
+        ? (_project.activeStoreyId == storeyId
+              ? _currentCadUnderlayConfig
+              : _project.cadUnderlays[storeyId])
+        : null;
     bool hasTarget() => mounted && ownerId == _underlayOwnerId &&
         _project.storeys.any((storey) => storey.id == storeyId);
-    bool isCurrent() => hasTarget() && _project.cadUnderlays[storeyId] == existing;
+    bool isCurrent() =>
+        hasTarget() &&
+        (existing == null ||
+            _project.cadUnderlayById(storeyId, existing.effectiveId) ==
+                existing);
 
     final service = ArchitectUnderlayService.instance;
     ArchitectPreparedCadUnderlay? prepared;
     var importingRaster = false;
+    var autoStraightenCad = false;
+    String? autoStraightenRasterId;
     setState(() => _underlayBusy = true);
     try {
       final externalPath = refresh ? existing?.externalSourcePath : null;
@@ -4806,7 +4972,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (file == null || !hasTarget()) return;
       importingRaster = includeRaster && !BimUnderlayPickerHelper.isCadFile(file);
       if (importingRaster) {
-        await _importRasterUnderlay(file, ownerId, storeyId, hasTarget);
+        autoStraightenRasterId = await _importRasterUnderlay(
+          file,
+          ownerId,
+          storeyId,
+          hasTarget,
+        );
         return;
       }
       if (!isCurrent()) return;
@@ -4822,6 +4993,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           storeyId: storeyId,
           sourceFile: file,
           existingConfig: existing,
+          isSitePlan: isSitePlan,
           isCurrent: isCurrent,
         );
       } else {
@@ -4832,6 +5004,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           context: context,
           prepared: prepared,
           existing: existing,
+          isSitePlan: isSitePlan,
         );
         if (selection == null || !isCurrent()) return;
         setState(() => _underlayBusyMessage = context.l10n.architectWizardLoadingUnderlay);
@@ -4840,6 +5013,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           storeyId: storeyId,
           selection: selection,
           existingConfig: existing,
+          isSitePlan: isSitePlan,
           isCurrent: isCurrent,
         );
       }
@@ -4852,12 +5026,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
       setState(() {
         _cacheCadRevision(_cadRevisionKey(config), imported.document);
-        _underlaysByStorey[storeyId] = imported.document;
-        _unavailableUnderlayStoreys.remove(storeyId);
-        _commands.commit(_project.copyWith(cadUnderlays: {
-          ..._project.cadUnderlays, storeyId: config,
-        }));
+        _underlaysById[config.effectiveId] = imported.document;
+        final updatedProject = existing != null
+            ? _project.withCadUnderlayUpdated(config)
+            : _project.withCadUnderlayAdded(config);
+        final primaryForStorey = updatedProject.cadUnderlays[storeyId];
+        if (primaryForStorey?.effectiveId == config.effectiveId) {
+          _underlaysByStorey[storeyId] = imported.document;
+          _unavailableUnderlayStoreys.remove(storeyId);
+        }
+        _commands.commit(updatedProject);
         if (!reload && _project.activeStoreyId == storeyId) {
+          _selectedCadUnderlayId = config.effectiveId;
           _isCadUnderlaySelected = config.visible;
           _selectedRasterId = null;
           _selectionIds.clear();
@@ -4865,7 +5045,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _touchCandidates = null;
         }
       });
-      if (existing == null && _project.activeStoreyId == storeyId) _initTransform();
+      if (existing == null && _project.activeStoreyId == storeyId) {
+        _initTransform();
+        autoStraightenCad = !reload && config.visible;
+      }
       final l = context.l10n;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(reload
@@ -4886,10 +5069,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ));
       }
     } finally {
-      if (mounted) setState(() {
-        _underlayBusy = false;
-        _underlayBusyMessage = null;
-      });
+      if (mounted) {
+        setState(() {
+          _underlayBusy = false;
+          _underlayBusyMessage = null;
+        });
+        if (autoStraightenCad) {
+          _startUnderlayRotation(isCad: true);
+        } else if (autoStraightenRasterId != null) {
+          _startUnderlayRotation(isCad: false, rasterId: autoStraightenRasterId);
+        }
+      }
       await prepared?.dispose();
     }
   }
@@ -4898,11 +5088,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final cfg = _currentCadUnderlayConfig;
     if (cfg == null) return;
     final updated = cfg.copyWith(lockOrigin: value);
-    final map = Map<String, ArchitectCadUnderlayConfig>.from(
-      _project.cadUnderlays,
-    )..[cfg.storeyId] = updated;
     setState(() {
-      _commands.commit(_project.copyWith(cadUnderlays: map));
+      _commands.commit(_project.withCadUnderlayUpdated(updated));
     });
     _saveBiMProjectIfAttached();
   }
@@ -4983,7 +5170,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _openCadDxfLayersSheet() {
     final cfg = _currentCadUnderlayConfig;
-    final doc = _underlaysByStorey[_project.activeStoreyId];
+    final doc = cfg == null ? null : _docForCadConfig(cfg);
     if (cfg == null || doc == null || doc.layers.isEmpty) return;
     final revision = _cadRevisionKey(cfg);
     showModalBottomSheet<void>(
@@ -4992,7 +5179,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       builder: (ctx) => ListenableBuilder(
         listenable: _commands,
         builder: (ctx, _) {
-          final current = _project.cadUnderlays[cfg.storeyId];
+          final current = _project.cadUnderlayById(
+            cfg.storeyId,
+            cfg.effectiveId,
+          );
           if (current == null || _cadRevisionKey(current) != revision) {
             return const SizedBox.shrink();
           }
@@ -5024,9 +5214,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             hiddenDxfLayers: hidden,
                             shownDxfLayers: shown,
                           );
-                          _commands.commit(_project.copyWith(cadUnderlays: {
-                            ..._project.cadUnderlays, cfg.storeyId: updated,
-                          }));
+                          _commands.commit(
+                            _project.withCadUnderlayUpdated(updated),
+                          );
                         },
                       );
                     },
@@ -5103,32 +5293,45 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             storeyId,
           },
         ));
+        _selectedCadUnderlayId = null;
         _isCadUnderlaySelected = false;
       });
       _saveBiMProjectIfAttached();
       return;
     }
-    final nextUnderlays = Map<String, ArchitectCadUnderlayConfig>.from(
-      _project.cadUnderlays,
-    )..remove(storeyId);
+    final cfg = _currentCadUnderlayConfig;
+    if (cfg == null) return;
+    final nextProject = _project.withCadUnderlayRemoved(
+      storeyId,
+      cfg.effectiveId,
+    );
+    final nextPrimary = nextProject.cadUnderlays[storeyId];
     setState(() {
-      _underlaysByStorey.remove(storeyId);
-      _commands.commit(_project.copyWith(
-        cadUnderlays: nextUnderlays,
+      _underlaysById.remove(cfg.effectiveId);
+      final promotedDoc =
+          nextPrimary == null ? null : _underlaysById[nextPrimary.effectiveId];
+      if (promotedDoc != null) {
+        _underlaysByStorey[storeyId] = promotedDoc;
+      } else if (nextPrimary == null) {
+        _underlaysByStorey.remove(storeyId);
+      }
+      _commands.commit(nextProject.copyWith(
         excludedInheritedCadStoreys: {
-          ..._project.excludedInheritedCadStoreys,
-          if (widget.bimProject?.storeys.any(
-                (storey) => storey.storeyId == storeyId && storey.hasUnderlay,
-              ) == true)
+          ...nextProject.excludedInheritedCadStoreys,
+          if (nextPrimary == null &&
+              widget.bimProject?.storeys.any(
+                    (storey) => storey.storeyId == storeyId && storey.hasUnderlay,
+                  ) == true)
             storeyId,
         },
       ));
+      _selectedCadUnderlayId = nextPrimary?.effectiveId;
       _isCadUnderlaySelected = false;
     });
     _saveBiMProjectIfAttached();
   }
 
-  void _toggleCadVisibility(bool visible) {
+  void _toggleCadVisibility(bool visible, {String? underlayId}) {
     final activeId = _project.activeStorey.id;
     if (!visible && _project.isSharedCadUnderlayForStorey(activeId)) {
       setState(() {
@@ -5143,15 +5346,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _saveBiMProjectIfAttached();
       return;
     }
-    final cfg = _currentCadUnderlayConfig;
+    final cfg = underlayId == null
+        ? _currentCadUnderlayConfig
+        : _project.cadUnderlayById(activeId, underlayId);
     if (cfg == null) return;
     final updated = cfg.copyWith(visible: visible);
-    final map = Map<String, ArchitectCadUnderlayConfig>.from(
-      _project.cadUnderlays,
-    )..[cfg.storeyId] = updated;
     setState(() {
-      _commands.commit(_project.copyWith(cadUnderlays: map));
-      if (!visible) _isCadUnderlaySelected = false;
+      _commands.commit(_project.withCadUnderlayUpdated(updated));
+      if (!visible &&
+          (underlayId == null ||
+              _currentCadUnderlayConfig?.effectiveId == cfg.effectiveId)) {
+        _isCadUnderlaySelected = false;
+      }
     });
     _saveBiMProjectIfAttached();
     if (!visible && mounted) {
@@ -5161,7 +5367,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           duration: const Duration(seconds: 4),
           action: SnackBarAction(
             label: context.l10n.undoAction,
-            onPressed: () => _toggleCadVisibility(true),
+            onPressed: () => _toggleCadVisibility(
+              true,
+              underlayId: cfg.effectiveId,
+            ),
           ),
         ),
       );
@@ -5194,7 +5403,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
-  Future<void> _importRasterUnderlay(
+  Future<String?> _importRasterUnderlay(
     File source,
     String projectId,
     String storeyId,
@@ -5209,14 +5418,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _underlayBusyMessage = context.l10n.architectWizardLoadingUnderlay;
       });
       final pageCount = await service.getPdfPageCount(source.path);
-      if (!hasTarget()) return;
+      if (!hasTarget()) return null;
       if (pageCount > 1) {
         setState(() => _underlayBusyMessage = null);
         final chosen = await showArchitectPdfPagePickerDialog(
           context: context,
           pageCount: pageCount,
         );
-        if (chosen == null || !hasTarget()) return;
+        if (chosen == null || !hasTarget()) return null;
         selectedPage = chosen;
       }
     }
@@ -5224,6 +5433,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     setState(() {
       _underlayBusyMessage = context.l10n.architectUnderlayConverting;
     });
+    final isSitePlan =
+        _project.storeys.where((s) => s.id == storeyId).firstOrNull?.isSite ??
+        false;
+    final kind = isSitePlan
+        ? ArchitectUnderlayKind.geodetic
+        : ArchitectUnderlayKind.technical;
     final loaded = isPdf
         ? await service.importPdfPageAsRaster(
             projectId: projectId,
@@ -5231,16 +5446,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             pdfFile: source,
             pageNumber: selectedPage,
             initialCenter: centre,
+            kind: kind,
           )
         : await service.importRasterImageFile(
             projectId: projectId,
             storeyId: storeyId,
             sourceFile: source,
             initialCenter: centre,
+            kind: kind,
           );
     if (!hasTarget()) {
       loaded.image.dispose();
-      return;
+      return null;
     }
     if (_project.activeStoreyId == storeyId &&
         _activeTool == ArchitectTool.cadUnderlay) {
@@ -5259,6 +5476,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
     });
     _saveBiMProjectIfAttached();
+    return _project.activeStoreyId == storeyId && loaded.model.visible
+        ? loaded.model.id
+        : null;
   }
 
   void _updateSelectedRaster(ArchitectRasterUnderlay updated) {
@@ -5366,13 +5586,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     if (_underlayMaskTargetIsCad) {
       final storeyId = _project.activeStorey.id;
-      final cfg = _project.cadUnderlays[storeyId];
+      final cfg = _project.cadUnderlayById(storeyId, _selectedCadUnderlayId);
       if (cfg != null) {
         final updated = cfg.copyWith(maskPolygon: polygon, maskEnabled: true);
-        final map = Map<String, ArchitectCadUnderlayConfig>.from(
-          _project.cadUnderlays,
-        )..[storeyId] = updated;
-        _commands.commit(_project.copyWith(cadUnderlays: map));
+        _commands.commit(_project.withCadUnderlayUpdated(updated));
         _saveBiMProjectIfAttached();
       }
     } else {
@@ -5413,20 +5630,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final owner = _underlayOwnerId;
     bool current() => mounted && owner == _underlayOwnerId &&
         _project.activeStoreyId == activeId && _currentCadUnderlayConfig == cfg;
-    final hasDocument = _underlaysByStorey[storeyId] != null;
+    final isSitePlan = _project.activeStorey.isSite;
+    final hasDocument = _docForCadConfig(cfg) != null;
     final survey = _project.geodeticSurvey;
-    final hasSurvey = (survey?.contoursForStorey(storeyId).isNotEmpty ?? false) ||
-        (survey?.pointsForStorey(storeyId).isNotEmpty ?? false);
+    final hasSurvey = isSitePlan &&
+        ((survey?.contoursForStorey(storeyId).isNotEmpty ?? false) ||
+            (survey?.pointsForStorey(storeyId).isNotEmpty ?? false));
     final action = await showArchitectUnderlayContextMenu(
       context: context,
       globalPosition: globalPosition,
       isCad: true,
       visible: cfg.visible,
+      isSitePlan: isSitePlan,
       canMove: !isShared && _currentUnderlayDoc != null,
       canEditGeometry: !isShared,
       hasDocument: hasDocument,
       hasSurvey: hasSurvey,
-      canOrientBuilding: _project.activeStorey.isSite && !isShared,
+      canOrientBuilding: isSitePlan && !isShared,
     );
     if (!current() || action == null) return;
     switch (action) {
@@ -5474,17 +5694,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _startUnderlayMaskDraft(isCad: true, mode: 'polygon');
       case 'mask_toggle':
         final updated = cfg.copyWith(maskEnabled: !cfg.maskEnabled);
-        final map = Map<String, ArchitectCadUnderlayConfig>.from(
-          _project.cadUnderlays,
-        )..[cfg.storeyId] = updated;
-        setState(() => _commands.commit(_project.copyWith(cadUnderlays: map)));
+        setState(() => _commands.commit(_project.withCadUnderlayUpdated(updated)));
         _saveBiMProjectIfAttached();
       case 'mask_clear':
         final updated = cfg.copyWith(clearMask: true, maskEnabled: false);
-        final map = Map<String, ArchitectCadUnderlayConfig>.from(
-          _project.cadUnderlays,
-        )..[cfg.storeyId] = updated;
-        setState(() => _commands.commit(_project.copyWith(cadUnderlays: map)));
+        setState(() => _commands.commit(_project.withCadUnderlayUpdated(updated)));
         _saveBiMProjectIfAttached();
     }
   }
@@ -5509,10 +5723,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       transformMask: true,
       fallback: _restoredUnderlayFrame ?? widget.underlayFrame,
     );
-    final map = Map<String, ArchitectCadUnderlayConfig>.from(
-      _project.cadUnderlays,
-    )..[cfg.storeyId] = updated;
-    setState(() => _commands.commit(_project.copyWith(cadUnderlays: map)));
+    setState(() => _commands.commit(_project.withCadUnderlayUpdated(updated)));
     _saveBiMProjectIfAttached();
   }
 
@@ -5520,6 +5731,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     double? opacity,
     bool? useOriginalColors,
     bool? useOriginalLineweights,
+    ArchitectTechnicalUnderlayDiscipline? discipline,
   }) {
     final current = _currentCadUnderlayConfig;
     if (current == null) return;
@@ -5527,16 +5739,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       opacity: opacity,
       useOriginalColors: useOriginalColors,
       useOriginalLineweights: useOriginalLineweights,
+      discipline: discipline,
     );
-    final map = Map<String, ArchitectCadUnderlayConfig>.from(
-      _project.cadUnderlays,
-    )..[current.storeyId] = updated;
-    setState(() => _commands.commit(_project.copyWith(cadUnderlays: map)));
+    setState(() => _commands.commit(_project.withCadUnderlayUpdated(updated)));
   }
 
   void _openCadEditDialog() {
     final cfg = _currentCadUnderlayConfig;
     if (cfg == null) return;
+    final isSitePlan = _project.activeStorey.isSite;
     showArchitectUnderlayEditDialog(
       context: context,
       title: '${context.l10n.architectUnderlayEditDialogTitle}: ${cfg.fileName}',
@@ -5546,6 +5757,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       onUseOriginalColorsChanged: (value) => _updateCadPresentation(useOriginalColors: value),
       initialUseOriginalLineweights: cfg.useOriginalLineweights,
       onUseOriginalLineweightsChanged: (value) => _updateCadPresentation(useOriginalLineweights: value),
+      isVisible: cfg.visible,
+      onVisibilityChanged: (value) =>
+          _toggleCadVisibility(value, underlayId: cfg.effectiveId),
+      discipline: isSitePlan ? null : cfg.discipline,
+      onDisciplineChanged: isSitePlan
+          ? null
+          : (d) {
+              _updateCadPresentation(discipline: d);
+              _saveBiMProjectIfAttached();
+            },
       isLockOrigin: cfg.lockOrigin,
       onToggleLockOrigin: _toggleCadOriginLock,
       onRotate: _currentUnderlayDoc == null
@@ -5676,6 +5897,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       globalPosition: globalPosition,
       isCad: false,
       visible: sel.visible,
+      isSitePlan: _project.activeStorey.isSite,
       canMove: !sel.locked,
       canEditGeometry: !sel.locked && sel.visible,
     );
@@ -5749,6 +5971,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _openRasterEditDialog() {
     final sel = _selectedRasterUnderlay;
     if (sel == null) return;
+    final isSitePlan = _project.activeStorey.isSite;
     showArchitectUnderlayEditDialog(
       context: context,
       title: '${context.l10n.architectUnderlayEditDialogTitle}: ${sel.fileName}',
@@ -5759,6 +5982,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _updateSelectedRaster(current.copyWith(opacity: val));
         }
       },
+      isVisible: sel.visible,
+      onVisibilityChanged: (val) => _toggleRasterVisibility(sel.id, val),
+      discipline: isSitePlan ? null : sel.discipline,
+      onDisciplineChanged: isSitePlan
+          ? null
+          : (d) {
+              final current = _selectedRasterUnderlay;
+              if (current != null) {
+                _updateSelectedRaster(current.copyWith(discipline: d));
+              }
+            },
       isLocked: sel.locked,
       onToggleLock: () {
         final current = _selectedRasterUnderlay;
@@ -9355,6 +9589,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       visibility: _effectiveUnderlayLayerVisibility,
 
+      extraUnderlays: _extraSnapUnderlays,
+
     );
 
     delta = snap.point;
@@ -9624,10 +9860,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (widget.underlaysByStorey != null) {
 
       _underlaysByStorey = Map.from(widget.underlaysByStorey!);
+      for (final cfg in _project.cadUnderlays.values) {
+        final doc = _underlaysByStorey[cfg.storeyId];
+        if (doc != null) _underlaysById[cfg.effectiveId] = doc;
+      }
 
     }
 
     _knownCadConfigs = _project.cadUnderlays;
+    _knownTechCadConfigs = _project.technicalCadUnderlays;
     unawaited(_restorePersistedUnderlays());
 
 
@@ -11766,6 +12007,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             visibility: _effectiveUnderlayLayerVisibility,
 
+            extraUnderlays: _extraSnapUnderlays,
+
           )
 
         : ArchitectSnapHelper.snapWithAnchor(
@@ -11791,6 +12034,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             frame: _effectiveUnderlayFrame,
 
             visibility: _effectiveUnderlayLayerVisibility,
+
+            extraUnderlays: _extraSnapUnderlays,
 
           );
 
@@ -11842,6 +12087,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         alignment: true, midpointReferences: _midpointTracking.references,
         underlay: _currentUnderlayDoc, frame: _effectiveUnderlayFrame,
         visibility: _effectiveUnderlayLayerVisibility,
+        extraUnderlays: _extraSnapUnderlays,
       );
     }
     return ArchitectSnapHelper.snapFree(rawPoint: raw, project: source,
@@ -11850,6 +12096,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       underlay: _rotationUnderlay == null ? _currentUnderlayDoc : null,
       frame: _effectiveUnderlayFrame,
       visibility: _effectiveUnderlayLayerVisibility,
+      extraUnderlays: _rotationUnderlay == null ? _extraSnapUnderlays : const [],
     );
   }
 
@@ -11982,6 +12229,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
             visibility: _effectiveUnderlayLayerVisibility,
 
+            extraUnderlays: _extraSnapUnderlays,
+
           )
 
         : ArchitectSnapHelper.snapWithAnchor(
@@ -12011,6 +12260,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             frame: _effectiveUnderlayFrame,
 
             visibility: _effectiveUnderlayLayerVisibility,
+
+            extraUnderlays: _extraSnapUnderlays,
 
           );
 
@@ -12336,6 +12587,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       frame: _effectiveUnderlayFrame,
 
       visibility: _effectiveUnderlayLayerVisibility,
+
+      extraUnderlays: _extraSnapUnderlays,
 
     );
 
@@ -12752,6 +13005,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             frame: _effectiveUnderlayFrame,
 
             visibility: _effectiveUnderlayLayerVisibility,
+
+            extraUnderlays: _extraSnapUnderlays,
 
           );
 
@@ -21741,18 +21996,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     // Context menu for CAD Underlay
-    final cadCfg = _currentCadUnderlayConfig;
-    final cadDoc = _underlaysByStorey[_project.activeStorey.id];
-    final isOverCad = cadCfg != null &&
-        cadCfg.visible &&
-        cadDoc != null &&
-        _cadUnderlayContains(raw);
-    if (isOverCad &&
+    final cadCfg = _hitCadUnderlayConfig(raw);
+    if (cadCfg != null &&
         (_activeTool == ArchitectTool.cadUnderlay ||
             (!overModelElement && (_activeTool == ArchitectTool.pan ||
                 (_activeTool == ArchitectTool.select && _effectiveSelection.isEmpty))))) {
       setState(() {
         _cancelActiveDrags();
+        _selectedCadUnderlayId = cadCfg.effectiveId;
         _isCadUnderlaySelected = true;
         _selectedRasterId = null;
         _selectedElementId = null;
@@ -22649,7 +22900,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    if (elementId == 'underlay_cad') {
+    if (elementId == 'underlay_cad' || elementId.startsWith('underlay_cad:')) {
       items.add(_radialItem(action: ArchitectRadialAction.move, color: const Color(0xFFFFB300)));
       items.add(_radialItem(action: ArchitectRadialAction.properties, color: const Color(0xFFB388FF)));
       items.add(_radialItem(action: ArchitectRadialAction.offset, color: const Color(0xFF4FC3F7)));
@@ -24365,7 +24616,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
 
     if (id == null) return;
-    if (id == 'underlay_cad') {
+    if (id == 'underlay_cad' || id.startsWith('underlay_cad:')) {
+      if (id.startsWith('underlay_cad:')) {
+        _selectedCadUnderlayId = id.substring('underlay_cad:'.length);
+      }
       switch (action) {
         case ArchitectRadialAction.move:
           _startUnderlaySnapDrag(isCad: true);
@@ -25171,9 +25425,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _applySelectionId(String id, Offset point, {
     bool invalidateGesture = true, bool toggle = false, bool direct = false,
   }) {
-    if (id == 'underlay_cad') {
+    if (id == 'underlay_cad' || id.startsWith('underlay_cad:')) {
       _cancelActiveDrags();
       setState(() {
+        if (id.startsWith('underlay_cad:')) {
+          _selectedCadUnderlayId = id.substring('underlay_cad:'.length);
+        }
         _isCadUnderlaySelected = true;
         _selectedRasterId = null;
         _selectedElementId = null;
@@ -27511,7 +27768,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_dragController.isUnderlay) {
       final storeyId = _dragController.storeyId;
       if (_dragController.isCadUnderlay) {
-        final cfg = _project.cadUnderlays[storeyId];
+        final cfg = _project.cadUnderlayById(storeyId, _selectedCadUnderlayId);
         if (cfg != null) {
           final placement = _dragController.computeCadPlacement(
             targetPointModel: target,
@@ -27523,11 +27780,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             maskPolygon: placement.translatedMask,
             lockOrigin: true,
           );
-          final map = Map<String, ArchitectCadUnderlayConfig>.from(
-            _project.cadUnderlays,
-          )..[storeyId] = updated;
-
-          _commands.commit(_project.copyWith(cadUnderlays: map));
+          _commands.commit(_project.withCadUnderlayUpdated(updated));
           _saveBiMProjectIfAttached();
         }
       } else {
@@ -29316,7 +29569,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     double angle,
   ) {
     if (underlay.isCad) {
-      final config = source.cadUnderlayForStorey(source.activeStoreyId);
+      final config =
+          source.cadUnderlayById(source.activeStoreyId, _selectedCadUnderlayId) ??
+          source.effectiveCadUnderlayForStorey(source.activeStoreyId);
       if (config == null) return null;
       final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
       final frame = config.frame(fallback).rotatingAround(pivot, angle);
@@ -29332,17 +29587,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
             )
           : prevNorth;
-      return source.copyWith(
-        cadUnderlays: {
-          ...source.cadUnderlays,
-          config.storeyId: config.withFrame(
-            frame,
-            transformMask: true,
-            fallback: fallback,
-          ),
-        },
-        northSymbol: nextNorth,
-      );
+      return source
+          .withCadUnderlayUpdated(
+            config.withFrame(frame, transformMask: true, fallback: fallback),
+          )
+          .copyWith(northSymbol: nextNorth);
     }
     return source.copyWith(rasterUnderlays: [
       for (final raster in source.rasterUnderlays)
@@ -36601,6 +36850,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             _effectiveUnderlayFrame,
                     viewport: _viewport,
                     visibility: Map.of(_effectiveUnderlayLayerVisibility),
+                    extraCadUnderlays: _extraCadRenderLayers,
                     rasterUnderlays: _paintRasterUnderlays,
                     rasterImages: _rasterImages,
                     selectedRasterId: _selectedRasterUnderlay?.id,
@@ -36640,6 +36890,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ),
                     showGeodesyLayer:
                         _commands.isPlan &&
+                        _project.activeStorey.isSite &&
                         _project.isLayerVisible(ArchitectLayer.geodesyLayerId),
                     geodeticContours:
                         _project.geodeticSurvey?.contoursForStorey(
@@ -37668,8 +37919,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             alignment: Alignment.topLeft,
             child: ArchitectCadUnderlayBar(
               config: _currentCadUnderlayConfig,
+              underlays: _project.effectiveCadUnderlaysForStorey(
+                _project.activeStoreyId,
+              ),
+              isSitePlan: _project.activeStorey.isSite,
               isBusy: _underlayBusy,
               onAddUnderlay: _addUnderlay,
+              onSelectUnderlay: (id) => setState(() {
+                _selectedCadUnderlayId = id;
+                _isCadUnderlaySelected = true;
+                _selectedRasterId = null;
+              }),
+              onToggleUnderlayVisibility: (pair) =>
+                  _toggleCadVisibility(pair.$2, underlayId: pair.$1),
               onMove: () => _startUnderlaySnapDrag(isCad: true),
               onOpenScale: _openCadScaleDialog,
               onOpenContextMenu: _openCadContextMenu,
@@ -37686,6 +37948,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             child: ArchitectRasterUnderlayBar(
               underlays: _project.rasterUnderlaysForStorey(_project.activeStoreyId),
               selectedUnderlay: _selectedRasterUnderlay,
+              isSitePlan: _project.activeStorey.isSite,
               calibrationStep: _rasterCalibrationStep,
               isBusy: _underlayBusy,
               onAddUnderlay: _addUnderlay,
@@ -37693,6 +37956,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 _selectedRasterId = id;
                 _isCadUnderlaySelected = false;
               }),
+              onToggleUnderlayVisibility: (pair) =>
+                  _toggleRasterVisibility(pair.$1, pair.$2),
               onMove: () => _startUnderlaySnapDrag(isCad: false),
               onStartCalibration: _openRasterScaleDialog,
               onCancelCalibration: _cancelRasterCalibration,

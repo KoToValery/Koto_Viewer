@@ -10,8 +10,12 @@ import 'architect_numeric_keypad.dart';
 /// The underlay HUD keeps drafting actions in reach and uses the ambient theme.
 class ArchitectCadUnderlayBar extends StatelessWidget {
   final ArchitectCadUnderlayConfig? config;
+  final List<ArchitectCadUnderlayConfig> underlays;
+  final bool? isSitePlan;
   final bool isBusy;
   final VoidCallback onAddUnderlay;
+  final ValueChanged<String>? onSelectUnderlay;
+  final ValueChanged<(String, bool)>? onToggleUnderlayVisibility;
   final VoidCallback onMove;
   final VoidCallback onOpenScale;
   final void Function(Offset globalPosition)? onOpenContextMenu;
@@ -19,8 +23,12 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
   const ArchitectCadUnderlayBar({
     super.key,
     required this.config,
+    this.underlays = const [],
+    this.isSitePlan,
     required this.isBusy,
     required this.onAddUnderlay,
+    this.onSelectUnderlay,
+    this.onToggleUnderlayVisibility,
     required this.onMove,
     required this.onOpenScale,
     this.onOpenContextMenu,
@@ -30,13 +38,52 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final add = isBusy ? null : onAddUnderlay;
-    final cad = config;
+    final items = underlays.isNotEmpty
+        ? underlays
+        : [?config];
+    final cad = config ?? (items.isNotEmpty ? items.first : null);
+    final site = isSitePlan ?? (cad?.kind == ArchitectUnderlayKind.geodetic);
+    final addTooltip = isSitePlan == null
+        ? null
+        : (site
+              ? l.architectUnderlayAddGeodeticTooltip
+              : l.architectUnderlayAddTechnicalTooltip);
     return _UnderlayToolbar(
       children: cad == null
-          ? [_addUnderlayButton(context, add)]
+          ? [
+              if (isSitePlan != null) _UnderlayRoleBadge(isSitePlan: site),
+              _addUnderlayButton(context, add, tooltip: addTooltip),
+            ]
           : [
-              Flexible(child: _UnderlayName(cad.fileName)),
-              _addUnderlayButton(context, add, compact: true),
+              _UnderlayRoleBadge(
+                isSitePlan: site,
+                discipline: site ? null : cad.discipline,
+              ),
+              Flexible(
+                child: items.length <= 1 || onSelectUnderlay == null
+                    ? _UnderlayName(cad.fileName, visible: cad.visible)
+                    : _UnderlayMultiSelector<ArchitectCadUnderlayConfig>(
+                        tooltip: l.architectUnderlayChooseCad,
+                        enabled: !isBusy,
+                        items: items,
+                        selectedId: cad.effectiveId,
+                        idOf: (item) => item.effectiveId,
+                        labelOf: (item) => site
+                            ? item.fileName
+                            : '${item.discipline.label(l)} · ${item.fileName}',
+                        visibleOf: (item) => item.visible,
+                        displayName: cad.fileName,
+                        selectedVisible: cad.visible,
+                        onSelect: onSelectUnderlay!,
+                        onToggleVisibility: onToggleUnderlayVisibility,
+                      ),
+              ),
+              _addUnderlayButton(
+                context,
+                add,
+                compact: true,
+                tooltip: addTooltip,
+              ),
               _action(
                 context,
                 l.architectSelectionMove,
@@ -58,10 +105,12 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
 class ArchitectRasterUnderlayBar extends StatelessWidget {
   final List<ArchitectRasterUnderlay> underlays;
   final ArchitectRasterUnderlay? selectedUnderlay;
+  final bool? isSitePlan;
   final int calibrationStep;
   final bool isBusy;
   final VoidCallback onAddUnderlay;
   final ValueChanged<String> onSelectUnderlay;
+  final ValueChanged<(String, bool)>? onToggleUnderlayVisibility;
   final VoidCallback onMove;
   final VoidCallback onStartCalibration;
   final VoidCallback onCancelCalibration;
@@ -71,10 +120,12 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
     super.key,
     required this.underlays,
     required this.selectedUnderlay,
+    this.isSitePlan,
     required this.calibrationStep,
     required this.isBusy,
     required this.onAddUnderlay,
     required this.onSelectUnderlay,
+    this.onToggleUnderlayVisibility,
     required this.onMove,
     required this.onStartCalibration,
     required this.onCancelCalibration,
@@ -101,38 +152,48 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
     }
 
     final add = isBusy ? null : onAddUnderlay;
+    final site = isSitePlan ?? (raster?.kind == ArchitectUnderlayKind.geodetic);
+    final addTooltip = isSitePlan == null
+        ? null
+        : (site
+              ? l.architectUnderlayAddGeodeticTooltip
+              : l.architectUnderlayAddTechnicalTooltip);
     return _UnderlayToolbar(
       children: raster == null
-          ? [_addUnderlayButton(context, add)]
+          ? [
+              if (isSitePlan != null) _UnderlayRoleBadge(isSitePlan: site),
+              _addUnderlayButton(context, add, tooltip: addTooltip),
+            ]
           : [
+              _UnderlayRoleBadge(
+                isSitePlan: site,
+                discipline: site ? null : raster.discipline,
+              ),
               Flexible(
-                child: underlays.length == 1
-                    ? _UnderlayName(raster.fileName)
-                    : PopupMenuButton<String>(
+                child: underlays.length <= 1
+                    ? _UnderlayName(raster.fileName, visible: raster.visible)
+                    : _UnderlayMultiSelector<ArchitectRasterUnderlay>(
                         tooltip: l.architectRasterChooseUnderlay,
                         enabled: !isBusy,
-                        onSelected: onSelectUnderlay,
-                        itemBuilder: (_) => [
-                          for (final item in underlays)
-                            CheckedPopupMenuItem(
-                              value: item.id,
-                              checked: item.id == raster.id,
-                              child: Text(
-                                item.fileName,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(child: _UnderlayName(raster.fileName)),
-                            const Icon(Icons.arrow_drop_down),
-                          ],
-                        ),
+                        items: underlays,
+                        selectedId: raster.id,
+                        idOf: (item) => item.id,
+                        labelOf: (item) => site
+                            ? item.fileName
+                            : '${item.discipline.label(l)} · ${item.fileName}',
+                        visibleOf: (item) => item.visible,
+                        displayName: raster.fileName,
+                        selectedVisible: raster.visible,
+                        onSelect: onSelectUnderlay,
+                        onToggleVisibility: onToggleUnderlayVisibility,
                       ),
               ),
-              _addUnderlayButton(context, add, compact: true),
+              _addUnderlayButton(
+                context,
+                add,
+                compact: true,
+                tooltip: addTooltip,
+              ),
               _action(
                 context,
                 l.architectSelectionMove,
@@ -153,22 +214,188 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
   }
 }
 
+class _UnderlayRoleBadge extends StatelessWidget {
+  final bool isSitePlan;
+  final ArchitectTechnicalUnderlayDiscipline? discipline;
+
+  const _UnderlayRoleBadge({required this.isSitePlan, this.discipline});
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final colors = Theme.of(context).colorScheme;
+    final compact = MediaQuery.sizeOf(context).width < 650;
+    final roleText = isSitePlan
+        ? l.architectUnderlayKindGeodetic
+        : (discipline != null &&
+                  discipline != ArchitectTechnicalUnderlayDiscipline.general
+              ? discipline!.label(l)
+              : l.architectUnderlayKindTechnical);
+    return Padding(
+      padding: EdgeInsetsDirectional.only(start: compact ? 6 : 8),
+      child: Tooltip(
+        message: isSitePlan
+            ? l.architectUnderlayKindGeodetic
+            : '${l.architectUnderlayKindTechnical}${discipline != null ? ' · ${discipline!.label(l)}' : ''}',
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 4 : 7,
+            vertical: compact ? 2 : 3,
+          ),
+          decoration: BoxDecoration(
+            color: isSitePlan
+                ? colors.tertiaryContainer
+                : colors.secondaryContainer,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isSitePlan ? Icons.terrain_outlined : Icons.layers_outlined,
+                size: 13,
+                color: isSitePlan
+                    ? colors.onTertiaryContainer
+                    : colors.onSecondaryContainer,
+              ),
+              if (!compact) ...[
+                const SizedBox(width: 4),
+                Text(
+                  roleText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isSitePlan
+                        ? colors.onTertiaryContainer
+                        : colors.onSecondaryContainer,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UnderlayMultiSelector<T> extends StatelessWidget {
+  final String tooltip;
+  final bool enabled;
+  final List<T> items;
+  final String selectedId;
+  final String Function(T) idOf;
+  final String Function(T) labelOf;
+  final bool Function(T) visibleOf;
+  final String displayName;
+  final bool selectedVisible;
+  final ValueChanged<String> onSelect;
+  final ValueChanged<(String, bool)>? onToggleVisibility;
+
+  const _UnderlayMultiSelector({
+    required this.tooltip,
+    required this.enabled,
+    required this.items,
+    required this.selectedId,
+    required this.idOf,
+    required this.labelOf,
+    required this.visibleOf,
+    required this.displayName,
+    required this.selectedVisible,
+    required this.onSelect,
+    this.onToggleVisibility,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    return PopupMenuButton<String>(
+      tooltip: tooltip,
+      enabled: enabled,
+      onSelected: onSelect,
+      itemBuilder: (menuCtx) => [
+        for (final item in items)
+          PopupMenuItem<String>(
+            value: idOf(item),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  child: idOf(item) == selectedId
+                      ? const Icon(Icons.check, size: 18)
+                      : null,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    labelOf(item),
+                    overflow: TextOverflow.ellipsis,
+                    style: visibleOf(item)
+                        ? null
+                        : TextStyle(
+                            color: Theme.of(
+                              menuCtx,
+                            ).colorScheme.onSurface.withValues(alpha: 0.5),
+                          ),
+                  ),
+                ),
+                if (onToggleVisibility != null)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                    tooltip: visibleOf(item)
+                        ? l.architectUnderlayHide
+                        : l.architectUnderlayShow,
+                    icon: Icon(
+                      visibleOf(item)
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      size: 16,
+                    ),
+                    onPressed: () {
+                      onToggleVisibility!((idOf(item), !visibleOf(item)));
+                      Navigator.of(menuCtx).pop();
+                    },
+                  ),
+              ],
+            ),
+          ),
+      ],
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(child: _UnderlayName(displayName, visible: selectedVisible)),
+          const Icon(Icons.arrow_drop_down),
+        ],
+      ),
+    );
+  }
+}
+
 Widget _addUnderlayButton(
   BuildContext context,
   VoidCallback? onPressed, {
   bool compact = false,
+  String? tooltip,
 }) {
   final l = context.l10n;
+  final effectiveTooltip = tooltip ?? l.architectUnderlayAddTooltip;
   const icon = AppIcon(AppIconId.openFile, size: 18);
   if (compact && MediaQuery.sizeOf(context).width < 650) {
     return IconButton(
-      tooltip: l.architectUnderlayAddTooltip,
+      tooltip: effectiveTooltip,
       onPressed: onPressed,
       icon: icon,
     );
   }
   return Tooltip(
-    message: l.architectUnderlayAddTooltip,
+    message: effectiveTooltip,
     child: TextButton.icon(
       onPressed: onPressed,
       icon: icon,
@@ -179,13 +406,27 @@ Widget _addUnderlayButton(
 
 class _UnderlayName extends StatelessWidget {
   final String name;
-  const _UnderlayName(this.name);
+  final bool visible;
+  const _UnderlayName(this.name, {this.visible = true});
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsetsDirectional.only(start: 10, end: 4),
-    child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-  );
+  Widget build(BuildContext context) {
+    final style = visible
+        ? null
+        : TextStyle(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.5),
+            decoration: TextDecoration.lineThrough,
+          );
+    return Padding(
+      padding: EdgeInsetsDirectional.only(
+        start: MediaQuery.sizeOf(context).width < 650 ? 6 : 8,
+        end: 4,
+      ),
+      child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
+    );
+  }
 }
 
 class ArchitectUnderlayCropBar extends StatelessWidget {
@@ -271,7 +512,12 @@ Widget _action(
       (icon == AppIconId.move || icon == AppIconId.measure)) {
     return TextButton(
       onPressed: onPressed,
-      style: TextButton.styleFrom(foregroundColor: colors.onSurface),
+      style: TextButton.styleFrom(
+        foregroundColor: colors.onSurface,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
       child: Text(label),
     );
   }
@@ -499,6 +745,7 @@ Future<String?> showArchitectUnderlayContextMenu({
   required Offset globalPosition,
   required bool isCad,
   required bool visible,
+  bool isSitePlan = false,
   bool canMove = true,
   bool canEditGeometry = true,
   bool hasDocument = true,
@@ -507,7 +754,7 @@ Future<String?> showArchitectUnderlayContextMenu({
 }) {
   final l = context.l10n;
   return _showUnderlayMenu(context, globalPosition, [
-    if (canOrientBuilding)
+    if (isSitePlan && canOrientBuilding)
       _entry(
         'orient_building',
         AppIconId.compass,
@@ -550,7 +797,7 @@ Future<String?> showArchitectUnderlayContextMenu({
       const PopupMenuDivider(),
       _entry('replace', AppIconId.openFile, l.architectCadReplaceAccept),
       _entry('reload', AppIconId.refresh, l.architectCadUnderlayReloadNow),
-      if (hasSurvey)
+      if (isSitePlan && hasSurvey)
         _entry('terrain', AppIconId.terrain, l.architectGeodesyApplyToTerrain),
     ] else
       _entry('add', AppIconId.imageAdd, l.architectUnderlayAdd),
@@ -624,6 +871,10 @@ Future<void> showArchitectUnderlayEditDialog({
   bool initialUseOriginalLineweights = false,
   ValueChanged<bool>? onUseOriginalColorsChanged,
   ValueChanged<bool>? onUseOriginalLineweightsChanged,
+  bool? isVisible,
+  ValueChanged<bool>? onVisibilityChanged,
+  ArchitectTechnicalUnderlayDiscipline? discipline,
+  ValueChanged<ArchitectTechnicalUnderlayDiscipline>? onDisciplineChanged,
   bool? isLockOrigin,
   ValueChanged<bool>? onToggleLockOrigin,
   bool? isLocked,
@@ -635,6 +886,8 @@ Future<void> showArchitectUnderlayEditDialog({
   var opacity = initialOpacity;
   var originalColors = initialUseOriginalColors;
   var originalLineweights = initialUseOriginalLineweights;
+  var visible = isVisible ?? true;
+  var selectedDiscipline = discipline;
 
   return showDialog<void>(
     context: context,
@@ -653,6 +906,36 @@ Future<void> showArchitectUnderlayEditDialog({
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (selectedDiscipline != null && onDisciplineChanged != null) ...[
+                DropdownButtonFormField<ArchitectTechnicalUnderlayDiscipline>(
+                  key: const ValueKey('architect-underlay-discipline'),
+                  initialValue: selectedDiscipline,
+                  decoration: InputDecoration(
+                    labelText: l.architectUnderlayDisciplineLabel,
+                  ),
+                  items: [
+                    for (final d in ArchitectTechnicalUnderlayDiscipline.values)
+                      DropdownMenuItem(value: d, child: Text(d.label(l))),
+                  ],
+                  onChanged: (d) {
+                    if (d == null) return;
+                    setDialogState(() => selectedDiscipline = d);
+                    onDisciplineChanged(d);
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (isVisible != null && onVisibilityChanged != null)
+                SwitchListTile(
+                  key: const ValueKey('architect-underlay-visibility'),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.architectUnderlayShow),
+                  value: visible,
+                  onChanged: (v) {
+                    setDialogState(() => visible = v);
+                    onVisibilityChanged(v);
+                  },
+                ),
               Text(
                 '${l.architectRasterOpacityLabel}: ${(opacity * 100).round()}%',
                 style: const TextStyle(

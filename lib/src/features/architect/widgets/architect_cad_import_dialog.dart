@@ -15,9 +15,14 @@ Future<ArchitectCadImportSelection?> showArchitectCadImportDialog({
   required BuildContext context,
   required ArchitectPreparedCadUnderlay prepared,
   ArchitectCadUnderlayConfig? existing,
+  bool isSitePlan = false,
 }) => showDialog<ArchitectCadImportSelection>(
   context: context,
-  builder: (_) => _CadImportDialog(prepared: prepared, existing: existing),
+  builder: (_) => _CadImportDialog(
+    prepared: prepared,
+    existing: existing,
+    isSitePlan: isSitePlan,
+  ),
 );
 
 enum _ScaleChoice {
@@ -143,8 +148,13 @@ double? _readScale(String input) {
 class _CadImportDialog extends StatefulWidget {
   final ArchitectPreparedCadUnderlay prepared;
   final ArchitectCadUnderlayConfig? existing;
+  final bool isSitePlan;
 
-  const _CadImportDialog({required this.prepared, this.existing});
+  const _CadImportDialog({
+    required this.prepared,
+    this.existing,
+    this.isSitePlan = false,
+  });
 
   @override
   State<_CadImportDialog> createState() => _CadImportDialogState();
@@ -155,6 +165,7 @@ class _CadImportDialogState extends State<_CadImportDialog> {
   late final TextEditingController _custom;
   late _ScaleChoice _choice;
   late bool _cadOrientation;
+  late ArchitectTechnicalUnderlayDiscipline _discipline;
 
   @override
   void initState() {
@@ -167,6 +178,9 @@ class _CadImportDialogState extends State<_CadImportDialog> {
         ? _ScaleChoice.current
         : _ScaleChoice.automatic;
     _cadOrientation = widget.existing?.cadOrientation ?? true;
+    _discipline =
+        widget.existing?.discipline ??
+        ArchitectTechnicalUnderlayDiscipline.general;
     _custom = TextEditingController(text: _factor.toString());
   }
 
@@ -205,6 +219,9 @@ class _CadImportDialogState extends State<_CadImportDialog> {
         ? scientific.format(value)
         : format.format(value);
     final replacing = widget.existing != null;
+    final effectiveKind = widget.isSitePlan
+        ? ArchitectUnderlayKind.geodetic
+        : ArchitectUnderlayKind.technical;
     final suggested = widget.prepared.scaleIsEstimated
         ? switch (widget.prepared.suggestedUnitsPerMeter) {
             1000 => 'mm',
@@ -228,6 +245,44 @@ class _CadImportDialogState extends State<_CadImportDialog> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Chip(
+                  avatar: Icon(
+                    effectiveKind == ArchitectUnderlayKind.geodetic
+                        ? Icons.terrain_outlined
+                        : Icons.layers_outlined,
+                    size: 16,
+                  ),
+                  label: Text(
+                    effectiveKind == ArchitectUnderlayKind.geodetic
+                        ? l.architectUnderlayKindGeodetic
+                        : l.architectUnderlayKindTechnical,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+            if (effectiveKind == ArchitectUnderlayKind.technical) ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<ArchitectTechnicalUnderlayDiscipline>(
+                initialValue: _discipline,
+                decoration: InputDecoration(
+                  labelText: l.architectUnderlayDisciplineLabel,
+                ),
+                items: [
+                  for (final d in ArchitectTechnicalUnderlayDiscipline.values)
+                    DropdownMenuItem(value: d, child: Text(d.label(l))),
+                ],
+                onChanged: (d) {
+                  if (d != null) setState(() => _discipline = d);
+                },
+              ),
+            ],
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -328,6 +383,10 @@ class _CadImportDialogState extends State<_CadImportDialog> {
                     prepared: widget.prepared,
                     unitsPerMeter: factor,
                     cadOrientation: _cadOrientation,
+                    kind: effectiveKind,
+                    discipline: effectiveKind == ArchitectUnderlayKind.geodetic
+                        ? ArchitectTechnicalUnderlayDiscipline.general
+                        : _discipline,
                   ),
                 )
               : null,

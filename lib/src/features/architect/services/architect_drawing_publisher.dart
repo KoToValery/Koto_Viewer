@@ -110,6 +110,8 @@ class ArchitectDrawingPublisher {
     p.slabCompositionNumbers,
     p.existingTerrain,
     p.proposedTerrain,
+    p.cadUnderlays,
+    p.technicalCadUnderlays,
     p.document.viewScales,
     p.document.profileMm,
     p.document.overrideMm,
@@ -138,7 +140,9 @@ class ArchitectDrawingPublisher {
     denominator,
     l.localeName,
     visibilityKey(drawing.visibility),
-    identityHashCode(sources.underlays[drawing.sourceId]),
+    Object.hashAll(
+      sources.underlays.entries.map((e) => Object.hash(e.key, identityHashCode(e.value))),
+    ),
     sources.frame.hashCode,
     visibilityKey(sources.visibility),
     (viewRotationRad * 1e5).round(),
@@ -243,16 +247,12 @@ class ArchitectDrawingPublisher {
         );
         if (visible['axes'] == false) plan = plan.copyWith(gridAxes: []);
         canvas.scale(1000 / denominator);
-        final cad = plan.effectiveCadUnderlayForStorey(drawing.sourceId);
-        final underlayOwnerId =
-            plan.effectiveCadUnderlayOwnerId(drawing.sourceId) ??
-            drawing.sourceId;
-        final underlayDoc = sources.underlays[underlayOwnerId];
-        final showUnderlay =
+        final cadList = plan.effectiveCadUnderlaysForStorey(drawing.sourceId);
+        final ownerId = plan.effectiveCadUnderlayOwnerId(drawing.sourceId);
+        final layerOn =
             drawing.visibility['underlay'] != false &&
-            cad?.visible != false &&
             effectiveProject.isLayerVisible(ArchitectLayer.cadUnderlayLayerId);
-        if (showUnderlay && underlayDoc != null) {
+        void paintPlanCad(DxfDocument underlayDoc, ArchitectCadUnderlayConfig? cad) {
           final frame = cad?.frame(sources.frame) ?? sources.frame;
           canvas.save();
           if (cad?.hasActiveMask == true) {
@@ -279,6 +279,27 @@ class ArchitectDrawingPublisher {
             },
           );
           canvas.restore();
+        }
+        if (layerOn) {
+          if (cadList.isEmpty) {
+            final fallbackDoc =
+                sources.underlays[ownerId ?? drawing.sourceId] ??
+                sources.underlays[drawing.sourceId];
+            if (fallbackDoc != null) {
+              paintPlanCad(fallbackDoc, null);
+            }
+          } else {
+            for (final cad in cadList) {
+              if (!cad.visible) continue;
+              final doc =
+                  sources.underlays[cad.effectiveId] ??
+                  sources.underlays[cad.storeyId] ??
+                  (ownerId != null ? sources.underlays[ownerId] : null);
+              if (doc != null) {
+                paintPlanCad(doc, cad);
+              }
+            }
+          }
         }
         final wallLayers = hasLayerOverrides
             ? ArchitectWallLayers.forProject(

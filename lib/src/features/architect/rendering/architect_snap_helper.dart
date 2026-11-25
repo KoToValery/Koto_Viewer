@@ -29,6 +29,13 @@ class ArchitectSnapResult {
   });
 }
 
+typedef ArchitectExtraSnapUnderlay = ({
+  DxfDocument document,
+  BimCoordinateFrame frame,
+  Map<String, bool> visibility,
+  List<Offset>? mask,
+});
+
 /// Common bounded object snaps and magnetic guides for all drawing tools.
 class ArchitectSnapHelper {
   static BimPrecisionPolicy precision(ArchitectProject project) =>
@@ -51,6 +58,7 @@ class ArchitectSnapHelper {
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
+    List<ArchitectExtraSnapUnderlay> extraUnderlays = const [],
   }) => _resolve(
     raw: rawPoint,
     anchor: anchor,
@@ -66,6 +74,7 @@ class ArchitectSnapHelper {
     underlay: underlay,
     frame: frame,
     visibility: visibility,
+    extraUnderlays: extraUnderlays,
   );
 
   static ArchitectSnapResult snapFree({
@@ -83,6 +92,7 @@ class ArchitectSnapHelper {
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
+    List<ArchitectExtraSnapUnderlay> extraUnderlays = const [],
   }) => _resolve(
     raw: rawPoint,
     project: project,
@@ -98,6 +108,7 @@ class ArchitectSnapHelper {
     underlay: underlay,
     frame: frame,
     visibility: visibility,
+    extraUnderlays: extraUnderlays,
   );
 
   static BimSnapKind _kind(String label) => switch (label) {
@@ -132,6 +143,7 @@ class ArchitectSnapHelper {
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
+    List<ArchitectExtraSnapUnderlay> extraUnderlays = const [],
   }) {
     if (!magnetic) return ArchitectSnapResult(point: delta);
     final points =
@@ -156,6 +168,7 @@ class ArchitectSnapHelper {
         underlay: underlay,
         frame: frame,
         visibility: visibility,
+        extraUnderlays: extraUnderlays,
       );
       if (!snap.isSnapped) continue;
       final correction = snap.point - raw;
@@ -191,6 +204,7 @@ class ArchitectSnapHelper {
     DxfDocument? underlay,
     required BimCoordinateFrame frame,
     required Map<String, bool> visibility,
+    List<ArchitectExtraSnapUnderlay> extraUnderlays = const [],
   }) {
     if (!magnetic || radius <= 0) {
       return ArchitectSnapResult(point: precision(project).inputPoint(raw));
@@ -280,19 +294,31 @@ class ArchitectSnapHelper {
       final projection = BimLineGeometry.closest(raw, edge.a, edge.b);
       if ((projection - raw).distance <= radius) nearby.add((edge.a, edge.b));
     }
-    if (underlay != null && includedIds == null) {
-      underlay.orBuildSpatialIndex;
-      nearby.addAll(
-        ArchitectUnderlayClip.segments(
-          DxfSegmentSnap.nearby(
-            document: underlay,
-            point: frame.toCad(raw),
-            radius: radius * frame.unitsPerMeter,
-            layerVisibility: visibility,
-          ).map((e) => (frame.toModel(e.$1), frame.toModel(e.$2))),
-          underlayMask,
+    final allUnderlays = <ArchitectExtraSnapUnderlay>[
+      if (underlay != null)
+        (
+          document: underlay,
+          frame: frame,
+          visibility: visibility,
+          mask: underlayMask,
         ),
-      );
+      ...extraUnderlays,
+    ];
+    if (allUnderlays.isNotEmpty && includedIds == null) {
+      for (final u in allUnderlays) {
+        u.document.orBuildSpatialIndex;
+        nearby.addAll(
+          ArchitectUnderlayClip.segments(
+            DxfSegmentSnap.nearby(
+              document: u.document,
+              point: u.frame.toCad(raw),
+              radius: radius * u.frame.unitsPerMeter,
+              layerVisibility: u.visibility,
+            ).map((e) => (u.frame.toModel(e.$1), u.frame.toModel(e.$2))),
+            u.mask,
+          ),
+        );
+      }
     }
     for (final edge in nearby) {
       consider(edge.$1, 'Endpoint');
@@ -332,26 +358,29 @@ class ArchitectSnapHelper {
         extendedCandidates.add((a: edge.a, b: edge.b, owner: edge.owner));
       }
     }
-    if (underlay != null && includedIds == null) {
-      final cadMaxExt = maxExtension * frame.unitsPerMeter;
-      final cadRaw = frame.toCad(raw);
+    if (allUnderlays.isNotEmpty && includedIds == null) {
       var dxfIdx = 0;
-      for (final e in ArchitectUnderlayClip.segments(
-        DxfSegmentSnap.nearby(
-          document: underlay,
-          point: cadRaw,
-          radius: cadMaxExt,
-          layerVisibility: visibility,
-        ).map((e) => (frame.toModel(e.$1), frame.toModel(e.$2))),
-        underlayMask,
-      )) {
-        final u = e.$2 - e.$1;
-        final lenSq = u.dx * u.dx + u.dy * u.dy;
-        if (lenSq < 1e-8) continue;
-        final cross = ((raw.dx - e.$1.dx) * u.dy - (raw.dy - e.$1.dy) * u.dx)
-            .abs();
-        if (cross * cross <= radius * radius * lenSq) {
-          extendedCandidates.add((a: e.$1, b: e.$2, owner: '@dxf:${dxfIdx++}'));
+      for (final u in allUnderlays) {
+        final cadMaxExt = maxExtension * u.frame.unitsPerMeter;
+        final cadRaw = u.frame.toCad(raw);
+        for (final e in ArchitectUnderlayClip.segments(
+          DxfSegmentSnap.nearby(
+            document: u.document,
+            point: cadRaw,
+            radius: cadMaxExt,
+            layerVisibility: u.visibility,
+          ).map((e) => (u.frame.toModel(e.$1), u.frame.toModel(e.$2))),
+          u.mask,
+        )) {
+          final uVec = e.$2 - e.$1;
+          final lenSq = uVec.dx * uVec.dx + uVec.dy * uVec.dy;
+          if (lenSq < 1e-8) continue;
+          final cross =
+              ((raw.dx - e.$1.dx) * uVec.dy - (raw.dy - e.$1.dy) * uVec.dx)
+                  .abs();
+          if (cross * cross <= radius * radius * lenSq) {
+            extendedCandidates.add((a: e.$1, b: e.$2, owner: '@dxf:${dxfIdx++}'));
+          }
         }
       }
     }

@@ -3,15 +3,39 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import '../../../core/l10n/generated/app_localizations.dart';
 import '../../bim_editing/geometry/bim_coordinate_frame.dart';
 import '../../bim_editing/geometry/bim_transform_2d.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
+
+/// Role separation between the Site Plan geodetic survey underlay and floor-plan technical underlays.
+enum ArchitectUnderlayKind { geodetic, technical }
+
+/// Engineering/design discipline for technical underlays on building and roof plans.
+enum ArchitectTechnicalUnderlayDiscipline {
+  general,
+  structural,
+  plumbing,
+  electrical,
+  hvac,
+  architectural;
+
+  String label(AppLocalizations l) => switch (this) {
+    general => l.architectUnderlayDisciplineGeneral,
+    structural => l.architectUnderlayDisciplineStructural,
+    plumbing => l.architectUnderlayDisciplinePlumbing,
+    electrical => l.architectUnderlayDisciplineElectrical,
+    hvac => l.architectUnderlayDisciplineHvac,
+    architectural => l.architectUnderlayDisciplineArchitectural,
+  };
+}
 
 /// Alignment / deskew mode for 2-point raster calibration.
 enum ArchitectRasterAlignMode { keepAngle, horizontal, vertical }
 
 /// Persistent configuration for a storey's CAD (DWG/DXF) Xref underlay.
 class ArchitectCadUnderlayConfig {
+  final String? id;
   final String storeyId;
   final String fileName;
   final String? externalSourcePath;
@@ -27,6 +51,8 @@ class ArchitectCadUnderlayConfig {
   final double rotationRad;
   final Set<String> hiddenDxfLayers;
   final Set<String> shownDxfLayers;
+  final ArchitectUnderlayKind kind;
+  final ArchitectTechnicalUnderlayDiscipline discipline;
   final bool isGeodetic;
   final String? detectedCrsName;
   final double opacity;
@@ -35,11 +61,12 @@ class ArchitectCadUnderlayConfig {
   final bool visible;
   final List<Offset>? maskPolygon;
   final bool maskEnabled;
-  /// When attached to the Site Plan storey, automatically displays this
-  /// aligned survey underlay on building storeys at or below `±0.00`.
+  /// When attached to the Site Plan storey, optionally shares the survey
+  /// underlay onto building storeys at or below `±0.00`.
   final bool shareToGroundStoreys;
 
   const ArchitectCadUnderlayConfig({
+    this.id,
     required this.storeyId,
     required this.fileName,
     this.externalSourcePath,
@@ -55,7 +82,9 @@ class ArchitectCadUnderlayConfig {
     this.rotationRad = 0,
     this.hiddenDxfLayers = const {},
     this.shownDxfLayers = const {},
-    this.isGeodetic = false,
+    ArchitectUnderlayKind? kind,
+    this.discipline = ArchitectTechnicalUnderlayDiscipline.general,
+    bool isGeodetic = false,
     this.detectedCrsName,
     this.opacity = 0.42,
     this.useOriginalColors = false,
@@ -64,7 +93,15 @@ class ArchitectCadUnderlayConfig {
     this.maskPolygon,
     this.maskEnabled = true,
     this.shareToGroundStoreys = true,
-  });
+  }) : kind =
+           kind ??
+           (isGeodetic
+               ? ArchitectUnderlayKind.geodetic
+               : ArchitectUnderlayKind.technical),
+       isGeodetic = isGeodetic || kind == ArchitectUnderlayKind.geodetic;
+
+  String get effectiveId => id ?? storeyId;
+  bool get isTechnical => kind == ArchitectUnderlayKind.technical;
 
   bool get hasLockedOrigin =>
       lockedCadOriginX != null &&
@@ -120,6 +157,7 @@ class ArchitectCadUnderlayConfig {
       maskEnabled && maskPolygon != null && maskPolygon!.length >= 3;
 
   ArchitectCadUnderlayConfig copyWith({
+    String? id,
     String? storeyId,
     String? fileName,
     String? externalSourcePath,
@@ -136,6 +174,8 @@ class ArchitectCadUnderlayConfig {
     double? rotationRad,
     Set<String>? hiddenDxfLayers,
     Set<String>? shownDxfLayers,
+    ArchitectUnderlayKind? kind,
+    ArchitectTechnicalUnderlayDiscipline? discipline,
     bool? isGeodetic,
     String? detectedCrsName,
     double? opacity,
@@ -146,37 +186,51 @@ class ArchitectCadUnderlayConfig {
     bool clearMask = false,
     bool? maskEnabled,
     bool? shareToGroundStoreys,
-  }) => ArchitectCadUnderlayConfig(
-    storeyId: storeyId ?? this.storeyId,
-    fileName: fileName ?? this.fileName,
-    externalSourcePath: clearExternalSourcePath
-        ? null
-        : (externalSourcePath ?? this.externalSourcePath),
-    internalCopyPath: internalCopyPath ?? this.internalCopyPath,
-    kcadCachePath: kcadCachePath ?? this.kcadCachePath,
-    autoReload: false,
-    lockOrigin: lockOrigin ?? this.lockOrigin,
-    lastModifiedMs: lastModifiedMs ?? this.lastModifiedMs,
-    lockedCadOriginX: lockedCadOriginX ?? this.lockedCadOriginX,
-    lockedCadOriginY: lockedCadOriginY ?? this.lockedCadOriginY,
-    unitsPerMeter: unitsPerMeter ?? this.unitsPerMeter,
-    cadOrientation: cadOrientation ?? this.cadOrientation,
-    rotationRad: rotationRad ?? this.rotationRad,
-    hiddenDxfLayers: hiddenDxfLayers ?? this.hiddenDxfLayers,
-    shownDxfLayers: shownDxfLayers ?? this.shownDxfLayers,
-    isGeodetic: isGeodetic ?? this.isGeodetic,
-    detectedCrsName: detectedCrsName ?? this.detectedCrsName,
-    opacity: (opacity ?? this.opacity).clamp(0.05, 1.0),
-    useOriginalColors: useOriginalColors ?? this.useOriginalColors,
-    useOriginalLineweights:
-        useOriginalLineweights ?? this.useOriginalLineweights,
-    visible: visible ?? this.visible,
-    maskPolygon: clearMask ? null : (maskPolygon ?? this.maskPolygon),
-    maskEnabled: maskEnabled ?? this.maskEnabled,
-    shareToGroundStoreys: shareToGroundStoreys ?? this.shareToGroundStoreys,
-  );
+  }) {
+    final resolvedKind =
+        kind ??
+        (isGeodetic != null
+            ? (isGeodetic
+                  ? ArchitectUnderlayKind.geodetic
+                  : ArchitectUnderlayKind.technical)
+            : this.kind);
+    return ArchitectCadUnderlayConfig(
+      id: id ?? this.id,
+      storeyId: storeyId ?? this.storeyId,
+      fileName: fileName ?? this.fileName,
+      externalSourcePath: clearExternalSourcePath
+          ? null
+          : (externalSourcePath ?? this.externalSourcePath),
+      internalCopyPath: internalCopyPath ?? this.internalCopyPath,
+      kcadCachePath: kcadCachePath ?? this.kcadCachePath,
+      autoReload: false,
+      lockOrigin: lockOrigin ?? this.lockOrigin,
+      lastModifiedMs: lastModifiedMs ?? this.lastModifiedMs,
+      lockedCadOriginX: lockedCadOriginX ?? this.lockedCadOriginX,
+      lockedCadOriginY: lockedCadOriginY ?? this.lockedCadOriginY,
+      unitsPerMeter: unitsPerMeter ?? this.unitsPerMeter,
+      cadOrientation: cadOrientation ?? this.cadOrientation,
+      rotationRad: rotationRad ?? this.rotationRad,
+      hiddenDxfLayers: hiddenDxfLayers ?? this.hiddenDxfLayers,
+      shownDxfLayers: shownDxfLayers ?? this.shownDxfLayers,
+      kind: resolvedKind,
+      discipline: discipline ?? this.discipline,
+      isGeodetic:
+          isGeodetic ?? (resolvedKind == ArchitectUnderlayKind.geodetic),
+      detectedCrsName: detectedCrsName ?? this.detectedCrsName,
+      opacity: (opacity ?? this.opacity).clamp(0.05, 1.0),
+      useOriginalColors: useOriginalColors ?? this.useOriginalColors,
+      useOriginalLineweights:
+          useOriginalLineweights ?? this.useOriginalLineweights,
+      visible: visible ?? this.visible,
+      maskPolygon: clearMask ? null : (maskPolygon ?? this.maskPolygon),
+      maskEnabled: maskEnabled ?? this.maskEnabled,
+      shareToGroundStoreys: shareToGroundStoreys ?? this.shareToGroundStoreys,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
+    if (id != null) 'id': id,
     'storeyId': storeyId,
     'fileName': fileName,
     if (externalSourcePath != null) 'externalSourcePath': externalSourcePath,
@@ -192,6 +246,9 @@ class ArchitectCadUnderlayConfig {
     if (rotationRad != 0) 'rotationRad': rotationRad,
     if (hiddenDxfLayers.isNotEmpty) 'hiddenDxfLayers': hiddenDxfLayers.toList(),
     if (shownDxfLayers.isNotEmpty) 'shownDxfLayers': shownDxfLayers.toList(),
+    'kind': kind.name,
+    if (discipline != ArchitectTechnicalUnderlayDiscipline.general)
+      'discipline': discipline.name,
     if (isGeodetic) 'isGeodetic': true,
     if (detectedCrsName != null) 'detectedCrsName': detectedCrsName,
     'opacity': opacity,
@@ -206,54 +263,69 @@ class ArchitectCadUnderlayConfig {
     if (!shareToGroundStoreys) 'shareToGroundStoreys': false,
   };
 
-  factory ArchitectCadUnderlayConfig.fromJson(Map<String, dynamic> json) =>
-      ArchitectCadUnderlayConfig(
-        storeyId: json['storeyId'] as String? ?? 'default',
-        fileName: json['fileName'] as String? ?? '',
-        useOriginalColors: json['useOriginalColors'] == true,
-        useOriginalLineweights: json['useOriginalLineweights'] == true,
-        externalSourcePath: json['externalSourcePath'] as String?,
-        internalCopyPath: json['internalCopyPath'] as String? ?? '',
-        kcadCachePath: json['kcadCachePath'] as String?,
-        autoReload: false,
-        lockOrigin: json['lockOrigin'] != false,
-        lastModifiedMs: (json['lastModifiedMs'] as num?)?.toInt(),
-        lockedCadOriginX: (json['lockedCadOriginX'] as num?)?.toDouble(),
-        lockedCadOriginY: (json['lockedCadOriginY'] as num?)?.toDouble(),
-        unitsPerMeter: (json['unitsPerMeter'] as num?)?.toDouble(),
-        cadOrientation: json['cadOrientation'] == true,
-        rotationRad: switch (json['rotationRad']) {
-          final num value when value.isFinite => value.toDouble(),
-          _ => (((json['quarterTurns'] as num?)?.toInt() ?? 0) % 4) * math.pi / 2,
-        },
-        hiddenDxfLayers: {
-          for (final l in json['hiddenDxfLayers'] as List? ?? const [])
-            if (l is String) l,
-        },
-        shownDxfLayers: {
-          for (final layer in json['shownDxfLayers'] as List? ?? const [])
-            if (layer is String) layer,
-        },
-        isGeodetic: json['isGeodetic'] == true,
-        detectedCrsName: json['detectedCrsName'] as String?,
-        opacity: ((json['opacity'] as num?)?.toDouble() ?? 0.42).clamp(
-          0.05,
-          1.0,
-        ),
-        visible: json['visible'] != false,
-        maskPolygon: json['maskPolygon'] is List
-            ? [
-                for (final item in json['maskPolygon'] as List)
-                  if (item is Map)
-                    Offset(
-                      (item['x'] as num?)?.toDouble() ?? 0.0,
-                      (item['y'] as num?)?.toDouble() ?? 0.0,
-                    ),
-              ]
-            : null,
-        maskEnabled: json['maskEnabled'] != false,
-        shareToGroundStoreys: json['shareToGroundStoreys'] != false,
-      );
+  factory ArchitectCadUnderlayConfig.fromJson(Map<String, dynamic> json) {
+    final isGeo = json['isGeodetic'] == true;
+    final parsedKind = ArchitectUnderlayKind.values.firstWhere(
+      (k) => k.name == json['kind'],
+      orElse: () =>
+          isGeo ? ArchitectUnderlayKind.geodetic : ArchitectUnderlayKind.technical,
+    );
+    final parsedDiscipline = ArchitectTechnicalUnderlayDiscipline.values
+        .firstWhere(
+          (d) => d.name == json['discipline'],
+          orElse: () => ArchitectTechnicalUnderlayDiscipline.general,
+        );
+    return ArchitectCadUnderlayConfig(
+      id: json['id'] as String?,
+      storeyId: json['storeyId'] as String? ?? 'default',
+      fileName: json['fileName'] as String? ?? '',
+      useOriginalColors: json['useOriginalColors'] == true,
+      useOriginalLineweights: json['useOriginalLineweights'] == true,
+      externalSourcePath: json['externalSourcePath'] as String?,
+      internalCopyPath: json['internalCopyPath'] as String? ?? '',
+      kcadCachePath: json['kcadCachePath'] as String?,
+      autoReload: false,
+      lockOrigin: json['lockOrigin'] != false,
+      lastModifiedMs: (json['lastModifiedMs'] as num?)?.toInt(),
+      lockedCadOriginX: (json['lockedCadOriginX'] as num?)?.toDouble(),
+      lockedCadOriginY: (json['lockedCadOriginY'] as num?)?.toDouble(),
+      unitsPerMeter: (json['unitsPerMeter'] as num?)?.toDouble(),
+      cadOrientation: json['cadOrientation'] == true,
+      rotationRad: switch (json['rotationRad']) {
+        final num value when value.isFinite => value.toDouble(),
+        _ => (((json['quarterTurns'] as num?)?.toInt() ?? 0) % 4) * math.pi / 2,
+      },
+      hiddenDxfLayers: {
+        for (final l in json['hiddenDxfLayers'] as List? ?? const [])
+          if (l is String) l,
+      },
+      shownDxfLayers: {
+        for (final layer in json['shownDxfLayers'] as List? ?? const [])
+          if (layer is String) layer,
+      },
+      kind: parsedKind,
+      discipline: parsedDiscipline,
+      isGeodetic: isGeo || parsedKind == ArchitectUnderlayKind.geodetic,
+      detectedCrsName: json['detectedCrsName'] as String?,
+      opacity: ((json['opacity'] as num?)?.toDouble() ?? 0.42).clamp(
+        0.05,
+        1.0,
+      ),
+      visible: json['visible'] != false,
+      maskPolygon: json['maskPolygon'] is List
+          ? [
+              for (final item in json['maskPolygon'] as List)
+                if (item is Map)
+                  Offset(
+                    (item['x'] as num?)?.toDouble() ?? 0.0,
+                    (item['y'] as num?)?.toDouble() ?? 0.0,
+                  ),
+            ]
+          : null,
+      maskEnabled: json['maskEnabled'] != false,
+      shareToGroundStoreys: json['shareToGroundStoreys'] != false,
+    );
+  }
 }
 
 /// Raster image / PDF page underlay attached to a storey with 2-point calibration.
@@ -272,6 +344,8 @@ class ArchitectRasterUnderlay {
   final double opacity;
   final bool locked;
   final bool visible;
+  final ArchitectUnderlayKind kind;
+  final ArchitectTechnicalUnderlayDiscipline discipline;
   final List<Offset>? maskPolygon;
   final bool maskEnabled;
 
@@ -290,6 +364,8 @@ class ArchitectRasterUnderlay {
     this.opacity = 0.55,
     this.locked = false,
     this.visible = true,
+    this.kind = ArchitectUnderlayKind.technical,
+    this.discipline = ArchitectTechnicalUnderlayDiscipline.general,
     this.maskPolygon,
     this.maskEnabled = true,
   });
@@ -430,6 +506,8 @@ class ArchitectRasterUnderlay {
     double? opacity,
     bool? locked,
     bool? visible,
+    ArchitectUnderlayKind? kind,
+    ArchitectTechnicalUnderlayDiscipline? discipline,
     List<Offset>? maskPolygon,
     bool clearMask = false,
     bool? maskEnabled,
@@ -448,6 +526,8 @@ class ArchitectRasterUnderlay {
     opacity: (opacity ?? this.opacity).clamp(0.05, 1.0),
     locked: locked ?? this.locked,
     visible: visible ?? this.visible,
+    kind: kind ?? this.kind,
+    discipline: discipline ?? this.discipline,
     maskPolygon: clearMask ? null : (maskPolygon ?? this.maskPolygon),
     maskEnabled: maskEnabled ?? this.maskEnabled,
   );
@@ -467,6 +547,9 @@ class ArchitectRasterUnderlay {
     'opacity': opacity,
     if (locked) 'locked': true,
     if (!visible) 'visible': false,
+    if (kind != ArchitectUnderlayKind.technical) 'kind': kind.name,
+    if (discipline != ArchitectTechnicalUnderlayDiscipline.general)
+      'discipline': discipline.name,
     if (maskPolygon != null && maskPolygon!.isNotEmpty)
       'maskPolygon': [
         for (final p in maskPolygon!) {'x': p.dx, 'y': p.dy},
@@ -496,6 +579,14 @@ class ArchitectRasterUnderlay {
       opacity: ((json['opacity'] as num?)?.toDouble() ?? 0.55).clamp(0.05, 1.0),
       locked: json['locked'] == true,
       visible: json['visible'] != false,
+      kind: ArchitectUnderlayKind.values.firstWhere(
+        (k) => k.name == json['kind'],
+        orElse: () => ArchitectUnderlayKind.technical,
+      ),
+      discipline: ArchitectTechnicalUnderlayDiscipline.values.firstWhere(
+        (d) => d.name == json['discipline'],
+        orElse: () => ArchitectTechnicalUnderlayDiscipline.general,
+      ),
       maskPolygon: json['maskPolygon'] is List
           ? [
               for (final item in json['maskPolygon'] as List)

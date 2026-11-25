@@ -36,18 +36,48 @@ class ArchitectRotationOverlay extends StatefulWidget {
   State<ArchitectRotationOverlay> createState() => _RotationState();
 }
 
+enum _UnderlayAlignAxis { auto, horizontal, vertical }
+
 class _RotationState extends State<ArchitectRotationOverlay> {
   late Offset pivot = widget.initialPivot;
   Offset? reference, target;
   double angle = 0;
   int stage = 0;
+  _UnderlayAlignAxis _alignAxis = _UnderlayAlignAxis.auto;
 
   static double _angleBetween(Offset start, Offset end) => math.atan2(
     start.dx * end.dy - start.dy * end.dx,
     start.dx * end.dx + start.dy * end.dy,
   );
 
+  static double _normalizeAngle(double radians) {
+    if (!radians.isFinite) return 0;
+    var a = radians % (2 * math.pi);
+    if (a > math.pi) a -= 2 * math.pi;
+    if (a <= -math.pi) a += 2 * math.pi;
+    return a;
+  }
+
+  static double _alignmentAngle(Offset ray, _UnderlayAlignAxis mode) {
+    if (ray.distanceSquared < 1e-12) return 0;
+    final current = math.atan2(ray.dy, ray.dx);
+    final candidates = switch (mode) {
+      _UnderlayAlignAxis.horizontal => const [0.0, math.pi],
+      _UnderlayAlignAxis.vertical => const [math.pi / 2, -math.pi / 2],
+      _UnderlayAlignAxis.auto => const [0.0, math.pi / 2, math.pi, -math.pi / 2],
+    };
+    var bestDelta = double.infinity;
+    for (final target in candidates) {
+      final delta = _normalizeAngle(target - current);
+      if (delta.abs() < bestDelta.abs()) {
+        bestDelta = delta;
+      }
+    }
+    return bestDelta.abs() <= 1e-8 ? 0 : bestDelta;
+  }
+
   void aim(ArchitectSnapResult snap) {
+    if (widget.alignReferenceToAxes && stage == 2) return;
     final point = snap.point;
     setState(() {
       target = point;
@@ -63,11 +93,6 @@ class _RotationState extends State<ArchitectRotationOverlay> {
             .clamp(math.pi / 180, math.pi / 30);
         if (snap.isSnapped) {
           angle = raw;
-        } else if (widget.alignReferenceToAxes) {
-          final startAngle = math.atan2(start.dy, start.dx);
-          final world = startAngle + raw;
-          final nearest = (world / (math.pi / 2)).round() * (math.pi / 2);
-          angle = (nearest - world).abs() <= tol ? nearest - startAngle : raw;
         } else {
           angle = ArchitectRotation.snapAngle(raw, tolerance: tol);
         }
@@ -77,6 +102,7 @@ class _RotationState extends State<ArchitectRotationOverlay> {
   }
 
   void accept(ArchitectSnapResult snap) {
+    if (widget.alignReferenceToAxes && stage == 2) return;
     aim(snap);
     if (stage == 0) {
       setState(() {
@@ -89,8 +115,19 @@ class _RotationState extends State<ArchitectRotationOverlay> {
           (target! - pivot).distance < 1e-8) {
         return;
       }
+      final ref = target!;
+      if (widget.alignReferenceToAxes) {
+        final nextAngle = _alignmentAngle(ref - pivot, _alignAxis);
+        setState(() {
+          reference = ref;
+          angle = nextAngle;
+          stage = 2;
+        });
+        widget.onPreview(pivot, nextAngle);
+        return;
+      }
       setState(() {
-        reference = target;
+        reference = ref;
         stage = 2;
       });
     } else if (angle.abs() > 1e-8) {
@@ -107,16 +144,43 @@ class _RotationState extends State<ArchitectRotationOverlay> {
     applyAngle(degrees * math.pi / 180);
   }
 
-  void alignToAxis({required bool vertical}) {
-    final ray = reference! - pivot;
-    final axis = vertical
-        ? Offset(0, ray.dy < 0 ? -1 : 1)
-        : Offset(ray.dx < 0 ? -1 : 1, 0);
-    final radians = _angleBetween(ray, axis);
-    if (radians.abs() <= 1e-8) {
+  void _selectUnderlayAxis(_UnderlayAlignAxis mode) {
+    setState(() {
+      _alignAxis = mode;
+      if (stage == 2 && reference != null) {
+        angle = _alignmentAngle(reference! - pivot, mode);
+      }
+    });
+    if (stage == 2 && reference != null) {
+      widget.onPreview(pivot, angle);
+    }
+  }
+
+  void _rotatePlus90() {
+    final nextAngle = _normalizeAngle(angle + math.pi / 2);
+    setState(() {
+      reference ??= pivot + const Offset(1, 0);
+      stage = 2;
+      angle = nextAngle;
+    });
+    widget.onPreview(pivot, nextAngle);
+  }
+
+  void _resetPicking() {
+    setState(() {
+      stage = 0;
+      reference = null;
+      target = null;
+      angle = 0;
+    });
+    widget.onPreview(pivot, 0);
+  }
+
+  void _confirmUnderlayAlignment() {
+    if (angle.abs() <= 1e-8) {
       widget.onCancel();
     } else {
-      applyAngle(radians);
+      widget.onApply(pivot, angle);
     }
   }
 
@@ -152,22 +216,23 @@ class _RotationState extends State<ArchitectRotationOverlay> {
             ),
           ),
         ),
-        Positioned.fill(
-          child: ArchitectTransformPointInput(
-            key: const ValueKey('architect-rotation-input'),
-            toModel: widget.toModel,
-            toScreen: widget.toScreen,
-            snap: (raw, touch) => widget.snap(
-              raw,
-              touch,
-              widget.alignReferenceToAxes ? stage < 2 : stage == 1,
+        if (!(widget.alignReferenceToAxes && stage == 2))
+          Positioned.fill(
+            child: ArchitectTransformPointInput(
+              key: const ValueKey('architect-rotation-input'),
+              toModel: widget.toModel,
+              toScreen: widget.toScreen,
+              snap: (raw, touch) => widget.snap(
+                raw,
+                touch,
+                widget.alignReferenceToAxes ? stage < 2 : stage == 1,
+              ),
+              localizeSnap: widget.localizeSnap,
+              onAim: aim,
+              onPick: accept,
+              onNavigate: widget.onNavigate,
             ),
-            localizeSnap: widget.localizeSnap,
-            onAim: aim,
-            onPick: accept,
-            onNavigate: widget.onNavigate,
           ),
-        ),
         Positioned(
           top: widget.alignReferenceToAxes ? 8 : null,
           bottom: widget.alignReferenceToAxes ? null : 8,
@@ -176,9 +241,10 @@ class _RotationState extends State<ArchitectRotationOverlay> {
           child: Material(
             key: const ValueKey('architect-rotation-banner'),
             color: Theme.of(context).colorScheme.surface,
+            elevation: widget.alignReferenceToAxes ? 3 : 0,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -192,74 +258,128 @@ class _RotationState extends State<ArchitectRotationOverlay> {
                           1 => widget.alignReferenceToAxes
                               ? l.architectUnderlayRotationEnd
                               : l.architectRotationReference,
-                          _ => l.architectRotationTarget,
+                          _ => widget.alignReferenceToAxes
+                              ? l.architectUnderlayRotationReview(
+                                  (angle * 180 / math.pi).toStringAsFixed(1),
+                                )
+                              : l.architectRotationTarget,
                         }, maxLines: 2),
                       ),
                       IconButton(
                         key: const ValueKey('architect-rotation-pick-pivot'),
                         tooltip: l.architectRotationPickPivot,
-                        onPressed: () {
-                          setState(() {
-                            stage = 0;
-                            reference = null;
-                            target = null;
-                            angle = 0;
-                          });
-                          widget.onPreview(pivot, 0);
-                        },
+                        onPressed: _resetPicking,
                         icon: const AppIcon(AppIconId.fitView),
                       ),
                       if (widget.alignReferenceToAxes)
                         IconButton(
+                          key: const ValueKey('architect-rotation-close'),
                           tooltip: l.cancel,
                           onPressed: widget.onCancel,
                           icon: const AppIcon(AppIconId.close),
                         ),
                     ],
                   ),
-                  if (widget.alignReferenceToAxes && reference != null)
-                    Row(
+                  if (widget.alignReferenceToAxes) ...[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      alignment: WrapAlignment.center,
                       children: [
-                        Expanded(
-                          child: TextButton(
-                            key: const ValueKey('architect-rotation-horizontal'),
-                            onPressed: () => alignToAxis(vertical: false),
-                            child: Text(l.architectUnderlayAlignHorizontal),
+                        ChoiceChip(
+                          key: const ValueKey('architect-rotation-auto'),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          label: Text(l.architectUnderlayAlignAuto),
+                          selected: _alignAxis == _UnderlayAlignAxis.auto,
+                          onSelected: (_) =>
+                              _selectUnderlayAxis(_UnderlayAlignAxis.auto),
+                        ),
+                        ChoiceChip(
+                          key: const ValueKey('architect-rotation-horizontal'),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          label: Text(l.architectUnderlayAlignHorizontal),
+                          selected:
+                              _alignAxis == _UnderlayAlignAxis.horizontal,
+                          onSelected: (_) => _selectUnderlayAxis(
+                            _UnderlayAlignAxis.horizontal,
                           ),
                         ),
+                        ChoiceChip(
+                          key: const ValueKey('architect-rotation-vertical'),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          label: Text(l.architectUnderlayAlignVertical),
+                          selected: _alignAxis == _UnderlayAlignAxis.vertical,
+                          onSelected: (_) =>
+                              _selectUnderlayAxis(_UnderlayAlignAxis.vertical),
+                        ),
+                        ActionChip(
+                          key: const ValueKey('architect-rotation-exact'),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          label: Text(l.architectPropertyAngle),
+                          onPressed: exact,
+                        ),
+                      ],
+                    ),
+                    if (stage == 2) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          OutlinedButton.icon(
+                            key: const ValueKey('architect-rotation-rotate90'),
+                            onPressed: _rotatePlus90,
+                            icon: const AppIcon(AppIconId.rotate, size: 16),
+                            label: Text(l.architectUnderlayRotatePlus90),
+                          ),
+                          OutlinedButton.icon(
+                            key: const ValueKey('architect-rotation-retry'),
+                            onPressed: _resetPicking,
+                            icon: const AppIcon(AppIconId.refresh, size: 16),
+                            label: Text(l.architectSiteOrientRetry),
+                          ),
+                          FilledButton.icon(
+                            key: const ValueKey('architect-rotation-apply'),
+                            onPressed: _confirmUnderlayAlignment,
+                            icon: const AppIcon(AppIconId.confirm, size: 16),
+                            label: Text(l.applyAction),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ] else
+                    Row(
+                      children: [
+                        for (final d in [30, 45, 90])
+                          Expanded(
+                            child: TextButton(
+                              key: ValueKey('architect-rotation-preset-$d'),
+                              onPressed: () => applyAngle(d * math.pi / 180),
+                              child: Text('$d°'),
+                            ),
+                          ),
                         Expanded(
-                          child: TextButton(
-                            key: const ValueKey('architect-rotation-vertical'),
-                            onPressed: () => alignToAxis(vertical: true),
-                            child: Text(l.architectUnderlayAlignVertical),
+                          child: Tooltip(
+                            message: l.architectPropertyAngle,
+                            child: TextButton(
+                              key: const ValueKey('architect-rotation-exact'),
+                              onPressed: exact,
+                              child: Text('${(angle * 180 / math.pi).toStringAsFixed(1)}°'),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  Row(
-                    children: [
-                      for (final d in [30, 45, 90])
-                        Expanded(
-                          child: TextButton(
-                            key: ValueKey('architect-rotation-preset-$d'),
-                            onPressed: () => applyAngle(d * math.pi / 180),
-                            child: Text('$d°'),
-                          ),
-                        ),
-                      Expanded(
-                        child: Tooltip(
-                          message: l.architectPropertyAngle,
-                          child: TextButton(
-                            key: const ValueKey('architect-rotation-exact'),
-                            onPressed: exact,
-                            child: Text(widget.alignReferenceToAxes && stage < 2
-                                ? l.architectPropertyAngle
-                                : '${(angle * 180 / math.pi).toStringAsFixed(1)}°'),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),

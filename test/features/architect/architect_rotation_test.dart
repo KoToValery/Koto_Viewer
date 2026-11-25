@@ -404,9 +404,10 @@ void main() {
   });
 
   testWidgets(
-    'Underlay rotation aligns reference ray magnetically to world 90-degree axes',
+    'Underlay straightening supports Auto, Horizontal, Vertical, +90°, Retry and Apply without 30/45/90 presets',
     (tester) async {
-      double? preview;
+      double? preview, applied;
+      Offset? appliedPivot;
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -420,28 +421,56 @@ void main() {
               localizeSnap: (label) => label,
               alignReferenceToAxes: true,
               onPreview: (_, a) => preview = a,
-              onApply: (_, _) {},
+              onApply: (p, a) {
+                appliedPivot = p;
+                applied = a;
+              },
               onCancel: () {},
               onNavigate: (_, _, _) {},
             ),
           ),
         ),
       );
+      expect(find.byKey(const ValueKey('architect-rotation-preset-30')), findsNothing);
+      expect(find.byKey(const ValueKey('architect-rotation-preset-45')), findsNothing);
+      expect(find.byKey(const ValueKey('architect-rotation-preset-90')), findsNothing);
+      expect(find.byKey(const ValueKey('architect-rotation-auto')), findsOneWidget);
+      expect(find.byKey(const ValueKey('architect-rotation-horizontal')), findsOneWidget);
+      expect(find.byKey(const ValueKey('architect-rotation-vertical')), findsOneWidget);
+
       await tester.tapAt(const Offset(200, 300));
       await tester.pump();
       await tester.tapAt(const Offset(420, 340));
       await tester.pump();
       final startAngle = math.atan2(40, 220);
-      final gesture = await tester.startGesture(const Offset(420, 340));
-      await gesture.moveTo(const Offset(420, 302));
-      await tester.pump();
       expect(preview, isNotNull);
       expect((startAngle + preview!).abs(), lessThan(1e-8));
-      await gesture.moveTo(const Offset(202, 460));
+      expect(applied, isNull);
+
+      await tester.tap(find.byKey(const ValueKey('architect-rotation-vertical')));
       await tester.pump();
       expect((startAngle + preview! - math.pi / 2).abs(), lessThan(1e-8));
-      await gesture.up();
+
+      await tester.tap(find.byKey(const ValueKey('architect-rotation-rotate90')));
       await tester.pump();
+      expect((startAngle + preview! - math.pi).abs(), lessThan(1e-8));
+
+      await tester.tap(find.byKey(const ValueKey('architect-rotation-retry')));
+      await tester.pump();
+      expect(preview, 0);
+
+      await tester.tap(find.byKey(const ValueKey('architect-rotation-horizontal')));
+      await tester.pump();
+      await tester.tapAt(const Offset(200, 300));
+      await tester.pump();
+      await tester.tapAt(const Offset(420, 340));
+      await tester.pump();
+      expect((startAngle + preview!).abs(), lessThan(1e-8));
+
+      await tester.tap(find.byKey(const ValueKey('architect-rotation-apply')));
+      await tester.pump();
+      expect(appliedPivot, const Offset(200, 300));
+      expect((startAngle + applied!).abs(), lessThan(1e-8));
       expect(tester.takeException(), isNull);
     },
   );

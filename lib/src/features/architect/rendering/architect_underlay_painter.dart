@@ -11,6 +11,20 @@ import '../models/architect_underlay_models.dart';
 import 'architect_cad_underlay_renderer.dart';
 import 'architect_canvas_palette.dart';
 
+class ArchitectCadRenderLayer {
+  final DxfDocument document;
+  final BimCoordinateFrame frame;
+  final Map<String, bool> visibility;
+  final ArchitectCadUnderlayConfig? config;
+
+  const ArchitectCadRenderLayer({
+    required this.document,
+    required this.frame,
+    this.visibility = const {},
+    this.config,
+  });
+}
+
 /// Independent background layer rendering Raster Underlays (`A-RAST`),
 /// CAD Xref Underlays (`A-XREF`), and Geodetic Contours & Spot Elevations (`G-TOPO`).
 class ArchitectUnderlayPainter extends CustomPainter {
@@ -19,6 +33,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
   final BimCoordinateFrame frame;
   final BimViewportController viewport;
   final Map<String, bool> visibility;
+  final List<ArchitectCadRenderLayer> extraCadUnderlays;
   final List<ArchitectRasterUnderlay> rasterUnderlays;
   final Map<String, ui.Image> rasterImages;
   final String? selectedRasterId;
@@ -55,6 +70,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
     required this.frame,
     required this.viewport,
     required this.visibility,
+    this.extraCadUnderlays = const [],
     this.rasterUnderlays = const [],
     this.rasterImages = const {},
     this.selectedRasterId,
@@ -88,7 +104,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final hasCad = document != null;
+    final hasCad = document != null || extraCadUnderlays.isNotEmpty;
     final hasRaster = showRasterLayer && rasterUnderlays.isNotEmpty;
     final hasTopo =
         showGeodesyLayer &&
@@ -201,63 +217,32 @@ class ArchitectUnderlayPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 2. Paint CAD Xref Underlay (A-XREF)
+    // 2. Paint CAD Xref Underlays (A-XREF)
     if (hasCad) {
       canvas.save();
       viewport.applyToCanvas(canvas);
-
-      final hasCadMask = cadConfig?.hasActiveMask ?? false;
-      if (hasCadMask) {
-        canvas.save();
-        final clipPath = Path()
-          ..moveTo(
-            cadConfig!.maskPolygon!.first.dx,
-            cadConfig!.maskPolygon!.first.dy,
-          );
-        for (var i = 1; i < cadConfig!.maskPolygon!.length; i++) {
-          clipPath.lineTo(
-            cadConfig!.maskPolygon![i].dx,
-            cadConfig!.maskPolygon![i].dy,
-          );
-        }
-        clipPath.close();
-        canvas.clipPath(clipPath);
+      for (final extra in extraCadUnderlays) {
+        _paintSingleCadUnderlay(
+          canvas: canvas,
+          size: size,
+          doc: extra.document,
+          layerFrame: extra.frame,
+          layerVisibility: extra.visibility,
+          config: extra.config,
+          hasGhostCad: hasGhostCad,
+        );
       }
-
-      paintArchitectCadUnderlay(
-        canvas: canvas,
-        size: size,
-        document: document!,
-        frame: frame,
-        visibleModel: viewport.visibleRect,
-        viewportScale: viewport.scale,
-        palette: palette,
-        visibility: visibility,
-        config: cadConfig,
-        opacityMultiplier: hasGhostCad ? .28 : 1,
-      );
-
-      if (hasCadMask) {
-        canvas.restore(); // restore clip
-        final maskPath = Path()
-          ..moveTo(
-            cadConfig!.maskPolygon!.first.dx,
-            cadConfig!.maskPolygon!.first.dy,
-          );
-        for (var i = 1; i < cadConfig!.maskPolygon!.length; i++) {
-          maskPath.lineTo(
-            cadConfig!.maskPolygon![i].dx,
-            cadConfig!.maskPolygon![i].dy,
-          );
-        }
-        maskPath.close();
-        final maskPaint = Paint()
-          ..color = const Color(0xFF00E5FF).withValues(alpha: 0.85)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.3 / viewport.scale;
-        canvas.drawPath(maskPath, maskPaint);
+      if (document != null) {
+        _paintSingleCadUnderlay(
+          canvas: canvas,
+          size: size,
+          doc: document!,
+          layerFrame: frame,
+          layerVisibility: visibility,
+          config: cadConfig,
+          hasGhostCad: hasGhostCad,
+        );
       }
-
       canvas.restore();
     }
 
@@ -289,6 +274,56 @@ class ArchitectUnderlayPainter extends CustomPainter {
     // 8. Paint Underlay 2-Point Snap Drag (Rubber-band, Guides, Anchors, Ghost)
     if (isDragActive) {
       _paintUnderlayDrag(canvas, size);
+    }
+  }
+
+  void _paintSingleCadUnderlay({
+    required Canvas canvas,
+    required Size size,
+    required DxfDocument doc,
+    required BimCoordinateFrame layerFrame,
+    required Map<String, bool> layerVisibility,
+    required ArchitectCadUnderlayConfig? config,
+    required bool hasGhostCad,
+  }) {
+    final hasMask = config?.hasActiveMask ?? false;
+    if (hasMask) {
+      canvas.save();
+      final clipPath = Path()
+        ..moveTo(config!.maskPolygon!.first.dx, config.maskPolygon!.first.dy);
+      for (var i = 1; i < config.maskPolygon!.length; i++) {
+        clipPath.lineTo(config.maskPolygon![i].dx, config.maskPolygon![i].dy);
+      }
+      clipPath.close();
+      canvas.clipPath(clipPath);
+    }
+
+    paintArchitectCadUnderlay(
+      canvas: canvas,
+      size: size,
+      document: doc,
+      frame: layerFrame,
+      visibleModel: viewport.visibleRect,
+      viewportScale: viewport.scale,
+      palette: palette,
+      visibility: layerVisibility,
+      config: config,
+      opacityMultiplier: hasGhostCad ? .28 : 1,
+    );
+
+    if (hasMask) {
+      canvas.restore();
+      final maskPath = Path()
+        ..moveTo(config!.maskPolygon!.first.dx, config.maskPolygon!.first.dy);
+      for (var i = 1; i < config.maskPolygon!.length; i++) {
+        maskPath.lineTo(config.maskPolygon![i].dx, config.maskPolygon![i].dy);
+      }
+      maskPath.close();
+      final maskPaint = Paint()
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3 / viewport.scale;
+      canvas.drawPath(maskPath, maskPaint);
     }
   }
 

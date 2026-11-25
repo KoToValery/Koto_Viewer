@@ -500,6 +500,12 @@ void main() {
         );
         await _pumpUntil(tester, () => cfg() != null);
         await tester.pumpAndSettle();
+        // Straightening overlay opens automatically after fresh import.
+        expect(find.byKey(const ValueKey('architect-rotation-banner')), findsOneWidget);
+        expect(find.byKey(const ValueKey('architect-rotation-horizontal')), findsOneWidget);
+        expect(find.byKey(const ValueKey('architect-rotation-vertical')), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('architect-rotation-close')));
+        await tester.pumpAndSettle();
         expect(painter().frame.invertY, isTrue);
         expect(painter().document!.bounds.width, 12000);
         if (phone) {
@@ -635,6 +641,10 @@ void main() {
           expect(horizontal, findsOneWidget);
           await tester.tap(horizontal);
           await tester.pumpAndSettle();
+          final apply = find.byKey(const ValueKey('architect-rotation-apply'));
+          expect(apply, findsOneWidget);
+          await tester.tap(apply);
+          await tester.pumpAndSettle();
           final aligned = painter().frame;
           expect(
             aligned.toModel(edge.first).dy,
@@ -689,6 +699,9 @@ void main() {
             find.widgetWithText(FilledButton, l.architectRasterImportPdfButton),
           );
           await _pumpUntil(tester, () => model.project.rasterUnderlays.isNotEmpty);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('architect-rotation-banner')), findsOneWidget);
+          await tester.tap(find.byKey(const ValueKey('architect-rotation-close')));
           await tester.pumpAndSettle();
           final raster = model.project.rasterUnderlays.single;
           expect(raster.storeyId, 'ground');
@@ -785,6 +798,10 @@ void main() {
       );
       await _pumpUntil(tester, () => model.project.cadUnderlays['ground'] != null);
       await tester.pumpAndSettle();
+      if (find.byKey(const ValueKey('architect-rotation-close')).evaluate().isNotEmpty) {
+        await tester.tap(find.byKey(const ValueKey('architect-rotation-close')));
+        await tester.pumpAndSettle();
+      }
 
       final cropFinder = find.byKey(const ValueKey('architect-underlay-crop'));
       expect(cropFinder, findsOneWidget);

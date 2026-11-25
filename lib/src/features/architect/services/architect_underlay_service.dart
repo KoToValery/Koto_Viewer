@@ -69,11 +69,15 @@ class ArchitectCadImportSelection {
   final ArchitectPreparedCadUnderlay prepared;
   final double unitsPerMeter;
   final bool cadOrientation;
+  final ArchitectUnderlayKind? kind;
+  final ArchitectTechnicalUnderlayDiscipline discipline;
 
   const ArchitectCadImportSelection({
     required this.prepared,
     required this.unitsPerMeter,
     required this.cadOrientation,
+    this.kind,
+    this.discipline = ArchitectTechnicalUnderlayDiscipline.general,
   });
 }
 
@@ -197,6 +201,8 @@ class ArchitectUnderlayService {
     required String storeyId,
     required File sourceFile,
     ArchitectCadUnderlayConfig? existingConfig,
+    String? underlayId,
+    bool isSitePlan = false,
     bool preserveExistingOrigin = true,
     bool Function()? isCurrent,
   }) async {
@@ -211,8 +217,13 @@ class ArchitectUnderlayService {
               existingConfig?.frame(const BimCoordinateFrame()).unitsPerMeter ??
               prepared.suggestedUnitsPerMeter,
           cadOrientation: existingConfig?.cadOrientation ?? true,
+          discipline:
+              existingConfig?.discipline ??
+              ArchitectTechnicalUnderlayDiscipline.general,
         ),
         existingConfig: existingConfig,
+        underlayId: underlayId,
+        isSitePlan: isSitePlan,
         preserveExistingOrigin: preserveExistingOrigin,
         isCurrent: isCurrent,
       );
@@ -227,6 +238,8 @@ class ArchitectUnderlayService {
     required String storeyId,
     required ArchitectCadImportSelection selection,
     ArchitectCadUnderlayConfig? existingConfig,
+    String? underlayId,
+    bool isSitePlan = false,
     bool preserveExistingOrigin = true,
     bool Function()? isCurrent,
   }) async {
@@ -270,12 +283,29 @@ class ArchitectUnderlayService {
         debugPrint('[ArchitectUnderlayService] KCAD cache export: $error');
       }
 
+      final resolvedKind =
+          selection.kind ??
+          existingConfig?.kind ??
+          (isSitePlan
+              ? ArchitectUnderlayKind.geodetic
+              : ArchitectUnderlayKind.technical);
+      final resolvedDiscipline = resolvedKind == ArchitectUnderlayKind.geodetic
+          ? ArchitectTechnicalUnderlayDiscipline.general
+          : selection.discipline;
+      final resolvedId =
+          existingConfig?.id ??
+          underlayId ??
+          'cad_${DateTime.now().microsecondsSinceEpoch}';
+
       final config = ArchitectCadUnderlayConfig(
+        id: resolvedId,
         storeyId: storeyId,
         fileName: prepared.fileName,
         externalSourcePath: prepared.source.path,
         internalCopyPath: await projectRelativePath(projectId, internalCopy),
         kcadCachePath: cachePath,
+        kind: resolvedKind,
+        discipline: resolvedDiscipline,
         lockOrigin: existingConfig?.lockOrigin ?? true,
         lastModifiedMs: prepared._lastModifiedMs,
         lockedCadOriginX: frame.origin.dx,
@@ -283,6 +313,7 @@ class ArchitectUnderlayService {
         unitsPerMeter: units,
         cadOrientation: frame.invertY,
         rotationRad: frame.rotationRadians,
+        shareToGroundStoreys: existingConfig?.shareToGroundStoreys ?? false,
         hiddenDxfLayers: existingConfig?.hiddenDxfLayers ?? const {},
         shownDxfLayers: existingConfig?.shownDxfLayers ?? const {},
         opacity: existingConfig?.opacity ?? 0.42,
@@ -383,6 +414,9 @@ class ArchitectUnderlayService {
     required String storeyId,
     required File sourceFile,
     ui.Offset initialCenter = ui.Offset.zero,
+    ArchitectUnderlayKind kind = ArchitectUnderlayKind.technical,
+    ArchitectTechnicalUnderlayDiscipline discipline =
+        ArchitectTechnicalUnderlayDiscipline.general,
   }) async {
     final rasterDir = await getRasterUnderlayDir(projectId);
     final fileName = sourceFile.uri.pathSegments.isNotEmpty
@@ -419,6 +453,10 @@ class ArchitectUnderlayService {
       position: topLeft,
       metersPerPixel: initialMetersPerPx,
       opacity: 0.55,
+      kind: kind,
+      discipline: kind == ArchitectUnderlayKind.geodetic
+          ? ArchitectTechnicalUnderlayDiscipline.general
+          : discipline,
     );
 
     return ArchitectRasterImportResult(model: model, image: uiImage);
@@ -442,6 +480,9 @@ class ArchitectUnderlayService {
     required File pdfFile,
     int pageNumber = 1,
     ui.Offset initialCenter = ui.Offset.zero,
+    ArchitectUnderlayKind kind = ArchitectUnderlayKind.technical,
+    ArchitectTechnicalUnderlayDiscipline discipline =
+        ArchitectTechnicalUnderlayDiscipline.general,
   }) async {
     final rasterDir = await getRasterUnderlayDir(projectId);
     final fileName = pdfFile.uri.pathSegments.isNotEmpty
@@ -518,6 +559,10 @@ class ArchitectUnderlayService {
           position: topLeft,
           metersPerPixel: initialMetersPerPx,
           opacity: 0.55,
+          kind: kind,
+          discipline: kind == ArchitectUnderlayKind.geodetic
+              ? ArchitectTechnicalUnderlayDiscipline.general
+              : discipline,
         );
         return ArchitectRasterImportResult(model: model, image: uiImage);
       } finally {

@@ -117,22 +117,30 @@ abstract final class ArchitectSiteOrientation {
     final siteStoreyId = project.siteStorey?.id;
 
     // 1. Rotate CAD underlays (site only, or all if rotating building too).
-    final nextCadUnderlays = <String, ArchitectCadUnderlayConfig>{};
-    for (final entry in project.cadUnderlays.entries) {
-      final shouldRotate =
-          rotateBuilding || entry.key == siteStoreyId || siteStoreyId == null;
-      if (shouldRotate) {
-        final cfg = entry.value;
-        final nextFrame = cfg.frame(fallbackFrame).rotatingAround(pivot, angle);
-        nextCadUnderlays[entry.key] = cfg.withFrame(
-          nextFrame,
-          transformMask: true,
-          fallback: fallbackFrame,
-        );
-      } else {
-        nextCadUnderlays[entry.key] = entry.value;
-      }
+    ArchitectCadUnderlayConfig rotateCadConfig(
+      ArchitectCadUnderlayConfig cfg,
+    ) {
+      final nextFrame = cfg.frame(fallbackFrame).rotatingAround(pivot, angle);
+      return cfg.withFrame(
+        nextFrame,
+        transformMask: true,
+        fallback: fallbackFrame,
+      );
     }
+
+    final nextCadUnderlays = <String, ArchitectCadUnderlayConfig>{
+      for (final entry in project.cadUnderlays.entries)
+        entry.key:
+            (rotateBuilding || entry.key == siteStoreyId || siteStoreyId == null)
+            ? rotateCadConfig(entry.value)
+            : entry.value,
+    };
+    final nextTechCadUnderlays = [
+      for (final cfg in project.technicalCadUnderlays)
+        (rotateBuilding || cfg.storeyId == siteStoreyId)
+            ? rotateCadConfig(cfg)
+            : cfg,
+    ];
 
     // 2. Rotate Raster underlays (site only, or all if rotating building too).
     final nextRasterUnderlays = [
@@ -222,6 +230,7 @@ abstract final class ArchitectSiteOrientation {
       sections: nextSections,
       elevations: nextElevations,
       cadUnderlays: nextCadUnderlays,
+      technicalCadUnderlays: nextTechCadUnderlays,
       rasterUnderlays: nextRasterUnderlays,
       existingTerrain: nextExistingTerrain,
       proposedTerrain: nextProposedTerrain,

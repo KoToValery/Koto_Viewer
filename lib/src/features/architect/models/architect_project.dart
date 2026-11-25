@@ -505,6 +505,7 @@ class ArchitectProject {
   final List<ArchitectLayer> layers;
   final Map<String, String> elementLayers;
   final Map<String, ArchitectCadUnderlayConfig> cadUnderlays;
+  final List<ArchitectCadUnderlayConfig> technicalCadUnderlays;
   final Set<String> excludedInheritedCadStoreys;
   final List<ArchitectRasterUnderlay> rasterUnderlays;
   final ArchitectGeodeticSurvey? geodeticSurvey;
@@ -541,6 +542,7 @@ class ArchitectProject {
     this.layers = const [],
     this.elementLayers = const {},
     this.cadUnderlays = const {},
+    this.technicalCadUnderlays = const [],
     this.excludedInheritedCadStoreys = const {},
     this.rasterUnderlays = const [],
     this.geodeticSurvey,
@@ -584,6 +586,138 @@ class ArchitectProject {
   bool isSharedCadUnderlayForStorey(String storeyId) =>
       !cadUnderlays.containsKey(storeyId) &&
       effectiveCadUnderlayForStorey(storeyId) != null;
+
+  /// All CAD underlays attached to [storeyId]:
+  /// - On Site Plan (`isSite`): only the Geodetic CAD underlay.
+  /// - On building/roof storeys: all Technical CAD underlays on [storeyId].
+  List<ArchitectCadUnderlayConfig> cadUnderlaysForStorey(String storeyId) {
+    final isSite = storeys.any((s) => s.id == storeyId && s.isSite);
+    final primary = cadUnderlays[storeyId];
+    if (isSite) {
+      return [?primary];
+    }
+    return [
+      ?primary,
+      ...technicalCadUnderlays.where((c) => c.storeyId == storeyId),
+    ];
+  }
+
+  /// Resolves all CAD underlays active on [storeyId], including any inherited
+  /// Site Plan survey when [shareToGroundStoreys] is enabled.
+  List<ArchitectCadUnderlayConfig> effectiveCadUnderlaysForStorey(
+    String storeyId,
+  ) {
+    final own = cadUnderlaysForStorey(storeyId);
+    if (own.isNotEmpty) return own;
+    final inherited = effectiveCadUnderlayForStorey(storeyId);
+    return inherited == null ? const [] : [inherited];
+  }
+
+  ArchitectCadUnderlayConfig? cadUnderlayById(
+    String storeyId,
+    String? underlayId,
+  ) {
+    final list = cadUnderlaysForStorey(storeyId);
+    if (underlayId != null) {
+      for (final cfg in list) {
+        if (cfg.effectiveId == underlayId) return cfg;
+      }
+    }
+    return list.lastOrNull ?? effectiveCadUnderlayForStorey(storeyId);
+  }
+
+  /// Adds a CAD underlay to [config.storeyId]:
+  /// - On Site Plan (`isSite`), replaces the Geodetic underlay (keeping it on Site Plan only).
+  /// - On other plans, adds an additional Technical underlay (preserving existing ones).
+  ArchitectProject withCadUnderlayAdded(ArchitectCadUnderlayConfig config) {
+    final isSite = storeys.any((s) => s.id == config.storeyId && s.isSite);
+    final normalized = isSite
+        ? config.copyWith(
+            kind: ArchitectUnderlayKind.geodetic,
+            isGeodetic: true,
+            shareToGroundStoreys: false,
+          )
+        : config.copyWith(
+            kind: ArchitectUnderlayKind.technical,
+            isGeodetic: false,
+            shareToGroundStoreys: false,
+          );
+    if (isSite || !cadUnderlays.containsKey(normalized.storeyId)) {
+      return copyWith(
+        cadUnderlays: {...cadUnderlays, normalized.storeyId: normalized},
+      );
+    }
+    final assignedId =
+        normalized.id ?? 'cad_${DateTime.now().microsecondsSinceEpoch}';
+    return copyWith(
+      technicalCadUnderlays: [
+        ...technicalCadUnderlays,
+        normalized.copyWith(id: assignedId),
+      ],
+    );
+  }
+
+  /// Updates an existing CAD underlay in either [cadUnderlays] or [technicalCadUnderlays].
+  ArchitectProject withCadUnderlayUpdated(ArchitectCadUnderlayConfig updated) {
+    final primary = cadUnderlays[updated.storeyId];
+    if (primary != null && primary.effectiveId == updated.effectiveId) {
+      return copyWith(
+        cadUnderlays: {...cadUnderlays, updated.storeyId: updated},
+      );
+    }
+    var found = false;
+    final nextTech = [
+      for (final cfg in technicalCadUnderlays)
+        if (cfg.storeyId == updated.storeyId &&
+            cfg.effectiveId == updated.effectiveId)
+          () {
+            found = true;
+            return updated;
+          }()
+        else
+          cfg,
+    ];
+    if (found) {
+      return copyWith(technicalCadUnderlays: nextTech);
+    }
+    return copyWith(
+      cadUnderlays: {...cadUnderlays, updated.storeyId: updated},
+    );
+  }
+
+  /// Removes a CAD underlay by [underlayId] on [storeyId], promoting the next
+  /// technical underlay into [cadUnderlays] if needed.
+  ArchitectProject withCadUnderlayRemoved(String storeyId, String underlayId) {
+    final primary = cadUnderlays[storeyId];
+    if (primary != null && primary.effectiveId == underlayId) {
+      final nextPrimary = technicalCadUnderlays
+          .where((c) => c.storeyId == storeyId)
+          .firstOrNull;
+      final nextMap = Map<String, ArchitectCadUnderlayConfig>.from(cadUnderlays);
+      if (nextPrimary != null) {
+        nextMap[storeyId] = nextPrimary;
+        return copyWith(
+          cadUnderlays: nextMap,
+          technicalCadUnderlays: technicalCadUnderlays
+              .where(
+                (c) =>
+                    !(c.storeyId == storeyId &&
+                        c.effectiveId == nextPrimary.effectiveId),
+              )
+              .toList(),
+        );
+      }
+      nextMap.remove(storeyId);
+      return copyWith(cadUnderlays: nextMap);
+    }
+    return copyWith(
+      technicalCadUnderlays: technicalCadUnderlays
+          .where(
+            (c) => !(c.storeyId == storeyId && c.effectiveId == underlayId),
+          )
+          .toList(),
+    );
+  }
 
   List<ArchitectRasterUnderlay> rasterUnderlaysForStorey(String storeyId) =>
       rasterUnderlays.where((r) => r.storeyId == storeyId).toList();
@@ -894,6 +1028,7 @@ class ArchitectProject {
     List<ArchitectLayer>? layers,
     Map<String, String>? elementLayers,
     Map<String, ArchitectCadUnderlayConfig>? cadUnderlays,
+    List<ArchitectCadUnderlayConfig>? technicalCadUnderlays,
     Set<String>? excludedInheritedCadStoreys,
     List<ArchitectRasterUnderlay>? rasterUnderlays,
     ArchitectGeodeticSurvey? geodeticSurvey,
@@ -931,6 +1066,8 @@ class ArchitectProject {
     layers: layers ?? this.layers,
     elementLayers: elementLayers ?? this.elementLayers,
     cadUnderlays: cadUnderlays ?? this.cadUnderlays,
+    technicalCadUnderlays:
+        technicalCadUnderlays ?? this.technicalCadUnderlays,
     excludedInheritedCadStoreys:
         excludedInheritedCadStoreys ?? this.excludedInheritedCadStoreys,
     rasterUnderlays: rasterUnderlays ?? this.rasterUnderlays,
@@ -972,6 +1109,9 @@ class ArchitectProject {
     if (elementLayers.isNotEmpty) 'elementLayers': elementLayers,
     if (cadUnderlays.isNotEmpty)
       'cadUnderlays': cadUnderlays.map((k, v) => MapEntry(k, v.toJson())),
+    if (technicalCadUnderlays.isNotEmpty)
+      'technicalCadUnderlays':
+          technicalCadUnderlays.map((c) => c.toJson()).toList(),
     if (excludedInheritedCadStoreys.isNotEmpty)
       'excludedInheritedCadStoreys': excludedInheritedCadStoreys.toList(),
     if (rasterUnderlays.isNotEmpty)
@@ -1109,6 +1249,13 @@ class ArchitectProject {
             Map<String, dynamic>.from(entry.value as Map),
           ),
     },
+    technicalCadUnderlays: [
+      for (final item in json['technicalCadUnderlays'] as List? ?? const [])
+        if (item is Map)
+          ArchitectCadUnderlayConfig.fromJson(
+            Map<String, dynamic>.from(item),
+          ),
+    ],
     excludedInheritedCadStoreys: {
       for (final id in json['excludedInheritedCadStoreys'] as List? ?? const [])
         if (id is String) id,

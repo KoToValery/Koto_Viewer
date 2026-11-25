@@ -140,10 +140,23 @@ List<ArchitectCandidateLabel> architectCandidateLabels(
   }
   for (final id in ids) {
     if (labels.containsKey(id)) continue;
-    if (id == 'underlay_cad') {
-      final cfg = project.cadUnderlays[project.activeStoreyId];
-      final name = cfg?.fileName.isNotEmpty == true ? cfg!.fileName : l.architectUnderlayToggle;
-      labels[id] = ArchitectCandidateLabel(id, l.architectUnderlayCandidate(name), null);
+    if (id == 'underlay_cad' || id.startsWith('underlay_cad:')) {
+      final underlayId = id.startsWith('underlay_cad:')
+          ? id.substring('underlay_cad:'.length)
+          : null;
+      final cfg = underlayId != null
+          ? project.cadUnderlayById(project.activeStoreyId, underlayId)
+          : project.cadUnderlayForStorey(project.activeStoreyId);
+      final name = cfg?.fileName.isNotEmpty == true
+          ? (project.activeStorey.isSite
+                ? cfg!.fileName
+                : '${cfg!.discipline.label(l)} · ${cfg.fileName}')
+          : l.architectUnderlayToggle;
+      labels[id] = ArchitectCandidateLabel(
+        id,
+        l.architectUnderlayCandidate(name),
+        null,
+      );
     } else if (id.startsWith('underlay_raster_')) {
       final rasterId = id.substring('underlay_raster_'.length);
       final r = project.rasterUnderlays.where((x) => x.id == rasterId).firstOrNull;

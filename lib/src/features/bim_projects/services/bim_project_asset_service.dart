@@ -88,17 +88,23 @@ class BimProjectAssetService {
       return file == null ? value : relativePath(root, file);
     }
 
+    Future<ArchitectCadUnderlayConfig> adoptCad(
+      ArchitectCadUnderlayConfig config,
+    ) async => config.copyWith(
+      internalCopyPath: await owned(config.internalCopyPath),
+      kcadCachePath: config.kcadCachePath == null
+          ? null
+          : await owned(config.kcadCachePath!),
+      autoReload: false,
+    );
+
     final cad = <String, ArchitectCadUnderlayConfig>{};
     for (final entry in project.cadUnderlays.entries) {
-      final config = entry.value;
-      cad[entry.key] = config.copyWith(
-        internalCopyPath: await owned(config.internalCopyPath),
-        kcadCachePath: config.kcadCachePath == null
-            ? null
-            : await owned(config.kcadCachePath!),
-        autoReload: false,
-      );
+      cad[entry.key] = await adoptCad(entry.value);
     }
+    final techCad = <ArchitectCadUnderlayConfig>[
+      for (final config in project.technicalCadUnderlays) await adoptCad(config),
+    ];
     final raster = <ArchitectRasterUnderlay>[];
     for (final item in project.rasterUnderlays) {
       raster.add(
@@ -113,6 +119,7 @@ class BimProjectAssetService {
     return project.copyWith(
       id: ownerId,
       cadUnderlays: cad,
+      technicalCadUnderlays: techCad,
       rasterUnderlays: raster,
     );
   }

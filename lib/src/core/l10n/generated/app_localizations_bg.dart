@@ -13354,17 +13354,65 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectUnderlayOriginalLineweights => 'Оригинални дебелини';
 
   @override
-  String get architectUnderlayRotationStart =>
-      'Посочи начало на ръба или въведи ъгъл';
+  String get architectUnderlayRotationStart => 'Посочи начало на отсечката';
 
   @override
-  String get architectUnderlayRotationEnd => 'Посочи другия край на ръба';
+  String get architectUnderlayRotationEnd => 'Посочи края на отсечката';
 
   @override
-  String get architectUnderlayAlignHorizontal => 'Хоризонтално';
+  String get architectUnderlayAlignAuto => 'Авто';
 
   @override
-  String get architectUnderlayAlignVertical => 'Вертикално';
+  String get architectUnderlayAlignHorizontal => 'По хоризонтала';
+
+  @override
+  String get architectUnderlayAlignVertical => 'По вертикала';
+
+  @override
+  String get architectUnderlayRotatePlus90 => '+90°';
+
+  @override
+  String architectUnderlayRotationReview(String angle) {
+    return 'Изправено ($angle°) — провери и приложи';
+  }
+
+  @override
+  String get architectUnderlayKindGeodetic => 'Геодезическа';
+
+  @override
+  String get architectUnderlayKindTechnical => 'Техническа';
+
+  @override
+  String get architectUnderlayDisciplineLabel => 'Специалност';
+
+  @override
+  String get architectUnderlayDisciplineGeneral => 'Обща';
+
+  @override
+  String get architectUnderlayDisciplineStructural => 'Конструкции';
+
+  @override
+  String get architectUnderlayDisciplinePlumbing => 'ВиК';
+
+  @override
+  String get architectUnderlayDisciplineElectrical => 'ЕЛ';
+
+  @override
+  String get architectUnderlayDisciplineHvac => 'ОВК';
+
+  @override
+  String get architectUnderlayDisciplineArchitectural => 'Архитектура';
+
+  @override
+  String get architectUnderlayChooseCad => 'Избери техническа CAD подложка';
+
+  @override
+  String get architectUnderlayAddGeodeticTooltip =>
+      'Добави геодезическа подложка за план Ситуация';
+
+  @override
+  String get architectUnderlayAddTechnicalTooltip =>
+      'Добави техническа подложка (Конструкции, ВиК, ЕЛ и др.)';
 
   @override
   String get architectStoreyManagerTitle => 'Етажи';

@@ -24171,14 +24171,20 @@ abstract class AppLocalizations {
   /// No description provided for @architectUnderlayRotationStart.
   ///
   /// In en, this message translates to:
-  /// **'Pick the first end of the edge or enter an angle'**
+  /// **'Pick segment start'**
   String get architectUnderlayRotationStart;
 
   /// No description provided for @architectUnderlayRotationEnd.
   ///
   /// In en, this message translates to:
-  /// **'Pick the other end of the edge'**
+  /// **'Pick segment end'**
   String get architectUnderlayRotationEnd;
+
+  /// Automatically straighten an underlay to the nearest horizontal or vertical axis
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get architectUnderlayAlignAuto;
 
   /// No description provided for @architectUnderlayAlignHorizontal.
   ///
@@ -24191,6 +24197,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Vertical'**
   String get architectUnderlayAlignVertical;
+
+  /// Rotate the straightened underlay by an extra 90 degrees
+  ///
+  /// In en, this message translates to:
+  /// **'+90°'**
+  String get architectUnderlayRotatePlus90;
+
+  /// Prompt shown after picking a segment to straighten an underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Aligned ({angle}°) — review and apply'**
+  String architectUnderlayRotationReview(String angle);
+
+  /// Label for geodetic survey underlay on Site Plan
+  ///
+  /// In en, this message translates to:
+  /// **'Geodetic'**
+  String get architectUnderlayKindGeodetic;
+
+  /// Label for technical discipline underlays on floor plans
+  ///
+  /// In en, this message translates to:
+  /// **'Technical'**
+  String get architectUnderlayKindTechnical;
+
+  /// Field label for selecting a technical underlay discipline
+  ///
+  /// In en, this message translates to:
+  /// **'Discipline'**
+  String get architectUnderlayDisciplineLabel;
+
+  /// No description provided for @architectUnderlayDisciplineGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get architectUnderlayDisciplineGeneral;
+
+  /// No description provided for @architectUnderlayDisciplineStructural.
+  ///
+  /// In en, this message translates to:
+  /// **'Structural'**
+  String get architectUnderlayDisciplineStructural;
+
+  /// No description provided for @architectUnderlayDisciplinePlumbing.
+  ///
+  /// In en, this message translates to:
+  /// **'Plumbing'**
+  String get architectUnderlayDisciplinePlumbing;
+
+  /// No description provided for @architectUnderlayDisciplineElectrical.
+  ///
+  /// In en, this message translates to:
+  /// **'Electrical'**
+  String get architectUnderlayDisciplineElectrical;
+
+  /// No description provided for @architectUnderlayDisciplineHvac.
+  ///
+  /// In en, this message translates to:
+  /// **'HVAC'**
+  String get architectUnderlayDisciplineHvac;
+
+  /// No description provided for @architectUnderlayDisciplineArchitectural.
+  ///
+  /// In en, this message translates to:
+  /// **'Architectural'**
+  String get architectUnderlayDisciplineArchitectural;
+
+  /// No description provided for @architectUnderlayChooseCad.
+  ///
+  /// In en, this message translates to:
+  /// **'Select technical CAD underlay'**
+  String get architectUnderlayChooseCad;
+
+  /// No description provided for @architectUnderlayAddGeodeticTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add geodetic survey underlay for Site Plan'**
+  String get architectUnderlayAddGeodeticTooltip;
+
+  /// No description provided for @architectUnderlayAddTechnicalTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add technical underlay (Structural, Plumbing, Electrical, etc.)'**
+  String get architectUnderlayAddTechnicalTooltip;
 
   /// Short title of the storey manager
   ///

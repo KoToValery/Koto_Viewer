@@ -278,18 +278,22 @@ class BimImportService {
               : 'Architectural Project');
 
     // Normalize CAD underlays (portable packages never retain external host paths).
+    ArchitectCadUnderlayConfig cleanCad(ArchitectCadUnderlayConfig config) =>
+        config.copyWith(clearExternalSourcePath: true, autoReload: false);
+
     final cleanedCadUnderlays = <String, ArchitectCadUnderlayConfig>{
       for (final entry in rawArchitect.cadUnderlays.entries)
-        entry.key: entry.value.copyWith(
-          clearExternalSourcePath: true,
-          autoReload: false,
-        ),
+        entry.key: cleanCad(entry.value),
     };
+    final cleanedTechCadUnderlays = [
+      for (final config in rawArchitect.technicalCadUnderlays) cleanCad(config),
+    ];
 
     var preparedArchitect = rawArchitect.copyWith(
       id: targetId,
       name: resolvedName,
       cadUnderlays: cleanedCadUnderlays,
+      technicalCadUnderlays: cleanedTechCadUnderlays,
     );
 
     // 4. Stage assets atomically and verify every referenced underlay exists.
@@ -445,7 +449,10 @@ class BimImportService {
       }
     }
 
-    for (final config in architect.cadUnderlays.values) {
+    for (final config in [
+      ...architect.cadUnderlays.values,
+      ...architect.technicalCadUnderlays,
+    ]) {
       await requireAsset(config.internalCopyPath);
       if (config.kcadCachePath != null && config.kcadCachePath!.isNotEmpty) {
         await requireAsset(config.kcadCachePath!);
