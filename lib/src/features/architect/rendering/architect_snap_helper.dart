@@ -54,6 +54,7 @@ class ArchitectSnapHelper {
     bool wallCoresOnly = true,
     bool preferIntersections = false,
     Set<String> excludedIds = const {},
+    List<Offset> excludedPoints = const [],
     List<ArchitectMidpointReference> midpointReferences = const [],
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
@@ -70,6 +71,7 @@ class ArchitectSnapHelper {
     wallCoresOnly: wallCoresOnly,
     preferIntersections: preferIntersections,
     excludedIds: excludedIds,
+    excludedPoints: excludedPoints,
     midpointReferences: midpointReferences,
     underlay: underlay,
     frame: frame,
@@ -88,6 +90,7 @@ class ArchitectSnapHelper {
     bool preferIntersections = false,
     Set<String> excludedIds = const {},
     Set<String>? includedIds,
+    List<Offset> excludedPoints = const [],
     List<ArchitectMidpointReference> midpointReferences = const [],
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
@@ -104,6 +107,7 @@ class ArchitectSnapHelper {
     preferIntersections: preferIntersections,
     excludedIds: excludedIds,
     includedIds: includedIds,
+    excludedPoints: excludedPoints,
     midpointReferences: midpointReferences,
     underlay: underlay,
     frame: frame,
@@ -241,6 +245,7 @@ class ArchitectSnapHelper {
     bool preferIntersections = false,
     required Set<String> excludedIds,
     Set<String>? includedIds,
+    List<Offset> excludedPoints = const [],
     required List<ArchitectMidpointReference> midpointReferences,
     DxfDocument? underlay,
     required BimCoordinateFrame frame,
@@ -301,6 +306,7 @@ class ArchitectSnapHelper {
       anchor: anchor,
     );
     void consider(Offset point, String label) {
+      if (excludedPoints.any((e) => (point - e).distance < 1e-3)) return;
       final candidate = BimSnapCandidate(
         point: point,
         kind: _kind(label),
@@ -619,6 +625,7 @@ class ArchitectSnapHelper {
       var distance = radius;
       void align(Offset base, Offset direction) {
         final projection = base + direction * _dot(raw - base, direction);
+        if (excludedPoints.any((e) => (projection - e).distance < 1e-3)) return;
         final d = (projection - raw).distance;
         if (d < distance &&
             (anchor == null || (projection - anchor).distance > 1e-9)) {

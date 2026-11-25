@@ -323,7 +323,10 @@ void main() {
       await _enterOpeningDimension(tester, 'door-sill-input', '0 cm', '12');
 
       await tester.tapAt(workspace.screen(tester, const Offset(2.0, 0)));
+      await tester.pump();
+      expect(find.byType(SnackBar), findsNothing);
       await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
 
       expect(_host(commands.project).doors, hasLength(1));
       final placed = _door(commands.project);
@@ -386,7 +389,10 @@ void main() {
       await _enterOpeningDimension(tester, 'window-sill-input', '90 cm', '85');
 
       await tester.tapAt(workspace.screen(tester, const Offset(2.0, 0)));
+      await tester.pump();
+      expect(find.byType(SnackBar), findsNothing);
       await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
 
       expect(_host(commands.project).windows, hasLength(1));
       final placed = _window(commands.project);

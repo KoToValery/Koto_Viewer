@@ -190,6 +190,60 @@ void main() {
     }
   });
 
+  test(
+    'Unlocked tilted wall straightens to 0° with guide lines along 90° vertical wall',
+    () {
+      // Wall tilted ~4° downwards to the right, meeting a 90° vertical wall at (4, -0.28).
+      final tilted = editing.wall('w', Offset.zero, const Offset(4, -0.28));
+      final vertical = editing.wall('v', const Offset(4, 3), const Offset(4, -0.28));
+      final oblique = editing.wall('d', const Offset(-0.5, -1.2), Offset.zero);
+      final project = snapProject(walls: [vertical, oblique]);
+
+      // Dragging the right endpoint near 0° (y = 0) along the vertical wall (x = 4)
+      // snaps to the exact intersection (4, 0) with both 0° and 90° guide lines.
+      final rightResult = ArchitectWallEndpointSnap.resolve(
+        wall: tilted,
+        atStart: false,
+        raw: const Offset(4.02, 0.03),
+        snapProject: project,
+        scale: 100,
+        angleLocked: false,
+      );
+      expect(rightResult.point.dx, closeTo(4.0, 1e-6));
+      expect(rightResult.point.dy, closeTo(0.0, 1e-6));
+      expect(rightResult.isSnapped, isTrue);
+      expect(rightResult.magneticGuides.length, greaterThanOrEqualTo(2));
+
+      // Dragging the right endpoint near origin along the vertical wall keeps it on x = 4.
+      final slideResult = ArchitectWallEndpointSnap.resolve(
+        wall: tilted,
+        atStart: false,
+        raw: const Offset(4.02, -0.24),
+        snapProject: project,
+        scale: 100,
+        angleLocked: false,
+      );
+      expect(slideResult.point.dx, closeTo(4.0, 1e-6));
+      expect(slideResult.point.dy, closeTo(-0.24, 1e-6));
+      expect(slideResult.isSnapped, isTrue);
+      expect(slideResult.magneticGuides, isNotEmpty);
+
+      // Dragging the left endpoint to 0° relative to the right endpoint (y = -0.28)
+      // keeps the vertical wall untouched and provides a 0° guide line.
+      final leftResult = ArchitectWallEndpointSnap.resolve(
+        wall: tilted,
+        atStart: true,
+        raw: const Offset(0.2, -0.25),
+        snapProject: project,
+        scale: 100,
+        angleLocked: false,
+      );
+      expect(leftResult.point.dy, closeTo(-0.28, 1e-6));
+      expect(leftResult.isSnapped, isTrue);
+      expect(leftResult.magneticGuides, isNotEmpty);
+    },
+  );
+
   for (final language in ['bg', 'en']) {
     testWidgets('Phone lock, fine correction and whole-wall move ($language)', (
       tester,

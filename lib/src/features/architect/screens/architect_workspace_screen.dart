@@ -13523,6 +13523,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               scale: _currentScale,
               angleLocked: _wallAngleUnlockedId != original.id,
               magnetic: _magnetEnabled,
+              midpointReferences: _midpointTracking.references,
               underlay: _currentUnderlayDoc,
               frame: _effectiveUnderlayFrame,
               visibility: _effectiveUnderlayLayerVisibility,
@@ -16691,30 +16692,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _saveBiMProjectIfAttached();
 
           HapticFeedback.mediumImpact();
-
-          ScaffoldMessenger.of(context).showSnackBar(
-
-            SnackBar(
-
-              content: Text(
-
-                context.l10n.architectWindowPlaced(
-
-                  newWin.id,
-
-                  (newWin.width * 100).round(),
-
-                  (newWin.height * 100).round(),
-
-                ),
-
-              ),
-
-              duration: const Duration(seconds: 1),
-
-            ),
-
-          );
 
         }
 
@@ -21803,30 +21780,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
     HapticFeedback.mediumImpact();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-
-      SnackBar(
-
-        content: Text(
-
-          context.l10n.architectDoorPlaced(
-
-            newDoor.specId,
-
-            (newDoor.width * 100).round(),
-
-            (newDoor.height * 100).round(),
-
-          ),
-
-        ),
-
-        duration: const Duration(seconds: 1),
-
-      ),
-
-    );
 
   }
 
