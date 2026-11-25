@@ -86,11 +86,20 @@ class ArchitectDimensionLayout {
     return result;
   }
 
-  /// Keep vertical text readable from the right, regardless of pick direction.
+  /// Keep vertical and rotated-view text readable from bottom/right,
+  /// regardless of pick direction or active view/sheet rotation.
   static double textAngle(Offset direction) {
+    final viewRot = ArchitectTextScope.current?.viewRotationRad ?? 0.0;
     var angle = math.atan2(direction.dy, direction.dx);
-    if (angle >= math.pi / 2 - 1e-9) angle -= math.pi;
-    if (angle < -math.pi / 2 - 1e-9) angle += math.pi;
+    var net = (angle + viewRot) % (2 * math.pi);
+    if (net > math.pi) net -= 2 * math.pi;
+    if (net <= -math.pi) net += 2 * math.pi;
+    if (net >= math.pi / 2 - 1e-9 || net < -math.pi / 2 - 1e-9) {
+      angle += math.pi;
+    }
+    angle %= 2 * math.pi;
+    if (angle > math.pi) angle -= 2 * math.pi;
+    if (angle <= -math.pi) angle += 2 * math.pi;
     return angle;
   }
 

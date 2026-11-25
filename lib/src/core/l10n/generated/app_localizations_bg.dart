@@ -14079,4 +14079,70 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectTerrainSlopeRatio => 'Наклон на откоса (1:H)';
+
+  @override
+  String get architectSiteOrientBuilding => 'Ориентация';
+
+  @override
+  String get architectSiteOrientBuildingTooltip =>
+      'Посочи страна от подложката за изправяне на етажите при запазен Истински север на Ситуация';
+
+  @override
+  String get architectSiteOrientStartHint => 'Посочи начало на страната';
+
+  @override
+  String get architectSiteOrientEndHint => 'Посочи край на страната';
+
+  @override
+  String get architectSiteOrientReviewHint =>
+      'Използвай 90° за посока нагоре на етажите';
+
+  @override
+  String get architectSiteOrientRotate90 => '90°';
+
+  @override
+  String get architectSiteOrientRetry => 'Наново';
+
+  @override
+  String get architectSiteOrientViewTrueNorth => 'Север';
+
+  @override
+  String get architectSiteOrientViewProjectNorth => 'Сграда';
+
+  @override
+  String get architectSiteOrientToggleTooltip =>
+      'Превключи Ситуация между Истински север и изправена сграда';
+
+  @override
+  String get architectSiteOrientExistingBuildingTitle => 'Има начертана сграда';
+
+  @override
+  String get architectSiteOrientExistingBuildingBody =>
+      'Избери дали да се завъртят само парцелът и подложката, или сградата заедно с парцела.';
+
+  @override
+  String get architectSiteOrientSiteOnly => 'Само парцела';
+
+  @override
+  String get architectSiteOrientWithBuilding => 'Сграда + парцел';
+
+  @override
+  String architectSiteOrientApplied(String angle) {
+    return 'Ориентацията е зададена (Север $angle°)';
+  }
+
+  @override
+  String get architectSheetOrientation => 'Ориентация';
+
+  @override
+  String get architectSheetOrientationProjectNorth => 'Проектен север';
+
+  @override
+  String get architectSheetOrientationTrueNorth => 'Истински север';
+
+  @override
+  String get architectSheetOrientationCustom => 'По избор';
+
+  @override
+  String get architectUnderlayShareGround => 'Покажи на етажи ≤ ±0.00';
 }

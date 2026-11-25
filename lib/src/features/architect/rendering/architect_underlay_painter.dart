@@ -117,8 +117,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
     // 1. Paint Raster Underlays (A-RAST) in model space
     if (hasRaster) {
       canvas.save();
-      canvas.translate(viewport.translation.dx, viewport.translation.dy);
-      canvas.scale(viewport.scale);
+      viewport.applyToCanvas(canvas);
 
       for (final raster in rasterUnderlays) {
         if (!raster.visible) continue;
@@ -205,8 +204,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
     // 2. Paint CAD Xref Underlay (A-XREF)
     if (hasCad) {
       canvas.save();
-      canvas.translate(viewport.translation.dx, viewport.translation.dy);
-      canvas.scale(viewport.scale);
+      viewport.applyToCanvas(canvas);
 
       final hasCadMask = cadConfig?.hasActiveMask ?? false;
       if (hasCadMask) {
@@ -297,8 +295,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
   void _paintGhostCadPlacement(Canvas canvas, Size size) {
     if (ghostCadDocument == null || ghostCadFrame == null) return;
     canvas.save();
-    canvas.translate(viewport.translation.dx, viewport.translation.dy);
-    canvas.scale(viewport.scale);
+    viewport.applyToCanvas(canvas);
 
     final mask = cadConfig?.maskPolygon;
     final clip = cadConfig?.hasActiveMask == true && mask != null;
@@ -376,8 +373,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
     if (maskDraftPoints == null || maskDraftPoints!.isEmpty) return;
 
     canvas.save();
-    canvas.translate(viewport.translation.dx, viewport.translation.dy);
-    canvas.scale(viewport.scale);
+    viewport.applyToCanvas(canvas);
 
     final previewPath = Path()
       ..moveTo(maskDraftPoints!.first.dx, maskDraftPoints!.first.dy);
@@ -413,8 +409,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
 
   void _paintGeodesyLayer(Canvas canvas) {
     canvas.save();
-    canvas.translate(viewport.translation.dx, viewport.translation.dy);
-    canvas.scale(viewport.scale);
+    viewport.applyToCanvas(canvas);
 
     final isDark = palette.isDark;
     final majorColor = isDark
@@ -536,12 +531,12 @@ class ArchitectUnderlayPainter extends CustomPainter {
 
   void _paintCalibrationOverlay(Canvas canvas, Size size) {
     final p1Screen = calibrationP1 != null
-        ? calibrationP1! * viewport.scale + viewport.translation
+        ? viewport.toScreen(calibrationP1!)
         : null;
     final p2Screen = calibrationP2 != null
-        ? calibrationP2! * viewport.scale + viewport.translation
+        ? viewport.toScreen(calibrationP2!)
         : (calibrationCursor != null
-              ? calibrationCursor! * viewport.scale + viewport.translation
+              ? viewport.toScreen(calibrationCursor!)
               : null);
 
     final accentColor = const Color(0xFFD84315);
@@ -663,8 +658,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
   void _paintCadSelection(Canvas canvas) {
     if (document == null) return;
     canvas.save();
-    canvas.translate(viewport.translation.dx, viewport.translation.dy);
-    canvas.scale(viewport.scale);
+    viewport.applyToCanvas(canvas);
 
     final borderPaint = Paint()
       ..color = const Color(0xFF00E5FF)
@@ -719,8 +713,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
 
   void _paintUnderlayDrag(Canvas canvas, Size size) {
     canvas.save();
-    canvas.translate(viewport.translation.dx, viewport.translation.dy);
-    canvas.scale(viewport.scale);
+    viewport.applyToCanvas(canvas);
 
     if (!isDragPickingBase &&
         ghostRasterPosition != null &&

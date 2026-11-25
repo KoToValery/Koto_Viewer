@@ -16,6 +16,8 @@ class ArchitectSheetComposer {
     ArchitectPublicationSources sources,
     Map<Object, ArchitectVectorScene>? drawingScenes,
   ) {
+    final resolved = ArchitectSheetGeometry.resolveOrientation(place, p);
+    final viewRotationRad = resolved.rotation * math.pi / 180;
     final effectiveDrawing = drawing.copyWith(
       visibility: {...drawing.visibility, ...place.visibilityOverrides},
     );
@@ -24,6 +26,7 @@ class ArchitectSheetComposer {
       place.scale,
       l,
       sources: sources,
+      viewRotationRad: viewRotationRad,
     );
     ArchitectVectorScene build() => ArchitectDrawingPublisher.build(
       p,
@@ -31,6 +34,7 @@ class ArchitectSheetComposer {
       place.scale,
       l,
       sources: sources,
+      viewRotationRad: viewRotationRad,
     );
     return drawingScenes?.putIfAbsent(key, build) ?? build();
   }
@@ -45,20 +49,21 @@ class ArchitectSheetComposer {
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
     Map<Object, ArchitectVectorScene>? drawingScenes,
   }) {
+    final resolved = ArchitectSheetGeometry.resolveOrientation(place, p);
     final drawing = p.document.drawings
-        .where((d) => d.id == place.drawingId)
+        .where((d) => d.id == resolved.drawingId)
         .firstOrNull;
     if (drawing == null ||
         !ArchitectDrawingPublisher.hasSource(p, drawing) ||
-        !ArchitectSheetGeometry.valid(place.copyWith(clearCrop: true))) {
+        !ArchitectSheetGeometry.valid(resolved.copyWith(clearCrop: true))) {
       return const ArchitectVectorScene([], 1);
     }
     final canvas = ArchitectVectorCanvas();
-    final unit = 1000 / place.scale;
-    canvas.translate(place.frame.left, place.frame.top);
-    canvas.rotate(place.rotation * math.pi / 180);
-    canvas.translate(-place.anchor.dx * unit, -place.anchor.dy * unit);
-    _sourceScene(p, place, drawing, l, sources, drawingScenes).paint(canvas);
+    final unit = 1000 / resolved.scale;
+    canvas.translate(resolved.frame.left, resolved.frame.top);
+    canvas.rotate(resolved.rotation * math.pi / 180);
+    canvas.translate(-resolved.anchor.dx * unit, -resolved.anchor.dy * unit);
+    _sourceScene(p, resolved, drawing, l, sources, drawingScenes).paint(canvas);
     return ArchitectVectorScene(canvas.operations, 1);
   }
 
@@ -172,13 +177,14 @@ class ArchitectSheetComposer {
         );
         continue;
       }
-      final scene = _sourceScene(p, place, drawing, l, sources, drawingScenes);
-      final unit = 1000 / place.scale;
+      final resolved = ArchitectSheetGeometry.resolveOrientation(place, p);
+      final scene = _sourceScene(p, resolved, drawing, l, sources, drawingScenes);
+      final unit = 1000 / resolved.scale;
       canvas.save();
-      canvas.clipPath(ArchitectSheetGeometry.clipPath(place));
-      canvas.translate(place.frame.left, place.frame.top);
-      canvas.rotate(place.rotation * math.pi / 180);
-      canvas.translate(-place.anchor.dx * unit, -place.anchor.dy * unit);
+      canvas.clipPath(ArchitectSheetGeometry.clipPath(resolved));
+      canvas.translate(resolved.frame.left, resolved.frame.top);
+      canvas.rotate(resolved.rotation * math.pi / 180);
+      canvas.translate(-resolved.anchor.dx * unit, -resolved.anchor.dy * unit);
       scene.paint(canvas);
       canvas.restore();
       canvas.sources(const {}, 'sheet');

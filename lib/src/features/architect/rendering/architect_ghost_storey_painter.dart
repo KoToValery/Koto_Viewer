@@ -42,8 +42,7 @@ class ArchitectGhostStoreyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.translate(viewport.translation.dx, viewport.translation.dy);
-    canvas.scale(viewport.scale);
+    viewport.applyToCanvas(canvas);
     for (final floor in neighbors(project)) {
       final scene = ArchitectSceneGeometry.visible(
         project.copyWith(activeStoreyId: floor.id, gridAxes: []),

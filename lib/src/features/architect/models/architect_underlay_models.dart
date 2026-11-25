@@ -35,6 +35,9 @@ class ArchitectCadUnderlayConfig {
   final bool visible;
   final List<Offset>? maskPolygon;
   final bool maskEnabled;
+  /// When attached to the Site Plan storey, automatically displays this
+  /// aligned survey underlay on building storeys at or below `±0.00`.
+  final bool shareToGroundStoreys;
 
   const ArchitectCadUnderlayConfig({
     required this.storeyId,
@@ -60,6 +63,7 @@ class ArchitectCadUnderlayConfig {
     this.visible = true,
     this.maskPolygon,
     this.maskEnabled = true,
+    this.shareToGroundStoreys = true,
   });
 
   bool get hasLockedOrigin =>
@@ -141,6 +145,7 @@ class ArchitectCadUnderlayConfig {
     List<Offset>? maskPolygon,
     bool clearMask = false,
     bool? maskEnabled,
+    bool? shareToGroundStoreys,
   }) => ArchitectCadUnderlayConfig(
     storeyId: storeyId ?? this.storeyId,
     fileName: fileName ?? this.fileName,
@@ -168,6 +173,7 @@ class ArchitectCadUnderlayConfig {
     visible: visible ?? this.visible,
     maskPolygon: clearMask ? null : (maskPolygon ?? this.maskPolygon),
     maskEnabled: maskEnabled ?? this.maskEnabled,
+    shareToGroundStoreys: shareToGroundStoreys ?? this.shareToGroundStoreys,
   );
 
   Map<String, dynamic> toJson() => {
@@ -197,6 +203,7 @@ class ArchitectCadUnderlayConfig {
         for (final p in maskPolygon!) {'x': p.dx, 'y': p.dy},
       ],
     if (!maskEnabled) 'maskEnabled': false,
+    if (!shareToGroundStoreys) 'shareToGroundStoreys': false,
   };
 
   factory ArchitectCadUnderlayConfig.fromJson(Map<String, dynamic> json) =>
@@ -245,6 +252,7 @@ class ArchitectCadUnderlayConfig {
               ]
             : null,
         maskEnabled: json['maskEnabled'] != false,
+        shareToGroundStoreys: json['shareToGroundStoreys'] != false,
       );
 }
 

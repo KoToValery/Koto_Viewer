@@ -83,13 +83,16 @@ import '../widgets/architect_find_and_select_dialog.dart';
 
 import '../services/architect_offset.dart';
 import '../services/architect_rotation.dart';
+import '../services/architect_site_orientation.dart';
 import '../widgets/architect_rotation_overlay.dart';
+import '../widgets/architect_site_orientation_overlay.dart';
 import '../widgets/architect_hatch_transform_handle.dart';
 import '../widgets/architect_transform_point_input.dart';
 import '../widgets/architect_offset_direction.dart';
 
 import '../../bim_editing/widgets/bim_offset_dialog.dart';
 import '../../bim_editing/geometry/bim_offset_geometry.dart';
+import '../../bim_editing/geometry/bim_transform_2d.dart';
 
 import '../services/architect_apartment_zones.dart';
 
@@ -501,7 +504,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   final Map<ArchitectWorkspaceView, String> _lastViewIds = {};
 
-  final Map<String, ({double scale, Offset translation})> _viewCameras = {};
+  final Map<String, ({double scale, Offset translation, double rotation})> _viewCameras = {};
+
+  bool _siteTrueNorthView = true;
+
+  bool _siteOrientationActive = false;
+
+  double get _desiredViewportRotation =>
+      (_commands.isPlan && _project.activeStorey.isSite && _siteTrueNorthView)
+          ? ArchitectSiteOrientation.trueNorthViewRotationRad(_project)
+          : 0.0;
+
+  void _syncWorkspaceCameraRotation({Offset? screenAnchor}) {
+    _viewport.setRotation(
+      _desiredViewportRotation,
+      screenAnchor: screenAnchor,
+    );
+  }
 
   bool _printPreview = false;
 
@@ -558,6 +577,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     kind: ArchitectDrawingKind.values.byName(_commands.view.name),
 
     ceilingPlan: _commands.isCeilingPlan,
+
+    sitePlan: _commands.isPlan && _project.activeStorey.isSite,
 
     scale: _publicationScale,
 
@@ -1003,6 +1024,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       sources: _publicationSources,
 
+      viewRotationRad: _viewport.rotation,
+
     );
 
     return ColoredBox(
@@ -1042,6 +1065,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               _viewport.scale,
 
               _viewport.translation,
+
+              _viewport.rotation,
 
             ),
 
@@ -1246,6 +1271,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       translation: _viewport.translation,
 
+      rotation: _viewport.rotation,
+
     );
 
     ArchitectPlanMode? nextPlanMode;
@@ -1299,6 +1326,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     } else {
 
+      _viewport.setRotation(_desiredViewportRotation);
+
       _viewport.navigate(
 
         previousFocal: Offset.zero,
@@ -1309,7 +1338,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       );
 
-      _viewport.panBy(saved.translation - _viewport.translation);
+      if ((saved.rotation - _viewport.rotation).abs() < 1e-6) {
+        _viewport.panBy(saved.translation - _viewport.translation);
+      } else {
+        _initTransform();
+      }
 
     }
 
@@ -4566,6 +4599,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return polygon == null ? const SizedBox.shrink() : ArchitectUnderlayCropOverlay(
           key: const ValueKey('architect-underlay-crop'), polygon: polygon,
           scale: _currentScale, translation: _viewport.translation,
+          rotation: _viewport.rotation,
           handleLength: _handleOffsetLength,
           activeEdge: _underlayCropEditor.active ? _underlayCropEditor.index : null,
           invalid: _underlayCropEditor.invalid,
@@ -4578,7 +4612,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ArchitectCadUnderlayConfig? get _paintCadUnderlayConfig {
     final cfg = _cadDragPreview ??
-        _underlayRotationPreview?.cadUnderlayForStorey(_project.activeStoreyId) ??
+        _underlayRotationPreview?.effectiveCadUnderlayForStorey(_project.activeStoreyId) ??
         _currentCadUnderlayConfig;
     return cfg != null && _underlayCropEditor.active && _underlayCropCad
         ? cfg.copyWith(maskPolygon: _underlayCropEditor.preview, maskEnabled: true) : cfg;
@@ -4612,7 +4646,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   });
 
   ArchitectCadUnderlayConfig? get _currentCadUnderlayConfig =>
-      _project.cadUnderlayForStorey(_project.activeStorey.id);
+      _project.effectiveCadUnderlayForStorey(_project.activeStorey.id);
 
   BimCoordinateFrame get _effectiveUnderlayFrame {
     final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
@@ -4629,7 +4663,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     final cfg = _currentCadUnderlayConfig;
     if (cfg != null && !cfg.visible) return null;
-    return _underlaysByStorey[_project.activeStorey.id];
+    final ownerId =
+        _project.effectiveCadUnderlayOwnerId(_project.activeStorey.id) ??
+        _project.activeStorey.id;
+    return _underlaysByStorey[ownerId];
   }
 
   ArchitectRasterUnderlay? get _selectedRasterUnderlay {
@@ -5058,6 +5095,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _removeCurrentCadUnderlay() {
     final storeyId = _project.activeStorey.id;
+    if (_project.isSharedCadUnderlayForStorey(storeyId)) {
+      setState(() {
+        _commands.commit(_project.copyWith(
+          excludedInheritedCadStoreys: {
+            ..._project.excludedInheritedCadStoreys,
+            storeyId,
+          },
+        ));
+        _isCadUnderlaySelected = false;
+      });
+      _saveBiMProjectIfAttached();
+      return;
+    }
     final nextUnderlays = Map<String, ArchitectCadUnderlayConfig>.from(
       _project.cadUnderlays,
     )..remove(storeyId);
@@ -5079,6 +5129,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _toggleCadVisibility(bool visible) {
+    final activeId = _project.activeStorey.id;
+    if (!visible && _project.isSharedCadUnderlayForStorey(activeId)) {
+      setState(() {
+        _commands.commit(_project.copyWith(
+          excludedInheritedCadStoreys: {
+            ..._project.excludedInheritedCadStoreys,
+            activeId,
+          },
+        ));
+        _isCadUnderlaySelected = false;
+      });
+      _saveBiMProjectIfAttached();
+      return;
+    }
     final cfg = _currentCadUnderlayConfig;
     if (cfg == null) return;
     final updated = cfg.copyWith(visible: visible);
@@ -5343,10 +5407,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Future<void> _openCadContextMenu(Offset globalPosition) async {
     final cfg = _currentCadUnderlayConfig;
     if (cfg == null || _underlayBusy) return;
+    final activeId = _project.activeStoreyId;
     final storeyId = cfg.storeyId;
+    final isShared = _project.isSharedCadUnderlayForStorey(activeId);
     final owner = _underlayOwnerId;
     bool current() => mounted && owner == _underlayOwnerId &&
-        _project.activeStoreyId == storeyId && _currentCadUnderlayConfig == cfg;
+        _project.activeStoreyId == activeId && _currentCadUnderlayConfig == cfg;
     final hasDocument = _underlaysByStorey[storeyId] != null;
     final survey = _project.geodeticSurvey;
     final hasSurvey = (survey?.contoursForStorey(storeyId).isNotEmpty ?? false) ||
@@ -5356,12 +5422,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       globalPosition: globalPosition,
       isCad: true,
       visible: cfg.visible,
-      canMove: _currentUnderlayDoc != null,
+      canMove: !isShared && _currentUnderlayDoc != null,
+      canEditGeometry: !isShared,
       hasDocument: hasDocument,
       hasSurvey: hasSurvey,
+      canOrientBuilding: _project.activeStorey.isSite && !isShared,
     );
     if (!current() || action == null) return;
     switch (action) {
+      case 'orient_building':
+        _startSiteOrientation();
       case 'position':
         _startUnderlaySnapDrag(isCad: true);
       case 'visibility':
@@ -5481,6 +5551,89 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       onRotate: _currentUnderlayDoc == null
           ? null : () => _startUnderlayRotation(isCad: true),
     );
+  }
+
+  void _startSiteOrientation() {
+    if (!_commands.isPlan || !_project.activeStorey.isSite) return;
+    _discardGeometryCommand();
+    _cancelActiveDrags();
+    setState(() {
+      _siteOrientationActive = true;
+      _isCadUnderlaySelected = false;
+      _selectedRasterId = null;
+      _selectionIds.clear();
+      _selectedElementId = null;
+      _touchCandidates = null;
+    });
+  }
+
+  Future<void> _applySiteOrientation(Offset pivot, double deltaRad) async {
+    var rotateBuilding = false;
+    if (ArchitectSiteOrientation.hasBuildingGeometry(_project)) {
+      final l = context.l10n;
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l.architectSiteOrientExistingBuildingTitle),
+          content: Text(l.architectSiteOrientExistingBuildingBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l.cancel),
+            ),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l.architectSiteOrientSiteOnly),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l.architectSiteOrientWithBuilding),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || choice == null) return;
+      rotateBuilding = choice;
+    }
+
+    final pivotScreen = _viewport.toScreen(pivot);
+    final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
+    final aligned = ArchitectSiteOrientation.align(
+      project: _project,
+      pivot: pivot,
+      deltaRad: deltaRad,
+      fallbackFrame: fallback,
+      rotateBuilding: rotateBuilding,
+    );
+    _modelCommands.execute(AlignArchitectSiteOrientation(aligned));
+    _saveBiMProjectIfAttached();
+
+    setState(() {
+      _siteOrientationActive = false;
+      _siteTrueNorthView = true;
+    });
+    // Counter-rotate the Site Plan camera around the picked edge midpoint so
+    // the geodetic survey underlay remains completely motionless on screen.
+    _syncWorkspaceCameraRotation(screenAnchor: pivotScreen);
+    HapticFeedback.mediumImpact();
+    _repaintPreview();
+    if (mounted) {
+      final angleDeg = ((aligned.northSymbol?.angle ?? 0.0) * 180 / math.pi)
+          .toStringAsFixed(1);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectSiteOrientApplied(angleDeg)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _toggleSiteNorthMode() {
+    if (!_commands.isPlan || !_project.activeStorey.isSite) return;
+    setState(() => _siteTrueNorthView = !_siteTrueNorthView);
+    _syncWorkspaceCameraRotation();
+    _repaintPreview();
   }
 
   void _startUnderlayRotation({required bool isCad, String? rasterId}) {
@@ -5680,6 +5833,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _onModelChanged() {
     _syncCadRevisionHistory();
+    _syncWorkspaceCameraRotation();
     if (_stairDraft != null && !identical(_stairDraftDocument, _modelCommands.project)) {
       _closeFreeStair();
     }
@@ -9572,6 +9726,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
   void _initTransform() {
+
+    _viewport.setRotation(_desiredViewportRotation);
 
     var bounds = ArchitectSceneGeometry.projectBounds(_project);
 
@@ -14440,6 +14596,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _hatchTransformEpoch++;
 
     _viewDirectionDraft = null;
+    _siteOrientationActive = false;
     _rotationSource = null;
     _rotationUnderlay = null;
     _underlayRotationPreview = null;
@@ -29136,14 +29293,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (config == null) return null;
       final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
       final frame = config.frame(fallback).rotatingAround(pivot, angle);
-      return source.copyWith(cadUnderlays: {
-        ...source.cadUnderlays,
-        config.storeyId: config.withFrame(
-          frame,
-          transformMask: true,
-          fallback: fallback,
-        ),
-      });
+      final syncNorth = source.activeStorey.isSite;
+      final prevNorth = source.northSymbol;
+      final nextNorth = syncNorth
+          ? ArchitectNorthSymbol(
+              position: prevNorth != null
+                  ? BimTransform2D.rotate(prevNorth.position, pivot, angle)
+                  : pivot,
+              angle: ArchitectSiteOrientation.normalizeAngle(
+                (prevNorth?.angle ?? 0.0) + angle,
+              ),
+            )
+          : prevNorth;
+      return source.copyWith(
+        cadUnderlays: {
+          ...source.cadUnderlays,
+          config.storeyId: config.withFrame(
+            frame,
+            transformMask: true,
+            fallback: fallback,
+          ),
+        },
+        northSymbol: nextNorth,
+      );
     }
     return source.copyWith(rasterUnderlays: [
       for (final raster in source.rasterUnderlays)
@@ -33284,6 +33456,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           onSyncTerrainFromGeodesy: _syncTerrainFromGeodesy,
                           onTriggerChamfer: _triggerChamfer,
                           onTriggerFillet: _triggerFillet,
+                          onOrientBuilding: _project.activeStorey.isSite
+                              ? _startSiteOrientation
+                              : null,
                         )
                       : null,
 
@@ -38446,6 +38621,97 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
         _buildOffsetFloatingOverlay(),
       ],
+      if (_siteOrientationActive)
+        Positioned.fill(
+          child: AnimatedBuilder(
+            animation: _viewport,
+            builder: (_, _) => ArchitectSiteOrientationOverlay(
+              key: const ValueKey('architect-site-orientation-overlay'),
+              toModel: _screenToModel,
+              toScreen: _viewport.toScreen,
+              snap: (raw, touch) => _snapTransformPoint(
+                raw,
+                touch,
+                selectionOnly: false,
+              ),
+              localizeSnap: _localizedSnapLabel,
+              onApply: _applySiteOrientation,
+              onNavigate: (delta, factor, focal) => _viewport.navigate(
+                previousFocal: focal - delta,
+                focal: focal,
+                scaleFactor: factor,
+              ),
+              onCancel: () {
+                setState(() => _siteOrientationActive = false);
+                _repaintPreview();
+              },
+            ),
+          ),
+        ),
+      if (_commands.isPlan &&
+          _project.activeStorey.isSite &&
+          !_siteOrientationActive &&
+          _rotationSource == null &&
+          !_dragController.isActive &&
+          !_underlayMaskDrafting)
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if ((_project.northSymbol?.angle ?? 0.0).abs() > 1e-4) ...[
+                Tooltip(
+                  message: context.l10n.architectSiteOrientToggleTooltip,
+                  child: ActionChip(
+                    key: const ValueKey('architect-site-north-toggle'),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    avatar: AppIcon(
+                      AppIconId.compass,
+                      size: 14,
+                      color: _siteTrueNorthView
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    label: Text(
+                      _siteTrueNorthView
+                          ? context.l10n.architectSiteOrientViewTrueNorth
+                          : context.l10n.architectSiteOrientViewProjectNorth,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onPressed: _toggleSiteNorthMode,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Tooltip(
+                message: context.l10n.architectSiteOrientBuildingTooltip,
+                child: ActionChip(
+                  key: const ValueKey('architect-site-orient-pill'),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  avatar: AppIcon(
+                    AppIconId.rotate,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  label: Text(
+                    context.l10n.architectSiteOrientBuilding,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onPressed: _startSiteOrientation,
+                ),
+              ),
+            ],
+          ),
+        ),
       if (_rotationSource != null)
         Positioned.fill(child: AnimatedBuilder(animation: _viewport,
           builder: (_, _) => ArchitectRotationOverlay(
@@ -39670,7 +39936,14 @@ class _PublicationPreviewPainter extends CustomPainter {
 
   final Offset translation;
 
-  _PublicationPreviewPainter(this.scene, this.zoom, this.translation);
+  final double rotation;
+
+  _PublicationPreviewPainter(
+    this.scene,
+    this.zoom,
+    this.translation, [
+    this.rotation = 0.0,
+  ]);
 
   @override
 
@@ -39679,6 +39952,8 @@ class _PublicationPreviewPainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
 
     canvas.translate(translation.dx, translation.dy);
+
+    if (rotation != 0) canvas.rotate(rotation);
 
     canvas.scale(zoom * scene.denominator / 1000);
 
@@ -39692,7 +39967,10 @@ class _PublicationPreviewPainter extends CustomPainter {
 
   bool shouldRepaint(covariant _PublicationPreviewPainter old) =>
 
-      old.scene != scene || old.zoom != zoom || old.translation != translation;
+      old.scene != scene ||
+      old.zoom != zoom ||
+      old.translation != translation ||
+      old.rotation != rotation;
 
 }
 

@@ -432,14 +432,23 @@ class Architect2dPainter extends CustomPainter {
     if (ArchitectTextScope.current == null) {
       final key = drawingViewKey ?? 'plan:${_project.activeStoreyId}';
       final denominator = _project.document.viewScales[key] ?? _project.dimensionScale.denominator;
-      ArchitectTextScope(_project.document, key, denominator, zoomScale, units: _project.units, decimals: _project.distanceDecimals, levelUnits: _project.levelUnits, levelDecimals: _project.levelDecimals).run(() => _paint(canvas, size));
+      ArchitectTextScope(
+        _project.document,
+        key,
+        denominator,
+        zoomScale,
+        units: _project.units,
+        decimals: _project.distanceDecimals,
+        levelUnits: _project.levelUnits,
+        levelDecimals: _project.levelDecimals,
+        viewRotationRad: viewport?.rotation ?? 0.0,
+      ).run(() => _paint(canvas, size));
     } else { _paint(canvas, size); }
   }
   void _paint(Canvas canvas, Size size) {
     canvas.save();
     if (viewport != null) {
-      canvas.translate(viewport!.translation.dx, viewport!.translation.dy);
-      canvas.scale(zoomScale);
+      viewport!.applyToCanvas(canvas);
     }
     // Interaction renders the selected objects even while their preview moves
     // outside the original bounds. The static layer is culled to the camera.

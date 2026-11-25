@@ -1873,11 +1873,14 @@ class ArchitectLandscapePainterHelper {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+    final viewRot = scope?.viewRotationRad ?? 0.0;
+    canvas.save();
+    canvas.translate(worldPos.dx, worldPos.dy);
+    if (viewRot.abs() > 1e-6) canvas.rotate(-viewRot);
     if (badge) {
       final padX = fontSize * 0.28;
       final padY = fontSize * 0.14;
-      final topLeft =
-          worldPos - Offset(tp.width * 0.5, tp.height * 0.5);
+      final topLeft = Offset(-tp.width * 0.5, -tp.height * 0.5);
       final rect = Rect.fromLTWH(
         topLeft.dx - padX,
         topLeft.dy - padY,
@@ -1904,9 +1907,11 @@ class ArchitectLandscapePainterHelper {
         );
       }
       tp.paint(canvas, topLeft);
+      canvas.restore();
       return;
     }
-    tp.paint(canvas, worldPos);
+    tp.paint(canvas, Offset.zero);
+    canvas.restore();
   }
 
   static Path _safePathOp(PathOperation op, Path a, Path b) {

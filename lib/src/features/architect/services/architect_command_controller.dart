@@ -3604,6 +3604,16 @@ class UpdateArchitectLandscapeProject extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) => nextProject;
 }
 
+/// Atomic undoable command aligning site orientation (survey underlay, terrain,
+/// site elements, north symbol, and optionally building storeys) to Project North.
+class AlignArchitectSiteOrientation extends ArchitectModelCommand {
+  final ArchitectProject alignedProject;
+  const AlignArchitectSiteOrientation(this.alignedProject);
+
+  @override
+  ArchitectProject apply(ArchitectProject project) => alignedProject;
+}
+
 // --- SUBSECTION: [TAG:CMD_CEILING] Suspended Ceiling Commands ---
 class PutArchitectCeiling extends ArchitectModelCommand {
   final String storeyId;

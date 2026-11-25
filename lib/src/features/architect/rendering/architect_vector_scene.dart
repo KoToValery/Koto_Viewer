@@ -21,6 +21,10 @@ class ArchitectTextScope {
   final BimDistanceUnit levelUnits;
   final int levelDecimals;
   final bool publication;
+  /// Active clockwise rotation (radians) of the enclosing viewport or sheet
+  /// placement. Used to counter-rotate view-upright BIM labels and keep
+  /// line-aligned dimensions ISO-readable.
+  final double viewRotationRad;
   const ArchitectTextScope(
     this.document,
     this.view,
@@ -31,6 +35,7 @@ class ArchitectTextScope {
     this.levelUnits = BimDistanceUnit.meters,
     this.levelDecimals = 2,
     this.publication = false,
+    this.viewRotationRad = 0.0,
   });
   T run<T>(T Function() body) => runZoned(body, zoneValues: {_key: this});
   double height(String id, ArchitectAnnotationRole role) {

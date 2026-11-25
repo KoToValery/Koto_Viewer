@@ -503,9 +503,17 @@ Future<String?> showArchitectUnderlayContextMenu({
   bool canEditGeometry = true,
   bool hasDocument = true,
   bool hasSurvey = false,
+  bool canOrientBuilding = false,
 }) {
   final l = context.l10n;
   return _showUnderlayMenu(context, globalPosition, [
+    if (canOrientBuilding)
+      _entry(
+        'orient_building',
+        AppIconId.compass,
+        l.architectSiteOrientBuilding,
+        enabled: visible && (!isCad || hasDocument),
+      ),
     _entry(
       'position',
       AppIconId.move,

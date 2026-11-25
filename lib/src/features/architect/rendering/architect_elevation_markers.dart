@@ -30,12 +30,16 @@ void drawArchitectElevationMarkers(
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+    final viewRot = ArchitectTextScope.current?.viewRotationRad ?? 0.0;
+    canvas.save();
+    canvas.translate(point.dx, point.dy);
+    if (viewRot.abs() > 1e-6) canvas.rotate(-viewRot);
     architectDrawKnockout(
       canvas,
       Path()..addRect(
         Rect.fromLTWH(
-          point.dx - text.width / 2 - 1 / scale,
-          point.dy - .5 / scale,
+          -text.width / 2 - 1 / scale,
+          -.5 / scale,
           text.width + 2 / scale,
           text.height + 1 / scale,
         ),
@@ -45,7 +49,8 @@ void drawArchitectElevationMarkers(
               : Colors.white)
           .withValues(alpha: .9),
     );
-    text.paint(canvas, point - Offset(text.width / 2, 0));
+    text.paint(canvas, Offset(-text.width / 2, 0));
+    canvas.restore();
   }
 
   for (final e in project.elevations) {

@@ -128,6 +128,7 @@ class ArchitectDrawingPublisher {
     int denominator,
     AppLocalizations l, {
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+    double viewRotationRad = 0.0,
   }) => jsonEncode([
     drawing.id,
     drawing.sourceKey,
@@ -140,6 +141,7 @@ class ArchitectDrawingPublisher {
     identityHashCode(sources.underlays[drawing.sourceId]),
     sources.frame.hashCode,
     visibilityKey(sources.visibility),
+    (viewRotationRad * 1e5).round(),
   ]);
   static bool hasSource(ArchitectProject p, ArchitectSavedDrawing drawing) =>
       switch (drawing.kind) {
@@ -160,12 +162,19 @@ class ArchitectDrawingPublisher {
     int denominator,
     AppLocalizations l, {
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+    double viewRotationRad = 0.0,
   }) {
     if (denominator <= 0) throw ArgumentError.value(denominator, 'denominator');
     if (!hasSource(p, drawing)) {
       throw StateError('Missing drawing source: ${drawing.id}');
     }
-    final key = sceneKey(drawing, denominator, l, sources: sources);
+    final key = sceneKey(
+      drawing,
+      denominator,
+      l,
+      sources: sources,
+      viewRotationRad: viewRotationRad,
+    );
     final cache = _cache[p] ??= {};
     if (cache.containsKey(key)) return cache[key]!;
     final scope = ArchitectTextScope(
@@ -178,6 +187,7 @@ class ArchitectDrawingPublisher {
       levelUnits: p.levelUnits,
       levelDecimals: p.levelDecimals,
       publication: true,
+      viewRotationRad: viewRotationRad,
     );
     final ids = <String>{};
     void collect(Object? value) {
@@ -233,12 +243,16 @@ class ArchitectDrawingPublisher {
         );
         if (visible['axes'] == false) plan = plan.copyWith(gridAxes: []);
         canvas.scale(1000 / denominator);
-        final cad = plan.cadUnderlayForStorey(drawing.sourceId);
+        final cad = plan.effectiveCadUnderlayForStorey(drawing.sourceId);
+        final underlayOwnerId =
+            plan.effectiveCadUnderlayOwnerId(drawing.sourceId) ??
+            drawing.sourceId;
+        final underlayDoc = sources.underlays[underlayOwnerId];
         final showUnderlay =
             drawing.visibility['underlay'] != false &&
             cad?.visible != false &&
             effectiveProject.isLayerVisible(ArchitectLayer.cadUnderlayLayerId);
-        if (showUnderlay && sources.underlays[drawing.sourceId] != null) {
+        if (showUnderlay && underlayDoc != null) {
           final frame = cad?.frame(sources.frame) ?? sources.frame;
           canvas.save();
           if (cad?.hasActiveMask == true) {
@@ -251,7 +265,7 @@ class ArchitectDrawingPublisher {
           );
           ArchitectElementsPainterHelper.drawUnderlay(
             canvas: canvas,
-            underlayDoc: sources.underlays[drawing.sourceId],
+            underlayDoc: underlayDoc,
             zoomScale: scope.renderScale / frame.unitsPerMeter,
             // Subtract geodetic offsets before constructing float32 paths.
             sourceOrigin: frame.origin,

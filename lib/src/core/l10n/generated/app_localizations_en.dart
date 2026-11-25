@@ -14028,4 +14028,71 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectTerrainSlopeRatio => 'Slope ratio (1:H)';
+
+  @override
+  String get architectSiteOrientBuilding => 'Orient building';
+
+  @override
+  String get architectSiteOrientBuildingTooltip =>
+      'Pick a site edge to straighten floor plans while keeping Site Plan on True North';
+
+  @override
+  String get architectSiteOrientStartHint => 'Tap start of alignment edge';
+
+  @override
+  String get architectSiteOrientEndHint => 'Tap end of alignment edge';
+
+  @override
+  String get architectSiteOrientReviewHint =>
+      'Use 90° to choose floor-plan up direction';
+
+  @override
+  String get architectSiteOrientRotate90 => '90°';
+
+  @override
+  String get architectSiteOrientRetry => 'Reset';
+
+  @override
+  String get architectSiteOrientViewTrueNorth => 'North';
+
+  @override
+  String get architectSiteOrientViewProjectNorth => 'Building';
+
+  @override
+  String get architectSiteOrientToggleTooltip =>
+      'Switch Site Plan view between True North and Building orientation';
+
+  @override
+  String get architectSiteOrientExistingBuildingTitle =>
+      'Existing building geometry';
+
+  @override
+  String get architectSiteOrientExistingBuildingBody =>
+      'Choose whether to rotate only the site and survey underlay, or rotate the building together with the site.';
+
+  @override
+  String get architectSiteOrientSiteOnly => 'Site only';
+
+  @override
+  String get architectSiteOrientWithBuilding => 'Building + site';
+
+  @override
+  String architectSiteOrientApplied(String angle) {
+    return 'Building aligned (North $angle°)';
+  }
+
+  @override
+  String get architectSheetOrientation => 'Orientation';
+
+  @override
+  String get architectSheetOrientationProjectNorth => 'Project North';
+
+  @override
+  String get architectSheetOrientationTrueNorth => 'True North';
+
+  @override
+  String get architectSheetOrientationCustom => 'Custom angle';
+
+  @override
+  String get architectUnderlayShareGround => 'Show on storeys ≤ ±0.00';
 }

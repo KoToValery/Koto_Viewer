@@ -668,28 +668,32 @@ class ArchitectElementsPainterHelper {
               !(scope?.view.startsWith('section:') == true ||
                   scope?.view.startsWith('elevation:') == true ||
                   storey.id.startsWith('view:'));
+      final viewRot = scope?.viewRotationRad ?? 0.0;
+      canvas.save();
+      canvas.translate(p.dx, p.dy);
+      if (viewRot.abs() > 1e-6) canvas.rotate(-viewRot);
       if (plan) {
-        canvas.drawCircle(p, s, markerPaint);
+        canvas.drawCircle(Offset.zero, s, markerPaint);
         canvas.drawLine(
-          p - Offset(s * 1.4, 0),
-          p + Offset(s * 1.4, 0),
+          Offset(-s * 1.4, 0),
+          Offset(s * 1.4, 0),
           markerPaint,
         );
         canvas.drawLine(
-          p - Offset(0, s * 1.4),
-          p + Offset(0, s * 1.4),
+          Offset(0, -s * 1.4),
+          Offset(0, s * 1.4),
           markerPaint,
         );
       } else {
         canvas.drawPath(
           Path()
-            ..moveTo(p.dx, p.dy)
-            ..lineTo(p.dx - s, p.dy - s * 1.5)
-            ..lineTo(p.dx + s, p.dy - s * 1.5)
+            ..moveTo(0, 0)
+            ..lineTo(-s, -s * 1.5)
+            ..lineTo(s, -s * 1.5)
             ..close(),
           markerPaint,
         );
-        canvas.drawLine(p, p + Offset(s * 5, 0), markerPaint);
+        canvas.drawLine(Offset.zero, Offset(s * 5, 0), markerPaint);
       }
 
       final label =
@@ -700,7 +704,7 @@ class ArchitectElementsPainterHelper {
           ) ??
           marker.formattedElevation;
       canvas.save();
-      canvas.translate(p.dx + s * (plan ? 2 : 1.4), p.dy - s * .35);
+      canvas.translate(s * (plan ? 2 : 1.4), -s * .35);
       canvas.scale(1.0 / zoomScale);
       final tp = ArchitectTextPainter(
         elementId: marker.id,
@@ -718,6 +722,7 @@ class ArchitectElementsPainterHelper {
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(0, -tp.height));
+      canvas.restore();
       canvas.restore();
     }
   }

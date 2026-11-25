@@ -25445,6 +25445,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Slope ratio (1:H)'**
   String get architectTerrainSlopeRatio;
+
+  /// Short action label to align building orthogonal axes to a site edge
+  ///
+  /// In en, this message translates to:
+  /// **'Orient building'**
+  String get architectSiteOrientBuilding;
+
+  /// Tooltip explaining the 2-tap site-to-building orientation tool
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a site edge to straighten floor plans while keeping Site Plan on True North'**
+  String get architectSiteOrientBuildingTooltip;
+
+  /// Step 1 prompt for site orientation tool
+  ///
+  /// In en, this message translates to:
+  /// **'Tap start of alignment edge'**
+  String get architectSiteOrientStartHint;
+
+  /// Step 2 prompt for site orientation tool
+  ///
+  /// In en, this message translates to:
+  /// **'Tap end of alignment edge'**
+  String get architectSiteOrientEndHint;
+
+  /// Step 3 prompt for reviewing building orthogonal axes on site plan
+  ///
+  /// In en, this message translates to:
+  /// **'Use 90° to choose floor-plan up direction'**
+  String get architectSiteOrientReviewHint;
+
+  /// Button cycling building up-direction by 90 degrees
+  ///
+  /// In en, this message translates to:
+  /// **'90°'**
+  String get architectSiteOrientRotate90;
+
+  /// Button to re-pick alignment edge points
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get architectSiteOrientRetry;
+
+  /// Short chip label indicating Site Plan is oriented to True North
+  ///
+  /// In en, this message translates to:
+  /// **'North'**
+  String get architectSiteOrientViewTrueNorth;
+
+  /// Short chip label indicating Site Plan is oriented to orthogonal Project North
+  ///
+  /// In en, this message translates to:
+  /// **'Building'**
+  String get architectSiteOrientViewProjectNorth;
+
+  /// Tooltip for toggling Site Plan view rotation
+  ///
+  /// In en, this message translates to:
+  /// **'Switch Site Plan view between True North and Building orientation'**
+  String get architectSiteOrientToggleTooltip;
+
+  /// Dialog title when orienting site while building geometry already exists
+  ///
+  /// In en, this message translates to:
+  /// **'Existing building geometry'**
+  String get architectSiteOrientExistingBuildingTitle;
+
+  /// Dialog body explaining the two orientation choices when building already exists
+  ///
+  /// In en, this message translates to:
+  /// **'Choose whether to rotate only the site and survey underlay, or rotate the building together with the site.'**
+  String get architectSiteOrientExistingBuildingBody;
+
+  /// Option to rotate only the site, terrain, and survey underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Site only'**
+  String get architectSiteOrientSiteOnly;
+
+  /// Option to rotate existing building storeys together with the site
+  ///
+  /// In en, this message translates to:
+  /// **'Building + site'**
+  String get architectSiteOrientWithBuilding;
+
+  /// Snackbar confirming building orientation alignment
+  ///
+  /// In en, this message translates to:
+  /// **'Building aligned (North {angle}°)'**
+  String architectSiteOrientApplied(String angle);
+
+  /// Sheet placement orientation mode label
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation'**
+  String get architectSheetOrientation;
+
+  /// Sheet orientation matching orthogonal Project North (0 degrees)
+  ///
+  /// In en, this message translates to:
+  /// **'Project North'**
+  String get architectSheetOrientationProjectNorth;
+
+  /// Sheet orientation automatically aligned to True North
+  ///
+  /// In en, this message translates to:
+  /// **'True North'**
+  String get architectSheetOrientationTrueNorth;
+
+  /// Sheet orientation using a manual rotation angle
+  ///
+  /// In en, this message translates to:
+  /// **'Custom angle'**
+  String get architectSheetOrientationCustom;
+
+  /// Toggle sharing the Site Plan CAD underlay onto ground/basement storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Show on storeys ≤ ±0.00'**
+  String get architectUnderlayShareGround;
 }
 
 class _AppLocalizationsDelegate

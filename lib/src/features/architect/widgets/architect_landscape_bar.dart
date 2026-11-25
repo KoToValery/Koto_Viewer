@@ -28,6 +28,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
   final ValueChanged<ArchitectTerrainDraftMode>? onTerrainModeSelected;
   final VoidCallback? onTriggerChamfer;
   final VoidCallback? onTriggerFillet;
+  final VoidCallback? onOrientBuilding;
 
   const ArchitectLandscapeBar({
     super.key,
@@ -50,6 +51,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
     this.onTerrainModeSelected,
     this.onTriggerChamfer,
     this.onTriggerFillet,
+    this.onOrientBuilding,
   });
 
   ArchitectLandscapeTool get controller => landscapeTool;
@@ -239,6 +241,30 @@ class ArchitectLandscapeBar extends StatelessWidget {
       ),
       const SizedBox(width: 6),
       _contourIntervalChip(context, l, colors),
+      if (onOrientBuilding != null) ...[
+        const SizedBox(width: 6),
+        Tooltip(
+          message: l.architectSiteOrientBuildingTooltip,
+          child: ActionChip(
+            key: const ValueKey('architect-site-orient-building'),
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            avatar: AppIcon(
+              AppIconId.compass,
+              size: 15,
+              color: colors.primary,
+            ),
+            label: Text(
+              l.architectSiteOrientBuilding,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            onPressed: onOrientBuilding,
+          ),
+        ),
+      ],
       if (onCreateProposedFromExisting != null &&
           project != null &&
           project!.existingTerrain.isNotEmpty &&

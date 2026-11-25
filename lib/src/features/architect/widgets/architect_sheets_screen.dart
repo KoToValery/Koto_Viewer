@@ -16,6 +16,7 @@ import '../services/architect_pdf_export.dart';
 import 'architect_numeric_keypad.dart';
 import '../services/architect_sheet_layout.dart';
 import '../services/architect_sheet_geometry.dart';
+import '../services/architect_site_orientation.dart';
 import 'architect_sheet_viewport.dart';
 import 'architect_annotation_settings.dart';
 import 'architect_exchange_export_dialog.dart';
@@ -166,21 +167,24 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
     bool reportFailure = true,
   }) {
     final l = context.l10n;
+    final resolved = ArchitectSheetGeometry.resolveOrientation(place, project);
+    final viewRot = resolved.rotation * math.pi / 180;
     try {
       return ArchitectSheetLayout.fit(
-        place,
+        resolved,
         area,
         (scale) => ArchitectDrawingPublisher.build(
           project,
           drawing.copyWith(
-            visibility: {...drawing.visibility, ...place.visibilityOverrides},
+            visibility: {...drawing.visibility, ...resolved.visibilityOverrides},
           ),
           scale,
           l,
           sources: widget.sources,
+          viewRotationRad: viewRot,
         ),
         title: (scale) =>
-            '${place.number}  ${ArchitectSheetComposer.drawingName(drawing, l)}  1:$scale',
+            '${resolved.number}  ${ArchitectSheetComposer.drawingName(drawing, l)}  1:$scale',
       );
     } on ArchitectSheetFitException {
       if (reportFailure) message(l.architectSheetNoSpace);
@@ -363,14 +367,37 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         .where((e) => e.id == value.id)
         .firstOrNull;
     final drawing = existing ?? value;
+    final orientation = drawing.sitePlan
+        ? ArchitectPlacementOrientation.trueNorth
+        : ArchitectPlacementOrientation.projectNorth;
+    final rotationDeg = drawing.sitePlan
+        ? ArchitectSiteOrientation.trueNorthSheetRotationDeg(project)
+        : 0.0;
+    final radians = rotationDeg * math.pi / 180;
     final scene = ArchitectDrawingPublisher.build(
       project,
       drawing,
       drawing.scale,
       l,
       sources: widget.sources,
+      viewRotationRad: radians,
     );
-    final bounds = scene.bounds;
+    Offset rot(Offset pt, double rad) => Offset(
+      pt.dx * math.cos(rad) - pt.dy * math.sin(rad),
+      pt.dx * math.sin(rad) + pt.dy * math.cos(rad),
+    );
+    final rawBounds = scene.bounds;
+    final bounds = radians.abs() < 1e-9
+        ? rawBounds
+        : (Path()..addPolygon([
+            for (final pt in [
+              rawBounds.topLeft,
+              rawBounds.topRight,
+              rawBounds.bottomRight,
+              rawBounds.bottomLeft,
+            ])
+              rot(pt, radians),
+          ], true)).getBounds();
     final gap = ArchitectSheetLayout.gapMm;
     final origin = Offset(sheet!.marginMm, sheet!.marginMm);
     final place = ArchitectDrawingPlacement(
@@ -383,8 +410,11 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
         math.max(20, bounds.height + gap),
       ),
       anchor:
-          (bounds.topLeft - Offset(gap / 2, gap / 2)) * (drawing.scale / 1000),
+          rot(bounds.topLeft - Offset(gap / 2, gap / 2), -radians) *
+          (drawing.scale / 1000),
       scale: drawing.scale,
+      rotation: rotationDeg,
+      orientation: orientation,
       number: '${sheet!.placements.length + 1}',
     );
     setState(() {
@@ -422,10 +452,20 @@ class _SheetsState extends State<ArchitectSheetsScreen> {
 
   Future<void> placementProperties() async {
     if (placement == null) return;
+    final resolved = ArchitectSheetGeometry.resolveOrientation(
+      placement!,
+      project,
+    );
     final result = await showDialog<ArchitectDrawingPlacement>(
       context: context,
-      builder: (_) =>
-          _PlacementDialog(placement!, _sourceOptions(), project.units),
+      builder: (_) => _PlacementDialog(
+        resolved,
+        _sourceOptions(),
+        project.units,
+        trueNorthDeg: ArchitectSiteOrientation.trueNorthSheetRotationDeg(
+          project,
+        ),
+      ),
     );
     if (result != null && mounted) {
       final linked = _sourceOptions().firstWhere(
@@ -1452,7 +1492,13 @@ class _PlacementDialog extends StatefulWidget {
   final ArchitectDrawingPlacement initial;
   final List<ArchitectSavedDrawing> drawings;
   final ArchitectUnit units;
-  const _PlacementDialog(this.initial, this.drawings, this.units);
+  final double trueNorthDeg;
+  const _PlacementDialog(
+    this.initial,
+    this.drawings,
+    this.units, {
+    this.trueNorthDeg = 0.0,
+  });
   @override
   State<_PlacementDialog> createState() => _PlacementDialogState();
 }
@@ -1478,6 +1524,7 @@ class _PlacementDialogState extends State<_PlacementDialog> {
       widget.drawings.any((e) => e.id == widget.initial.drawingId)
       ? widget.initial.drawingId
       : null;
+  late ArchitectPlacementOrientation orientation = widget.initial.orientation;
   late bool title = widget.initial.showTitle;
   bool invalid = false;
   @override
@@ -1487,6 +1534,17 @@ class _PlacementDialogState extends State<_PlacementDialog> {
     }
     scaleField.dispose();
     super.dispose();
+  }
+
+  void _setOrientation(ArchitectPlacementOrientation next) {
+    setState(() {
+      orientation = next;
+      if (next == ArchitectPlacementOrientation.projectNorth) {
+        fields[7].text = _paperNumber(0.0);
+      } else if (next == ArchitectPlacementOrientation.trueNorth) {
+        fields[7].text = _paperNumber(widget.trueNorthDeg);
+      }
+    });
   }
 
   @override
@@ -1536,21 +1594,50 @@ class _PlacementDialogState extends State<_PlacementDialog> {
                 onChanged: (v) => source = v,
               ),
               _scaleInput(context, scaleField),
-              for (var i = 0; i < fields.length; i++)
-                TextField(
-                  controller: fields[i],
-                  decoration: InputDecoration(labelText: labels[i]),
-                  keyboardType: i == 0 ? TextInputType.text : TextInputType.none,
-                  onTap: i == 0
-                      ? null
-                      : () => openArchitectNumericKeypad(
-                          context: context,
-                          controller: fields[i],
-                          title: labels[i],
-                          decimals: 3,
-                          allowNegative: true,
-                        ),
+              DropdownButtonFormField<ArchitectPlacementOrientation>(
+                key: const ValueKey('architect-sheet-orientation-dropdown'),
+                initialValue: orientation,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: l.architectSheetOrientation,
                 ),
+                items: [
+                  DropdownMenuItem(
+                    value: ArchitectPlacementOrientation.projectNorth,
+                    child: Text(l.architectSheetOrientationProjectNorth),
+                  ),
+                  DropdownMenuItem(
+                    value: ArchitectPlacementOrientation.trueNorth,
+                    child: Text(
+                      '${l.architectSheetOrientationTrueNorth} (${_paperNumber(widget.trueNorthDeg)}°)',
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: ArchitectPlacementOrientation.custom,
+                    child: Text(l.architectSheetOrientationCustom),
+                  ),
+                ],
+                onChanged: (v) {
+                  if (v != null) _setOrientation(v);
+                },
+              ),
+              for (var i = 0; i < fields.length; i++)
+                if (i != 7 || orientation == ArchitectPlacementOrientation.custom)
+                  TextField(
+                    controller: fields[i],
+                    decoration: InputDecoration(labelText: labels[i]),
+                    keyboardType:
+                        i == 0 ? TextInputType.text : TextInputType.none,
+                    onTap: i == 0
+                        ? null
+                        : () => openArchitectNumericKeypad(
+                            context: context,
+                            controller: fields[i],
+                            title: labels[i],
+                            decimals: 3,
+                            allowNegative: true,
+                          ),
+                  ),
               SwitchListTile(
                 title: Text(l.architectSheetTitle),
                 value: title,
@@ -1588,6 +1675,11 @@ class _PlacementDialogState extends State<_PlacementDialog> {
               setState(() => invalid = true);
               return;
             }
+            final resolvedRotation = switch (orientation) {
+              ArchitectPlacementOrientation.projectNorth => 0.0,
+              ArchitectPlacementOrientation.trueNorth => widget.trueNorthDeg,
+              ArchitectPlacementOrientation.custom => n[6]!,
+            };
             var next =
                 ArchitectSheetGeometry.resizeFrame(
                   widget.initial,
@@ -1603,7 +1695,8 @@ class _PlacementDialogState extends State<_PlacementDialog> {
                         ? widget.initial.anchor.dy
                         : widget.units.fromUnit(n[5]!),
                   ),
-                  rotation: n[6],
+                  rotation: resolvedRotation,
+                  orientation: orientation,
                   showTitle: title,
                 );
             if (scale != widget.initial.scale) {

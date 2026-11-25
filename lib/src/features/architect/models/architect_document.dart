@@ -29,6 +29,8 @@ enum ArchitectAnnotationRole {
 
 enum ArchitectDrawingKind { plan, section, elevation }
 
+enum ArchitectPlacementOrientation { projectNorth, trueNorth, custom }
+
 enum ArchitectTitleField { text, project, drawing, number, scale, author, date }
 
 double _number(Object? value, double fallback) =>
@@ -291,6 +293,7 @@ class ArchitectDrawingPlacement {
   final Offset anchor;
   final int scale;
   final double rotation;
+  final ArchitectPlacementOrientation orientation;
   final bool locked, showTitle;
 
   /// Optional visible boundary, in paper mm relative to [frame.topLeft].
@@ -307,6 +310,7 @@ class ArchitectDrawingPlacement {
     this.number = '1',
     this.scale = 100,
     this.rotation = 0,
+    this.orientation = ArchitectPlacementOrientation.projectNorth,
     this.locked = false,
     this.showTitle = true,
     this.crop,
@@ -320,6 +324,7 @@ class ArchitectDrawingPlacement {
     Offset? anchor,
     int? scale,
     double? rotation,
+    ArchitectPlacementOrientation? orientation,
     bool? locked,
     bool? showTitle,
     List<Offset>? crop,
@@ -333,6 +338,7 @@ class ArchitectDrawingPlacement {
     anchor: anchor ?? this.anchor,
     scale: scale ?? this.scale,
     rotation: rotation ?? this.rotation,
+    orientation: orientation ?? this.orientation,
     locked: locked ?? this.locked,
     showTitle: showTitle ?? this.showTitle,
     crop: clearCrop ? null : crop ?? this.crop,
@@ -346,28 +352,42 @@ class ArchitectDrawingPlacement {
     'anchor': _xy(anchor),
     'scale': scale,
     'rotation': rotation,
+    if (orientation != ArchitectPlacementOrientation.projectNorth)
+      'orientation': orientation.name,
     'locked': locked,
     'showTitle': showTitle,
     if (crop != null) 'crop': crop!.map(_xy).toList(),
     if (visibilityOverrides.isNotEmpty)
       'visibilityOverrides': visibilityOverrides,
   };
-  factory ArchitectDrawingPlacement.fromJson(Map j) =>
-      ArchitectDrawingPlacement(
-        id: j['id'] as String,
-        drawingId: j['drawingId'] as String,
-        number: j['number'] as String? ?? '1',
-        frame: _rect(j['frame']),
-        anchor: _point(j['anchor']),
-        scale: (j['scale'] as num?)?.toInt() ?? 100,
-        rotation: _number(j['rotation'], 0),
-        locked: j['locked'] == true,
-        showTitle: j['showTitle'] != false,
-        crop: _crop(j['crop']),
-        visibilityOverrides: Map<String, bool>.from(
-          j['visibilityOverrides'] as Map? ?? {},
-        ),
-      );
+  factory ArchitectDrawingPlacement.fromJson(Map j) {
+    final rot = _number(j['rotation'], 0);
+    final rawOrientation = j['orientation'] as String?;
+    final orientation = rawOrientation != null
+        ? ArchitectPlacementOrientation.values
+            .where((e) => e.name == rawOrientation)
+            .firstOrNull ??
+            ArchitectPlacementOrientation.projectNorth
+        : (rot.abs() > 1e-6
+            ? ArchitectPlacementOrientation.custom
+            : ArchitectPlacementOrientation.projectNorth);
+    return ArchitectDrawingPlacement(
+      id: j['id'] as String,
+      drawingId: j['drawingId'] as String,
+      number: j['number'] as String? ?? '1',
+      frame: _rect(j['frame']),
+      anchor: _point(j['anchor']),
+      scale: (j['scale'] as num?)?.toInt() ?? 100,
+      rotation: rot,
+      orientation: orientation,
+      locked: j['locked'] == true,
+      showTitle: j['showTitle'] != false,
+      crop: _crop(j['crop']),
+      visibilityOverrides: Map<String, bool>.from(
+        j['visibilityOverrides'] as Map? ?? {},
+      ),
+    );
+  }
 }
 
 class ArchitectTitleItem {

@@ -34,8 +34,7 @@ class ArchitectDimensionChainPreview extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (dimension == null) return;
     canvas.save();
-    canvas.translate(viewport.translation.dx, viewport.translation.dy);
-    canvas.scale(viewport.scale);
+    viewport.applyToCanvas(canvas);
     final key = viewKey ?? 'plan:${storey?.id ?? 'preview'}';
     final denominator = document.viewScales[key] ?? dimensionScale.denominator;
     ArchitectTextScope(
@@ -45,6 +44,7 @@ class ArchitectDimensionChainPreview extends CustomPainter {
       viewport.scale,
       units: units,
       decimals: decimals ?? 2,
+      viewRotationRad: viewport.rotation,
     ).run(
       () => ArchitectElementsPainterHelper.drawDimensions(
         gridAxes: gridAxes,

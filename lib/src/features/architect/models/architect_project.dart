@@ -555,6 +555,36 @@ class ArchitectProject {
   ArchitectCadUnderlayConfig? cadUnderlayForStorey(String storeyId) =>
       cadUnderlays[storeyId];
 
+  /// Resolves the active CAD underlay for [storeyId], falling back to the
+  /// Site Plan's shared survey underlay on building storeys at or below `±0.00`
+  /// unless excluded for that storey.
+  ArchitectCadUnderlayConfig? effectiveCadUnderlayForStorey(String storeyId) {
+    final own = cadUnderlays[storeyId];
+    if (own != null) return own;
+    if (excludedInheritedCadStoreys.contains(storeyId)) return null;
+    final target = storeys.where((s) => s.id == storeyId).firstOrNull;
+    if (target == null || !target.isBuildingStorey || target.elevation > 0.001) {
+      return null;
+    }
+    final site = siteStorey;
+    if (site == null || site.id == storeyId) return null;
+    final siteCad = cadUnderlays[site.id];
+    if (siteCad == null || !siteCad.shareToGroundStoreys) return null;
+    return siteCad;
+  }
+
+  /// Storeys owning the DXF document painted for [storeyId] (either [storeyId]
+  /// itself or the Site Plan storey when shared onto `<= ±0.00`).
+  String? effectiveCadUnderlayOwnerId(String storeyId) {
+    if (cadUnderlays.containsKey(storeyId)) return storeyId;
+    final inherited = effectiveCadUnderlayForStorey(storeyId);
+    return inherited?.storeyId;
+  }
+
+  bool isSharedCadUnderlayForStorey(String storeyId) =>
+      !cadUnderlays.containsKey(storeyId) &&
+      effectiveCadUnderlayForStorey(storeyId) != null;
+
   List<ArchitectRasterUnderlay> rasterUnderlaysForStorey(String storeyId) =>
       rasterUnderlays.where((r) => r.storeyId == storeyId).toList();
 

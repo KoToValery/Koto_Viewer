@@ -2,10 +2,35 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import '../../bim_editing/geometry/bim_polygon_geometry.dart';
-import '../models/architect_document.dart';
+import '../models/architect_project.dart';
+import 'architect_site_orientation.dart';
 
 /// Shared paper-space geometry for sheet preview, interaction and publication.
 abstract final class ArchitectSheetGeometry {
+  /// Resolves the effective paper rotation (degrees) for [place], dynamically
+  /// following True North (`-northSymbol.angle`) when [place.orientation] is
+  /// [ArchitectPlacementOrientation.trueNorth].
+  static double effectiveRotationDeg(
+    ArchitectDrawingPlacement place,
+    ArchitectProject project,
+  ) => switch (place.orientation) {
+    ArchitectPlacementOrientation.projectNorth => 0.0,
+    ArchitectPlacementOrientation.trueNorth =>
+      ArchitectSiteOrientation.trueNorthSheetRotationDeg(project),
+    ArchitectPlacementOrientation.custom => place.rotation,
+  };
+
+  /// Returns a copy of [place] whose [rotation] matches its resolved
+  /// orientation against [project].
+  static ArchitectDrawingPlacement resolveOrientation(
+    ArchitectDrawingPlacement place,
+    ArchitectProject project,
+  ) {
+    final deg = effectiveRotationDeg(place, project);
+    return (deg - place.rotation).abs() < 1e-9
+        ? place
+        : place.copyWith(rotation: deg);
+  }
   static Offset _rotate(Offset point, double radians) => Offset(
     point.dx * math.cos(radians) - point.dy * math.sin(radians),
     point.dx * math.sin(radians) + point.dy * math.cos(radians),

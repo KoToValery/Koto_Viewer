@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../services/architect_polygon_editor.dart';
@@ -5,7 +6,7 @@ import '../services/architect_polygon_editor.dart';
 /// Edge grips share the polygon editor's direct and displaced touch targets.
 class ArchitectUnderlayCropOverlay extends StatelessWidget {
   final List<Offset> polygon;
-  final double scale, handleLength;
+  final double scale, handleLength, rotation;
   final Offset translation;
   final int? activeEdge;
   final bool invalid;
@@ -17,6 +18,7 @@ class ArchitectUnderlayCropOverlay extends StatelessWidget {
     required this.scale,
     required this.translation,
     required this.handleLength,
+    this.rotation = 0,
     this.activeEdge,
     this.invalid = false,
     this.canMove = false,
@@ -51,7 +53,15 @@ class _CropPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final p = data.polygon;
     if (p.length < 3 || data.scale <= 0) return;
-    Offset screen(Offset point) => point * data.scale + data.translation;
+    Offset screen(Offset point) {
+      final scaled = point * data.scale;
+      if (data.rotation == 0) return scaled + data.translation;
+      final c = math.cos(data.rotation), s = math.sin(data.rotation);
+      return Offset(
+        scaled.dx * c - scaled.dy * s,
+        scaled.dx * s + scaled.dy * c,
+      ) + data.translation;
+    }
     final line = Paint()
       ..color = (data.invalid
           ? const Color(0xffb3261e)

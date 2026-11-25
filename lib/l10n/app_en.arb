@@ -7717,5 +7717,88 @@
   "architectTerrainSlopeRatio": "Slope ratio (1:H)",
   "@architectTerrainSlopeRatio": {
     "description": "Horizontal-to-vertical batter slope ratio parameter"
+  },
+  "architectSiteOrientBuilding": "Orient building",
+  "@architectSiteOrientBuilding": {
+    "description": "Short action label to align building orthogonal axes to a site edge"
+  },
+  "architectSiteOrientBuildingTooltip": "Pick a site edge to straighten floor plans while keeping Site Plan on True North",
+  "@architectSiteOrientBuildingTooltip": {
+    "description": "Tooltip explaining the 2-tap site-to-building orientation tool"
+  },
+  "architectSiteOrientStartHint": "Tap start of alignment edge",
+  "@architectSiteOrientStartHint": {
+    "description": "Step 1 prompt for site orientation tool"
+  },
+  "architectSiteOrientEndHint": "Tap end of alignment edge",
+  "@architectSiteOrientEndHint": {
+    "description": "Step 2 prompt for site orientation tool"
+  },
+  "architectSiteOrientReviewHint": "Use 90° to choose floor-plan up direction",
+  "@architectSiteOrientReviewHint": {
+    "description": "Step 3 prompt for reviewing building orthogonal axes on site plan"
+  },
+  "architectSiteOrientRotate90": "90°",
+  "@architectSiteOrientRotate90": {
+    "description": "Button cycling building up-direction by 90 degrees"
+  },
+  "architectSiteOrientRetry": "Reset",
+  "@architectSiteOrientRetry": {
+    "description": "Button to re-pick alignment edge points"
+  },
+  "architectSiteOrientViewTrueNorth": "North",
+  "@architectSiteOrientViewTrueNorth": {
+    "description": "Short chip label indicating Site Plan is oriented to True North"
+  },
+  "architectSiteOrientViewProjectNorth": "Building",
+  "@architectSiteOrientViewProjectNorth": {
+    "description": "Short chip label indicating Site Plan is oriented to orthogonal Project North"
+  },
+  "architectSiteOrientToggleTooltip": "Switch Site Plan view between True North and Building orientation",
+  "@architectSiteOrientToggleTooltip": {
+    "description": "Tooltip for toggling Site Plan view rotation"
+  },
+  "architectSiteOrientExistingBuildingTitle": "Existing building geometry",
+  "@architectSiteOrientExistingBuildingTitle": {
+    "description": "Dialog title when orienting site while building geometry already exists"
+  },
+  "architectSiteOrientExistingBuildingBody": "Choose whether to rotate only the site and survey underlay, or rotate the building together with the site.",
+  "@architectSiteOrientExistingBuildingBody": {
+    "description": "Dialog body explaining the two orientation choices when building already exists"
+  },
+  "architectSiteOrientSiteOnly": "Site only",
+  "@architectSiteOrientSiteOnly": {
+    "description": "Option to rotate only the site, terrain, and survey underlay"
+  },
+  "architectSiteOrientWithBuilding": "Building + site",
+  "@architectSiteOrientWithBuilding": {
+    "description": "Option to rotate existing building storeys together with the site"
+  },
+  "architectSiteOrientApplied": "Building aligned (North {angle}°)",
+  "@architectSiteOrientApplied": {
+    "description": "Snackbar confirming building orientation alignment",
+    "placeholders": {
+      "angle": { "type": "String" }
+    }
+  },
+  "architectSheetOrientation": "Orientation",
+  "@architectSheetOrientation": {
+    "description": "Sheet placement orientation mode label"
+  },
+  "architectSheetOrientationProjectNorth": "Project North",
+  "@architectSheetOrientationProjectNorth": {
+    "description": "Sheet orientation matching orthogonal Project North (0 degrees)"
+  },
+  "architectSheetOrientationTrueNorth": "True North",
+  "@architectSheetOrientationTrueNorth": {
+    "description": "Sheet orientation automatically aligned to True North"
+  },
+  "architectSheetOrientationCustom": "Custom angle",
+  "@architectSheetOrientationCustom": {
+    "description": "Sheet orientation using a manual rotation angle"
+  },
+  "architectUnderlayShareGround": "Show on storeys ≤ ±0.00",
+  "@architectUnderlayShareGround": {
+    "description": "Toggle sharing the Site Plan CAD underlay onto ground/basement storeys"
   }
 }
