@@ -13,11 +13,14 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
   final List<ArchitectCadUnderlayConfig> underlays;
   final bool? isSitePlan;
   final bool isBusy;
+  final bool canResetOrientation;
   final VoidCallback onAddUnderlay;
   final ValueChanged<String>? onSelectUnderlay;
   final ValueChanged<(String, bool)>? onToggleUnderlayVisibility;
   final VoidCallback onMove;
   final VoidCallback onOpenScale;
+  final VoidCallback? onEditOrientation;
+  final VoidCallback? onResetOrientation;
   final void Function(Offset globalPosition)? onOpenContextMenu;
 
   const ArchitectCadUnderlayBar({
@@ -26,11 +29,14 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
     this.underlays = const [],
     this.isSitePlan,
     required this.isBusy,
+    this.canResetOrientation = false,
     required this.onAddUnderlay,
     this.onSelectUnderlay,
     this.onToggleUnderlayVisibility,
     required this.onMove,
     required this.onOpenScale,
+    this.onEditOrientation,
+    this.onResetOrientation,
     this.onOpenContextMenu,
   });
 
@@ -96,6 +102,28 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
                 AppIconId.measure,
                 isBusy ? null : onOpenScale,
               ),
+              if (site && onEditOrientation != null)
+                _action(
+                  context,
+                  l.architectUnderlayEditOrientation,
+                  AppIconId.compass,
+                  isBusy || !cad.visible ? null : onEditOrientation,
+                  buttonKey: const ValueKey(
+                    'architect-underlay-edit-orientation',
+                  ),
+                ),
+              if (site && onResetOrientation != null)
+                _action(
+                  context,
+                  l.architectUnderlayResetOrientation,
+                  AppIconId.refresh,
+                  isBusy || !cad.visible || !canResetOrientation
+                      ? null
+                      : onResetOrientation,
+                  buttonKey: const ValueKey(
+                    'architect-underlay-reset-orientation',
+                  ),
+                ),
               _more(context, isBusy ? null : onOpenContextMenu),
             ],
     );
@@ -108,12 +136,15 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
   final bool? isSitePlan;
   final int calibrationStep;
   final bool isBusy;
+  final bool canResetOrientation;
   final VoidCallback onAddUnderlay;
   final ValueChanged<String> onSelectUnderlay;
   final ValueChanged<(String, bool)>? onToggleUnderlayVisibility;
   final VoidCallback onMove;
   final VoidCallback onStartCalibration;
   final VoidCallback onCancelCalibration;
+  final VoidCallback? onEditOrientation;
+  final VoidCallback? onResetOrientation;
   final void Function(Offset globalPosition)? onOpenContextMenu;
 
   const ArchitectRasterUnderlayBar({
@@ -123,12 +154,15 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
     this.isSitePlan,
     required this.calibrationStep,
     required this.isBusy,
+    this.canResetOrientation = false,
     required this.onAddUnderlay,
     required this.onSelectUnderlay,
     this.onToggleUnderlayVisibility,
     required this.onMove,
     required this.onStartCalibration,
     required this.onCancelCalibration,
+    this.onEditOrientation,
+    this.onResetOrientation,
     this.onOpenContextMenu,
   });
 
@@ -208,6 +242,33 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
                     ? null
                     : onStartCalibration,
               ),
+              if (site && onEditOrientation != null)
+                _action(
+                  context,
+                  l.architectUnderlayEditOrientation,
+                  AppIconId.compass,
+                  isBusy || raster.locked || !raster.visible
+                      ? null
+                      : onEditOrientation,
+                  buttonKey: const ValueKey(
+                    'architect-underlay-edit-orientation',
+                  ),
+                ),
+              if (site && onResetOrientation != null)
+                _action(
+                  context,
+                  l.architectUnderlayResetOrientation,
+                  AppIconId.refresh,
+                  isBusy ||
+                          raster.locked ||
+                          !raster.visible ||
+                          !canResetOrientation
+                      ? null
+                      : onResetOrientation,
+                  buttonKey: const ValueKey(
+                    'architect-underlay-reset-orientation',
+                  ),
+                ),
               _more(context, isBusy ? null : onOpenContextMenu),
             ],
     );
@@ -390,6 +451,9 @@ Widget _addUnderlayButton(
   if (compact && MediaQuery.sizeOf(context).width < 650) {
     return IconButton(
       tooltip: effectiveTooltip,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      constraints: const BoxConstraints(minWidth: 34, minHeight: 36),
       onPressed: onPressed,
       icon: icon,
     );
@@ -497,11 +561,13 @@ Widget _action(
   BuildContext context,
   String label,
   AppIconId icon,
-  VoidCallback? onPressed,
-) {
+  VoidCallback? onPressed, {
+  Key? buttonKey,
+}) {
   final colors = Theme.of(context).colorScheme;
   if (MediaQuery.sizeOf(context).width >= 650 && icon != AppIconId.close) {
     return TextButton.icon(
+      key: buttonKey,
       onPressed: onPressed,
       style: TextButton.styleFrom(foregroundColor: colors.onSurface),
       icon: AppIcon(icon, size: 17),
@@ -511,10 +577,11 @@ Widget _action(
   if (_showCompactLabels(context) &&
       (icon == AppIconId.move || icon == AppIconId.measure)) {
     return TextButton(
+      key: buttonKey,
       onPressed: onPressed,
       style: TextButton.styleFrom(
         foregroundColor: colors.onSurface,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         minimumSize: const Size(0, 36),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
@@ -522,14 +589,18 @@ Widget _action(
     );
   }
   return IconButton(
+    key: buttonKey,
     tooltip: label,
+    visualDensity: VisualDensity.compact,
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    constraints: const BoxConstraints(minWidth: 34, minHeight: 36),
     onPressed: onPressed,
     icon: AppIcon(icon, size: 19),
   );
 }
 
 bool _showCompactLabels(BuildContext context) =>
-    MediaQuery.sizeOf(context).width >= 320 &&
+    MediaQuery.sizeOf(context).width >= 480 &&
     MediaQuery.textScalerOf(context).scale(14) <= 18;
 
 Widget _more(BuildContext context, void Function(Offset)? open) {
@@ -558,6 +629,9 @@ Widget _more(BuildContext context, void Function(Offset)? open) {
       }
       return IconButton(
         tooltip: label,
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        constraints: const BoxConstraints(minWidth: 34, minHeight: 36),
         icon: const AppIcon(AppIconId.moreVertical, size: 19),
         onPressed: action,
       );
@@ -751,16 +825,24 @@ Future<String?> showArchitectUnderlayContextMenu({
   bool hasDocument = true,
   bool hasSurvey = false,
   bool canOrientBuilding = false,
+  bool canResetOrientation = false,
 }) {
   final l = context.l10n;
   return _showUnderlayMenu(context, globalPosition, [
-    if (isSitePlan && canOrientBuilding)
+    if (isSitePlan && canOrientBuilding) ...[
       _entry(
         'orient_building',
         AppIconId.compass,
-        l.architectSiteOrientBuilding,
+        l.architectUnderlayEditOrientation,
         enabled: visible && (!isCad || hasDocument),
       ),
+      _entry(
+        'reset_orientation',
+        AppIconId.refresh,
+        l.architectUnderlayResetOrientation,
+        enabled: canResetOrientation && visible && (!isCad || hasDocument),
+      ),
+    ],
     _entry(
       'position',
       AppIconId.move,

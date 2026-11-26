@@ -7834,5 +7834,17 @@
   "architectWallMoveExactDistanceHint": "Distance from the pre-drag position along the move direction. Use ± to reverse.",
   "@architectWallMoveExactDistanceHint": {
     "description": "Helper text inside the exact distance dialog after dragging a wall"
+  },
+  "architectUnderlayEditOrientation": "Edit orientation",
+  "@architectUnderlayEditOrientation": {
+    "description": "Action to edit or realign the orientation of the geodetic underlay and site plan"
+  },
+  "architectUnderlayResetOrientation": "Reset orientation",
+  "@architectUnderlayResetOrientation": {
+    "description": "Action to reset the geodetic underlay and site orientation back to 0 degrees"
+  },
+  "architectSiteOrientResetDone": "Orientation reset",
+  "@architectSiteOrientResetDone": {
+    "description": "Snackbar confirming that site and geodetic underlay orientation has been reset to 0 degrees"
   }
 }

@@ -4831,5 +4831,8 @@
   "architectSheetOrientationCustom": "По избор",
   "architectUnderlayShareGround": "Покажи на етажи ≤ ±0.00",
   "architectWallMoveExactDistance": "Точно разстояние",
-  "architectWallMoveExactDistanceHint": "Разстояние от началната позиция по посоката на преместване. С ± обръщате посоката."
+  "architectWallMoveExactDistanceHint": "Разстояние от началната позиция по посоката на преместване. С ± обръщате посоката.",
+  "architectUnderlayEditOrientation": "Редакция на ориентацията",
+  "architectUnderlayResetOrientation": "Нулиране на ориентацията",
+  "architectSiteOrientResetDone": "Ориентацията е нулирана"
 }

@@ -25667,6 +25667,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Distance from the pre-drag position along the move direction. Use ± to reverse.'**
   String get architectWallMoveExactDistanceHint;
+
+  /// Action to edit or realign the orientation of the geodetic underlay and site plan
+  ///
+  /// In en, this message translates to:
+  /// **'Edit orientation'**
+  String get architectUnderlayEditOrientation;
+
+  /// Action to reset the geodetic underlay and site orientation back to 0 degrees
+  ///
+  /// In en, this message translates to:
+  /// **'Reset orientation'**
+  String get architectUnderlayResetOrientation;
+
+  /// Snackbar confirming that site and geodetic underlay orientation has been reset to 0 degrees
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation reset'**
+  String get architectSiteOrientResetDone;
 }
 
 class _AppLocalizationsDelegate

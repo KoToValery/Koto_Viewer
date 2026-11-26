@@ -14200,4 +14200,13 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectWallMoveExactDistanceHint =>
       'Разстояние от началната позиция по посоката на преместване. С ± обръщате посоката.';
+
+  @override
+  String get architectUnderlayEditOrientation => 'Редакция на ориентацията';
+
+  @override
+  String get architectUnderlayResetOrientation => 'Нулиране на ориентацията';
+
+  @override
+  String get architectSiteOrientResetDone => 'Ориентацията е нулирана';
 }

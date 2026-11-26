@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kotoview/src/features/architect/models/architect_elevation.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart'
     show ArchitectTool;
@@ -8,6 +11,7 @@ import 'package:kotoview/src/features/architect/rendering/architect_ghost_storey
 import 'package:kotoview/src/features/architect/rendering/architect_underlay_painter.dart';
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_interaction_mode.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_site_orientation_overlay.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_underlay_bar.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
@@ -402,6 +406,153 @@ void main() {
       await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
       await tester.pumpAndSettle();
       expect(_palette(tester).activeTool, ArchitectTool.pan);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Selected geodetic CAD and raster underlays expose Edit orientation and Reset orientation without phone overflow',
+    (tester) async {
+      final starter = ArchitectProject.starterWithCatalog(
+        name: 'Geodetic Orientation Actions',
+        storeyCount: 1,
+      );
+      final siteId = starter.siteStorey!.id;
+      const angle = math.pi / 6; // 30 degrees
+      const cadCfg = ArchitectCadUnderlayConfig(
+        id: 'geo_cad_orient',
+        storeyId: 'storey_site',
+        fileName: 'survey_long_name.dwg',
+        internalCopyPath: '',
+        unitsPerMeter: 1.0,
+        lockedCadOriginX: 0,
+        lockedCadOriginY: 0,
+        rotationRad: angle,
+        kind: ArchitectUnderlayKind.geodetic,
+        isGeodetic: true,
+      );
+      final model = ArchitectCommandController(
+        starter
+            .copyWith(
+              activeStoreyId: siteId,
+              northSymbol: const ArchitectNorthSymbol(
+                position: Offset.zero,
+                angle: angle,
+              ),
+            )
+            .withCadUnderlayAdded(cadCfg),
+      );
+      addTearDown(model.dispose);
+
+      // Test on narrow phone width (360x800) to confirm zero RenderFlex overflow.
+      await workspace.open(
+        tester,
+        model,
+        underlays: {siteId: _cadDoc()},
+      );
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpAndSettle();
+      workspace
+          .camera(tester)
+          .fit(const Rect.fromLTWH(-4, -3, 12, 10), padding: 60);
+      await tester.pumpAndSettle();
+
+      // Select the geodetic CAD underlay.
+      await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ArchitectCadUnderlayBar), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('architect-underlay-edit-orientation')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-underlay-reset-orientation')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      // Tap Edit orientation -> opens ArchitectSiteOrientationOverlay, then cancel.
+      await tester.tap(
+        find.byKey(const ValueKey('architect-underlay-edit-orientation')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(ArchitectSiteOrientationOverlay), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('architect-site-orientation-close')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(ArchitectSiteOrientationOverlay), findsNothing);
+
+      // Re-select geodetic CAD underlay and tap Reset orientation.
+      await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('architect-underlay-reset-orientation')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(model.project.northSymbol!.angle.abs(), lessThan(1e-6));
+      expect(
+        model.project.cadUnderlays[siteId]!.rotationRad.abs(),
+        lessThan(1e-6),
+      );
+      expect(workspace.camera(tester).rotation.abs(), lessThan(1e-6));
+
+      // Undo restores the previous orientation.
+      model.undo();
+      await tester.pumpAndSettle();
+      expect(model.project.northSymbol!.angle, closeTo(angle, 1e-6));
+      expect(
+        model.project.cadUnderlays[siteId]!.rotationRad,
+        closeTo(angle, 1e-6),
+      );
+
+      // Also verify geodetic raster underlay exposes Edit & Reset orientation.
+      const siteRaster = ArchitectRasterUnderlay(
+        id: 'geo_raster_orient',
+        storeyId: 'storey_site',
+        fileName: 'site_photo.png',
+        internalImagePath: '',
+        imageWidthPx: 400,
+        imageHeightPx: 200,
+        position: Offset(8, 0),
+        metersPerPixel: 0.01,
+        rotationRad: 0.4,
+        kind: ArchitectUnderlayKind.geodetic,
+      );
+      model.restore(
+        starter.copyWith(
+          activeStoreyId: siteId,
+          rasterUnderlays: const [siteRaster],
+        ),
+      );
+      workspace
+          .camera(tester)
+          .fit(const Rect.fromLTWH(6, -2, 8, 6), padding: 60);
+      await tester.pumpAndSettle();
+
+      await tester.tapAt(workspace.screen(tester, const Offset(10, 1)));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ArchitectRasterUnderlayBar), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('architect-underlay-edit-orientation')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-underlay-reset-orientation')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('architect-underlay-reset-orientation')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        model.project.rasterUnderlays.single.rotationRad.abs(),
+        lessThan(1e-6),
+      );
       expect(tester.takeException(), isNull);
     },
   );

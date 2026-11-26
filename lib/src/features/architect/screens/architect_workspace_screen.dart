@@ -5710,11 +5710,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       hasDocument: hasDocument,
       hasSurvey: hasSurvey,
       canOrientBuilding: isSitePlan && !isShared,
+      canResetOrientation:
+          isSitePlan &&
+          !isShared &&
+          _canResetGeodeticOrientation(isCad: true, cad: cfg),
     );
     if (!current() || action == null) return;
     switch (action) {
       case 'orient_building':
         _startSiteOrientation();
+      case 'reset_orientation':
+        unawaited(_resetGeodeticOrientation(isCad: true));
       case 'position':
         _startUnderlaySnapDrag(isCad: true);
       case 'visibility':
@@ -5851,34 +5857,151 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
   }
 
-  Future<void> _applySiteOrientation(Offset pivot, double deltaRad) async {
-    var rotateBuilding = false;
-    if (ArchitectSiteOrientation.hasBuildingGeometry(_project)) {
-      final l = context.l10n;
-      final choice = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(l.architectSiteOrientExistingBuildingTitle),
-          content: Text(l.architectSiteOrientExistingBuildingBody),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(l.cancel),
-            ),
-            OutlinedButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l.architectSiteOrientSiteOnly),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(l.architectSiteOrientWithBuilding),
-            ),
-          ],
+  bool _canResetGeodeticOrientation({
+    required bool isCad,
+    ArchitectCadUnderlayConfig? cad,
+    ArchitectRasterUnderlay? raster,
+  }) {
+    if (!_commands.isPlan || !_project.activeStorey.isSite) return false;
+    final northAngle = _project.northSymbol?.angle ?? 0.0;
+    final underlayAngle =
+        isCad ? (cad?.rotationRad ?? 0.0) : (raster?.rotationRad ?? 0.0);
+    return northAngle.abs() > 1e-4 || underlayAngle.abs() > 1e-4;
+  }
+
+  Future<bool?> _confirmRotateBuildingIfNeeded() async {
+    if (!ArchitectSiteOrientation.hasBuildingGeometry(_project)) return false;
+    final l = context.l10n;
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.architectSiteOrientExistingBuildingTitle),
+        content: Text(l.architectSiteOrientExistingBuildingBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.cancel),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.architectSiteOrientSiteOnly),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.architectSiteOrientWithBuilding),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _resetGeodeticOrientation({
+    required bool isCad,
+    String? rasterId,
+  }) async {
+    if (!_commands.isPlan || !_project.activeStorey.isSite || _underlayBusy) {
+      return;
+    }
+    final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
+    final cad = isCad ? _currentCadUnderlayConfig : null;
+    final raster = isCad
+        ? null
+        : (rasterId == null
+              ? _selectedRasterUnderlay
+              : _project
+                    .rasterUnderlaysForStorey(_project.activeStoreyId)
+                    .where((r) => r.id == rasterId)
+                    .firstOrNull);
+    if (isCad && cad == null) return;
+    if (!isCad && (raster == null || raster.locked)) return;
+
+    final northAngle = _project.northSymbol?.angle ?? 0.0;
+    final underlayAngle = isCad ? cad!.rotationRad : raster!.rotationRad;
+    if (northAngle.abs() <= 1e-4 && underlayAngle.abs() <= 1e-4) return;
+
+    final Offset pivot;
+    if (isCad) {
+      final doc = _docForCadConfig(cad!);
+      pivot = doc != null
+          ? cad.frame(fallback).toModel(doc.bounds.center)
+          : Offset.zero;
+    } else {
+      pivot = raster!.localBounds.center;
+    }
+
+    if (northAngle.abs() > 1e-4) {
+      final rotateBuilding = await _confirmRotateBuildingIfNeeded();
+      if (!mounted || rotateBuilding == null) return;
+      final pivotScreen = _viewport.toScreen(pivot);
+      var aligned = ArchitectSiteOrientation.align(
+        project: _project,
+        pivot: pivot,
+        deltaRad: -northAngle,
+        fallbackFrame: fallback,
+        rotateBuilding: rotateBuilding,
+      );
+      if (isCad) {
+        final afterCad = aligned.cadUnderlays[cad!.storeyId];
+        if (afterCad != null && afterCad.rotationRad.abs() > 1e-4) {
+          final frame = afterCad
+              .frame(fallback)
+              .rotatingAround(pivot, -afterCad.rotationRad);
+          aligned = aligned.withCadUnderlayUpdated(
+            afterCad.withFrame(frame, transformMask: true, fallback: fallback),
+          );
+        }
+      } else {
+        final afterRaster = aligned.rasterUnderlays
+            .where((r) => r.id == raster!.id)
+            .firstOrNull;
+        if (afterRaster != null && afterRaster.rotationRad.abs() > 1e-4) {
+          aligned = aligned.copyWith(
+            rasterUnderlays: [
+              for (final r in aligned.rasterUnderlays)
+                if (r.id == afterRaster.id)
+                  r.rotatingAround(
+                    afterRaster.localBounds.center,
+                    -afterRaster.rotationRad,
+                  )
+                else
+                  r,
+            ],
+          );
+        }
+      }
+      _modelCommands.execute(AlignArchitectSiteOrientation(aligned));
+      _saveBiMProjectIfAttached();
+      setState(() => _siteTrueNorthView = true);
+      _syncWorkspaceCameraRotation(screenAnchor: pivotScreen);
+    } else if (isCad) {
+      final nextFrame = cad!
+          .frame(fallback)
+          .rotatingAround(pivot, -underlayAngle);
+      _commands.commit(
+        _project.withCadUnderlayUpdated(
+          cad.withFrame(nextFrame, transformMask: true, fallback: fallback),
         ),
       );
-      if (!mounted || choice == null) return;
-      rotateBuilding = choice;
+      _saveBiMProjectIfAttached();
+    } else {
+      _updateSelectedRaster(raster!.rotatingAround(pivot, -underlayAngle));
     }
+
+    HapticFeedback.mediumImpact();
+    _repaintPreview();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectSiteOrientResetDone),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _applySiteOrientation(Offset pivot, double deltaRad) async {
+    final rotateBuilding = await _confirmRotateBuildingIfNeeded();
+    if (!mounted || rotateBuilding == null) return;
 
     final pivotScreen = _viewport.toScreen(pivot);
     final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
@@ -5963,9 +6086,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       isSitePlan: _project.activeStorey.isSite,
       canMove: !sel.locked,
       canEditGeometry: !sel.locked && sel.visible,
+      canOrientBuilding: _project.activeStorey.isSite && !sel.locked,
+      canResetOrientation:
+          _project.activeStorey.isSite &&
+          !sel.locked &&
+          _canResetGeodeticOrientation(isCad: false, raster: sel),
     );
     if (action == null || !current()) return;
     switch (action) {
+      case 'orient_building':
+        _startSiteOrientation();
+      case 'reset_orientation':
+        unawaited(_resetGeodeticOrientation(isCad: false, rasterId: sel.id));
       case 'position':
         _startUnderlaySnapDrag(isCad: false, rasterId: sel.id);
       case 'visibility':
@@ -31781,6 +31913,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             isCad ? _openCadScaleDialog : _openRasterScaleDialog,
             color: const Color(0xFF4FC3F7),
           ),
+          if (_project.activeStorey.isSite &&
+              (!isCad || !_project.isSharedCadUnderlayForStorey(_project.activeStoreyId))) ...[
+            action(
+              'underlay-edit-orientation',
+              l.architectUnderlayEditOrientation,
+              Icons.explore_outlined,
+              _startSiteOrientation,
+              color: const Color(0xFF00E5FF),
+            ),
+            if (_canResetGeodeticOrientation(
+              isCad: isCad,
+              cad: isCad ? _currentCadUnderlayConfig : null,
+              raster: raster,
+            ))
+              action(
+                'underlay-reset-orientation',
+                l.architectUnderlayResetOrientation,
+                Icons.refresh,
+                () => unawaited(
+                  _resetGeodeticOrientation(isCad: isCad, rasterId: raster?.id),
+                ),
+                color: const Color(0xFFFFB300),
+              ),
+          ],
           action(
             'underlay-mask',
             l.architectUnderlayMask,
@@ -38444,6 +38600,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
               isSitePlan: _project.activeStorey.isSite,
               isBusy: _underlayBusy,
+              canResetOrientation:
+                  _project.activeStorey.isSite &&
+                  _canResetGeodeticOrientation(
+                    isCad: true,
+                    cad: _currentCadUnderlayConfig,
+                  ),
               onAddUnderlay: _addUnderlay,
               onSelectUnderlay: (id) => setState(() {
                 _selectedCadUnderlayId = id;
@@ -38454,6 +38616,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   _toggleCadVisibility(pair.$2, underlayId: pair.$1),
               onMove: () => _startUnderlaySnapDrag(isCad: true),
               onOpenScale: _openCadScaleDialog,
+              onEditOrientation:
+                  _project.activeStorey.isSite ? _startSiteOrientation : null,
+              onResetOrientation: _project.activeStorey.isSite
+                  ? () => unawaited(_resetGeodeticOrientation(isCad: true))
+                  : null,
               onOpenContextMenu: _openCadContextMenu,
             ),
           ),
@@ -38471,6 +38638,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               isSitePlan: _project.activeStorey.isSite,
               calibrationStep: _rasterCalibrationStep,
               isBusy: _underlayBusy,
+              canResetOrientation:
+                  _project.activeStorey.isSite &&
+                  _canResetGeodeticOrientation(
+                    isCad: false,
+                    raster: _selectedRasterUnderlay,
+                  ),
               onAddUnderlay: _addUnderlay,
               onSelectUnderlay: (id) => setState(() {
                 _selectedRasterId = id;
@@ -38481,6 +38654,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               onMove: () => _startUnderlaySnapDrag(isCad: false),
               onStartCalibration: _openRasterScaleDialog,
               onCancelCalibration: _cancelRasterCalibration,
+              onEditOrientation:
+                  _project.activeStorey.isSite ? _startSiteOrientation : null,
+              onResetOrientation: _project.activeStorey.isSite
+                  ? () => unawaited(
+                      _resetGeodeticOrientation(
+                        isCad: false,
+                        rasterId: _selectedRasterUnderlay?.id,
+                      ),
+                    )
+                  : null,
               onOpenContextMenu: _openRasterContextMenu,
             ),
           ),
@@ -39465,7 +39648,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           !_siteOrientationActive &&
           _rotationSource == null &&
           !_dragController.isActive &&
-          !_underlayMaskDrafting)
+          !_underlayMaskDrafting &&
+          !((_activeTool == ArchitectTool.cadUnderlay ||
+                  _activeTool == ArchitectTool.rasterUnderlay) &&
+              _effectiveSelection.isEmpty))
         Positioned(
           top: 8,
           right: 8,

@@ -14150,4 +14150,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectWallMoveExactDistanceHint =>
       'Distance from the pre-drag position along the move direction. Use ± to reverse.';
+
+  @override
+  String get architectUnderlayEditOrientation => 'Edit orientation';
+
+  @override
+  String get architectUnderlayResetOrientation => 'Reset orientation';
+
+  @override
+  String get architectSiteOrientResetDone => 'Orientation reset';
 }
