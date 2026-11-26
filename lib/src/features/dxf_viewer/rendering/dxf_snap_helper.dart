@@ -845,8 +845,20 @@ class DxfSnapHelper {
     required DxfDocument document,
     required Offset cadPoint,
     required double toleranceCad,
+  }) => hitTestEntities(
+    document: document,
+    cadPoint: cadPoint,
+    toleranceCad: toleranceCad,
+  ).firstOrNull;
+
+  /// Ordered candidates let tools preview and disambiguate overlapping items.
+  static List<DxfEntity> hitTestEntities({
+    required DxfDocument document,
+    required Offset cadPoint,
+    required double toleranceCad,
+    Map<String, bool>? layerVisibility,
   }) {
-    if (toleranceCad <= 0) return null;
+    if (!toleranceCad.isFinite || toleranceCad <= 0) return const [];
 
     final Iterable<DxfEntity> candidates;
     if (document.spatialIndex != null) {
@@ -860,12 +872,19 @@ class DxfSnapHelper {
       candidates = document.entities;
     }
 
-    DxfEntity? bestEntity;
-    double minDistance = toleranceCad;
+    final hits = <({DxfEntity entity, double distance, int order})>[];
 
     for (final entity in candidates) {
       final layer = document.layers[entity.layer];
-      if (layer != null && !layer.isVisible) continue;
+      final visible = layerVisibility == null
+          ? (layer?.isVisible ?? true)
+          : layerVisibility[entity.layer] ??
+              (layer == null || (layer.isVisible && !layer.isFrozen));
+      if (!visible ||
+          (layerVisibility != null &&
+              (entity.isPaperSpace || (entity is DxfText && entity.isInvisible)))) {
+        continue;
+      }
 
       double? dist;
 
@@ -884,38 +903,22 @@ class DxfSnapHelper {
           entity.endAngleDeg,
         );
         dist = (cadPoint - p).distance;
-      } else if (entity is DxfLwPolyline) {
-        final pts = entity.vertices.map((v) => Offset(v.x, v.y)).toList();
-        if (pts.length >= 2) {
-          double minDistSeg = double.infinity;
-          for (int i = 0; i < pts.length - 1; i++) {
-            final p = closestPointOnSegment(cadPoint, pts[i], pts[i + 1]);
-            final d = (cadPoint - p).distance;
-            if (d < minDistSeg) minDistSeg = d;
+      } else if (entity case DxfLwPolyline(:final vertices, :final isClosed) ||
+          DxfPolyline(:final vertices, :final isClosed)) {
+        var nearest = double.infinity;
+        final count = isClosed ? vertices.length : vertices.length - 1;
+        for (var index = 0; index < count && vertices.length >= 2; index++) {
+          final start = vertices[index];
+          final end = vertices[(index + 1) % vertices.length];
+          final points = start.bulge.abs() < 1e-6
+              ? [start.offset, end.offset]
+              : DxfMath.generateBulgeArcPoints(start.offset, end.offset, start.bulge);
+          for (var i = 1; i < points.length; i++) {
+            final p = closestPointOnSegment(cadPoint, points[i - 1], points[i]);
+            nearest = math.min(nearest, (cadPoint - p).distance);
           }
-          if (entity.isClosed && pts.length > 2) {
-            final p = closestPointOnSegment(cadPoint, pts.last, pts.first);
-            final d = (cadPoint - p).distance;
-            if (d < minDistSeg) minDistSeg = d;
-          }
-          dist = minDistSeg;
         }
-      } else if (entity is DxfPolyline) {
-        final pts = entity.vertices.map((v) => Offset(v.x, v.y)).toList();
-        if (pts.length >= 2) {
-          double minDistSeg = double.infinity;
-          for (int i = 0; i < pts.length - 1; i++) {
-            final p = closestPointOnSegment(cadPoint, pts[i], pts[i + 1]);
-            final d = (cadPoint - p).distance;
-            if (d < minDistSeg) minDistSeg = d;
-          }
-          if (entity.isClosed && pts.length > 2) {
-            final p = closestPointOnSegment(cadPoint, pts.last, pts.first);
-            final d = (cadPoint - p).distance;
-            if (d < minDistSeg) minDistSeg = d;
-          }
-          dist = minDistSeg;
-        }
+        dist = nearest;
       } else if (entity is DxfText) {
         final box = entity.getBoundingBox(document.blocks);
         if (box.inflate(toleranceCad * 0.5).contains(cadPoint)) {
@@ -963,13 +966,16 @@ class DxfSnapHelper {
         }
       }
 
-      if (dist != null && dist <= minDistance) {
-        minDistance = dist;
-        bestEntity = entity;
+      if (dist != null && dist <= toleranceCad) {
+        hits.add((entity: entity, distance: dist, order: hits.length));
       }
     }
 
-    return bestEntity;
+    hits.sort((a, b) {
+      final distance = a.distance.compareTo(b.distance);
+      return distance == 0 ? b.order.compareTo(a.order) : distance;
+    });
+    return [for (final hit in hits) hit.entity];
   }
 }
 

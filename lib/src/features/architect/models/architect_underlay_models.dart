@@ -51,6 +51,8 @@ class ArchitectCadUnderlayConfig {
   final double rotationRad;
   final Set<String> hiddenDxfLayers;
   final Set<String> shownDxfLayers;
+  /// Root entity positions in this immutable CAD revision, hidden on Site Plan.
+  final Set<int> siteHiddenEntities;
   final ArchitectUnderlayKind kind;
   final ArchitectTechnicalUnderlayDiscipline discipline;
   final bool isGeodetic;
@@ -82,6 +84,7 @@ class ArchitectCadUnderlayConfig {
     this.rotationRad = 0,
     this.hiddenDxfLayers = const {},
     this.shownDxfLayers = const {},
+    this.siteHiddenEntities = const {},
     ArchitectUnderlayKind? kind,
     this.discipline = ArchitectTechnicalUnderlayDiscipline.general,
     bool isGeodetic = false,
@@ -174,6 +177,7 @@ class ArchitectCadUnderlayConfig {
     double? rotationRad,
     Set<String>? hiddenDxfLayers,
     Set<String>? shownDxfLayers,
+    Set<int>? siteHiddenEntities,
     ArchitectUnderlayKind? kind,
     ArchitectTechnicalUnderlayDiscipline? discipline,
     bool? isGeodetic,
@@ -213,6 +217,7 @@ class ArchitectCadUnderlayConfig {
       rotationRad: rotationRad ?? this.rotationRad,
       hiddenDxfLayers: hiddenDxfLayers ?? this.hiddenDxfLayers,
       shownDxfLayers: shownDxfLayers ?? this.shownDxfLayers,
+      siteHiddenEntities: siteHiddenEntities ?? this.siteHiddenEntities,
       kind: resolvedKind,
       discipline: discipline ?? this.discipline,
       isGeodetic:
@@ -246,6 +251,8 @@ class ArchitectCadUnderlayConfig {
     if (rotationRad != 0) 'rotationRad': rotationRad,
     if (hiddenDxfLayers.isNotEmpty) 'hiddenDxfLayers': hiddenDxfLayers.toList(),
     if (shownDxfLayers.isNotEmpty) 'shownDxfLayers': shownDxfLayers.toList(),
+    if (siteHiddenEntities.isNotEmpty)
+      'siteHiddenEntities': siteHiddenEntities.toList()..sort(),
     'kind': kind.name,
     if (discipline != ArchitectTechnicalUnderlayDiscipline.general)
       'discipline': discipline.name,
@@ -303,6 +310,10 @@ class ArchitectCadUnderlayConfig {
         for (final layer in json['shownDxfLayers'] as List? ?? const [])
           if (layer is String) layer,
       },
+      siteHiddenEntities: Set.unmodifiable({
+        for (final index in json['siteHiddenEntities'] as List? ?? const [])
+          if (index is int && index >= 0) index,
+      }),
       kind: parsedKind,
       discipline: parsedDiscipline,
       isGeodetic: isGeo || parsedKind == ArchitectUnderlayKind.geodetic,

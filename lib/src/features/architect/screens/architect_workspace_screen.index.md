@@ -106,6 +106,11 @@ pan, zoom and lifted touch aiming. Survey picking queries visible finite CAD
 segments through `ArchitectSiteUnderlayPick`. Parcel drafts preview locally
 and commit through the workspace history and BIM save path.
 
+`_startSiteCadVisibility` opens an exclusive point overlay with hover, candidate
+cycling, confirmation, and a temporary hidden-object view. The active Site Plan
+and drawing publisher use the filtered model-space document from
+`ArchitectCadEntityVisibility`. The raw revision stays available for restoration.
+
 ### CAD underlay display settings
 
 `_openCadEditDialog` uses `_updateCadPresentation` to commit opacity, source

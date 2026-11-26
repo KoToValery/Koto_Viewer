@@ -12065,6 +12065,48 @@ abstract class AppLocalizations {
   /// **'Underlay'**
   String get architectSiteUnderlay;
 
+  /// No description provided for @architectSiteHideFromPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide from site plan'**
+  String get architectSiteHideFromPlan;
+
+  /// No description provided for @architectSitePickVisibleCad.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an object to hide'**
+  String get architectSitePickVisibleCad;
+
+  /// No description provided for @architectSitePickHiddenCad.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an object to restore'**
+  String get architectSitePickHiddenCad;
+
+  /// No description provided for @architectSiteShowHiddenCad.
+  ///
+  /// In en, this message translates to:
+  /// **'Show hidden'**
+  String get architectSiteShowHiddenCad;
+
+  /// No description provided for @architectSiteNextCadEntity.
+  ///
+  /// In en, this message translates to:
+  /// **'Next object'**
+  String get architectSiteNextCadEntity;
+
+  /// No description provided for @architectSiteRestoreCad.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get architectSiteRestoreCad;
+
+  /// No description provided for @architectSiteHideCad.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get architectSiteHideCad;
+
   /// No description provided for @architectSiteRasterReady.
   ///
   /// In en, this message translates to:

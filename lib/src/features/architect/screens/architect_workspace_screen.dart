@@ -84,10 +84,12 @@ import '../widgets/architect_find_and_select_dialog.dart';
 import '../services/architect_offset.dart';
 import '../services/architect_rotation.dart';
 import '../services/architect_site_orientation.dart';
+import '../services/architect_cad_entity_visibility.dart';
 import '../services/architect_site_underlay_pick.dart';
 import '../models/architect_site_parcel.dart';
 import '../widgets/architect_rotation_overlay.dart';
 import '../widgets/architect_site_orientation_overlay.dart';
+import '../widgets/architect_site_cad_visibility_overlay.dart';
 import '../widgets/architect_site_parcel_overlay.dart';
 import '../widgets/architect_hatch_transform_handle.dart';
 import '../widgets/architect_transform_point_input.dart';
@@ -515,6 +517,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _siteTrueNorthView = true;
 
   bool _siteOrientationActive = false;
+  bool _siteCadVisibilityActive = false;
   bool _siteOrientationUseCad = false;
   bool? _siteParcelEditingSetbacks;
 
@@ -4853,6 +4856,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _currentCadUnderlayConfig?.layerOverrides ?? const {};
 
   DxfDocument? get _currentUnderlayDoc {
+    final source = _rawCurrentUnderlayDoc;
+    final config = _currentCadUnderlayConfig;
+    return source != null && config != null && _project.activeStorey.isSite
+        ? ArchitectCadEntityVisibility.visible(source, config.siteHiddenEntities)
+        : source;
+  }
+
+  DxfDocument? get _rawCurrentUnderlayDoc {
     if (!_showUnderlay || !_commands.isPlan) return null;
     if (!_project.isLayerVisible(ArchitectLayer.cadUnderlayLayerId)) {
       return null;
@@ -5966,6 +5977,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         unawaited(_addUnderlay());
       case ArchitectSiteAction.align:
         _startSiteOrientation();
+      case ArchitectSiteAction.cadVisibility:
+        _startSiteCadVisibility();
       case ArchitectSiteAction.parcel:
         _startSiteParcel(setbacks: false);
       case ArchitectSiteAction.setback:
@@ -5975,6 +5988,42 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       case ArchitectSiteAction.contours:
         _changeTool(ArchitectTool.contour, toggle: false);
     }
+  }
+
+  bool get _canEditSiteCadVisibility => !_underlayBusy && _isInPlanCanvas &&
+      _project.activeStorey.isSite && _currentCadUnderlayConfig != null &&
+      _rawCurrentUnderlayDoc != null;
+
+  void _startSiteCadVisibility() {
+    if (!_canEditSiteCadVisibility) return;
+    _discardGeometryCommand();
+    _cancelActiveDrags();
+    _cancelRasterCalibration();
+    setState(() {
+      _siteCadVisibilityActive = true;
+      _isCadUnderlaySelected = false;
+      _selectedRasterId = null;
+      _selectionIds.clear();
+      _selectedElementId = null;
+      _touchCandidates = null;
+    });
+  }
+
+  void _setSiteCadEntityHidden(int index, bool hidden) {
+    if (!_siteCadVisibilityActive || !_canEditSiteCadVisibility) return;
+    final config = _currentCadUnderlayConfig!;
+    final source = _rawCurrentUnderlayDoc!;
+    if (index < 0 || index >= source.entities.length ||
+        source.entities[index].isPaperSpace) return;
+    final next = {...config.siteHiddenEntities};
+    final changed = hidden ? next.add(index) : next.remove(index);
+    if (!changed) return;
+    _commands.commit(_project.withCadUnderlayUpdated(
+      config.copyWith(siteHiddenEntities: Set.unmodifiable(next)),
+    ));
+    _saveBiMProjectIfAttached();
+    _repaintPreview();
+    HapticFeedback.selectionClick();
   }
 
   bool _canResetGeodeticOrientation({
@@ -15438,6 +15487,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _viewDirectionDraft = null;
     _siteOrientationActive = false;
+    _siteCadVisibilityActive = false;
     _siteParcelEditingSetbacks = null;
     _rotationSource = null;
     _rotationUnderlay = null;
@@ -34011,6 +34061,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   sitePlan: _commands.isPlan && _project.activeStorey.isSite,
                   onSiteAction: _onSiteAction,
+                  canEditSiteCadVisibility: _canEditSiteCadVisibility,
                   canAlignSite: !_underlayBusy &&
                       (_currentUnderlayDoc != null || _hasVisibleSiteRaster),
                   hasSiteParcel: _project.activeStorey.siteParcel != null,
@@ -39747,6 +39798,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
         _buildOffsetFloatingOverlay(),
       ],
+      if (_siteCadVisibilityActive && _canEditSiteCadVisibility)
+        Positioned.fill(
+          child: ArchitectSiteCadVisibilityOverlay(
+            key: ValueKey(_cadRevisionKey(_currentCadUnderlayConfig!)),
+            source: _rawCurrentUnderlayDoc!,
+            config: _currentCadUnderlayConfig!,
+            frame: _effectiveUnderlayFrame,
+            viewport: _viewport,
+            palette: _canvasPalette,
+            onChange: _setSiteCadEntityHidden,
+            onClose: () => setState(() => _siteCadVisibilityActive = false),
+          ),
+        ),
       if (_siteOrientationActive)
         Positioned.fill(
           child: AnimatedBuilder(
@@ -39795,6 +39859,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_commands.isPlan &&
           _project.activeStorey.isSite &&
           !_siteOrientationActive &&
+          !_siteCadVisibilityActive &&
           _siteParcelEditingSetbacks == null &&
           _rotationSource == null &&
           !_dragController.isActive &&

@@ -6825,6 +6825,27 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSiteUnderlay => 'Подложка';
 
   @override
+  String get architectSiteHideFromPlan => 'Скрий от ситуацията';
+
+  @override
+  String get architectSitePickVisibleCad => 'Посочи обект за скриване';
+
+  @override
+  String get architectSitePickHiddenCad => 'Посочи обект за връщане';
+
+  @override
+  String get architectSiteShowHiddenCad => 'Покажи скритите';
+
+  @override
+  String get architectSiteNextCadEntity => 'Следващ обект';
+
+  @override
+  String get architectSiteRestoreCad => 'Върни';
+
+  @override
+  String get architectSiteHideCad => 'Скрий';
+
+  @override
   String get architectSiteRasterReady => 'Подложката е поставена';
 
   @override

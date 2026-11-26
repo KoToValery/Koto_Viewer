@@ -51,7 +51,7 @@ export 'architect_tool_catalog.dart' show ArchitectToolCategory;
 
 // === SECTION: [SEC-01-WIDGET] WIDGET DECLARATIONS & PUBLIC API ===
 // --- SUBSECTION: [TAG:ARCH_PALETTE_WIDGET] Declarations: `ArchitectToolPalette` ---
-enum ArchitectSiteAction { underlay, align, parcel, setback, terrain, contours }
+enum ArchitectSiteAction { underlay, align, cadVisibility, parcel, setback, terrain, contours }
 
 /// Responsive bottom bar for architectural drafting tools and contextual sub-options.
 class ArchitectToolPalette extends StatefulWidget {
@@ -60,6 +60,7 @@ class ArchitectToolPalette extends StatefulWidget {
   final bool sitePlan;
   final ValueChanged<ArchitectSiteAction>? onSiteAction;
   final bool canAlignSite, hasSiteParcel;
+  final bool canEditSiteCadVisibility;
   final int viewSwitchEpoch;
   final ArchitectInteractionMode? interactionMode;
   final ArchitectTool? selectionTool;
@@ -206,6 +207,7 @@ class ArchitectToolPalette extends StatefulWidget {
     this.sitePlan = false,
     this.onSiteAction,
     this.canAlignSite = false,
+    this.canEditSiteCadVisibility = false,
     this.hasSiteParcel = false,
     this.viewSwitchEpoch = 0,
     this.interactionMode,
@@ -444,6 +446,9 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
         PopupMenuItem(value: ArchitectSiteAction.underlay, child: Text(l.architectSiteUnderlay)),
         PopupMenuItem(value: ArchitectSiteAction.align, enabled: widget.canAlignSite,
           child: Text(l.architectSiteAlign)),
+        PopupMenuItem(value: ArchitectSiteAction.cadVisibility,
+          enabled: widget.canEditSiteCadVisibility,
+          child: Text(l.architectSiteHideFromPlan)),
         PopupMenuItem(value: ArchitectSiteAction.parcel, child: Text(l.architectSiteParcel)),
         PopupMenuItem(value: ArchitectSiteAction.setback, enabled: widget.hasSiteParcel,
           child: Text(l.architectSiteSetback)),

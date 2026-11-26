@@ -11,6 +11,10 @@
 
 ## 2. Model & entity directory
 
+`DxfDocument` accepts already-resolved layer lineweights for view-only subsets.
+The architectural site visibility tool keeps the source table styles when it
+builds filtered model-space documents.
+
 | Category | Concrete classes / enums | Responsibility |
 | --- | --- | --- |
 | Tables & vertices | `DxfPolylineVertex`, `DxfTextStyle`, `DxfDimStyle`, `DxfLayer` | Vertex bulges, styles, and layer metadata |

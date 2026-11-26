@@ -13,6 +13,7 @@ import '../widgets/architect_building_sections_screen.dart';
 import '../widgets/architect_elevations_screen.dart';
 import 'architect_building_section.dart';
 import 'architect_building_elevation.dart';
+import 'architect_cad_entity_visibility.dart';
 import 'architect_workspace_view_controller.dart';
 
 class ArchitectPublicationSources {
@@ -265,7 +266,9 @@ class ArchitectDrawingPublisher {
           );
           ArchitectElementsPainterHelper.drawUnderlay(
             canvas: canvas,
-            underlayDoc: underlayDoc,
+            underlayDoc: s.isSite && cad != null
+                ? ArchitectCadEntityVisibility.visible(underlayDoc, cad.siteHiddenEntities)
+                : underlayDoc,
             zoomScale: scope.renderScale / frame.unitsPerMeter,
             // Subtract geodetic offsets before constructing float32 paths.
             sourceOrigin: frame.origin,

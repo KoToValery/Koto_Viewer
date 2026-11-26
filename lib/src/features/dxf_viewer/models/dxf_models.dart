@@ -1636,10 +1636,11 @@ class DxfDocument {
     List<String>? layouts,
     Map<String, List<DxfEntity>>? layoutEntities,
     Map<String, Rect>? layoutBounds,
+    bool inferLayerLineweights = true,
   })  : layouts = layouts ?? _computeLayouts(entities),
         layoutEntities = layoutEntities ?? _computeLayoutEntities(entities),
         layoutBounds = layoutBounds ?? _computeLayoutBounds(entities, bounds) {
-    _inferLayerEntityLineweights(layers, entities);
+    if (inferLayerLineweights) _inferLayerEntityLineweights(layers, entities);
   }
 
   static void _inferLayerEntityLineweights(

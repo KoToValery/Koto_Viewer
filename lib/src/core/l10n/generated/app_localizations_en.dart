@@ -6798,6 +6798,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSiteUnderlay => 'Underlay';
 
   @override
+  String get architectSiteHideFromPlan => 'Hide from site plan';
+
+  @override
+  String get architectSitePickVisibleCad => 'Pick an object to hide';
+
+  @override
+  String get architectSitePickHiddenCad => 'Pick an object to restore';
+
+  @override
+  String get architectSiteShowHiddenCad => 'Show hidden';
+
+  @override
+  String get architectSiteNextCadEntity => 'Next object';
+
+  @override
+  String get architectSiteRestoreCad => 'Restore';
+
+  @override
+  String get architectSiteHideCad => 'Hide';
+
+  @override
   String get architectSiteRasterReady => 'Underlay placed';
 
   @override
