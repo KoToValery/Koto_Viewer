@@ -123,19 +123,20 @@ class _ArchitectSiteOrientationOverlayState
             ),
           ),
         ),
-        if (!_hasSegment)
-          Positioned.fill(
-            child: ArchitectTransformPointInput(
-              key: const ValueKey('architect-site-orientation-input'),
-              toModel: widget.toModel,
-              toScreen: widget.toScreen,
-              snap: widget.snap,
-              localizeSnap: widget.localizeSnap,
-              onAim: _onAim,
-              onPick: _onPick,
-              onNavigate: widget.onNavigate,
-            ),
+        Positioned.fill(
+          child: ArchitectTransformPointInput(
+            key: const ValueKey('architect-site-orientation-input'),
+            pickingEnabled: !_hasSegment,
+            singlePointerPan: true,
+            toModel: widget.toModel,
+            toScreen: widget.toScreen,
+            snap: widget.snap,
+            localizeSnap: widget.localizeSnap,
+            onAim: _onAim,
+            onPick: _onPick,
+            onNavigate: widget.onNavigate,
           ),
+        ),
         Positioned(
           top: 8,
           left: 8,

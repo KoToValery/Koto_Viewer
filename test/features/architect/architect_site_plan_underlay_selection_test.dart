@@ -484,17 +484,60 @@ void main() {
       );
       expect(tester.takeException(), isNull);
 
-      // Tap Edit orientation -> opens ArchitectSiteOrientationOverlay, then cancel.
+      // Tap Edit orientation -> opens ArchitectSiteOrientationOverlay, verify
+      // full zoom & pan work before picking and during review, then cancel.
       await tester.tap(
         find.byKey(const ValueKey('architect-underlay-edit-orientation')),
       );
       await tester.pumpAndSettle();
       expect(find.byType(ArchitectSiteOrientationOverlay), findsOneWidget);
+
+      final orientInput = find.byKey(
+        const ValueKey('architect-site-orientation-input'),
+      );
+      final inputCenter = tester.getCenter(orientInput);
+      final scaleBeforeZoom = workspace.camera(tester).scale;
+      final mouseZoom = TestPointer(9, PointerDeviceKind.mouse);
+      await tester.sendEventToBinding(mouseZoom.hover(inputCenter));
+      await tester.sendEventToBinding(mouseZoom.scroll(const Offset(0, -120)));
+      await tester.pump();
+      expect(workspace.camera(tester).scale, greaterThan(scaleBeforeZoom));
+
+      final originBeforeDrag = workspace.camera(tester).toScreen(Offset.zero);
+      await tester.drag(orientInput, const Offset(40, 20));
+      await tester.pump();
+      expect(
+        (workspace.camera(tester).toScreen(Offset.zero) - originBeforeDrag)
+            .distance,
+        greaterThan(5),
+      );
+
+      // Pick start and end points; confirm zoom still works during review.
+      await tester.tapAt(workspace.screen(tester, const Offset(1, 1)));
+      await tester.pump();
+      await tester.tapAt(workspace.screen(tester, const Offset(5, 1)));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('architect-site-orientation-apply')),
+        findsOneWidget,
+      );
+      final scaleBeforeReviewZoom = workspace.camera(tester).scale;
+      await tester.sendEventToBinding(mouseZoom.scroll(const Offset(0, -120)));
+      await tester.pump();
+      expect(
+        workspace.camera(tester).scale,
+        greaterThan(scaleBeforeReviewZoom),
+      );
+
       await tester.tap(
         find.byKey(const ValueKey('architect-site-orientation-close')),
       );
       await tester.pumpAndSettle();
       expect(find.byType(ArchitectSiteOrientationOverlay), findsNothing);
+      workspace
+          .camera(tester)
+          .fit(const Rect.fromLTWH(-4, -3, 12, 10), padding: 60);
+      await tester.pumpAndSettle();
 
       // Re-select geodetic CAD underlay and tap Reset orientation.
       await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../bim_editing/interaction/bim_pointer_interaction.dart';
@@ -15,6 +17,8 @@ class ArchitectTransformPointInput extends StatefulWidget {
   final ValueChanged<ArchitectSnapResult> onAim, onPick;
   final void Function(Offset delta, double factor, Offset focal) onNavigate;
   final String? Function(String?) localizeSnap;
+  final bool pickingEnabled;
+  final bool singlePointerPan;
   const ArchitectTransformPointInput({
     super.key,
     required this.toModel,
@@ -24,6 +28,8 @@ class ArchitectTransformPointInput extends StatefulWidget {
     required this.onPick,
     required this.onNavigate,
     required this.localizeSnap,
+    this.pickingEnabled = true,
+    this.singlePointerPan = false,
   });
   @override
   State<ArchitectTransformPointInput> createState() => _PointInputState();
@@ -32,8 +38,18 @@ class ArchitectTransformPointInput extends StatefulWidget {
 class _PointInputState extends State<ArchitectTransformPointInput> {
   ArchitectSnapResult? current;
   Offset? pointer, focal;
-  bool touch = false, holding = false, navigating = false;
-  double scale = 1;
+  bool touch = false, holding = false, navigating = false, _mousePan = false;
+  double scale = 1, _trackpadScale = 1;
+
+  @override
+  void didUpdateWidget(covariant ArchitectTransformPointInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pickingEnabled && !widget.pickingEnabled) {
+      current = null;
+      pointer = null;
+      holding = false;
+    }
+  }
 
   ArchitectSnapResult aim(Offset screen) {
     final target = BimPointerInteraction.placementTarget(
@@ -49,67 +65,123 @@ class _PointInputState extends State<ArchitectTransformPointInput> {
     return result;
   }
 
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    GestureBinding.instance.pointerSignalResolver.register(event, (resolved) {
+      final scroll = resolved as PointerScrollEvent;
+      final factor = math.exp(-scroll.scrollDelta.dy / 240);
+      widget.onNavigate(Offset.zero, factor, scroll.localPosition);
+      if (widget.pickingEnabled && !touch && !holding) {
+        aim(scroll.localPosition);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) => MouseRegion(
-    onHover: (e) {
-      touch = false;
-      aim(e.localPosition);
-    },
+    onHover: widget.pickingEnabled
+        ? (e) {
+            touch = false;
+            aim(e.localPosition);
+          }
+        : null,
     child: Listener(
+      behavior: HitTestBehavior.opaque,
       onPointerDown: (e) {
         touch = e.kind == PointerDeviceKind.touch;
+        _mousePan =
+            !touch &&
+            (e.buttons & (kMiddleMouseButton | kSecondaryMouseButton)) != 0;
+      },
+      onPointerSignal: _onPointerSignal,
+      onPointerPanZoomStart: (_) {
+        _trackpadScale = 1;
+      },
+      onPointerPanZoomUpdate: (e) {
+        widget.onNavigate(
+          e.panDelta,
+          e.scale / _trackpadScale,
+          e.localPosition + e.pan,
+        );
+        _trackpadScale = e.scale;
+        if (widget.pickingEnabled && !touch && !holding) {
+          aim(e.localPosition + e.pan);
+        }
+      },
+      onPointerPanZoomEnd: (_) {
+        _trackpadScale = 1;
       },
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTapUp: (e) => widget.onPick(aim(e.localPosition)),
-        onLongPressStart: (e) {
-          if (!touch) return;
-          holding = true;
-          aim(e.localPosition);
-        },
-        onLongPressMoveUpdate: (e) {
-          if (holding) aim(e.localPosition);
-        },
-        onLongPressEnd: (e) {
-          if (!holding) return;
-          final result = aim(e.localPosition);
-          setState(() {
-            holding = false;
-          });
-          widget.onPick(result);
-        },
-        onLongPressCancel: () {
-          if (holding) {
-            setState(() {
-              holding = false;
-            });
-          }
-        },
+        onTapUp: widget.pickingEnabled
+            ? (e) => widget.onPick(aim(e.localPosition))
+            : null,
+        onLongPressStart: widget.pickingEnabled
+            ? (e) {
+                if (!touch) return;
+                holding = true;
+                aim(e.localPosition);
+              }
+            : null,
+        onLongPressMoveUpdate: widget.pickingEnabled
+            ? (e) {
+                if (holding) aim(e.localPosition);
+              }
+            : null,
+        onLongPressEnd: widget.pickingEnabled
+            ? (e) {
+                if (!holding) return;
+                final result = aim(e.localPosition);
+                setState(() {
+                  holding = false;
+                });
+                widget.onPick(result);
+              }
+            : null,
+        onLongPressCancel: widget.pickingEnabled
+            ? () {
+                if (holding) {
+                  setState(() {
+                    holding = false;
+                  });
+                }
+              }
+            : null,
         onScaleStart: (e) {
           focal = e.localFocalPoint;
           scale = 1;
-          navigating = e.pointerCount > 1;
+          navigating =
+              e.pointerCount > 1 ||
+              _mousePan ||
+              !widget.pickingEnabled ||
+              (widget.singlePointerPan && !holding);
         },
         onScaleUpdate: (e) {
+          if (holding) return;
           if (e.pointerCount > 1) navigating = true;
           if (navigating) {
+            final delta = focal == null
+                ? Offset.zero
+                : e.localFocalPoint - focal!;
             widget.onNavigate(
-              e.localFocalPoint - focal!,
+              delta,
               e.scale / scale,
               e.localFocalPoint,
             );
             focal = e.localFocalPoint;
             scale = e.scale;
-          } else {
+          } else if (widget.pickingEnabled) {
             aim(e.localFocalPoint);
           }
         },
         onScaleEnd: (_) {
           navigating = false;
+          _mousePan = false;
+          focal = null;
         },
         child: CustomPaint(
           key: const ValueKey('architect-transform-snap'),
-          painter: current == null
+          painter: !widget.pickingEnabled || current == null
               ? null
               : ArchitectTransformSnapPainter(
                   result: current!,
