@@ -4426,6 +4426,8 @@
   "architectFenceHeight": "H=",
   "architectFenceThickness": "B=",
   "architectFencePierSpacing": "Осово",
+  "architectFenceSlopeStepped": "Терасовидно",
+  "architectFenceSlopeSloped": "По наклона",
   "architectLayerTerrainExisting": "Съществуващ терен",
   "architectLayerTerrainProposed": "Проектен терен",
   "architectLayerPathways": "Алеи и бордюри",

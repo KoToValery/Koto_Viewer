@@ -1,8 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
+import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_fence_3d_mesh.dart';
+import 'package:kotoview/src/features/architect/services/architect_building_section.dart';
 import 'package:kotoview/src/features/cad_3d/rendering/cad_3d_gltf_encoder.dart';
+import 'package:kotoview/src/features/dxf_3d_viewer/models/mesh_3d.dart';
 
 void main() {
   group('ArchitectFence3dMesh — detailed 3D preset geometry', () {
@@ -282,6 +285,333 @@ void main() {
 
         final glb = Cad3DGltfEncoder.encode(mesh);
         expect(glb.length, greaterThan(1000));
+      },
+    );
+  });
+
+  group('ArchitectFence3dMesh — sloped, stepped & asymmetric terrain', () {
+    Iterable<Triangle3D> trisSpanningX(
+      List<Triangle3D> tris,
+      double x, {
+      double maxAbsY = 0.30,
+    }) => tris.where((t) {
+      final xs = [t.v0.x, t.v1.x, t.v2.x];
+      final ys = [t.v0.y, t.v1.y, t.v2.y];
+      final minX = xs.reduce((a, b) => a < b ? a : b);
+      final maxX = xs.reduce((a, b) => a > b ? a : b);
+      final minY = ys.reduce((a, b) => a < b ? a : b);
+      final maxY = ys.reduce((a, b) => a > b ? a : b);
+      return minX <= x && maxX >= x && minY.abs() <= maxAbsY && maxY.abs() <= maxAbsY;
+    });
+
+    test(
+      'piersAndSlats defaults to stepped horizontal bays on sloped terrain without floating plinths',
+      () {
+        // Uniform slope: z(x, y) = 0.25 * x (0.0m at x=0 -> 2.0m at x=8).
+        double slopedZ(Offset p) => 0.25 * p.dx;
+
+        const fence = ArchitectSiteFence(
+          id: 'fence_stepped_slope',
+          points: [Offset(0, 0), Offset(8, 0)],
+          preset: ArchitectSiteFencePreset.piersAndSlats,
+          height: 1.90,
+          thickness: 0.25,
+          plinthHeight: 0.45,
+          pierSize: 0.40,
+          pierSpacing: 2.00,
+        );
+        expect(fence.slopeMode, ArchitectFenceSlopeMode.stepped);
+
+        final tris = ArchitectFence3dMesh.build(fence, groundZAt: slopedZ);
+        expect(tris, isNotEmpty);
+
+        // Bay 0 (x in [0, 2]) mid-bay x = 1.0:
+        final bay0Tris = trisSpanningX(tris, 1.0).toList();
+        expect(bay0Tris, isNotEmpty);
+        final bay0PlinthMinZ = bay0Tris
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .map((v) => v.z)
+            .reduce((a, b) => a < b ? a : b);
+        final bay0TopZ = bay0Tris
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .map((v) => v.z)
+            .reduce((a, b) => a > b ? a : b);
+        expect(bay0PlinthMinZ, lessThan(-0.15)); // Embedded below lowest ground in bay (0.0)
+
+        // Check boards spanning x=0.60 and x=1.40 in Bay 0 have equal max Z (horizontal, not sloped).
+        final bay0LeftMaxZ = trisSpanningX(tris, 0.60)
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .map((v) => v.z)
+            .reduce((a, b) => a > b ? a : b);
+        final bay0RightMaxZ = trisSpanningX(tris, 1.40)
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .map((v) => v.z)
+            .reduce((a, b) => a > b ? a : b);
+        expect((bay0LeftMaxZ - bay0RightMaxZ).abs(), lessThan(1e-3));
+
+        // Bay 3 (x in [6, 8]) mid-bay x = 7.0:
+        final bay3Tris = trisSpanningX(tris, 7.0).toList();
+        final bay3PlinthMinZ = bay3Tris
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .map((v) => v.z)
+            .reduce((a, b) => a < b ? a : b);
+        final bay3TopZ = bay3Tris
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .map((v) => v.z)
+            .reduce((a, b) => a > b ? a : b);
+        // Bay 3 lowest terrain is at x=6 (z=1.50); plinth embeds below 1.50.
+        expect(bay3PlinthMinZ, lessThan(1.40));
+        // Bay 3 steps ~1.50 m higher than Bay 0.
+        expect(bay3TopZ - bay0TopZ, greaterThan(1.30));
+
+        // Pier at x=2.0 sits between Bay 0 (zHigh ~ 0.50) and Bay 1 (zHigh ~ 1.00):
+        // Cap must meet higher bay (1.00 + 1.90 = 2.90) and base must embed below bay 0 low (0.00 - 0.20).
+        final pier1Verts = tris
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .where((v) => (v.x - 2.0).abs() < 0.25 && v.y.abs() < 0.25)
+            .toList();
+        final pier1MinZ = pier1Verts
+            .map((v) => v.z)
+            .reduce((a, b) => a < b ? a : b);
+        final pier1MaxZ = pier1Verts
+            .map((v) => v.z)
+            .reduce((a, b) => a > b ? a : b);
+        expect(pier1MinZ, lessThanOrEqualTo(-0.19));
+        expect(pier1MaxZ, greaterThan(2.85));
+      },
+    );
+
+    test(
+      'concave undulating terrain never leaves plinth floating in stepped or sloped mode',
+      () {
+        // Parabolic dip: 0.0 at x=0 and x=10, -1.50 at x=5.
+        double dipZ(Offset p) {
+          final dx = p.dx - 5.0;
+          return -1.50 * (1.0 - (dx * dx) / 25.0);
+        }
+
+        for (final mode in ArchitectFenceSlopeMode.values) {
+          final fence = ArchitectSiteFence(
+            id: 'fence_dip_${mode.name}',
+            points: const [Offset(0, 0), Offset(10, 0)],
+            preset: ArchitectSiteFencePreset.modernLouvers,
+            height: 1.80,
+            thickness: 0.22,
+            pierSpacing: 5.0,
+            slopeMode: mode,
+          );
+          final tris = ArchitectFence3dMesh.build(fence, groundZAt: dipZ);
+          // At x=2.5 (inside first 5m bay), dipZ = -1.125; plinth triangles spanning x=2.5 must extend below -1.125.
+          final midBayMinZ = trisSpanningX(tris, 2.5)
+              .expand((t) => [t.v0, t.v1, t.v2])
+              .map((v) => v.z)
+              .reduce((a, b) => a < b ? a : b);
+          expect(midBayMinZ, lessThan(-1.20));
+        }
+      },
+    );
+
+    test(
+      'asymmetric terrain (sloped existing vs flat proposed) grounds plinth below lower side and keeps boards above higher side',
+      () {
+        // y >= 0: flat proposed yard at z = 0.0
+        // y < 0: sloped existing terrain from +1.20 (at x=0) down to -1.20 (at x=6)
+        double asymZ(Offset p) => p.dy >= 0.0 ? 0.0 : (1.20 - 0.40 * p.dx);
+
+        const fence = ArchitectSiteFence(
+          id: 'fence_asym',
+          points: [Offset(0, 0), Offset(6, 0)],
+          preset: ArchitectSiteFencePreset.piersAndSlats,
+          height: 1.90,
+          thickness: 0.25,
+          plinthHeight: 0.45,
+          pierSpacing: 3.0,
+          slopeMode: ArchitectFenceSlopeMode.stepped,
+        );
+
+        final tris = ArchitectFence3dMesh.build(fence, groundZAt: asymZ);
+
+        // Bay 0 (x in [0, 3]) mid-bay x = 1.5: existing side reaches +1.20, proposed side is 0.0.
+        // Plinth must embed below proposed (0.0) AND boards must stay above existing (+1.20).
+        final bay0Verts = trisSpanningX(tris, 1.5)
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .toList();
+        final bay0MinZ = bay0Verts
+            .map((v) => v.z)
+            .reduce((a, b) => a < b ? a : b);
+        final bay0MaxZ = bay0Verts
+            .map((v) => v.z)
+            .reduce((a, b) => a > b ? a : b);
+        expect(bay0MinZ, lessThan(-0.15));
+        expect(bay0MaxZ, greaterThan(2.90)); // 1.20 + 1.90 - 0.10 = 3.00
+
+        // Bay 1 (x in [3, 6]) mid-bay x = 4.5: proposed side is 0.0 (higher!), existing side drops to -1.20 (lower!).
+        // Plinth must descend below -1.20 while top of fence stays level with proposed yard (0.0 + ~1.80).
+        final bay1Verts = trisSpanningX(tris, 4.5)
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .toList();
+        final bay1MinZ = bay1Verts
+            .map((v) => v.z)
+            .reduce((a, b) => a < b ? a : b);
+        final bay1MaxZ = bay1Verts
+            .map((v) => v.z)
+            .reduce((a, b) => a > b ? a : b);
+        expect(bay1MinZ, lessThan(-1.35));
+        expect(bay1MaxZ, lessThan(1.95));
+        expect(bay1MaxZ, greaterThan(1.75));
+      },
+    );
+
+    test(
+      'gabion, classicIron, and rcRetaining step cleanly on sloped terrain & serialize slopeMode',
+      () {
+        double slopeZ(Offset p) => 0.30 * p.dx;
+        for (final preset in [
+          ArchitectSiteFencePreset.gabionFence,
+          ArchitectSiteFencePreset.gabionRetaining,
+          ArchitectSiteFencePreset.classicIron,
+          ArchitectSiteFencePreset.rcRetaining,
+        ]) {
+          final fence = ArchitectSiteFence(
+            id: 'step_${preset.name}',
+            points: const [Offset(0, 0), Offset(6, 0)],
+            preset: preset,
+            height: 1.60,
+            pierSpacing: 3.0,
+            slopeMode: ArchitectFenceSlopeMode.stepped,
+          );
+          final tris = ArchitectFence3dMesh.build(fence, groundZAt: slopeZ);
+          expect(tris, isNotEmpty);
+
+          final bay0TopZ = tris
+              .expand((t) => [t.v0, t.v1, t.v2])
+              .where((v) => v.x > 0.5 && v.x < 2.5)
+              .map((v) => v.z)
+              .reduce((a, b) => a > b ? a : b);
+          final bay1TopZ = tris
+              .expand((t) => [t.v0, t.v1, t.v2])
+              .where((v) => v.x > 3.5 && v.x < 5.5)
+              .map((v) => v.z)
+              .reduce((a, b) => a > b ? a : b);
+          expect(bay1TopZ - bay0TopZ, greaterThan(0.75));
+        }
+
+        // JSON round-trip & default stepped compatibility
+        const sloped = ArchitectSiteFence(
+          id: 'f_ser',
+          points: [Offset(0, 0), Offset(4, 0)],
+          closed: true,
+          slopeMode: ArchitectFenceSlopeMode.sloped,
+        );
+        final roundTrip = ArchitectSiteFence.fromJson(sloped.toJson());
+        expect(roundTrip.slopeMode, ArchitectFenceSlopeMode.sloped);
+        expect(roundTrip.closed, isTrue);
+
+        final withoutSlopeField = ArchitectSiteFence.fromJson({
+          'id': 'f_def',
+          'points': [
+            {'x': 0.0, 'y': 0.0},
+            {'x': 3.0, 'y': 0.0},
+          ],
+        });
+        expect(withoutSlopeField.slopeMode, ArchitectFenceSlopeMode.stepped);
+      },
+    );
+
+    test(
+      'composite existing+proposed terrain integrates cleanly with 3D builder and 2D section for boundary fence',
+      () {
+        // Sloped existing terrain: z(x, y) = 0.25 * x across x in [-4, 12], y in [-6, 6].
+        const existing = ArchitectTerrainSurface(
+          id: 'ex',
+          state: ArchitectTerrainState.existing,
+          spots: [
+            ArchitectTerrainSpot(id: 's0', position: Offset(-4, -6), elevation: -1.0),
+            ArchitectTerrainSpot(id: 's1', position: Offset(12, -6), elevation: 3.0),
+            ArchitectTerrainSpot(id: 's2', position: Offset(12, 6), elevation: 3.0),
+            ArchitectTerrainSpot(id: 's3', position: Offset(-4, 6), elevation: -1.0),
+          ],
+        );
+        // Flat proposed pad at z = 0.50 spanning x in [0, 8], y in [0, 5] with retaining wall edge.
+        const proposed = ArchitectTerrainSurface(
+          id: 'prop',
+          state: ArchitectTerrainState.proposed,
+          boundaries: [
+            ArchitectTerrainBoundary(
+              id: 'pad1',
+              polygon: [
+                Offset(0, 0),
+                Offset(8, 0),
+                Offset(8, 5),
+                Offset(0, 5),
+              ],
+              elevation: 0.50,
+              isFlatPad: true,
+              edgeTransition: ArchitectTerrainEdgeTransition.retainingWall,
+            ),
+          ],
+        );
+        // Fence runs along the southern pad edge y = 0 from x = 0 to x = 8.
+        const fence = ArchitectSiteFence(
+          id: 'f_boundary',
+          points: [Offset(0, 0), Offset(8, 0)],
+          preset: ArchitectSiteFencePreset.piersAndSlats,
+          height: 1.90,
+          thickness: 0.25,
+          plinthHeight: 0.45,
+          pierSpacing: 4.0,
+        );
+
+        final project = ArchitectProject(
+          id: 'p_asym',
+          name: 'Asym Fence',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          activeStoreyId: 's1',
+          existingTerrain: existing,
+          proposedTerrain: proposed,
+          storeys: const [
+            ArchitectStorey(
+              id: 's1',
+              name: 'Ground',
+              siteFences: [fence],
+            ),
+          ],
+        );
+
+        final mesh = Architect3dBuilder.buildProjectMesh(project);
+        // Near x = 2.0 (inside bay 0 [0, 4]), existing south side goes down to 0.0 while pad is 0.50 -> fence grounds below 0.0.
+        final leftMinZ = trisSpanningX(mesh.triangles, 2.0, maxAbsY: 0.28)
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .map((v) => v.z)
+            .reduce((a, b) => a < b ? a : b);
+        expect(leftMinZ, lessThan(-0.10));
+
+        // Near x = 6.0 (inside bay 1 [4, 8]), existing south side rises to 2.0 while pad is 0.50 -> fence rises above 2.0+1.8.
+        final rightMaxZ = trisSpanningX(mesh.triangles, 6.0, maxAbsY: 0.28)
+            .expand((t) => [t.v0, t.v1, t.v2])
+            .map((v) => v.z)
+            .reduce((a, b) => a > b ? a : b);
+        expect(rightMaxZ, greaterThan(3.70));
+
+        // Section cutting across the fence at x = 7.0 (existing=1.75 on y<0, pad=0.50 on y>0)
+        final section = ArchitectBuildingSection.build(
+          project,
+          const ArchitectSection(
+            id: 'sec_1',
+            name: 'A-A',
+            start: Offset(7.0, -3.0),
+            end: Offset(7.0, 3.0),
+          ),
+        );
+        final fenceRegions = section.regions
+            .where((r) => r.sourceId == 'f_boundary')
+            .toList();
+        expect(fenceRegions.length, 2); // plinth + panel
+        final plinthBounds = fenceRegions.first.path.getBounds();
+        // Plinth must cover from below pad (0.50 - 0.20 = 0.30) up to existing + plinthH (1.75 + 0.45 = 2.20).
+        expect(plinthBounds.top, lessThanOrEqualTo(0.35));
+        expect(plinthBounds.bottom, greaterThanOrEqualTo(2.15));
       },
     );
   });

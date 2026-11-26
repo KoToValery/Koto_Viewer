@@ -1509,9 +1509,12 @@ class Architect3dBuilder {
     List<Triangle3D> allTris,
     void Function(String id, int from) mark,
   ) {
+    final terrainSampler = ArchitectTerrainComposite.createSampler(
+      project,
+      respectLayerVisibility: true,
+    );
     double groundZ(Offset p, double fallback) =>
-        ArchitectTerrainComposite.evaluateFinalElevationAt(project, p) ??
-        fallback;
+        terrainSampler.evaluateAt(p) ?? fallback;
 
     // 1. Single Final Composite Terrain 2.5D Surface (Existing clipped outside
     //    Proposed modification zones ∪ Proposed inside, minus building cutouts).
@@ -1830,6 +1833,10 @@ class Architect3dBuilder {
               fence,
               groundZAt: (p) =>
                   groundZ(p, storey.elevation) + fence.elevationOffset,
+              tryGroundZAt: (p) {
+                final z = terrainSampler.evaluateAt(p);
+                return z == null ? null : z + fence.elevationOffset;
+              },
             ),
           );
           mark(fence.id, first);

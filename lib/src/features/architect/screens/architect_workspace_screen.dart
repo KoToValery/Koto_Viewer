@@ -36976,6 +36976,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               height: _landscapeTool.fenceHeight,
               thickness: _landscapeTool.fenceThickness,
               pierSpacing: _landscapeTool.fencePierSpacing,
+              slopeMode: _landscapeTool.fenceSlopeMode,
             );
           }()
         else

@@ -23580,6 +23580,18 @@ abstract class AppLocalizations {
   /// **'Span'**
   String get architectFencePierSpacing;
 
+  /// Terraced horizontal fence mode on sloped terrain
+  ///
+  /// In en, this message translates to:
+  /// **'Stepped'**
+  String get architectFenceSlopeStepped;
+
+  /// Continuous sloped fence mode following terrain grade
+  ///
+  /// In en, this message translates to:
+  /// **'Sloped'**
+  String get architectFenceSlopeSloped;
+
   /// No description provided for @architectLayerTerrainExisting.
   ///
   /// In en, this message translates to:

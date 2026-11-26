@@ -7084,6 +7084,14 @@
   "architectFenceHeight": "H=",
   "architectFenceThickness": "B=",
   "architectFencePierSpacing": "Span",
+  "architectFenceSlopeStepped": "Stepped",
+  "@architectFenceSlopeStepped": {
+    "description": "Terraced horizontal fence mode on sloped terrain"
+  },
+  "architectFenceSlopeSloped": "Sloped",
+  "@architectFenceSlopeSloped": {
+    "description": "Continuous sloped fence mode following terrain grade"
+  },
   "architectLayerTerrainExisting": "Existing Terrain",
   "architectLayerTerrainProposed": "Proposed Terrain",
   "architectLayerPathways": "Pathways & Curbs",

@@ -12961,6 +12961,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectFencePierSpacing => 'Span';
 
   @override
+  String get architectFenceSlopeStepped => 'Stepped';
+
+  @override
+  String get architectFenceSlopeSloped => 'Sloped';
+
+  @override
   String get architectLayerTerrainExisting => 'Existing Terrain';
 
   @override

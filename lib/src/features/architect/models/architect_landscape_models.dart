@@ -1458,6 +1458,20 @@ enum ArchitectSiteFencePreset {
   bool get isRetaining => this == gabionRetaining || this == rcRetaining;
 }
 
+/// How a site fence or retaining wall adapts to sloped or asymmetric terrain.
+enum ArchitectFenceSlopeMode {
+  /// Terraced horizontal bays that step cleanly at piers/modules.
+  stepped,
+
+  /// Panels/profiles rake continuously along the terrain slope.
+  sloped;
+
+  String label(AppLocalizations l) => switch (this) {
+    stepped => l.architectFenceSlopeStepped,
+    sloped => l.architectFenceSlopeSloped,
+  };
+}
+
 /// Architectural site fence or retaining wall (Gabion, Masonry Piers + Horizontal Boards,
 /// Modern Louvers, Classic Wrought Iron, or RC Retaining Wall).
 class ArchitectSiteFence {
@@ -1471,6 +1485,7 @@ class ArchitectSiteFence {
   final double pierSize;
   final double pierSpacing;
   final double elevationOffset;
+  final ArchitectFenceSlopeMode slopeMode;
 
   const ArchitectSiteFence({
     required this.id,
@@ -1483,6 +1498,7 @@ class ArchitectSiteFence {
     this.pierSize = 0.40,
     this.pierSpacing = 2.20,
     this.elevationOffset = 0.0,
+    this.slopeMode = ArchitectFenceSlopeMode.stepped,
   });
 
   List<Offset> get postPositions => [for (final p in pierPositions) p.$1];
@@ -1539,6 +1555,7 @@ class ArchitectSiteFence {
     double? pierSize,
     double? pierSpacing,
     double? elevationOffset,
+    ArchitectFenceSlopeMode? slopeMode,
   }) => ArchitectSiteFence(
     id: id ?? this.id,
     points: points ?? this.points,
@@ -1550,6 +1567,7 @@ class ArchitectSiteFence {
     pierSize: pierSize ?? this.pierSize,
     pierSpacing: pierSpacing ?? this.pierSpacing,
     elevationOffset: elevationOffset ?? this.elevationOffset,
+    slopeMode: slopeMode ?? this.slopeMode,
   );
 
   Map<String, dynamic> toJson() => {
@@ -1557,6 +1575,7 @@ class ArchitectSiteFence {
     'points': [
       for (final p in points) {'x': p.dx, 'y': p.dy},
     ],
+    if (closed) 'closed': true,
     'preset': preset.name,
     'height': height,
     'thickness': thickness,
@@ -1564,6 +1583,8 @@ class ArchitectSiteFence {
     'pierSize': pierSize,
     'pierSpacing': pierSpacing,
     if (elevationOffset.abs() > 1e-6) 'elevationOffset': elevationOffset,
+    if (slopeMode != ArchitectFenceSlopeMode.stepped)
+      'slopeMode': slopeMode.name,
   };
 
   factory ArchitectSiteFence.fromJson(Map<String, dynamic> json) =>
@@ -1577,6 +1598,7 @@ class ArchitectSiteFence {
                 (p['y'] as num?)?.toDouble() ?? 0.0,
               ),
         ],
+        closed: json['closed'] == true,
         preset: ArchitectSiteFencePreset.values.firstWhere(
           (p) => p.name == json['preset'],
           orElse: () => ArchitectSiteFencePreset.piersAndSlats,
@@ -1587,6 +1609,10 @@ class ArchitectSiteFence {
         pierSize: (json['pierSize'] as num?)?.toDouble() ?? 0.40,
         pierSpacing: (json['pierSpacing'] as num?)?.toDouble() ?? 2.20,
         elevationOffset: (json['elevationOffset'] as num?)?.toDouble() ?? 0.0,
+        slopeMode: ArchitectFenceSlopeMode.values.firstWhere(
+          (m) => m.name == json['slopeMode'],
+          orElse: () => ArchitectFenceSlopeMode.stepped,
+        ),
       );
 }
 

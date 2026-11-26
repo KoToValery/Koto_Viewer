@@ -13008,6 +13008,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectFencePierSpacing => 'Осово';
 
   @override
+  String get architectFenceSlopeStepped => 'Терасовидно';
+
+  @override
+  String get architectFenceSlopeSloped => 'По наклона';
+
+  @override
   String get architectLayerTerrainExisting => 'Съществуващ терен';
 
   @override

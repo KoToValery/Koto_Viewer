@@ -897,6 +897,19 @@ class ArchitectLandscapeBar extends StatelessWidget {
           _notifyChanged();
         },
       ),
+      const SizedBox(width: 6),
+      _popupChip<ArchitectFenceSlopeMode>(
+        key: const ValueKey('architect-fence-slope-mode'),
+        colors: colors,
+        label: controller.fenceSlopeMode.label(l),
+        values: ArchitectFenceSlopeMode.values,
+        selected: controller.fenceSlopeMode,
+        itemLabel: (m) => m.label(l),
+        onSelected: (m) {
+          controller.fenceSlopeMode = m;
+          _notifyChanged();
+        },
+      ),
       if (controller.fencePreset != ArchitectSiteFencePreset.rcRetaining &&
           controller.fencePreset != ArchitectSiteFencePreset.gabionRetaining) ...[
         const SizedBox(width: 6),

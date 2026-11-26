@@ -83,7 +83,9 @@ class ArchitectFence3dMesh {
   static const _rcWeepPipeColor = Color(0xFF334155);
   static const _rcWeepBoreColor = Color(0xFF0F172A);
 
-  /// Builds 3D triangles for [fence], grounded on [groundZAt].
+  /// Builds 3D triangles for [fence], grounded on [groundZAt] (and optional
+  /// nullable [tryGroundZAt] so transverse probes over cutout holes are ignored
+  /// instead of pulling the fence down to a fallback datum).
   ///
   /// When [detailed] is false (used by architectural elevation projection),
   /// tiny sub-cobble stone boulders in gabions are omitted while retaining full
@@ -91,6 +93,7 @@ class ArchitectFence3dMesh {
   static List<Triangle3D> build(
     ArchitectSiteFence fence, {
     required double Function(Offset p) groundZAt,
+    double? Function(Offset p)? tryGroundZAt,
     bool detailed = true,
   }) {
     final pts = _cleanChain(fence.points);
@@ -104,12 +107,34 @@ class ArchitectFence3dMesh {
 
     switch (fence.preset) {
       case ArchitectSiteFencePreset.piersAndSlats:
-        _buildPiersAndSlats(tris, fence, pts, isClosed, groundZAt);
+        _buildPiersAndSlats(
+          tris,
+          fence,
+          pts,
+          isClosed,
+          groundZAt,
+          tryGroundZAt: tryGroundZAt,
+        );
       case ArchitectSiteFencePreset.gabionFence:
       case ArchitectSiteFencePreset.gabionRetaining:
-        _buildGabion(tris, fence, pts, isClosed, groundZAt, detailed: detailed);
+        _buildGabion(
+          tris,
+          fence,
+          pts,
+          isClosed,
+          groundZAt,
+          tryGroundZAt: tryGroundZAt,
+          detailed: detailed,
+        );
       case ArchitectSiteFencePreset.modernLouvers:
-        _buildModernLouvers(tris, fence, pts, isClosed, groundZAt);
+        _buildModernLouvers(
+          tris,
+          fence,
+          pts,
+          isClosed,
+          groundZAt,
+          tryGroundZAt: tryGroundZAt,
+        );
       case ArchitectSiteFencePreset.classicIron:
         _buildClassicIron(
           tris,
@@ -117,6 +142,7 @@ class ArchitectFence3dMesh {
           pts,
           isClosed,
           groundZAt,
+          tryGroundZAt: tryGroundZAt,
           detailed: detailed,
         );
       case ArchitectSiteFencePreset.rcRetaining:
@@ -126,6 +152,7 @@ class ArchitectFence3dMesh {
           pts,
           isClosed,
           groundZAt,
+          tryGroundZAt: tryGroundZAt,
           detailed: detailed,
         );
     }
@@ -142,53 +169,110 @@ class ArchitectFence3dMesh {
     ArchitectSiteFence fence,
     List<Offset> pts,
     bool isClosed,
-    double Function(Offset p) groundZAt,
-  ) {
+    double Function(Offset p) groundZAt, {
+    double? Function(Offset p)? tryGroundZAt,
+  }) {
     final h = math.max(0.60, fence.height);
     final plinthH = fence.plinthHeight.clamp(0.18, h * 0.45);
     final halfT = math.max(0.08, fence.thickness * 0.5);
     final pierSize = math.max(fence.pierSize, math.max(halfT * 2.5, 0.34));
     final pierHalf = pierSize * 0.5;
     final plinthHalf = math.max(halfT * 0.92, 0.11);
+    final probeOffset = math.max(plinthHalf, pierHalf) + 0.10;
+    final isStepped = fence.slopeMode == ArchitectFenceSlopeMode.stepped;
+    const embed = 0.20;
 
-    // 1. Continuous concrete plinth + overhanging cap ledge
-    _addMiteredProfile(
-      tris,
-      pts: pts,
-      isClosed: isClosed,
-      leftBot: plinthHalf,
-      rightBot: plinthHalf,
-      leftTop: plinthHalf,
-      rightTop: plinthHalf,
-      zBotAt: (p) => groundZAt(p) - 0.10,
-      zTopAt: (p) => groundZAt(p) + plinthH - 0.035,
-      color: _plinthBodyColor,
+    final plan = _planBays(pts, isClosed, fence.pierSpacing);
+    final grounding = _samplePlanGrounding(
+      plan,
+      probeOffset: probeOffset,
+      groundZAt: groundZAt,
+      tryGroundZAt: tryGroundZAt,
     );
-    _addMiteredProfile(
-      tris,
-      pts: pts,
-      isClosed: isClosed,
-      leftBot: plinthHalf + 0.015,
-      rightBot: plinthHalf + 0.015,
-      leftTop: plinthHalf + 0.015,
-      rightTop: plinthHalf + 0.015,
-      zBotAt: (p) => groundZAt(p) + plinthH - 0.035,
-      zTopAt: (p) => groundZAt(p) + plinthH,
-      color: _plinthCapColor,
-    );
+
+    // 1. Bay-segmented concrete plinth + overhanging cap ledge
+    for (var bIdx = 0; bIdx < plan.bays.length; bIdx++) {
+      final bay = plan.bays[bIdx];
+      final bGround = grounding.bays[bIdx];
+      final trim = math.min(pierHalf - 0.01, bay.length * 0.25);
+      if (bay.length - 2 * trim < 0.04) continue;
+      final pStart = bay.start + bay.u * trim;
+      final pEnd = bay.end - bay.u * trim;
+
+      if (isStepped) {
+        final zBot = bGround.zLowMin - embed;
+        final zBodyTop = bGround.zHighMax + plinthH - 0.035;
+        final zCapTop = bGround.zHighMax + plinthH;
+        _addSlopedBeam(
+          tris,
+          a: pStart,
+          b: pEnd,
+          n: bay.n,
+          halfThick: plinthHalf,
+          zBotA: zBot,
+          zTopA: zBodyTop,
+          zBotB: zBot,
+          zTopB: zBodyTop,
+          color: _plinthBodyColor,
+        );
+        _addSlopedBeam(
+          tris,
+          a: pStart,
+          b: pEnd,
+          n: bay.n,
+          halfThick: plinthHalf + 0.015,
+          zBotA: zBodyTop,
+          zTopA: zCapTop,
+          zBotB: zBodyTop,
+          zTopB: zCapTop,
+          color: _plinthCapColor,
+        );
+      } else {
+        final t0 = trim / bay.length;
+        final t1 = 1.0 - t0;
+        _addSegmentedBayBeam(
+          tris,
+          bay: bay,
+          bGround: bGround,
+          tStart: t0,
+          tEnd: t1,
+          halfThick: plinthHalf,
+          zBotFromLow: -embed,
+          zTopFromHigh: plinthH - 0.035,
+          color: _plinthBodyColor,
+        );
+        _addSegmentedBayBeam(
+          tris,
+          bay: bay,
+          bGround: bGround,
+          tStart: t0,
+          tEnd: t1,
+          halfThick: plinthHalf + 0.015,
+          zBotFromLow: plinthH - 0.035,
+          zTopFromHigh: plinthH,
+          useHighForBot: true,
+          color: _plinthCapColor,
+        );
+      }
+    }
 
     // 2. Oriented masonry piers with reveal collar & stepped pyramid cap
-    final plan = _planBays(pts, isClosed, fence.pierSpacing);
-    for (final node in plan.nodes) {
-      final gz = groundZAt(node.pos);
+    for (var nIdx = 0; nIdx < plan.nodes.length; nIdx++) {
+      final node = plan.nodes[nIdx];
+      final span = grounding.nodeSpan(
+        nIdx,
+        stepped: isStepped,
+        embed: embed,
+        height: h,
+      );
       _addMasonryPier(
         tris,
         center: node.pos,
         u: node.u,
         n: node.n,
         halfW: pierHalf,
-        zGround: gz,
-        height: h,
+        zBot: span.zBot,
+        zTop: span.zTop,
       );
     }
 
@@ -210,22 +294,27 @@ class ArchitectFence3dMesh {
 
     for (var bIdx = 0; bIdx < plan.bays.length; bIdx++) {
       final bay = plan.bays[bIdx];
+      final bGround = grounding.bays[bIdx];
       final clearSpan = bay.length - pierSize;
       if (clearSpan < 0.10) continue;
 
-      final pStart = bay.start + bay.u * (pierHalf - 0.005);
-      final pEnd = bay.end - bay.u * (pierHalf - 0.005);
+      final edgeInset = pierHalf - 0.005;
+      final pStart = bay.start + bay.u * edgeInset;
+      final pEnd = bay.end - bay.u * edgeInset;
       final u = bay.u;
       final n = bay.n;
-      final za = groundZAt(pStart);
-      final zb = groundZAt(pEnd);
+      final tStart = (edgeInset / bay.length).clamp(0.0, 0.45);
+      final tEnd = (1.0 - tStart).clamp(0.55, 1.0);
+      final za = isStepped
+          ? bGround.zHighMax
+          : bGround.sampleAtT(tStart).zHigh;
+      final zb = isStepped ? bGround.zHighMax : bGround.sampleAtT(tEnd).zHigh;
 
       // Side steel U-channel cleats at pier inner faces
-      for (final edgeCenter in [
-        pStart + u * 0.016,
-        pEnd - u * 0.016,
+      for (final (edgeCenter, ez) in [
+        (pStart + u * 0.016, za),
+        (pEnd - u * 0.016, zb),
       ]) {
-        final ez = groundZAt(edgeCenter);
         _addOrientedBox(
           tris,
           center: edgeCenter,
@@ -243,7 +332,7 @@ class ArchitectFence3dMesh {
       // Vertical backing batten at bay midpoint for long spans
       if (clearSpan > 1.35) {
         final mid = Offset.lerp(pStart, pEnd, 0.5)!;
-        final mz = groundZAt(mid);
+        final mz = isStepped ? bGround.zHighMax : bGround.sampleAtT(0.5).zHigh;
         _addOrientedBox(
           tris,
           center: mid - n * (boardHalfThick + 0.010),
@@ -291,11 +380,13 @@ class ArchitectFence3dMesh {
     List<Offset> pts,
     bool isClosed,
     double Function(Offset p) groundZAt, {
+    double? Function(Offset p)? tryGroundZAt,
     required bool detailed,
   }) {
     final h = math.max(0.45, fence.height);
     final halfT = math.max(0.14, fence.thickness * 0.5);
     final isRetaining = fence.preset == ArchitectSiteFencePreset.gabionRetaining;
+    final isStepped = fence.slopeMode == ArchitectFenceSlopeMode.stepped;
 
     var totalLen = 0.0;
     final segCount = isClosed ? pts.length : pts.length - 1;
@@ -304,6 +395,14 @@ class ArchitectFence3dMesh {
     }
     if (totalLen < 0.05) return;
 
+    final plan = _planBays(pts, isClosed, math.max(1.20, fence.pierSpacing));
+    final grounding = _samplePlanGrounding(
+      plan,
+      probeOffset: halfT + 0.12,
+      groundZAt: groundZAt,
+      tryGroundZAt: tryGroundZAt,
+    );
+
     // For tall retaining gabion walls, step upper course back like terraced cages.
     final steppedRetaining = isRetaining && h >= 0.90;
     final lowerTopOff = steppedRetaining ? h * 0.52 : h;
@@ -311,19 +410,48 @@ class ArchitectFence3dMesh {
     final upperShiftN = steppedRetaining ? (halfT - upperHalfT) * 0.65 : 0.0;
 
     if (isRetaining) {
-      // Concrete levelling pad at toe/base
-      _addMiteredProfile(
-        tris,
-        pts: pts,
-        isClosed: isClosed,
-        leftBot: halfT + 0.08,
-        rightBot: halfT + 0.08,
-        leftTop: halfT + 0.08,
-        rightTop: halfT + 0.08,
-        zBotAt: (p) => groundZAt(p) - 0.14,
-        zTopAt: (p) => groundZAt(p) - 0.02,
-        color: _plinthBodyColor,
+      // Concrete levelling pad at toe/base (bay-stepped or sloped)
+      final padHalf = halfT + 0.08;
+      final miterPadL = ArchitectPathway.offsetChain(
+        pts,
+        padHalf,
+        closed: isClosed,
       );
+      final miterPadR = ArchitectPathway.offsetChain(
+        pts,
+        -padHalf,
+        closed: isClosed,
+      );
+      for (var bIdx = 0; bIdx < plan.bays.length; bIdx++) {
+        final bay = plan.bays[bIdx];
+        final bGround = grounding.bays[bIdx];
+        final (lA, lB) = _bayOffsetEndpoints(bay, miterPadL, padHalf);
+        final (rA, rB) = _bayOffsetEndpoints(bay, miterPadR, -padHalf);
+        final zBotA = isStepped
+            ? bGround.zLowMin - 0.14
+            : bGround.samples.first.zLow - 0.14;
+        final zBotB = isStepped
+            ? bGround.zLowMin - 0.14
+            : bGround.samples.last.zLow - 0.14;
+        _addPrismSpan(
+          tris,
+          bl0: lA,
+          bl1: lB,
+          br0: rA,
+          br1: rB,
+          tl0: lA,
+          tl1: lB,
+          tr0: rA,
+          tr1: rB,
+          zB0: zBotA,
+          zB1: zBotB,
+          zT0: zBotA + 0.12,
+          zT1: zBotB + 0.12,
+          color: _plinthBodyColor,
+          capStart: !isClosed && bIdx == 0 || isStepped,
+          capEnd: !isClosed && bIdx == plan.bays.length - 1 || isStepped,
+        );
+      }
     }
 
     // Build lower basket course
@@ -331,11 +459,14 @@ class ArchitectFence3dMesh {
       tris,
       pts: pts,
       isClosed: isClosed,
+      plan: plan,
+      grounding: grounding,
+      isStepped: isStepped,
       leftOffset: halfT,
       rightOffset: halfT,
       zBotOff: -0.02,
       zTopOff: lowerTopOff,
-      groundZAt: groundZAt,
+      botFollowsHigh: false,
       totalLen: totalLen,
       tierIndex: 0,
       detailed: detailed,
@@ -347,11 +478,14 @@ class ArchitectFence3dMesh {
         tris,
         pts: pts,
         isClosed: isClosed,
+        plan: plan,
+        grounding: grounding,
+        isStepped: isStepped,
         leftOffset: upperHalfT + upperShiftN,
         rightOffset: upperHalfT - upperShiftN,
         zBotOff: lowerTopOff,
         zTopOff: h,
-        groundZAt: groundZAt,
+        botFollowsHigh: true,
         totalLen: totalLen,
         tierIndex: 1,
         detailed: detailed,
@@ -364,38 +498,51 @@ class ArchitectFence3dMesh {
     List<Triangle3D> tris, {
     required List<Offset> pts,
     required bool isClosed,
+    required _FenceBayPlan plan,
+    required _PlanGrounding grounding,
+    required bool isStepped,
     required double leftOffset,
     required double rightOffset,
     required double zBotOff,
     required double zTopOff,
-    required double Function(Offset p) groundZAt,
+    required bool botFollowsHigh,
     required double totalLen,
     required int tierIndex,
     required bool detailed,
     required bool includeTopLid,
   }) {
     final tierH = zTopOff - zBotOff;
-    if (tierH < 0.12) return;
+    if (tierH < 0.12 || plan.bays.isEmpty) return;
 
-    // 1. Dark recessed inner stone shadow bed (inset 2.8 cm inside cage wire)
     const inset = 0.028;
     final coreLeft = math.max(0.05, leftOffset - inset);
     final coreRight = math.max(0.05, rightOffset - inset);
-    _addMiteredProfile(
-      tris,
-      pts: pts,
-      isClosed: isClosed,
-      leftBot: coreLeft,
-      rightBot: coreRight,
-      leftTop: coreLeft,
-      rightTop: coreRight,
-      zBotAt: (p) => groundZAt(p) + zBotOff + 0.015,
-      zTopAt: (p) => groundZAt(p) + zTopOff - 0.018,
-      color: _gabionCoreShadowColor,
+    final miterCoreL = ArchitectPathway.offsetChain(
+      pts,
+      coreLeft,
+      closed: isClosed,
+    );
+    final miterCoreR = ArchitectPathway.offsetChain(
+      pts,
+      -coreRight,
+      closed: isClosed,
     );
 
-    // 2. Protruding faceted 3D stones + galvanized weldmesh cage per segment
-    final segCount = isClosed ? pts.length : pts.length - 1;
+    const wireHalf = 0.0045;
+    const frameHalf = 0.0085;
+    final cageLeft = leftOffset + 0.005;
+    final cageRight = rightOffset + 0.005;
+    final miterCageL = ArchitectPathway.offsetChain(
+      pts,
+      cageLeft,
+      closed: isClosed,
+    );
+    final miterCageR = ArchitectPathway.offsetChain(
+      pts,
+      -cageRight,
+      closed: isClosed,
+    );
+
     // Adapt boulder density gently on very long perimeter fences for smooth FPS.
     final pitchScale = totalLen > 24.0
         ? (totalLen / 24.0).clamp(1.0, 1.85)
@@ -403,44 +550,133 @@ class ArchitectFence3dMesh {
     final rockPitchU = 0.21 * pitchScale;
     final rockPitchZ = 0.17 * math.min(pitchScale, 1.35);
 
-    const wireHalf = 0.0045;
-    const frameHalf = 0.0085;
-    final cageLeft = leftOffset + 0.005;
-    final cageRight = rightOffset + 0.005;
-    final miterLeft = ArchitectPathway.offsetChain(
-      pts,
-      cageLeft,
-      closed: isClosed,
-    );
-    final miterRight = ArchitectPathway.offsetChain(
-      pts,
-      -cageRight,
-      closed: isClosed,
-    );
+    final bayCount = plan.bays.length;
+    double bayBotZ(_BayTerrainInfo g, {required bool start}) {
+      if (isStepped) {
+        return (botFollowsHigh ? g.zHighMax : g.zLowMin) + zBotOff;
+      }
+      final s = start ? g.samples.first : g.samples.last;
+      return (botFollowsHigh ? s.zHigh : s.zLow) + zBotOff;
+    }
 
-    for (var s = 0; s < segCount; s++) {
-      final nextIdx = (s + 1) % pts.length;
-      final a = pts[s];
-      final b = pts[nextIdx];
-      final delta = b - a;
-      final len = delta.distance;
+    double bayTopZ(_BayTerrainInfo g, {required bool start}) {
+      if (isStepped) return g.zHighMax + zTopOff;
+      final s = start ? g.samples.first : g.samples.last;
+      return s.zHigh + zTopOff;
+    }
+
+    for (var bIdx = 0; bIdx < bayCount; bIdx++) {
+      final bay = plan.bays[bIdx];
+      final bGround = grounding.bays[bIdx];
+      final a = bay.start;
+      final b = bay.end;
+      final len = bay.length;
       if (len < 0.08) continue;
-      final u = delta / len;
-      final n = Offset(-u.dy, u.dx);
-      final za = groundZAt(a);
-      final zb = groundZAt(b);
+      final u = bay.u;
+      final n = bay.n;
 
-      // A. Faceted 3D quarry/river cobbles on both exposed faces (+n and -n)
+      final zBotA = bayBotZ(bGround, start: true);
+      final zBotB = bayBotZ(bGround, start: false);
+      final zTopA = bayTopZ(bGround, start: true);
+      final zTopB = bayTopZ(bGround, start: false);
+      final effTierH = math.max(zTopA - zBotA, zTopB - zBotB);
+      if (effTierH < 0.12) continue;
+
+      final hasPrev = isClosed || bIdx > 0;
+      final hasNext = isClosed || bIdx < bayCount - 1;
+      final prevIdx = (bIdx - 1 + bayCount) % bayCount;
+      final nextIdx = (bIdx + 1) % bayCount;
+      final prevTopEnd = hasPrev
+          ? bayTopZ(grounding.bays[prevIdx], start: false)
+          : zTopA;
+      final nextTopStart = hasNext
+          ? bayTopZ(grounding.bays[nextIdx], start: true)
+          : zTopB;
+      final prevBotEnd = hasPrev
+          ? bayBotZ(grounding.bays[prevIdx], start: false)
+          : zBotA;
+      final nextBotStart = hasNext
+          ? bayBotZ(grounding.bays[nextIdx], start: true)
+          : zBotB;
+
+      final stepStart = !hasPrev ||
+          (zTopA - prevTopEnd).abs() > 0.02 ||
+          (zBotA - prevBotEnd).abs() > 0.02;
+      final stepEnd = !hasNext ||
+          (zTopB - nextTopStart).abs() > 0.02 ||
+          (zBotB - nextBotStart).abs() > 0.02;
+
+      // 1. Dark recessed inner stone shadow bed (mitered at corners)
+      final (clA, clB) = _bayOffsetEndpoints(bay, miterCoreL, coreLeft);
+      final (crA, crB) = _bayOffsetEndpoints(bay, miterCoreR, -coreRight);
+      if (isStepped) {
+        _addPrismSpan(
+          tris,
+          bl0: clA,
+          bl1: clB,
+          br0: crA,
+          br1: crB,
+          tl0: clA,
+          tl1: clB,
+          tr0: crA,
+          tr1: crB,
+          zB0: zBotA + 0.015,
+          zB1: zBotB + 0.015,
+          zT0: zTopA - 0.018,
+          zT1: zTopB - 0.018,
+          color: _gabionCoreShadowColor,
+          capStart: stepStart,
+          capEnd: stepEnd,
+        );
+      } else {
+        // Subdivide sloped core along bay's 5 terrain samples to hug dips cleanly.
+        for (var k = 0; k < bGround.samples.length - 1; k++) {
+          final t0 = k / (bGround.samples.length - 1);
+          final t1 = (k + 1) / (bGround.samples.length - 1);
+          final s0 = bGround.samples[k];
+          final s1 = bGround.samples[k + 1];
+          final subBot0 = (botFollowsHigh ? s0.zHigh : s0.zLow) + zBotOff;
+          final subBot1 = (botFollowsHigh ? s1.zHigh : s1.zLow) + zBotOff;
+          final subTop0 = s0.zHigh + zTopOff;
+          final subTop1 = s1.zHigh + zTopOff;
+          _addPrismSpan(
+            tris,
+            bl0: Offset.lerp(clA, clB, t0)!,
+            bl1: Offset.lerp(clA, clB, t1)!,
+            br0: Offset.lerp(crA, crB, t0)!,
+            br1: Offset.lerp(crA, crB, t1)!,
+            tl0: Offset.lerp(clA, clB, t0)!,
+            tl1: Offset.lerp(clA, clB, t1)!,
+            tr0: Offset.lerp(crA, crB, t0)!,
+            tr1: Offset.lerp(crA, crB, t1)!,
+            zB0: subBot0 + 0.015,
+            zB1: subBot1 + 0.015,
+            zT0: subTop0 - 0.018,
+            zT1: subTop1 - 0.018,
+            color: _gabionCoreShadowColor,
+            capStart: k == 0 && stepStart,
+            capEnd: k == bGround.samples.length - 2 && stepEnd,
+          );
+        }
+      }
+
+      // 2A. Faceted 3D quarry/river cobbles on both exposed faces (+n and -n)
+      final mlA = _baySingleEndpoint(bay, miterCageL, cageLeft, start: true);
+      final mlB = _baySingleEndpoint(bay, miterCageL, cageLeft, start: false);
+      final mrA = _baySingleEndpoint(bay, miterCageR, -cageRight, start: true);
+      final mrB = _baySingleEndpoint(bay, miterCageR, -cageRight, start: false);
+
       if (detailed && len > 0.22) {
-        final zMin = zBotOff + 0.05;
-        final zMax = zTopOff - 0.05;
-        final rows = math.max(1, ((zMax - zMin) / rockPitchZ).floor());
-        final rowStep = (zMax - zMin) / rows;
+        final avgBot = (zBotA + zBotB) * 0.5;
+        final avgTop = (zTopA + zTopB) * 0.5;
+        final zSpan = avgTop - avgBot;
+        final rows = math.max(1, ((zSpan - 0.10) / rockPitchZ).floor());
+        final rowStep = (zSpan - 0.10) / rows;
         final startTrim = math.min(0.11, len * 0.12);
         final usableLen = math.max(0.08, len - 2 * startTrim);
 
         for (var r = 0; r < rows; r++) {
-          final zMidRel = zMin + (r + 0.5) * rowStep;
+          final relFrac = (0.05 + (r + 0.5) * rowStep) / zSpan;
           final stagger = r.isOdd ? rockPitchU * 0.48 : 0.0;
           final cols = math.max(1, ((usableLen - stagger) / rockPitchU).floor());
           final colStep = (usableLen - stagger) / cols;
@@ -448,12 +684,14 @@ class ArchitectFence3dMesh {
           for (var c = 0; c < cols; c++) {
             final along = startTrim + stagger + (c + 0.5) * colStep;
             final t = (along / len).clamp(0.0, 1.0);
-            final zGroundHere = za + (zb - za) * t;
+            final zBotHere = zBotA + (zBotB - zBotA) * t;
+            final zTopHere = zTopA + (zTopB - zTopA) * t;
+            final zMidAbs = zBotHere + (zTopHere - zBotHere) * relFrac;
             final center2D = a + u * along;
 
             for (final sideSign in const [1.0, -1.0]) {
               final hVal = _hash4(
-                s + tierIndex * 31,
+                bIdx + tierIndex * 31,
                 r,
                 c,
                 sideSign > 0 ? 1 : 2,
@@ -476,7 +714,7 @@ class ArchitectFence3dMesh {
                 baseCenter: center2D +
                     u * jitterU +
                     n * (sideSign * (coreOut - 0.008)),
-                zCenter: zGroundHere + zMidRel + jitterZ,
+                zCenter: zMidAbs + jitterZ,
                 u: u,
                 outNormal: n * sideSign,
                 halfU: halfU,
@@ -488,17 +726,19 @@ class ArchitectFence3dMesh {
             }
           }
 
-          // Open start / finish end cobbles so ends match the side faces
-          if (!isClosed && (s == 0 || s == segCount - 1)) {
-            final endSpecs = <(Offset endPt, double zEnd, Offset outDir, int seed)>[
-              if (s == 0) (a, za, -u, 701),
-              if (s == segCount - 1) (b, zb, u, 709),
+          // Open ends or stepped vertical risers receive end cobbles
+          if (stepStart || stepEnd) {
+            final endSpecs = <(Offset endPt, double zMinEnd, double zMaxEnd, Offset outDir, int seed)>[
+              if (stepStart && (!hasPrev || zTopA > prevTopEnd + 0.02 || zBotA < prevBotEnd - 0.02))
+                (a, zBotA, zTopA, -u, 701 + bIdx),
+              if (stepEnd && (!hasNext || zTopB > nextTopStart + 0.02 || zBotB < nextBotStart - 0.02))
+                (b, zBotB, zTopB, u, 709 + bIdx),
             ];
             final spanN = (coreLeft + coreRight) * 0.86;
             final endCols = math.max(1, (spanN / 0.19).round());
             final endStepN = spanN / endCols;
-            final nTan = Offset(-u.dy, u.dx);
-            for (final (endPt, zEnd, outDir, seed) in endSpecs) {
+            for (final (endPt, zMinEnd, zMaxEnd, outDir, seed) in endSpecs) {
+              final zMidEnd = zMinEnd + (zMaxEnd - zMinEnd) * relFrac;
               for (var ec = 0; ec < endCols; ec++) {
                 final offN = -coreRight * 0.86 + (ec + 0.5) * endStepN;
                 final hVal = _hash4(seed, tierIndex, r, ec);
@@ -506,9 +746,9 @@ class ArchitectFence3dMesh {
                     (hVal >> 12) % _gabionStonePalette.length];
                 _addGabionCobble(
                   tris,
-                  baseCenter: endPt + nTan * offN - outDir * 0.015,
-                  zCenter: zEnd + zMidRel,
-                  u: nTan,
+                  baseCenter: endPt + n * offN - outDir * 0.015,
+                  zCenter: zMidEnd,
+                  u: n,
                   outNormal: outDir,
                   halfU: endStepN * 0.43,
                   halfZ: rowStep * 0.42,
@@ -531,18 +771,17 @@ class ArchitectFence3dMesh {
           for (var c = 0; c < topCols; c++) {
             final along = startTrim + (c + 0.5) * topStep;
             final t = (along / len).clamp(0.0, 1.0);
-            final zGroundHere = za + (zb - za) * t;
+            final zTopHere = zTopA + (zTopB - zTopA) * t;
             final center2D = a + u * along;
             for (var rn = 0; rn < rowsN; rn++) {
-              final offN =
-                  -rightOffset + 0.03 + (rn + 0.5) * stepN;
-              final hVal = _hash4(s + 97, tierIndex, c, rn);
+              final offN = -rightOffset + 0.03 + (rn + 0.5) * stepN;
+              final hVal = _hash4(bIdx + 97, tierIndex, c, rn);
               final stoneColor = _gabionStonePalette[
                   (hVal >> 12) % _gabionStonePalette.length];
               _addGabionCobble(
                 tris,
                 baseCenter: center2D + n * offN,
-                zCenter: zGroundHere + zTopOff - 0.024,
+                zCenter: zTopHere - 0.024,
                 u: u,
                 outNormal: Offset.zero,
                 halfU: topStep * 0.42,
@@ -557,18 +796,17 @@ class ArchitectFence3dMesh {
         }
       }
 
-      // B. Galvanized steel wire basket frames (~1.0 m compartments) & weldmesh
+      // 2B. Galvanized steel wire basket frames (~1.0 m compartments) & weldmesh
       final compartments = math.max(1, len.round());
       final cellLen = len / compartments;
       final wireStepZ = detailed ? 0.15 : 0.28;
       final wireStepU = detailed ? 0.16 : 0.30;
-      final mlA = miterLeft[s];
-      final mlB = miterLeft[nextIdx];
-      final mrA = miterRight[s];
-      final mrB = miterRight[nextIdx];
 
       // Top & bottom border rods on both mitered faces
-      for (final zRod in [zBotOff + 0.012, zTopOff - 0.012]) {
+      for (final (zA, zB) in [
+        (zBotA + 0.012, zBotB + 0.012),
+        (zTopA - 0.012, zTopB - 0.012),
+      ]) {
         for (final (fa, fb) in [(mlA, mlB), (mrA, mrB)]) {
           _addSlopedBeam(
             tris,
@@ -576,10 +814,10 @@ class ArchitectFence3dMesh {
             b: fb,
             n: n,
             halfThick: frameHalf,
-            zBotA: za + zRod - frameHalf,
-            zTopA: za + zRod + frameHalf,
-            zBotB: zb + zRod - frameHalf,
-            zTopB: zb + zRod + frameHalf,
+            zBotA: zA - frameHalf,
+            zTopA: zA + frameHalf,
+            zBotB: zB - frameHalf,
+            zTopB: zB + frameHalf,
             color: _galvanizedWireColor,
             material: _galvanizedSteelMat,
           );
@@ -587,10 +825,11 @@ class ArchitectFence3dMesh {
       }
 
       // Intermediate horizontal welded wires on both mitered faces
-      final hWireCount = math.max(1, ((tierH - 0.12) / wireStepZ).floor());
-      final hStep = (tierH - 0.04) / (hWireCount + 1);
+      final hWireCount = math.max(1, ((effTierH - 0.12) / wireStepZ).floor());
       for (var w = 1; w <= hWireCount; w++) {
-        final zRod = zBotOff + 0.02 + w * hStep;
+        final frac = w / (hWireCount + 1);
+        final zRodA = (zBotA + 0.02) + ((zTopA - 0.02) - (zBotA + 0.02)) * frac;
+        final zRodB = (zBotB + 0.02) + ((zTopB - 0.02) - (zBotB + 0.02)) * frac;
         for (final (fa, fb) in [(mlA, mlB), (mrA, mrB)]) {
           _addSlopedBeam(
             tris,
@@ -598,10 +837,10 @@ class ArchitectFence3dMesh {
             b: fb,
             n: n,
             halfThick: wireHalf,
-            zBotA: za + zRod - wireHalf,
-            zTopA: za + zRod + wireHalf,
-            zBotB: zb + zRod - wireHalf,
-            zTopB: zb + zRod + wireHalf,
+            zBotA: zRodA - wireHalf,
+            zTopA: zRodA + wireHalf,
+            zBotB: zRodB - wireHalf,
+            zTopB: zRodB + wireHalf,
             color: _galvanizedWireColor,
             material: _galvanizedSteelMat,
             includeEndCaps: false,
@@ -615,7 +854,8 @@ class ArchitectFence3dMesh {
       for (var vw = 0; vw <= totalVWires; vw++) {
         final t = vw / totalVWires;
         final pos = Offset.lerp(a, b, t)!;
-        final gz = za + (zb - za) * t;
+        final zBotHere = zBotA + (zBotB - zBotA) * t;
+        final zTopHere = zTopA + (zTopB - zTopA) * t;
         final isRib = vw % vWiresPerCell == 0;
         final rHalf = isRib ? frameHalf : wireHalf;
         final leftWirePos = Offset.lerp(mlA, mlB, t)!;
@@ -629,8 +869,8 @@ class ArchitectFence3dMesh {
             n: n,
             halfU: rHalf,
             halfN: rHalf,
-            zBot: gz + zBotOff,
-            zTop: gz + zTopOff,
+            zBot: zBotHere,
+            zTop: zTopHere,
             color: _galvanizedWireColor,
             material: _galvanizedSteelMat,
           );
@@ -640,7 +880,7 @@ class ArchitectFence3dMesh {
         if (isRib) {
           final midN = (cageLeft - cageRight) * 0.5;
           final halfSpanN = (cageLeft + cageRight) * 0.5;
-          for (final zTie in [zBotOff + 0.012, zTopOff - 0.012]) {
+          for (final zTie in [zBotHere + 0.012, zTopHere - 0.012]) {
             _addOrientedBox(
               tris,
               center: pos + n * midN,
@@ -648,17 +888,18 @@ class ArchitectFence3dMesh {
               n: n,
               halfU: frameHalf,
               halfN: halfSpanN,
-              zBot: gz + zTie - frameHalf,
-              zTop: gz + zTie + frameHalf,
+              zBot: zTie - frameHalf,
+              zTop: zTie + frameHalf,
               color: _galvanizedWireColor,
               material: _galvanizedSteelMat,
             );
           }
-          // Close open fence end faces with transverse horizontal mesh wires
-          if (!isClosed &&
-              ((s == 0 && vw == 0) || (s == segCount - 1 && vw == totalVWires))) {
+          // Close open ends & stepped riser faces with transverse horizontal mesh wires
+          if ((vw == 0 && stepStart) || (vw == totalVWires && stepEnd)) {
             for (var w = 1; w <= hWireCount; w++) {
-              final zRod = zBotOff + 0.02 + w * hStep;
+              final frac = w / (hWireCount + 1);
+              final zRod =
+                  (zBotHere + 0.02) + ((zTopHere - 0.02) - (zBotHere + 0.02)) * frac;
               _addOrientedBox(
                 tris,
                 center: pos + n * midN,
@@ -666,8 +907,8 @@ class ArchitectFence3dMesh {
                 n: n,
                 halfU: wireHalf,
                 halfN: halfSpanN,
-                zBot: gz + zRod - wireHalf,
-                zTop: gz + zRod + wireHalf,
+                zBot: zRod - wireHalf,
+                zTop: zRod + wireHalf,
                 color: _galvanizedWireColor,
                 material: _galvanizedSteelMat,
               );
@@ -683,8 +924,8 @@ class ArchitectFence3dMesh {
             n: n,
             halfU: wireHalf,
             halfN: halfSpanN,
-            zBot: gz + zTopOff - wireHalf * 2,
-            zTop: gz + zTopOff,
+            zBot: zTopHere - wireHalf * 2,
+            zTop: zTopHere,
             color: _galvanizedWireColor,
             material: _galvanizedSteelMat,
           );
@@ -702,33 +943,88 @@ class ArchitectFence3dMesh {
     ArchitectSiteFence fence,
     List<Offset> pts,
     bool isClosed,
-    double Function(Offset p) groundZAt,
-  ) {
+    double Function(Offset p) groundZAt, {
+    double? Function(Offset p)? tryGroundZAt,
+  }) {
     final h = math.max(0.60, fence.height);
-    final plinthH = fence.plinthHeight.clamp(0.14, math.min(0.30, h * 0.25));
+    final plinthH = fence.plinthHeight
+        .clamp(0.14, math.min<double>(0.30, h * 0.25))
+        .toDouble();
     final halfT = math.max(0.06, fence.thickness * 0.5);
     final postSize = fence.pierSize.clamp(0.08, 0.14);
     final postHalf = postSize * 0.5;
     final plinthHalf = math.max(halfT * 0.85, postHalf + 0.015);
+    final probeOffset = plinthHalf + 0.10;
+    final isStepped = fence.slopeMode == ArchitectFenceSlopeMode.stepped;
+    const embed = 0.18;
 
-    // 1. Sleek low concrete kerb plinth
-    _addMiteredProfile(
-      tris,
-      pts: pts,
-      isClosed: isClosed,
-      leftBot: plinthHalf,
-      rightBot: plinthHalf,
-      leftTop: plinthHalf,
-      rightTop: plinthHalf,
-      zBotAt: (p) => groundZAt(p) - 0.08,
-      zTopAt: (p) => groundZAt(p) + plinthH,
-      color: _plinthBodyColor,
+    final plan = _planBays(pts, isClosed, fence.pierSpacing);
+    final grounding = _samplePlanGrounding(
+      plan,
+      probeOffset: probeOffset,
+      groundZAt: groundZAt,
+      tryGroundZAt: tryGroundZAt,
     );
 
-    // 2. Slim anthracite powder-coated steel posts + post cap plates
-    final plan = _planBays(pts, isClosed, fence.pierSpacing);
-    for (final node in plan.nodes) {
-      final gz = groundZAt(node.pos);
+    // 1. Sleek low concrete kerb plinth per bay
+    for (var bIdx = 0; bIdx < plan.bays.length; bIdx++) {
+      final bay = plan.bays[bIdx];
+      final bGround = grounding.bays[bIdx];
+      if (isStepped) {
+        final zBot = bGround.zLowMin - embed;
+        final zTop = bGround.zHighMax + plinthH;
+        _addSlopedBeam(
+          tris,
+          a: bay.start,
+          b: bay.end,
+          n: bay.n,
+          halfThick: plinthHalf,
+          zBotA: zBot,
+          zTopA: zTop,
+          zBotB: zBot,
+          zTopB: zTop,
+          color: _plinthBodyColor,
+        );
+      } else {
+        _addSegmentedBayBeam(
+          tris,
+          bay: bay,
+          bGround: bGround,
+          tStart: 0.0,
+          tEnd: 1.0,
+          halfThick: plinthHalf,
+          zBotFromLow: -embed,
+          zTopFromHigh: plinthH,
+          color: _plinthBodyColor,
+        );
+      }
+    }
+
+    // 2. Slim anthracite powder-coated steel posts + post cap plates (+ corner plinth pedestal)
+    for (var nIdx = 0; nIdx < plan.nodes.length; nIdx++) {
+      final node = plan.nodes[nIdx];
+      final span = grounding.nodeSpan(
+        nIdx,
+        stepped: isStepped,
+        embed: embed,
+        height: h,
+      );
+      if (node.isBendCorner && plinthHalf > postHalf) {
+        final plinthTop = isStepped
+            ? span.zTop - h + plinthH
+            : grounding.nodes[nIdx].zHigh + plinthH;
+        _addOrientedBox(
+          tris,
+          center: node.pos,
+          u: node.u,
+          n: node.n,
+          halfU: plinthHalf,
+          halfN: plinthHalf,
+          zBot: span.zBot,
+          zTop: plinthTop,
+          color: _plinthBodyColor,
+        );
+      }
       _addOrientedBox(
         tris,
         center: node.pos,
@@ -736,8 +1032,8 @@ class ArchitectFence3dMesh {
         n: node.n,
         halfU: postHalf,
         halfN: postHalf,
-        zBot: gz - 0.08,
-        zTop: gz + h - 0.016,
+        zBot: span.zBot,
+        zTop: span.zTop - 0.016,
         color: _anthraciteColor,
         material: _anthraciteMat,
       );
@@ -748,8 +1044,8 @@ class ArchitectFence3dMesh {
         n: node.n,
         halfU: postHalf + 0.012,
         halfN: postHalf + 0.012,
-        zBot: gz + h - 0.016,
-        zTop: gz + h,
+        zBot: span.zTop - 0.016,
+        zTop: span.zTop,
         color: _anthraciteLouverColor,
         material: _anthraciteLouverMat,
       );
@@ -768,12 +1064,19 @@ class ArchitectFence3dMesh {
     const tiltDz = 0.048;
     const bladeThickZ = 0.014;
 
-    for (final bay in plan.bays) {
+    for (var bIdx = 0; bIdx < plan.bays.length; bIdx++) {
+      final bay = plan.bays[bIdx];
+      final bGround = grounding.bays[bIdx];
       if (bay.length - postSize < 0.10) continue;
-      final pStart = bay.start + bay.u * (postHalf - 0.004);
-      final pEnd = bay.end - bay.u * (postHalf - 0.004);
-      final za = groundZAt(pStart);
-      final zb = groundZAt(pEnd);
+      final edgeInset = postHalf - 0.004;
+      final pStart = bay.start + bay.u * edgeInset;
+      final pEnd = bay.end - bay.u * edgeInset;
+      final tStart = (edgeInset / bay.length).clamp(0.0, 0.45);
+      final tEnd = (1.0 - tStart).clamp(0.55, 1.0);
+      final za = isStepped
+          ? bGround.zHighMax
+          : bGround.sampleAtT(tStart).zHigh;
+      final zb = isStepped ? bGround.zHighMax : bGround.sampleAtT(tEnd).zHigh;
 
       // Top rail spanning post to post
       _addSlopedBeam(
@@ -794,7 +1097,7 @@ class ArchitectFence3dMesh {
       // Center vertical stiffener behind blades on wide bays
       if (bay.length > 1.55) {
         final mid = Offset.lerp(pStart, pEnd, 0.5)!;
-        final mz = groundZAt(mid);
+        final mz = isStepped ? bGround.zHighMax : bGround.sampleAtT(0.5).zHigh;
         _addOrientedBox(
           tris,
           center: mid,
@@ -839,6 +1142,7 @@ class ArchitectFence3dMesh {
     List<Offset> pts,
     bool isClosed,
     double Function(Offset p) groundZAt, {
+    double? Function(Offset p)? tryGroundZAt,
     required bool detailed,
   }) {
     final h = math.max(0.75, fence.height);
@@ -847,44 +1151,101 @@ class ArchitectFence3dMesh {
     final pierSize = math.max(fence.pierSize, math.max(halfT * 2.4, 0.34));
     final pierHalf = pierSize * 0.5;
     final plinthHalf = math.max(halfT * 0.90, 0.11);
+    final probeOffset = math.max(plinthHalf, pierHalf) + 0.10;
+    final isStepped = fence.slopeMode == ArchitectFenceSlopeMode.stepped;
+    const embed = 0.20;
 
-    // 1. Plinth + cast stone coping
-    _addMiteredProfile(
-      tris,
-      pts: pts,
-      isClosed: isClosed,
-      leftBot: plinthHalf,
-      rightBot: plinthHalf,
-      leftTop: plinthHalf,
-      rightTop: plinthHalf,
-      zBotAt: (p) => groundZAt(p) - 0.10,
-      zTopAt: (p) => groundZAt(p) + plinthH - 0.035,
-      color: _plinthBodyColor,
+    final plan = _planBays(pts, isClosed, fence.pierSpacing);
+    final grounding = _samplePlanGrounding(
+      plan,
+      probeOffset: probeOffset,
+      groundZAt: groundZAt,
+      tryGroundZAt: tryGroundZAt,
     );
-    _addMiteredProfile(
-      tris,
-      pts: pts,
-      isClosed: isClosed,
-      leftBot: plinthHalf + 0.015,
-      rightBot: plinthHalf + 0.015,
-      leftTop: plinthHalf + 0.015,
-      rightTop: plinthHalf + 0.015,
-      zBotAt: (p) => groundZAt(p) + plinthH - 0.035,
-      zTopAt: (p) => groundZAt(p) + plinthH,
-      color: _plinthCapColor,
-    );
+
+    // 1. Bay-segmented concrete plinth + cast stone coping
+    for (var bIdx = 0; bIdx < plan.bays.length; bIdx++) {
+      final bay = plan.bays[bIdx];
+      final bGround = grounding.bays[bIdx];
+      final trim = math.min(pierHalf - 0.01, bay.length * 0.25);
+      if (bay.length - 2 * trim < 0.04) continue;
+      final pStart = bay.start + bay.u * trim;
+      final pEnd = bay.end - bay.u * trim;
+
+      if (isStepped) {
+        final zBot = bGround.zLowMin - embed;
+        final zBodyTop = bGround.zHighMax + plinthH - 0.035;
+        final zCapTop = bGround.zHighMax + plinthH;
+        _addSlopedBeam(
+          tris,
+          a: pStart,
+          b: pEnd,
+          n: bay.n,
+          halfThick: plinthHalf,
+          zBotA: zBot,
+          zTopA: zBodyTop,
+          zBotB: zBot,
+          zTopB: zBodyTop,
+          color: _plinthBodyColor,
+        );
+        _addSlopedBeam(
+          tris,
+          a: pStart,
+          b: pEnd,
+          n: bay.n,
+          halfThick: plinthHalf + 0.015,
+          zBotA: zBodyTop,
+          zTopA: zCapTop,
+          zBotB: zBodyTop,
+          zTopB: zCapTop,
+          color: _plinthCapColor,
+        );
+      } else {
+        final t0 = trim / bay.length;
+        final t1 = 1.0 - t0;
+        _addSegmentedBayBeam(
+          tris,
+          bay: bay,
+          bGround: bGround,
+          tStart: t0,
+          tEnd: t1,
+          halfThick: plinthHalf,
+          zBotFromLow: -embed,
+          zTopFromHigh: plinthH - 0.035,
+          color: _plinthBodyColor,
+        );
+        _addSegmentedBayBeam(
+          tris,
+          bay: bay,
+          bGround: bGround,
+          tStart: t0,
+          tEnd: t1,
+          halfThick: plinthHalf + 0.015,
+          zBotFromLow: plinthH - 0.035,
+          zTopFromHigh: plinthH,
+          useHighForBot: true,
+          color: _plinthCapColor,
+        );
+      }
+    }
 
     // 2. Oriented masonry piers
-    final plan = _planBays(pts, isClosed, fence.pierSpacing);
-    for (final node in plan.nodes) {
+    for (var nIdx = 0; nIdx < plan.nodes.length; nIdx++) {
+      final node = plan.nodes[nIdx];
+      final span = grounding.nodeSpan(
+        nIdx,
+        stepped: isStepped,
+        embed: embed,
+        height: h,
+      );
       _addMasonryPier(
         tris,
         center: node.pos,
         u: node.u,
         n: node.n,
         halfW: pierHalf,
-        zGround: groundZAt(node.pos),
-        height: h,
+        zBot: span.zBot,
+        zTop: span.zTop,
       );
     }
 
@@ -899,13 +1260,20 @@ class ArchitectFence3dMesh {
     final zSpearBaseOff = zTopRailOff + 0.08;
     final zSpearTipOff = zSpearBaseOff + 0.095;
 
-    for (final bay in plan.bays) {
+    for (var bIdx = 0; bIdx < plan.bays.length; bIdx++) {
+      final bay = plan.bays[bIdx];
+      final bGround = grounding.bays[bIdx];
       final clearSpan = bay.length - pierSize;
       if (clearSpan < 0.16) continue;
-      final pStart = bay.start + bay.u * (pierHalf - 0.004);
-      final pEnd = bay.end - bay.u * (pierHalf - 0.004);
-      final za = groundZAt(pStart);
-      final zb = groundZAt(pEnd);
+      final edgeInset = pierHalf - 0.004;
+      final pStart = bay.start + bay.u * edgeInset;
+      final pEnd = bay.end - bay.u * edgeInset;
+      final tStart = (edgeInset / bay.length).clamp(0.0, 0.45);
+      final tEnd = (1.0 - tStart).clamp(0.55, 1.0);
+      final za = isStepped
+          ? bGround.zHighMax
+          : bGround.sampleAtT(tStart).zHigh;
+      final zb = isStepped ? bGround.zHighMax : bGround.sampleAtT(tEnd).zHigh;
 
       // Horizontal wrought iron rails (bottom, dog-bar rail, top)
       for (final zRail in [zBotRailOff, zLowDogRailOff, zTopRailOff]) {
@@ -931,8 +1299,11 @@ class ArchitectFence3dMesh {
       final step = clearSpan / (picketCount + 1);
 
       for (var i = 1; i <= picketCount; i++) {
-        final pos = bay.start + bay.u * (pierHalf + i * step);
-        final pz = groundZAt(pos);
+        final distAlong = pierHalf + i * step;
+        final pos = bay.start + bay.u * distAlong;
+        final pz = isStepped
+            ? bGround.zHighMax
+            : bGround.sampleAtT((distAlong / bay.length).clamp(0.0, 1.0)).zHigh;
         // Main vertical square picket shaft
         _addOrientedBox(
           tris,
@@ -979,8 +1350,13 @@ class ArchitectFence3dMesh {
       // Shorter intermediate dog-bars between main pickets in the lower band
       if (detailed) {
         for (var i = 0; i <= picketCount; i++) {
-          final pos = bay.start + bay.u * (pierHalf + (i + 0.5) * step);
-          final pz = groundZAt(pos);
+          final distAlong = pierHalf + (i + 0.5) * step;
+          final pos = bay.start + bay.u * distAlong;
+          final pz = isStepped
+              ? bGround.zHighMax
+              : bGround
+                    .sampleAtT((distAlong / bay.length).clamp(0.0, 1.0))
+                    .zHigh;
           _addOrientedBox(
             tris,
             center: pos,
@@ -1022,6 +1398,7 @@ class ArchitectFence3dMesh {
     List<Offset> pts,
     bool isClosed,
     double Function(Offset p) groundZAt, {
+    double? Function(Offset p)? tryGroundZAt,
     required bool detailed,
   }) {
     final h = math.max(0.50, fence.height);
@@ -1030,90 +1407,227 @@ class ArchitectFence3dMesh {
     final halfTTop = math.max(0.08, halfTBot * 0.72);
     final topBack = halfTBot * 0.94;
     final topFront = math.max(0.06, halfTTop * 2 - topBack);
+    final isStepped = fence.slopeMode == ArchitectFenceSlopeMode.stepped;
 
-    // 1. Protruding RC strip footing (heel on +n, toe on -n)
-    _addMiteredProfile(
-      tris,
-      pts: pts,
-      isClosed: isClosed,
-      leftBot: halfTBot + 0.34,
-      rightBot: halfTBot + 0.16,
-      leftTop: halfTBot + 0.34,
-      rightTop: halfTBot + 0.16,
-      zBotAt: (p) => groundZAt(p) - 0.32,
-      zTopAt: (p) => groundZAt(p) - 0.06,
-      color: _rcFootingColor,
+    final plan = _planBays(pts, isClosed, math.max(1.50, fence.pierSpacing));
+    final grounding = _samplePlanGrounding(
+      plan,
+      probeOffset: halfTBot + 0.20,
+      groundZAt: groundZAt,
+      tryGroundZAt: tryGroundZAt,
     );
 
-    // 2. Tapered battered concrete stem wall
-    _addMiteredProfile(
-      tris,
-      pts: pts,
-      isClosed: isClosed,
-      leftBot: halfTBot,
-      rightBot: halfTBot,
-      leftTop: topBack,
-      rightTop: topFront,
-      zBotAt: (p) => groundZAt(p) - 0.06,
-      zTopAt: (p) => groundZAt(p) + h - 0.06,
-      color: _rcStemColor,
-    );
+    final footL = halfTBot + 0.34;
+    final footR = halfTBot + 0.16;
+    final capBotL = topBack + 0.03;
+    final capBotR = topFront + 0.03;
+    final capTopL = topBack + 0.02;
+    final capTopR = topFront + 0.02;
 
-    // 3. Beveled/overhanging precast concrete coping cap
-    _addMiteredProfile(
-      tris,
-      pts: pts,
-      isClosed: isClosed,
-      leftBot: topBack + 0.03,
-      rightBot: topFront + 0.03,
-      leftTop: topBack + 0.02,
-      rightTop: topFront + 0.02,
-      zBotAt: (p) => groundZAt(p) + h - 0.06,
-      zTopAt: (p) => groundZAt(p) + h,
-      color: _rcCapColor,
-    );
+    final mFootL = ArchitectPathway.offsetChain(pts, footL, closed: isClosed);
+    final mFootR = ArchitectPathway.offsetChain(pts, -footR, closed: isClosed);
+    final mStemBL = ArchitectPathway.offsetChain(pts, halfTBot, closed: isClosed);
+    final mStemBR = ArchitectPathway.offsetChain(pts, -halfTBot, closed: isClosed);
+    final mStemTL = ArchitectPathway.offsetChain(pts, topBack, closed: isClosed);
+    final mStemTR = ArchitectPathway.offsetChain(pts, -topFront, closed: isClosed);
+    final mCapBL = ArchitectPathway.offsetChain(pts, capBotL, closed: isClosed);
+    final mCapBR = ArchitectPathway.offsetChain(pts, -capBotR, closed: isClosed);
+    final mCapTL = ArchitectPathway.offsetChain(pts, capTopL, closed: isClosed);
+    final mCapTR = ArchitectPathway.offsetChain(pts, -capTopR, closed: isClosed);
 
-    if (!detailed) return;
+    final bayCount = plan.bays.length;
+    for (var bIdx = 0; bIdx < bayCount; bIdx++) {
+      final bay = plan.bays[bIdx];
+      final bGround = grounding.bays[bIdx];
+      final (fl0, fl1) = _bayOffsetEndpoints(bay, mFootL, footL);
+      final (fr0, fr1) = _bayOffsetEndpoints(bay, mFootR, -footR);
+      final (sbl0, sbl1) = _bayOffsetEndpoints(bay, mStemBL, halfTBot);
+      final (sbr0, sbr1) = _bayOffsetEndpoints(bay, mStemBR, -halfTBot);
+      final (stl0, stl1) = _bayOffsetEndpoints(bay, mStemTL, topBack);
+      final (str0, str1) = _bayOffsetEndpoints(bay, mStemTR, -topFront);
+      final (cbl0, cbl1) = _bayOffsetEndpoints(bay, mCapBL, capBotL);
+      final (cbr0, cbr1) = _bayOffsetEndpoints(bay, mCapBR, -capBotR);
+      final (ctl0, ctl1) = _bayOffsetEndpoints(bay, mCapTL, capTopL);
+      final (ctr0, ctr1) = _bayOffsetEndpoints(bay, mCapTR, -capTopR);
 
-    // 4. Control joint reveals & front PVC weep-hole drainage pipes
-    final segCount = isClosed ? pts.length : pts.length - 1;
-    final batterRatio = (halfTBot - topFront) / math.max(0.25, h - 0.06);
-    for (var s = 0; s < segCount; s++) {
-      final a = pts[s];
-      final b = pts[(s + 1) % pts.length];
-      final delta = b - a;
-      final len = delta.distance;
-      if (len < 0.40) continue;
-      final u = delta / len;
-      final n = Offset(-u.dy, u.dx);
-      final za = groundZAt(a);
-      final zb = groundZAt(b);
+      if (isStepped) {
+        final zLow = bGround.zLowMin;
+        final zTop = bGround.zHighMax + h;
+        final hasPrev = isClosed || bIdx > 0;
+        final hasNext = isClosed || bIdx < bayCount - 1;
+        final prevG = hasPrev ? grounding.bays[(bIdx - 1 + bayCount) % bayCount] : bGround;
+        final nextG = hasNext ? grounding.bays[(bIdx + 1) % bayCount] : bGround;
+        final capStart = !hasPrev ||
+            (zLow - prevG.zLowMin).abs() > 0.015 ||
+            (bGround.zHighMax - prevG.zHighMax).abs() > 0.015;
+        final capEnd = !hasNext ||
+            (zLow - nextG.zLowMin).abs() > 0.015 ||
+            (bGround.zHighMax - nextG.zHighMax).abs() > 0.015;
 
-      // Control joint shadow bands every ~3.0 m
-      for (var d = 3.0; d < len - 0.40; d += 3.0) {
-        final t = d / len;
-        final p = Offset.lerp(a, b, t)!;
-        final gz = za + (zb - za) * t;
+        // 1. Protruding RC strip footing
+        _addPrismSpan(
+          tris,
+          bl0: fl0,
+          bl1: fl1,
+          br0: fr0,
+          br1: fr1,
+          tl0: fl0,
+          tl1: fl1,
+          tr0: fr0,
+          tr1: fr1,
+          zB0: zLow - 0.32,
+          zB1: zLow - 0.32,
+          zT0: zLow - 0.06,
+          zT1: zLow - 0.06,
+          color: _rcFootingColor,
+          capStart: capStart,
+          capEnd: capEnd,
+        );
+        // 2. Tapered battered concrete stem wall
+        _addPrismSpan(
+          tris,
+          bl0: sbl0,
+          bl1: sbl1,
+          br0: sbr0,
+          br1: sbr1,
+          tl0: stl0,
+          tl1: stl1,
+          tr0: str0,
+          tr1: str1,
+          zB0: zLow - 0.06,
+          zB1: zLow - 0.06,
+          zT0: zTop - 0.06,
+          zT1: zTop - 0.06,
+          color: _rcStemColor,
+          capStart: capStart,
+          capEnd: capEnd,
+        );
+        // 3. Beveled/overhanging precast concrete coping cap
+        _addPrismSpan(
+          tris,
+          bl0: cbl0,
+          bl1: cbl1,
+          br0: cbr0,
+          br1: cbr1,
+          tl0: ctl0,
+          tl1: ctl1,
+          tr0: ctr0,
+          tr1: ctr1,
+          zB0: zTop - 0.06,
+          zB1: zTop - 0.06,
+          zT0: zTop,
+          zT1: zTop,
+          color: _rcCapColor,
+          capStart: capStart,
+          capEnd: capEnd,
+        );
+      } else {
+        final subCount = bGround.samples.length - 1;
+        for (var k = 0; k < subCount; k++) {
+          final t0 = k / subCount;
+          final t1 = (k + 1) / subCount;
+          final s0 = bGround.samples[k];
+          final s1 = bGround.samples[k + 1];
+          final isOpenStart = !isClosed && bIdx == 0 && k == 0;
+          final isOpenEnd = !isClosed && bIdx == bayCount - 1 && k == subCount - 1;
+          _addPrismSpan(
+            tris,
+            bl0: Offset.lerp(fl0, fl1, t0)!,
+            bl1: Offset.lerp(fl0, fl1, t1)!,
+            br0: Offset.lerp(fr0, fr1, t0)!,
+            br1: Offset.lerp(fr0, fr1, t1)!,
+            tl0: Offset.lerp(fl0, fl1, t0)!,
+            tl1: Offset.lerp(fl0, fl1, t1)!,
+            tr0: Offset.lerp(fr0, fr1, t0)!,
+            tr1: Offset.lerp(fr0, fr1, t1)!,
+            zB0: s0.zLow - 0.32,
+            zB1: s1.zLow - 0.32,
+            zT0: s0.zLow - 0.06,
+            zT1: s1.zLow - 0.06,
+            color: _rcFootingColor,
+            capStart: isOpenStart,
+            capEnd: isOpenEnd,
+          );
+          _addPrismSpan(
+            tris,
+            bl0: Offset.lerp(sbl0, sbl1, t0)!,
+            bl1: Offset.lerp(sbl0, sbl1, t1)!,
+            br0: Offset.lerp(sbr0, sbr1, t0)!,
+            br1: Offset.lerp(sbr0, sbr1, t1)!,
+            tl0: Offset.lerp(stl0, stl1, t0)!,
+            tl1: Offset.lerp(stl0, stl1, t1)!,
+            tr0: Offset.lerp(str0, str1, t0)!,
+            tr1: Offset.lerp(str0, str1, t1)!,
+            zB0: s0.zLow - 0.06,
+            zB1: s1.zLow - 0.06,
+            zT0: s0.zHigh + h - 0.06,
+            zT1: s1.zHigh + h - 0.06,
+            color: _rcStemColor,
+            capStart: isOpenStart,
+            capEnd: isOpenEnd,
+          );
+          _addPrismSpan(
+            tris,
+            bl0: Offset.lerp(cbl0, cbl1, t0)!,
+            bl1: Offset.lerp(cbl0, cbl1, t1)!,
+            br0: Offset.lerp(cbr0, cbr1, t0)!,
+            br1: Offset.lerp(cbr0, cbr1, t1)!,
+            tl0: Offset.lerp(ctl0, ctl1, t0)!,
+            tl1: Offset.lerp(ctl0, ctl1, t1)!,
+            tr0: Offset.lerp(ctr0, ctr1, t0)!,
+            tr1: Offset.lerp(ctr0, ctr1, t1)!,
+            zB0: s0.zHigh + h - 0.06,
+            zB1: s1.zHigh + h - 0.06,
+            zT0: s0.zHigh + h,
+            zT1: s1.zHigh + h,
+            color: _rcCapColor,
+            capStart: isOpenStart,
+            capEnd: isOpenEnd,
+          );
+        }
+      }
+
+      if (!detailed || bay.length < 0.40) continue;
+
+      // 4. Control joint reveals at bay end (for intermediate joints) & weep holes
+      final u = bay.u;
+      final n = bay.n;
+      final len = bay.length;
+      if (isClosed || bIdx < bayCount - 1) {
+        final zJointBot = isStepped
+            ? bGround.zLowMin
+            : bGround.samples.last.zLow;
+        final zJointTop = isStepped
+            ? bGround.zHighMax + h - 0.06
+            : bGround.samples.last.zHigh + h - 0.06;
         _addOrientedBox(
           tris,
-          center: p,
+          center: bay.end,
           u: u,
           n: n,
           halfU: 0.012,
           halfN: halfTBot + 0.004,
-          zBot: gz,
-          zTop: gz + h - 0.06,
+          zBot: zJointBot,
+          zTop: zJointTop,
           color: _rcJointColor,
         );
       }
 
       // Weep hole drainage pipes along the battered front (-n) face
       final weepZOff = math.min(0.26, h * 0.35);
-      final frontFaceOut = halfTBot - batterRatio * weepZOff;
+      final batterRatio = (halfTBot - topFront) / math.max(0.25, h - 0.06);
       for (var d = 0.90; d < len - 0.35; d += 1.80) {
         final t = d / len;
-        final p = Offset.lerp(a, b, t)! - n * (frontFaceOut + 0.008);
-        final gz = za + (zb - za) * t;
+        final sample = bGround.sampleAtT(t);
+        final zFront = isStepped ? bGround.zRightMin : sample.zRight;
+        final zTopHere = (isStepped ? bGround.zHighMax : sample.zHigh) + h;
+        final zWeep = math.min(zFront + weepZOff, zTopHere - 0.14);
+        final heightAboveBot = math.max(0.0, zWeep - bGround.zLowMin);
+        final frontFaceOut = (halfTBot - batterRatio * heightAboveBot).clamp(
+          topFront,
+          halfTBot,
+        );
+        final p = Offset.lerp(bay.start, bay.end, t)! - n * (frontFaceOut + 0.008);
         _addOrientedBox(
           tris,
           center: p,
@@ -1121,8 +1635,8 @@ class ArchitectFence3dMesh {
           n: n,
           halfU: 0.028,
           halfN: 0.018,
-          zBot: gz + weepZOff - 0.028,
-          zTop: gz + weepZOff + 0.028,
+          zBot: zWeep - 0.028,
+          zTop: zWeep + 0.028,
           color: _rcWeepPipeColor,
         );
         _addOrientedBox(
@@ -1132,8 +1646,8 @@ class ArchitectFence3dMesh {
           n: n,
           halfU: 0.016,
           halfN: 0.012,
-          zBot: gz + weepZOff - 0.016,
-          zTop: gz + weepZOff + 0.016,
+          zBot: zWeep - 0.016,
+          zTop: zWeep + 0.016,
           color: _rcWeepBoreColor,
         );
       }
@@ -1141,8 +1655,182 @@ class ArchitectFence3dMesh {
   }
 
   // ===========================================================================
-  // 6. SHARED PRISM, PIER, BAY & HASH HELPERS
+  // 6. SHARED PRISM, PIER, BAY, GROUNDING & HASH HELPERS
   // ===========================================================================
+
+  static _PlanGrounding _samplePlanGrounding(
+    _FenceBayPlan plan, {
+    required double probeOffset,
+    required double Function(Offset p) groundZAt,
+    double? Function(Offset p)? tryGroundZAt,
+  }) {
+    final nodeSamples = [
+      for (final node in plan.nodes)
+        _samplePoint(node.pos, node.n, probeOffset, groundZAt, tryGroundZAt),
+    ];
+    final bayInfos = <_BayTerrainInfo>[];
+    for (final bay in plan.bays) {
+      final samples = <_CrossSectionSample>[];
+      var zLowMin = double.infinity;
+      var zHighMax = double.negativeInfinity;
+      var zRightMin = double.infinity;
+      for (var k = 0; k <= 4; k++) {
+        final t = k / 4.0;
+        final pt = Offset.lerp(bay.start, bay.end, t)!;
+        final s = _samplePoint(
+          pt,
+          bay.n,
+          probeOffset,
+          groundZAt,
+          tryGroundZAt,
+        );
+        samples.add(s);
+        if (s.zLow < zLowMin) zLowMin = s.zLow;
+        if (s.zHigh > zHighMax) zHighMax = s.zHigh;
+        if (s.zRight < zRightMin) zRightMin = s.zRight;
+      }
+      bayInfos.add(
+        _BayTerrainInfo(
+          samples: samples,
+          zLowMin: zLowMin,
+          zHighMax: zHighMax,
+          zRightMin: zRightMin,
+        ),
+      );
+    }
+    return _PlanGrounding(plan, nodeSamples, bayInfos);
+  }
+
+  static _CrossSectionSample _samplePoint(
+    Offset p,
+    Offset n,
+    double probeOffset,
+    double Function(Offset p) groundZAt,
+    double? Function(Offset p)? tryGroundZAt,
+  ) {
+    double? evalOpt(Offset pt) =>
+        tryGroundZAt != null ? tryGroundZAt(pt) : groundZAt(pt);
+
+    final zC = evalOpt(p);
+    final zL = evalOpt(p + n * probeOffset);
+    final zR = evalOpt(p - n * probeOffset);
+    final fallback = zC ?? zL ?? zR ?? groundZAt(p);
+    final effC = zC ?? fallback;
+    final effL = zL ?? fallback;
+    final effR = zR ?? fallback;
+    final zLow = math.min(effC, math.min(effL, effR));
+    final zHigh = math.max(effC, math.max(effL, effR));
+    return _CrossSectionSample(
+      zLow: zLow,
+      zHigh: zHigh,
+      zLeft: effL,
+      zRight: effR,
+    );
+  }
+
+  static (Offset, Offset) _bayOffsetEndpoints(
+    _FenceBay bay,
+    List<Offset> miterChain,
+    double signedOffset,
+  ) => (
+    _baySingleEndpoint(bay, miterChain, signedOffset, start: true),
+    _baySingleEndpoint(bay, miterChain, signedOffset, start: false),
+  );
+
+  static Offset _baySingleEndpoint(
+    _FenceBay bay,
+    List<Offset> miterChain,
+    double signedOffset, {
+    required bool start,
+  }) {
+    final vertexIdx = start ? bay.startVertexIdx : bay.endVertexIdx;
+    if (vertexIdx != null && vertexIdx >= 0 && vertexIdx < miterChain.length) {
+      return miterChain[vertexIdx];
+    }
+    final pt = start ? bay.start : bay.end;
+    return pt + bay.n * signedOffset;
+  }
+
+  static void _addSegmentedBayBeam(
+    List<Triangle3D> tris, {
+    required _FenceBay bay,
+    required _BayTerrainInfo bGround,
+    required double tStart,
+    required double tEnd,
+    required double halfThick,
+    required double zBotFromLow,
+    required double zTopFromHigh,
+    bool useHighForBot = false,
+    required Color color,
+    MeshMaterial? material,
+  }) {
+    if (tEnd <= tStart + 1e-4) return;
+    const subCount = 4;
+    for (var k = 0; k < subCount; k++) {
+      final ta = tStart + (tEnd - tStart) * (k / subCount);
+      final tb = tStart + (tEnd - tStart) * ((k + 1) / subCount);
+      final pa = Offset.lerp(bay.start, bay.end, ta)!;
+      final pb = Offset.lerp(bay.start, bay.end, tb)!;
+      final sa = bGround.sampleAtT(ta);
+      final sb = bGround.sampleAtT(tb);
+      _addSlopedBeam(
+        tris,
+        a: pa,
+        b: pb,
+        n: bay.n,
+        halfThick: halfThick,
+        zBotA: (useHighForBot ? sa.zHigh : sa.zLow) + zBotFromLow,
+        zTopA: sa.zHigh + zTopFromHigh,
+        zBotB: (useHighForBot ? sb.zHigh : sb.zLow) + zBotFromLow,
+        zTopB: sb.zHigh + zTopFromHigh,
+        color: color,
+        material: material,
+        includeEndCaps: k == 0 || k == subCount - 1,
+      );
+    }
+  }
+
+  static void _addPrismSpan(
+    List<Triangle3D> tris, {
+    required Offset bl0,
+    required Offset bl1,
+    required Offset br0,
+    required Offset br1,
+    required Offset tl0,
+    required Offset tl1,
+    required Offset tr0,
+    required Offset tr1,
+    required double zB0,
+    required double zB1,
+    required double zT0,
+    required double zT1,
+    required Color color,
+    MeshMaterial? material,
+    bool capStart = true,
+    bool capEnd = true,
+  }) {
+    if ((zT0 - zB0).abs() < 1e-5 && (zT1 - zB1).abs() < 1e-5) return;
+    final vbl0 = Vector3(bl0.dx, bl0.dy, zB0);
+    final vbl1 = Vector3(bl1.dx, bl1.dy, zB1);
+    final vbr0 = Vector3(br0.dx, br0.dy, zB0);
+    final vbr1 = Vector3(br1.dx, br1.dy, zB1);
+    final vtl0 = Vector3(tl0.dx, tl0.dy, zT0);
+    final vtl1 = Vector3(tl1.dx, tl1.dy, zT1);
+    final vtr0 = Vector3(tr0.dx, tr0.dy, zT0);
+    final vtr1 = Vector3(tr1.dx, tr1.dy, zT1);
+
+    final c = (vbl0 + vbl1 + vbr0 + vbr1 + vtl0 + vtl1 + vtr0 + vtr1) * 0.125;
+    _addOutwardQuad(tris, vtl0, vtr0, vtr1, vtl1, c, color, material: material);
+    _addOutwardQuad(tris, vbl0, vbl1, vbr1, vbr0, c, color, material: material);
+    _addOutwardQuad(tris, vbl0, vtl0, vtl1, vbl1, c, color, material: material);
+    _addOutwardQuad(tris, vbr0, vbr1, vtr1, vtr0, c, color, material: material);
+    if (capStart) {
+      _addOutwardQuad(tris, vbl0, vbr0, vtr0, vtl0, c, color, material: material);
+    }
+    if (capEnd) {
+      _addOutwardQuad(tris, vbl1, vtl1, vtr1, vbr1, c, color, material: material);
+    }
+  }
 
   static void _addMasonryPier(
     List<Triangle3D> tris, {
@@ -1150,13 +1838,13 @@ class ArchitectFence3dMesh {
     required Offset u,
     required Offset n,
     required double halfW,
-    required double zGround,
-    required double height,
+    required double zBot,
+    required double zTop,
   }) {
-    final zShaftTop = zGround + math.max(0.25, height - 0.075);
+    final zShaftTop = math.max(zBot + 0.15, zTop - 0.075);
     final zNeckTop = zShaftTop + 0.015;
     final zFlangeTop = zNeckTop + 0.025;
-    final zPeak = zGround + height;
+    final zPeak = math.max(zFlangeTop + 0.01, zTop);
 
     // Pier masonry shaft
     _addOrientedBox(
@@ -1166,7 +1854,7 @@ class ArchitectFence3dMesh {
       n: n,
       halfU: halfW,
       halfN: halfW,
-      zBot: zGround - 0.10,
+      zBot: zBot,
       zTop: zShaftTop,
       color: _pierBodyColor,
     );
@@ -1220,6 +1908,7 @@ class ArchitectFence3dMesh {
     final segCount = isClosed ? pts.length : pts.length - 1;
     final bays = <_FenceBay>[];
     final nodes = <_FenceNode>[];
+    final cornerNodeIndices = <int?>[];
 
     // Segment unit vectors
     final segDirs = <Offset>[];
@@ -1231,19 +1920,20 @@ class ArchitectFence3dMesh {
 
     for (var i = 0; i < segCount; i++) {
       final a = pts[i];
-      final b = pts[(i + 1) % pts.length];
-      final d = b - a;
+      final d = pts[(i + 1) % pts.length] - a;
       final len = d.distance;
-      if (len < 1e-4) continue;
+      if (len < 1e-4) {
+        cornerNodeIndices.add(null);
+        continue;
+      }
       final u = d / len;
-      final n = Offset(-u.dy, u.dx);
-
-      // Node at segment start vertex (avoid duplicate corner pier; square off ~90° bends)
       final hasPrev = i > 0 || isClosed;
-      Offset nodeU = u;
+      var nodeU = u;
+      var isBendCorner = false;
       if (hasPrev) {
         final prevU = segDirs[(i - 1 + segCount) % segCount];
         final dot = prevU.dx * u.dx + prevU.dy * u.dy;
+        isBendCorner = dot < 0.99;
         if (dot > 0.65) {
           final avg = prevU + u;
           final avgLen = avg.distance;
@@ -1252,22 +1942,68 @@ class ArchitectFence3dMesh {
           nodeU = prevU;
         }
       }
-      nodes.add(_FenceNode(a, nodeU, Offset(-nodeU.dy, nodeU.dx)));
+      cornerNodeIndices.add(nodes.length);
+      nodes.add(
+        _FenceNode(
+          a,
+          nodeU,
+          Offset(-nodeU.dy, nodeU.dx),
+          isBendCorner: isBendCorner,
+        ),
+      );
+    }
+
+    int? endNodeIdx;
+    if (!isClosed && segCount > 0) {
+      final lastU = segDirs.last;
+      endNodeIdx = nodes.length;
+      nodes.add(_FenceNode(pts.last, lastU, Offset(-lastU.dy, lastU.dx)));
+    }
+
+    for (var i = 0; i < segCount; i++) {
+      final startCornerIdx = cornerNodeIndices[i];
+      if (startCornerIdx == null) continue;
+      final nextVertexIdx = (i + 1) % pts.length;
+      final endCornerIdx = (!isClosed && i == segCount - 1)
+          ? endNodeIdx!
+          : (cornerNodeIndices[nextVertexIdx] ??
+                cornerNodeIndices.firstWhere((e) => e != null)!);
+
+      final a = pts[i];
+      final b = pts[nextVertexIdx];
+      final d = b - a;
+      final len = d.distance;
+      if (len < 1e-4) continue;
+      final u = d / len;
+      final n = Offset(-u.dy, u.dx);
 
       final bayCount = math.max(1, (len / safeSpacing).round());
+      var prevNodeIdx = startCornerIdx;
       for (var k = 0; k < bayCount; k++) {
         final s = Offset.lerp(a, b, k / bayCount)!;
         final e = Offset.lerp(a, b, (k + 1) / bayCount)!;
-        bays.add(_FenceBay(s, e, u, n, len / bayCount));
-        if (k > 0) {
-          nodes.add(_FenceNode(s, u, n));
+        final int curEndNodeIdx;
+        if (k == bayCount - 1) {
+          curEndNodeIdx = endCornerIdx;
+        } else {
+          curEndNodeIdx = nodes.length;
+          nodes.add(_FenceNode(e, u, n));
         }
+        bays.add(
+          _FenceBay(
+            start: s,
+            end: e,
+            u: u,
+            n: n,
+            length: len / bayCount,
+            startNodeIdx: prevNodeIdx,
+            endNodeIdx: curEndNodeIdx,
+            startVertexIdx: k == 0 ? i : null,
+            endVertexIdx: k == bayCount - 1 ? nextVertexIdx : null,
+          ),
+        );
+        prevNodeIdx = curEndNodeIdx;
       }
-    }
-
-    if (!isClosed && segCount > 0) {
-      final lastU = segDirs.last;
-      nodes.add(_FenceNode(pts.last, lastU, Offset(-lastU.dy, lastU.dx)));
     }
 
     return _FenceBayPlan(nodes, bays);
@@ -1328,59 +2064,6 @@ class ArchitectFence3dMesh {
     for (var i = 0; i < 6; i++) {
       final j = (i + 1) % 6;
       _addOutwardTri(tris, tipCenter, top[i], top[j], center, color);
-    }
-  }
-
-  static void _addMiteredProfile(
-    List<Triangle3D> tris, {
-    required List<Offset> pts,
-    required bool isClosed,
-    required double leftBot,
-    required double rightBot,
-    required double leftTop,
-    required double rightTop,
-    required double Function(Offset p) zBotAt,
-    required double Function(Offset p) zTopAt,
-    required Color color,
-    MeshMaterial? material,
-  }) {
-    final lb = ArchitectPathway.offsetChain(pts, leftBot, closed: isClosed);
-    final rb = ArchitectPathway.offsetChain(pts, -rightBot, closed: isClosed);
-    final lt = ArchitectPathway.offsetChain(pts, leftTop, closed: isClosed);
-    final rt = ArchitectPathway.offsetChain(pts, -rightTop, closed: isClosed);
-
-    final segCount = isClosed ? pts.length : pts.length - 1;
-    for (var i = 0; i < segCount; i++) {
-      final j = (i + 1) % pts.length;
-      final zB0 = zBotAt(pts[i]);
-      final zB1 = zBotAt(pts[j]);
-      final zT0 = zTopAt(pts[i]);
-      final zT1 = zTopAt(pts[j]);
-      if ((zT0 - zB0).abs() < 1e-5 && (zT1 - zB1).abs() < 1e-5) continue;
-
-      final bl0 = Vector3(lb[i].dx, lb[i].dy, zB0);
-      final bl1 = Vector3(lb[j].dx, lb[j].dy, zB1);
-      final br0 = Vector3(rb[i].dx, rb[i].dy, zB0);
-      final br1 = Vector3(rb[j].dx, rb[j].dy, zB1);
-      final tl0 = Vector3(lt[i].dx, lt[i].dy, zT0);
-      final tl1 = Vector3(lt[j].dx, lt[j].dy, zT1);
-      final tr0 = Vector3(rt[i].dx, rt[i].dy, zT0);
-      final tr1 = Vector3(rt[j].dx, rt[j].dy, zT1);
-
-      final c = (bl0 + bl1 + br0 + br1 + tl0 + tl1 + tr0 + tr1) * 0.125;
-
-      // Top, Bottom, Left (+n), Right (-n)
-      _addOutwardQuad(tris, tl0, tr0, tr1, tl1, c, color, material: material);
-      _addOutwardQuad(tris, bl0, bl1, br1, br0, c, color, material: material);
-      _addOutwardQuad(tris, bl0, tl0, tl1, bl1, c, color, material: material);
-      _addOutwardQuad(tris, br0, br1, tr1, tr0, c, color, material: material);
-
-      if (!isClosed && i == 0) {
-        _addOutwardQuad(tris, bl0, br0, tr0, tl0, c, color, material: material);
-      }
-      if (!isClosed && i == segCount - 1) {
-        _addOutwardQuad(tris, bl1, tl1, tr1, br1, c, color, material: material);
-      }
     }
   }
 
@@ -1603,7 +2286,8 @@ class _FenceNode {
   final Offset pos;
   final Offset u;
   final Offset n;
-  const _FenceNode(this.pos, this.u, this.n);
+  final bool isBendCorner;
+  const _FenceNode(this.pos, this.u, this.n, {this.isBendCorner = false});
 }
 
 class _FenceBay {
@@ -1612,11 +2296,101 @@ class _FenceBay {
   final Offset u;
   final Offset n;
   final double length;
-  const _FenceBay(this.start, this.end, this.u, this.n, this.length);
+  final int startNodeIdx;
+  final int endNodeIdx;
+  final int? startVertexIdx;
+  final int? endVertexIdx;
+
+  const _FenceBay({
+    required this.start,
+    required this.end,
+    required this.u,
+    required this.n,
+    required this.length,
+    required this.startNodeIdx,
+    required this.endNodeIdx,
+    this.startVertexIdx,
+    this.endVertexIdx,
+  });
 }
 
 class _FenceBayPlan {
   final List<_FenceNode> nodes;
   final List<_FenceBay> bays;
   const _FenceBayPlan(this.nodes, this.bays);
+}
+
+class _CrossSectionSample {
+  final double zLow;
+  final double zHigh;
+  final double zLeft;
+  final double zRight;
+
+  const _CrossSectionSample({
+    required this.zLow,
+    required this.zHigh,
+    required this.zLeft,
+    required this.zRight,
+  });
+}
+
+class _BayTerrainInfo {
+  final List<_CrossSectionSample> samples;
+  final double zLowMin;
+  final double zHighMax;
+  final double zRightMin;
+
+  const _BayTerrainInfo({
+    required this.samples,
+    required this.zLowMin,
+    required this.zHighMax,
+    required this.zRightMin,
+  });
+
+  _CrossSectionSample sampleAtT(double t) {
+    final clamped = t.clamp(0.0, 1.0);
+    final scaled = clamped * (samples.length - 1);
+    final idx = scaled.floor().clamp(0, samples.length - 2);
+    final f = scaled - idx;
+    final a = samples[idx];
+    final b = samples[idx + 1];
+    return _CrossSectionSample(
+      zLow: a.zLow + (b.zLow - a.zLow) * f,
+      zHigh: a.zHigh + (b.zHigh - a.zHigh) * f,
+      zLeft: a.zLeft + (b.zLeft - a.zLeft) * f,
+      zRight: a.zRight + (b.zRight - a.zRight) * f,
+    );
+  }
+}
+
+class _PlanGrounding {
+  final _FenceBayPlan plan;
+  final List<_CrossSectionSample> nodes;
+  final List<_BayTerrainInfo> bays;
+
+  const _PlanGrounding(this.plan, this.nodes, this.bays);
+
+  ({double zBot, double zTop}) nodeSpan(
+    int nodeIdx, {
+    required bool stepped,
+    required double embed,
+    required double height,
+  }) {
+    final nodeSample = nodes[nodeIdx];
+    if (!stepped) {
+      return (zBot: nodeSample.zLow - embed, zTop: nodeSample.zHigh + height);
+    }
+    var minLow = nodeSample.zLow;
+    var maxHigh = double.negativeInfinity;
+    for (var i = 0; i < plan.bays.length; i++) {
+      final bay = plan.bays[i];
+      if (bay.startNodeIdx == nodeIdx || bay.endNodeIdx == nodeIdx) {
+        final g = bays[i];
+        if (g.zLowMin < minLow) minLow = g.zLowMin;
+        if (g.zHighMax > maxHigh) maxHigh = g.zHighMax;
+      }
+    }
+    if (!maxHigh.isFinite) maxHigh = nodeSample.zHigh;
+    return (zBot: minLow - embed, zTop: maxHigh + height);
+  }
 }

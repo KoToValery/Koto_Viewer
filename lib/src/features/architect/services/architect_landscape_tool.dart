@@ -89,6 +89,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
   double fenceHeight = 1.80;
   double fenceThickness = 0.25;
   double fencePierSpacing = 2.50;
+  ArchitectFenceSlopeMode fenceSlopeMode = ArchitectFenceSlopeMode.stepped;
 
   // --- Street State ---
   double streetRoadWidth = 6.00;
@@ -558,6 +559,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           height: fenceHeight,
           thickness: fenceThickness,
           pierSpacing: fencePierSpacing,
+          slopeMode: fenceSlopeMode,
         );
         final storey = project.landscapeTargetStorey;
         return project.updateStorey(
@@ -1134,6 +1136,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     fenceHeight = fence.height;
     fenceThickness = fence.thickness;
     fencePierSpacing = fence.pierSpacing;
+    fenceSlopeMode = fence.slopeMode;
     notifyListeners();
   }
 

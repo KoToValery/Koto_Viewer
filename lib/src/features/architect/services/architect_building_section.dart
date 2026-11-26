@@ -2275,10 +2275,13 @@ class ArchitectBuildingSection {
     required List<ArchitectSectionRegion> regions,
   }) {
     if (!project.isLayerVisible(ArchitectLayer.pathwayLayerId)) return;
+    final terrainSampler = ArchitectTerrainComposite.createSampler(
+      project,
+      respectLayerVisibility: true,
+    );
     double groundZAt(double s, double fallbackZ) {
       final pt = cut.pointAt(s);
-      return ArchitectTerrainComposite.evaluateFinalElevationAt(project, pt) ??
-          fallbackZ;
+      return terrainSampler.evaluateAt(pt) ?? fallbackZ;
     }
 
     for (final floor in project.storeys) {
@@ -2451,20 +2454,33 @@ class ArchitectBuildingSection {
         );
         final fencePoly = <Offset>[...left, ...right.reversed];
         for (final (s0, s1) in _polygonCutIntervals(fencePoly, cut)) {
-          final zBase = groundZAt((s0 + s1) * 0.5, floor.elevation);
+          final zSamples = <double>[
+            for (final sProbe in [s0 - 0.12, (s0 + s1) * 0.5, s1 + 0.12])
+              ?terrainSampler.evaluateAt(cut.pointAt(sProbe)),
+          ];
+          final zLow =
+              (zSamples.isEmpty
+                  ? floor.elevation
+                  : zSamples.reduce(math.min)) +
+              fence.elevationOffset;
+          final zHigh =
+              (zSamples.isEmpty
+                  ? floor.elevation
+                  : zSamples.reduce(math.max)) +
+              fence.elevationOffset;
           switch (fence.preset) {
             case ArchitectSiteFencePreset.rcRetaining:
               final stem = Path()
                 ..addRect(
-                  Rect.fromLTRB(s0, zBase - 0.45, s1, zBase + fence.height),
+                  Rect.fromLTRB(s0, zLow - 0.32, s1, zHigh + fence.height),
                 );
               final footing = Path()
                 ..addRect(
                   Rect.fromLTRB(
                     s0 - 0.18,
-                    zBase - 0.45,
+                    zLow - 0.32,
                     s1 + 0.52,
-                    zBase - 0.20,
+                    zLow - 0.06,
                   ),
                 );
               regions.add(
@@ -2480,7 +2496,7 @@ class ArchitectBuildingSection {
             case ArchitectSiteFencePreset.gabionRetaining:
               final basket = Path()
                 ..addRect(
-                  Rect.fromLTRB(s0, zBase - 0.15, s1, zBase + fence.height),
+                  Rect.fromLTRB(s0, zLow - 0.15, s1, zHigh + fence.height),
                 );
               regions.add(
                 ArchitectSectionRegion(
@@ -2494,8 +2510,12 @@ class ArchitectBuildingSection {
             case ArchitectSiteFencePreset.piersAndSlats:
             case ArchitectSiteFencePreset.modernLouvers:
             case ArchitectSiteFencePreset.classicIron:
+              final plinthH = fence.plinthHeight.clamp(
+                0.14,
+                math.max(0.18, fence.height * 0.45),
+              );
               final plinth = Path()
-                ..addRect(Rect.fromLTRB(s0, zBase - 0.15, s1, zBase + 0.40));
+                ..addRect(Rect.fromLTRB(s0, zLow - 0.20, s1, zHigh + plinthH));
               regions.add(
                 ArchitectSectionRegion(
                   fence.id,
@@ -2510,9 +2530,9 @@ class ArchitectBuildingSection {
                 ..addRect(
                   Rect.fromLTRB(
                     s0 + span * 0.28,
-                    zBase + 0.40,
+                    zHigh + plinthH,
                     s1 - span * 0.28,
-                    zBase + fence.height,
+                    zHigh + fence.height,
                   ),
                 );
               regions.add(

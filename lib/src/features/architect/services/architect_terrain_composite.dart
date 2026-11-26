@@ -146,12 +146,65 @@ class _CompositePlan {
   }
 }
 
+/// Reusable cached terrain sampler for fast repeated elevation queries at
+/// arbitrary 2D points (e.g. fence piers, bay intervals, pathways, sections).
+class ArchitectTerrainSampler {
+  final _CompositePlan? _plan;
+  final ArchitectTerrainSurface? _existingOnly;
+
+  const ArchitectTerrainSampler._({
+    _CompositePlan? plan,
+    ArchitectTerrainSurface? existingOnly,
+  }) : _plan = plan,
+       _existingOnly = existingOnly;
+
+  bool get isEmpty => _plan == null && _existingOnly == null;
+
+  /// Evaluates the final composite ground elevation Z at [point], or `null` if
+  /// no terrain covers [point] (or [point] lies inside a cutout hole).
+  double? evaluateAt(Offset point) {
+    if (_plan != null) return _plan.evaluateFinal(point);
+    return _existingOnly?.evaluateElevationAt(point);
+  }
+}
+
 /// Shared geometry engine that composes [ArchitectProject.existingTerrain] and
 /// [ArchitectProject.proposedTerrain] into a single seamless final terrain for
 /// 3D meshing, sections, elevations, 2D site plan clipping, and ground-level
 /// element placement.
 class ArchitectTerrainComposite {
   static const double defaultDiffTolerance = 0.005;
+
+  /// Creates a reusable [ArchitectTerrainSampler] so callers performing dozens
+  /// or hundreds of point queries (e.g. 3D fence/pathway builders, sections)
+  /// build the composite TIN plan only once.
+  static ArchitectTerrainSampler createSampler(
+    ArchitectProject project, {
+    bool respectLayerVisibility = false,
+  }) {
+    final useEx =
+        project.existingTerrain.isNotEmpty &&
+        (!respectLayerVisibility ||
+            project.isLayerVisible(ArchitectLayer.terrainExistingLayerId));
+    final useProp =
+        project.proposedTerrain.isNotEmpty &&
+        (!respectLayerVisibility ||
+            project.isLayerVisible(ArchitectLayer.terrainProposedLayerId));
+    if (!useEx && !useProp) {
+      return const ArchitectTerrainSampler._();
+    }
+    if (!useProp) {
+      return ArchitectTerrainSampler._(existingOnly: project.existingTerrain);
+    }
+    final plan = _buildPlan(
+      existing: project.existingTerrain,
+      proposed: project.proposedTerrain,
+      useExisting: useEx,
+      useProposed: true,
+      buildingCutouts: const [],
+    );
+    return ArchitectTerrainSampler._(plan: plan);
+  }
 
   /// Resolves all active proposed modification zones for [project] (used by 2D
   /// Site Plan clipping/daylight rendering, 3D meshing, and profile slicing).
@@ -176,29 +229,10 @@ class ArchitectTerrainComposite {
     ArchitectProject project,
     Offset point, {
     bool respectLayerVisibility = false,
-  }) {
-    final useEx =
-        project.existingTerrain.isNotEmpty &&
-        (!respectLayerVisibility ||
-            project.isLayerVisible(ArchitectLayer.terrainExistingLayerId));
-    final useProp =
-        project.proposedTerrain.isNotEmpty &&
-        (!respectLayerVisibility ||
-            project.isLayerVisible(ArchitectLayer.terrainProposedLayerId));
-    if (!useEx && !useProp) return null;
-
-    if (!useProp) {
-      return project.existingTerrain.evaluateElevationAt(point);
-    }
-    final plan = _buildPlan(
-      existing: project.existingTerrain,
-      proposed: project.proposedTerrain,
-      useExisting: useEx,
-      useProposed: true,
-      buildingCutouts: const [],
-    );
-    return plan.evaluateFinal(point);
-  }
+  }) => createSampler(
+    project,
+    respectLayerVisibility: respectLayerVisibility,
+  ).evaluateAt(point);
 
   /// Builds a single watertight 3D mesh for the final composite terrain surface
   /// (Existing clipped outside Proposed modification zones ∪ Proposed inside,
