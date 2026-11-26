@@ -163,6 +163,7 @@ class Architect2dPainter extends CustomPainter {
   final BimViewportController? viewport;
   final ArchitectPaintLayer layer;
   final bool paintGrid;
+  final bool paintOrigin;
   /// Publication can share physical wall geometry between annotation scales.
   final ArchitectWallLayers? publicationWallLayers;
   final List<ArchitectSiteSegment>? siteSetbackPreview;
@@ -309,6 +310,7 @@ class Architect2dPainter extends CustomPainter {
     this.l10n,
     this.layer = ArchitectPaintLayer.all,
     this.paintGrid = true,
+    this.paintOrigin = false,
     this.publicationWallLayers,
     this.drawingViewKey,
     this.palette = const ArchitectCanvasPalette.light(),
@@ -479,6 +481,7 @@ class Architect2dPainter extends CustomPainter {
         );
       }
       if (paintGrid) _drawDraftingGrid(canvas, size);
+      if (paintOrigin) _drawProjectOrigin(canvas);
       if (!isCeilingPlan && isSitePlan) {
         ArchitectLandscapePainterHelper.drawTerrain(
           canvas: canvas,
@@ -1190,9 +1193,20 @@ class Architect2dPainter extends CustomPainter {
       );
       return;
     }
+    // Terrain & landscape elements are rendered once on ArchitectPaintLayer.model
+    // (avoiding a double full-terrain paint on the interaction layer).
+    if (ArchitectLandscapeTool.isLandscapeElementId(_project, selectedElementId!)) {
+      return;
+    }
     Architect2dPainter(
       palette: palette,
-      project: project.updateActiveStorey(selected).copyWithGridAxes([]),
+      project: project
+          .updateActiveStorey(selected)
+          .copyWithGridAxes([])
+          .copyWith(
+            existingTerrain: const ArchitectTerrainSurface(),
+            proposedTerrain: const ArchitectTerrainSurface(),
+          ),
       dimensionWallObstacles: ArchitectWallNetwork.body(
         _project.activeStorey.walls,
       ),
@@ -1731,6 +1745,19 @@ class Architect2dPainter extends CustomPainter {
         y % 5 == 0 ? majorGridPaint : gridPaint,
       );
     }
+  }
+
+  /// Draws an unobtrusive ArchiCAD-style Project Origin `X` at model `(0, 0)`.
+  void _drawProjectOrigin(Canvas canvas) {
+    final safeScale = math.max(zoomScale, 1e-4);
+    final half = 7.5 / safeScale;
+    final originPaint = Paint()
+      ..color = palette.grid.withValues(alpha: palette.isDark ? 0.44 : 0.38)
+      ..strokeWidth = 1.0 / safeScale
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset(-half, -half), Offset(half, half), originPaint);
+    canvas.drawLine(Offset(-half, half), Offset(half, -half), originPaint);
   }
 
   // ===========================================================================

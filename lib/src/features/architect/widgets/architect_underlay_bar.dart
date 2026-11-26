@@ -447,7 +447,6 @@ Widget _addUnderlayButton(
 }) {
   final l = context.l10n;
   final effectiveTooltip = tooltip ?? l.architectUnderlayAddTooltip;
-  const icon = AppIcon(AppIconId.openFile, size: 18);
   if (compact && MediaQuery.sizeOf(context).width < 650) {
     return IconButton(
       tooltip: effectiveTooltip,
@@ -455,14 +454,14 @@ Widget _addUnderlayButton(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       constraints: const BoxConstraints(minWidth: 34, minHeight: 36),
       onPressed: onPressed,
-      icon: icon,
+      icon: const AppIcon(AppIconId.imageAdd, size: 18),
     );
   }
   return Tooltip(
     message: effectiveTooltip,
     child: TextButton.icon(
       onPressed: onPressed,
-      icon: icon,
+      icon: const AppIcon(AppIconId.openFile, size: 18),
       label: Text(l.architectUnderlayAdd),
     ),
   );
@@ -877,6 +876,7 @@ Future<String?> showArchitectUnderlayContextMenu({
     ),
     if (isCad) ...[
       const PopupMenuDivider(),
+      if (!isSitePlan) _entry('add', AppIconId.imageAdd, l.architectUnderlayAdd),
       _entry('replace', AppIconId.openFile, l.architectCadReplaceAccept),
       _entry('reload', AppIconId.refresh, l.architectCadUnderlayReloadNow),
       if (isSitePlan && hasSurvey)

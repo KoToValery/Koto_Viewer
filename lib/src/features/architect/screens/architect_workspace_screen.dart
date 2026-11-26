@@ -10,6 +10,7 @@ import '../services/architect_wall_endpoint_snap.dart';
 import '../widgets/architect_wall_angle_control.dart';
 import '../widgets/architect_polygon_angle_control.dart';
 import '../widgets/architect_slab_draft_bar.dart';
+import '../widgets/architect_terrain_move_overlay.dart';
 import '../widgets/architect_underlay_bar.dart';
 import '../widgets/architect_cad_import_dialog.dart';
 import '../../bim_projects/services/bim_underlay_picker_helper.dart';
@@ -1272,6 +1273,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _selectWorkspaceView(ArchitectWorkspaceView type, String? id) {
 
     _terrainDrafting = false;
+    _selectedCadUnderlayId = null;
 
     _cancelDrafting();
 
@@ -4309,10 +4311,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Map<String, ArchitectCadUnderlayConfig> _knownCadConfigs = const {};
   List<ArchitectCadUnderlayConfig> _knownTechCadConfigs = const [];
 
-  DxfDocument? _docForCadConfig(ArchitectCadUnderlayConfig cfg) =>
-      _underlaysById[cfg.effectiveId] ??
-      _underlaysByStorey[cfg.storeyId] ??
-      _cadRevisionDocs[_cadRevisionKey(cfg)];
+  DxfDocument? _docForCadConfig(ArchitectCadUnderlayConfig cfg) {
+    final byId = _underlaysById[cfg.effectiveId];
+    if (byId != null) return byId;
+    final isPrimary =
+        _project.cadUnderlays[cfg.storeyId]?.effectiveId == cfg.effectiveId;
+    if (isPrimary) {
+      final byStorey = _underlaysByStorey[cfg.storeyId];
+      if (byStorey != null) return byStorey;
+    }
+    return _cadRevisionDocs[_cadRevisionKey(cfg)];
+  }
 
   Map<String, DxfDocument> get _cadDocMapForPublication => {
     ..._underlaysByStorey,
@@ -4406,6 +4415,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   BimCoordinateFrame? _cadDragOriginalFrame;
   ArchitectCadUnderlayConfig? _cadDragOriginalConfig, _cadDragPreview;
   ArchitectProject? _cadDragSource;
+  String? _draggingTerrainId;
+  Offset? _terrainDragStartModel;
+  ArchitectProject? _terrainDragSource;
   bool _underlayMaskDrafting = false;
   String _underlayMaskMode = 'rect'; // 'rect' or 'polygon'
   bool _underlayMaskTargetIsCad = true;
@@ -4696,6 +4708,125 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     ),
   );
 
+  // --- SUBSECTION: [TAG:TERRAIN_DIRECT_DRAG] Selected terrain center free-move handle ---
+  ArchitectTerrainBoundary? get _selectedTerrainMoveBoundary {
+    if (!_commands.isPlan ||
+        !_project.activeStorey.isSite ||
+        _dragController.isActive ||
+        _rotationSource != null ||
+        _mirrorActive ||
+        _underlayMaskDrafting ||
+        _polygonEditor.active ||
+        _rasterCalibrationStep != 0 ||
+        _commandPreview != null) {
+      return null;
+    }
+    final activeProject = _draggingTerrainId != null && _elementMovePreview != null
+        ? _elementMovePreview!
+        : _project;
+    final targetId = _draggingTerrainId ??
+        (_effectiveSelection.length == 1 ? _selectedElementId : null);
+    if (targetId == null) return null;
+    for (final surface in [
+      activeProject.proposedTerrain,
+      activeProject.existingTerrain,
+    ]) {
+      for (final b in surface.boundaries) {
+        if (b.id == targetId && !b.isHole && b.polygon.length >= 3) {
+          return b;
+        }
+      }
+    }
+    return null;
+  }
+
+  Widget _buildTerrainMoveOverlay() => Positioned.fill(
+    child: AnimatedBuilder(
+      animation: Listenable.merge([_viewport, _previewRevision]),
+      builder: (context, _) {
+        final boundary = _selectedTerrainMoveBoundary;
+        if (boundary == null) return const SizedBox.shrink();
+        return ArchitectTerrainMoveOverlay(
+          key: const ValueKey('architect-terrain-move-handle'),
+          polygon: boundary.polygon,
+          scale: _currentScale,
+          translation: _viewport.translation,
+          rotation: _viewport.rotation,
+          moving: _draggingTerrainId != null,
+        );
+      },
+    ),
+  );
+
+  bool _tryStartTerrainDirectDrag(Offset rawModel) {
+    final boundary = _selectedTerrainMoveBoundary;
+    if (boundary == null ||
+        _draftStart != null ||
+        _commandPreview != null ||
+        !ArchitectTerrainMoveOverlay.hitCenterHandle(
+          boundary.polygon,
+          rawModel,
+          _currentScale,
+        )) {
+      return false;
+    }
+    _draggingTerrainId = boundary.id;
+    _terrainDragStartModel = rawModel;
+    _terrainDragSource = _project;
+    _elementMoveOriginal = _project;
+    _elementMovePreview = _project;
+    _elementMoveDelta = Offset.zero;
+    _isHandleEngaged = true;
+    setState(() {});
+    return true;
+  }
+
+  void _updateTerrainDirectDrag(Offset rawModel) {
+    final id = _draggingTerrainId;
+    final start = _terrainDragStartModel;
+    final source = _terrainDragSource;
+    if (id == null || start == null || source == null) return;
+    final delta = rawModel - start;
+    _handleMoved = true;
+    if (delta.distance <= 1e-7) {
+      _elementMoveDelta = Offset.zero;
+      _elementMovePreview = source;
+    } else {
+      try {
+        _elementMoveDelta = delta;
+        _elementMovePreview = MoveArchitectElement(
+          storeyId: source.activeStoreyId,
+          elementId: id,
+          delta: delta,
+        ).apply(source);
+      } on ArgumentError {
+        // Keep last valid preview if delta is invalid.
+      }
+    }
+    _repaintPreview();
+    setState(() {});
+  }
+
+  void _finishTerrainDirectDrag() {
+    final source = _terrainDragSource;
+    final preview = _elementMovePreview;
+    final delta = _elementMoveDelta;
+    final moved = _handleMoved;
+    _cancelActiveDrags();
+    if (moved &&
+        source != null &&
+        preview != null &&
+        delta != null &&
+        delta.distance > 1e-5 &&
+        identical(source, _project)) {
+      _commands.commit(preview);
+      _saveBiMProjectIfAttached();
+      HapticFeedback.selectionClick();
+    }
+    _repaintPreview();
+    setState(() {});
+  }
+
   ArchitectCadUnderlayConfig? get _paintCadUnderlayConfig {
     final rotated =
         _underlayRotationPreview?.cadUnderlayById(
@@ -4848,6 +4979,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _project.cadUnderlayById(_project.activeStorey.id, _selectedCadUnderlayId) ??
       _project.effectiveCadUnderlayForStorey(_project.activeStorey.id);
 
+  List<ArchitectCadUnderlayConfig> get _activeStoreyCadUnderlays =>
+      _project.activeStorey.isSite
+          ? _project.effectiveCadUnderlaysForStorey(_project.activeStorey.id)
+          : _project.cadUnderlaysForStorey(_project.activeStorey.id);
+
+  ArchitectCadUnderlayConfig? get _activeStoreyCadUnderlayConfig {
+    final own = _project.cadUnderlaysForStorey(_project.activeStorey.id);
+    if (own.isEmpty) {
+      return _project.activeStorey.isSite
+          ? _project.effectiveCadUnderlayForStorey(_project.activeStorey.id)
+          : null;
+    }
+    if (_selectedCadUnderlayId != null) {
+      for (final cfg in own) {
+        if (cfg.effectiveId == _selectedCadUnderlayId) return cfg;
+      }
+    }
+    return own.last;
+  }
+
   BimCoordinateFrame get _effectiveUnderlayFrame {
     final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
     return _currentCadUnderlayConfig?.frame(fallback) ?? fallback;
@@ -4970,6 +5121,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           final cfg = await ArchitectUnderlayService.instance.captureCadSnapshot(
             projectId: ownerId, storeyId: entry.key,
             document: entry.value, frame: _restoredUnderlayFrame ?? widget.underlayFrame,
+            isSitePlan: _project.storeys.any((s) => s.id == entry.key && s.isSite),
           );
           if (!current()) return;
           final project = _modelCommands.project;
@@ -5021,11 +5173,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final isSitePlan =
         _project.storeys.where((s) => s.id == storeyId).firstOrNull?.isSite ??
         false;
-    final existing = (isSitePlan || refresh || replaceCurrent)
+    final rawExisting = (isSitePlan || refresh || replaceCurrent)
         ? (_project.activeStoreyId == storeyId
               ? _currentCadUnderlayConfig
               : _project.cadUnderlays[storeyId])
         : null;
+    final existing =
+        rawExisting != null && rawExisting.storeyId == storeyId ? rawExisting : null;
     bool hasTarget() => mounted && ownerId == _underlayOwnerId &&
         _project.storeys.any((storey) => storey.id == storeyId);
     bool isCurrent() =>
@@ -5124,7 +5278,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _selectedCadUnderlayId = config.effectiveId;
           _isCadUnderlaySelected = config.visible;
           _selectedRasterId = null;
-          if (isSitePlan) _showUnderlay = true;
+          _showUnderlay = true;
           _selectionIds.clear();
           _selectedElementId = null;
           _touchCandidates = null;
@@ -5560,7 +5714,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_project.activeStoreyId == storeyId) {
         _isCadUnderlaySelected = false;
         _selectedRasterId = loaded.model.id;
-        if (isSitePlan) _showUnderlay = true;
+        _showUnderlay = true;
       }
       _commands.commit(
         _project.copyWith(
@@ -5765,6 +5919,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _openCadMaskMenu(globalPosition);
       case 'rotate':
         _startUnderlayRotation(isCad: true);
+      case 'add':
+        unawaited(_addUnderlay());
       case 'replace':
         _replaceCadUnderlay();
       case 'reload':
@@ -10403,6 +10559,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       _draggingCadUnderlay ||
 
+      _draggingTerrainId != null ||
+
       _groupDragIds.isNotEmpty;
 
 
@@ -10957,6 +11115,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_commandReady) return;
     _dismissTouchCandidates();
     if (_startUnderlayCrop(_screenToModel(event.localPosition))) {
+      _touchInput = event.kind == PointerDeviceKind.touch;
+      _handlePointerDown = event.localPosition;
+      _handleMoved = false;
+      return;
+    }
+    if (_tryStartTerrainDirectDrag(_screenToModel(event.localPosition))) {
       _touchInput = event.kind == PointerDeviceKind.touch;
       _handlePointerDown = event.localPosition;
       _handleMoved = false;
@@ -12164,6 +12328,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_handlePointerDown != null && !_handleMoved &&
           (event.localPosition - _handlePointerDown!).distance < 6) return;
       _updateUnderlayDirectDrag(_screenToModel(event.localPosition));
+      return;
+    }
+    if (_draggingTerrainId != null) {
+      if (_handlePointerDown != null && !_handleMoved &&
+          (event.localPosition - _handlePointerDown!).distance < 6) return;
+      _updateTerrainDirectDrag(_screenToModel(event.localPosition));
       return;
     }
     if (_dragController.isActive) {
@@ -15240,6 +15410,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _handlePointerDown = null;
       return;
     }
+    if (_draggingTerrainId != null) {
+      if (_handleMoved) _updateTerrainDirectDrag(_screenToModel(event.localPosition));
+      _finishTerrainDirectDrag();
+      _handlePointerDown = null;
+      return;
+    }
     if (_dragController.isActive) {
       _updateDragAim(event.localPosition);
       if (_dragController.isPickingBasePoint) {
@@ -15659,6 +15835,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _cadDragOriginalConfig = null;
     _cadDragPreview = null;
     _cadDragSource = null;
+    _draggingTerrainId = null;
+    _terrainDragStartModel = null;
+    _terrainDragSource = null;
 
   }
 
@@ -28475,9 +28654,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
     final defaultAnchor = overallBounds?.center;
+    final expandedIds = ArchitectLandscapeTool.expandTerrainMemberIds(_project, ids);
 
     _dragController.startDrag(
-      elementIds: ids,
+      elementIds: expandedIds,
       isUnderlay: false,
       storeyId: storeyId,
       defaultAnchor: defaultAnchor,
@@ -36100,6 +36280,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             closed: clippedPieces[i].closed,
             isMajor: isMajorAuto,
             isSpline: true,
+            hostBoundaryId: surface.resolveHostBoundaryIdForPoints(pts),
           ),
         );
       }
@@ -36185,6 +36366,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       position: point,
       elevation: rel,
       rawAbsoluteElevation: pickedAbs,
+      hostBoundaryId: surface.resolveHostBoundaryIdForPoint(point),
     );
     final nextSurface = surface.copyWith(
       datumElevation: datum,
@@ -38475,6 +38657,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
 
       _buildUnderlayCropOverlay(),
+      _buildTerrainMoveOverlay(),
 
       if (_unavailableUnderlayStoreys.contains(_project.activeStoreyId))
         Positioned(top: 64, right: 8, child: IgnorePointer(child: ArchitectCanvasHint(
@@ -38781,10 +38964,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           child: Align(
             alignment: Alignment.topLeft,
             child: ArchitectCadUnderlayBar(
-              config: _currentCadUnderlayConfig,
-              underlays: _project.effectiveCadUnderlaysForStorey(
-                _project.activeStoreyId,
-              ),
+              config: _project.activeStorey.isSite
+                  ? _currentCadUnderlayConfig
+                  : _activeStoreyCadUnderlayConfig,
+              underlays: _activeStoreyCadUnderlays,
               isSitePlan: _project.activeStorey.isSite,
               isBusy: _underlayBusy,
               canResetOrientation:
@@ -40718,6 +40901,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     palette: _canvasPalette,
 
     paintGrid: _showDrawingGrid,
+
+    paintOrigin: true,
 
     showUpperOverhangs: _showUpperOverhangs,
 

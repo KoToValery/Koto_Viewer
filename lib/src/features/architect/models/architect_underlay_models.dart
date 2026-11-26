@@ -267,7 +267,10 @@ class ArchitectCadUnderlayConfig {
         for (final p in maskPolygon!) {'x': p.dx, 'y': p.dy},
       ],
     if (!maskEnabled) 'maskEnabled': false,
-    if (!shareToGroundStoreys) 'shareToGroundStoreys': false,
+    if (!shareToGroundStoreys)
+      'shareToGroundStoreys': false
+    else if (isGeodetic)
+      'shareToGroundStoreys': true,
   };
 
   factory ArchitectCadUnderlayConfig.fromJson(Map<String, dynamic> json) {
@@ -277,6 +280,7 @@ class ArchitectCadUnderlayConfig {
       orElse: () =>
           isGeo ? ArchitectUnderlayKind.geodetic : ArchitectUnderlayKind.technical,
     );
+    final effectiveIsGeo = isGeo || parsedKind == ArchitectUnderlayKind.geodetic;
     final parsedDiscipline = ArchitectTechnicalUnderlayDiscipline.values
         .firstWhere(
           (d) => d.name == json['discipline'],
@@ -316,7 +320,7 @@ class ArchitectCadUnderlayConfig {
       }),
       kind: parsedKind,
       discipline: parsedDiscipline,
-      isGeodetic: isGeo || parsedKind == ArchitectUnderlayKind.geodetic,
+      isGeodetic: effectiveIsGeo,
       detectedCrsName: json['detectedCrsName'] as String?,
       opacity: ((json['opacity'] as num?)?.toDouble() ?? 0.42).clamp(
         0.05,
@@ -334,7 +338,9 @@ class ArchitectCadUnderlayConfig {
             ]
           : null,
       maskEnabled: json['maskEnabled'] != false,
-      shareToGroundStoreys: json['shareToGroundStoreys'] != false,
+      shareToGroundStoreys: effectiveIsGeo
+          ? (json['shareToGroundStoreys'] == true)
+          : (json['shareToGroundStoreys'] != false),
     );
   }
 }

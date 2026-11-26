@@ -86,6 +86,7 @@ class ArchitectTerrainBoundary {
   final bool autoInterpolateElevation;
   final ArchitectTerrainEdgeTransition? edgeTransition;
   final double slopeRatio;
+  final String? hostBoundaryId;
 
   const ArchitectTerrainBoundary({
     required this.id,
@@ -98,6 +99,7 @@ class ArchitectTerrainBoundary {
     this.autoInterpolateElevation = false,
     this.edgeTransition,
     this.slopeRatio = 1.5,
+    this.hostBoundaryId,
   }) : isFlatPad = isCutoutPad ?? isFlatPad;
 
   bool get isCutoutPad => isHole || isFlatPad;
@@ -160,6 +162,7 @@ class ArchitectTerrainBoundary {
     bool? autoInterpolateElevation,
     ArchitectTerrainEdgeTransition? edgeTransition,
     double? slopeRatio,
+    String? hostBoundaryId,
   }) => ArchitectTerrainBoundary(
     id: id ?? this.id,
     polygon: polygon ?? this.polygon,
@@ -171,6 +174,7 @@ class ArchitectTerrainBoundary {
         autoInterpolateElevation ?? this.autoInterpolateElevation,
     edgeTransition: edgeTransition ?? this.edgeTransition,
     slopeRatio: slopeRatio ?? this.slopeRatio,
+    hostBoundaryId: hostBoundaryId ?? this.hostBoundaryId,
   );
 
   Map<String, dynamic> toJson() => {
@@ -185,6 +189,7 @@ class ArchitectTerrainBoundary {
     if (autoInterpolateElevation) 'autoInterpolateElevation': true,
     if (edgeTransition != null) 'edgeTransition': edgeTransition!.name,
     if ((slopeRatio - 1.5).abs() > 1e-4) 'slopeRatio': slopeRatio,
+    if (hostBoundaryId != null) 'hostBoundaryId': hostBoundaryId,
   };
 
   factory ArchitectTerrainBoundary.fromJson(Map<String, dynamic> json) =>
@@ -214,6 +219,7 @@ class ArchitectTerrainBoundary {
           0.1,
           20.0,
         ),
+        hostBoundaryId: json['hostBoundaryId'] as String?,
       );
 }
 
@@ -226,6 +232,7 @@ class ArchitectTerrainContour {
   final bool closed;
   final bool isMajor;
   final bool isSpline;
+  final String? hostBoundaryId;
 
   const ArchitectTerrainContour({
     required this.id,
@@ -235,6 +242,7 @@ class ArchitectTerrainContour {
     this.closed = false,
     this.isMajor = false,
     this.isSpline = false,
+    this.hostBoundaryId,
   });
 
   /// Returns exact 1:1 points for CAD-extracted contours, or sampled Catmull-Rom
@@ -262,6 +270,7 @@ class ArchitectTerrainContour {
     bool? closed,
     bool? isMajor,
     bool? isSpline,
+    String? hostBoundaryId,
   }) => ArchitectTerrainContour(
     id: id ?? this.id,
     points: points ?? this.points,
@@ -270,6 +279,7 @@ class ArchitectTerrainContour {
     closed: closed ?? this.closed,
     isMajor: isMajor ?? this.isMajor,
     isSpline: isSpline ?? this.isSpline,
+    hostBoundaryId: hostBoundaryId ?? this.hostBoundaryId,
   );
 
   Map<String, dynamic> toJson() => {
@@ -283,6 +293,7 @@ class ArchitectTerrainContour {
     if (closed) 'closed': true,
     if (isMajor) 'isMajor': true,
     if (isSpline) 'isSpline': true,
+    if (hostBoundaryId != null) 'hostBoundaryId': hostBoundaryId,
   };
 
   factory ArchitectTerrainContour.fromJson(Map<String, dynamic> json) =>
@@ -302,6 +313,7 @@ class ArchitectTerrainContour {
         closed: json['closed'] == true,
         isMajor: json['isMajor'] == true,
         isSpline: json['isSpline'] == true,
+        hostBoundaryId: json['hostBoundaryId'] as String?,
       );
 }
 
@@ -311,12 +323,14 @@ class ArchitectTerrainSpot {
   final Offset position;
   final double elevation;
   final double? rawAbsoluteElevation;
+  final String? hostBoundaryId;
 
   const ArchitectTerrainSpot({
     required this.id,
     required this.position,
     required this.elevation,
     this.rawAbsoluteElevation,
+    this.hostBoundaryId,
   });
 
   double effectiveAbsolute(double datum) =>
@@ -330,11 +344,13 @@ class ArchitectTerrainSpot {
     Offset? position,
     double? elevation,
     double? rawAbsoluteElevation,
+    String? hostBoundaryId,
   }) => ArchitectTerrainSpot(
     id: id ?? this.id,
     position: position ?? this.position,
     elevation: elevation ?? this.elevation,
     rawAbsoluteElevation: rawAbsoluteElevation ?? this.rawAbsoluteElevation,
+    hostBoundaryId: hostBoundaryId ?? this.hostBoundaryId,
   );
 
   Map<String, dynamic> toJson() => {
@@ -343,6 +359,7 @@ class ArchitectTerrainSpot {
     'elevation': elevation,
     if (rawAbsoluteElevation != null)
       'rawAbsoluteElevation': rawAbsoluteElevation,
+    if (hostBoundaryId != null) 'hostBoundaryId': hostBoundaryId,
   };
 
   factory ArchitectTerrainSpot.fromJson(Map<String, dynamic> json) {
@@ -358,6 +375,7 @@ class ArchitectTerrainSpot {
       elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
       rawAbsoluteElevation:
           (json['rawAbsoluteElevation'] as num?)?.toDouble(),
+      hostBoundaryId: json['hostBoundaryId'] as String?,
     );
   }
 }
@@ -400,6 +418,163 @@ class ArchitectTerrainSurface {
     (b) => b.polygon.length >= 3 && !b.isFlatPad && !b.isHole,
   );
 
+  List<ArchitectTerrainBoundary> get outerBoundaries => [
+    for (final b in boundaries)
+      if (!b.isHole && !b.isFlatPad && b.polygon.length >= 3) b,
+  ];
+
+  /// Resolves the hosting outer terrain boundary ID for [point], returning the
+  /// enclosing boundary (or sole outer boundary when only one exists).
+  String? resolveHostBoundaryIdForPoint(Offset point) {
+    final outers = outerBoundaries;
+    for (final b in outers.reversed) {
+      if (b.containsPoint(point)) return b.id;
+    }
+    return outers.length == 1 ? outers.single.id : null;
+  }
+
+  /// Resolves the hosting outer terrain boundary ID for a polyline/polygon chain.
+  String? resolveHostBoundaryIdForPoints(List<Offset> points) {
+    final outers = outerBoundaries;
+    if (outers.isEmpty) return null;
+    for (final b in outers.reversed) {
+      for (var i = 0; i < points.length; i++) {
+        if (b.containsPoint(points[i])) return b.id;
+        if (i + 1 < points.length &&
+            b.containsPoint((points[i] + points[i + 1]) * 0.5)) {
+          return b.id;
+        }
+      }
+    }
+    return outers.length == 1 ? outers.single.id : null;
+  }
+
+  bool _belongsToOuter(
+    String? explicitHostId,
+    List<Offset> pts,
+    ArchitectTerrainBoundary outer,
+    List<ArchitectTerrainBoundary> outers,
+  ) {
+    if (explicitHostId != null) return explicitHostId == outer.id;
+    if (outers.length == 1 && outers.single.id == outer.id) return true;
+    return pts.any(outer.containsPoint);
+  }
+
+  /// Returns [boundaryId] plus all linked child members (contours, spots,
+  /// flat pads, cutout holes) when [boundaryId] is a terrain boundary.
+  Set<String> memberIdsForBoundary(String boundaryId) {
+    final target = boundaries.where((b) => b.id == boundaryId).firstOrNull;
+    if (target == null) return {boundaryId};
+    if (target.isHole) {
+      return {
+        boundaryId,
+        for (final s in spots)
+          if (s.hostBoundaryId == boundaryId || s.id.startsWith('${boundaryId}_pt_'))
+            s.id,
+      };
+    }
+    if (target.isFlatPad) {
+      return {
+        boundaryId,
+        for (final s in spots)
+          if (s.hostBoundaryId == boundaryId) s.id,
+      };
+    }
+    final outers = outerBoundaries;
+    final childBoundaryIds = <String>{
+      for (final b in boundaries)
+        if (b.id != boundaryId &&
+            (b.isHole || b.isFlatPad) &&
+            _belongsToOuter(b.hostBoundaryId, b.polygon, target, outers))
+          b.id,
+    };
+    return {
+      boundaryId,
+      ...childBoundaryIds,
+      for (final c in contours)
+        if (_belongsToOuter(c.hostBoundaryId, c.points, target, outers)) c.id,
+      for (final s in spots)
+        if (_belongsToOuter(s.hostBoundaryId, [s.position], target, outers) ||
+            childBoundaryIds.contains(s.hostBoundaryId) ||
+            childBoundaryIds.any((hid) => s.id.startsWith('${hid}_pt_')))
+          s.id,
+    };
+  }
+
+  /// Expands any terrain boundary IDs in [ids] into their full linked assemblies.
+  Set<String> expandMemberIds(Iterable<String> ids) {
+    final result = <String>{};
+    for (final id in ids) {
+      if (boundaries.any((b) => b.id == id)) {
+        result.addAll(memberIdsForBoundary(id));
+      } else {
+        result.add(id);
+      }
+    }
+    return result;
+  }
+
+  /// Links unowned contours, spots, pads, and holes enclosed by a newly added
+  /// [outerBoundary] (or all unowned items if it is the sole outer boundary).
+  ArchitectTerrainSurface adoptingUnlinkedMembersFor(
+    ArchitectTerrainBoundary outerBoundary,
+  ) {
+    final outers = outerBoundaries;
+    final isSoleOuter =
+        outers.length == 1 && outers.single.id == outerBoundary.id;
+    bool adoptsPoints(List<Offset> pts) =>
+        isSoleOuter || pts.any(outerBoundary.containsPoint);
+    return copyWith(
+      boundaries: [
+        for (final b in boundaries)
+          if (b.id != outerBoundary.id &&
+              b.hostBoundaryId == null &&
+              (b.isHole || b.isFlatPad) &&
+              adoptsPoints(b.polygon))
+            b.copyWith(hostBoundaryId: outerBoundary.id)
+          else
+            b,
+      ],
+      contours: [
+        for (final c in contours)
+          if (c.hostBoundaryId == null && adoptsPoints(c.points))
+            c.copyWith(hostBoundaryId: outerBoundary.id)
+          else
+            c,
+      ],
+      spots: [
+        for (final s in spots)
+          if (s.hostBoundaryId == null && adoptsPoints([s.position]))
+            s.copyWith(hostBoundaryId: outerBoundary.id)
+          else
+            s,
+      ],
+    );
+  }
+
+  /// Translates every boundary, contour, and spot matching [ids] by [delta].
+  ArchitectTerrainSurface translatedMembers(Set<String> ids, Offset delta) {
+    if (ids.isEmpty || delta == Offset.zero) return this;
+    return copyWith(
+      boundaries: [
+        for (final b in boundaries)
+          ids.contains(b.id)
+              ? b.copyWith(polygon: [for (final p in b.polygon) p + delta])
+              : b,
+      ],
+      contours: [
+        for (final c in contours)
+          ids.contains(c.id)
+              ? c.copyWith(points: [for (final p in c.points) p + delta])
+              : c,
+      ],
+      spots: [
+        for (final s in spots)
+          ids.contains(s.id) ? s.copyWith(position: s.position + delta) : s,
+      ],
+    );
+  }
+
   /// Updates the building ±0.00 datum (in absolute survey meters) and
   /// recalculates relative elevations of all contours and spots.
   ArchitectTerrainSurface withDatumElevation(double newDatum) {
@@ -428,9 +603,14 @@ class ArchitectTerrainSurface {
     );
   }
 
-  /// Clones this surface as a Proposed terrain with independent element IDs.
+  /// Clones this surface as a Proposed terrain with independent element IDs,
+  /// preserving parent-child [hostBoundaryId] references.
   ArchitectTerrainSurface cloneAsProposed() {
     final stamp = DateTime.now().microsecondsSinceEpoch;
+    final bndRemap = <String, String>{
+      for (var i = 0; i < boundaries.length; i++)
+        boundaries[i].id: 'prop_bnd_${stamp}_$i',
+    };
     return ArchitectTerrainSurface(
       id: 'terrain_proposed',
       state: ArchitectTerrainState.proposed,
@@ -439,15 +619,33 @@ class ArchitectTerrainSurface {
       contourIntervalManual: contourIntervalManual,
       boundaries: [
         for (var i = 0; i < boundaries.length; i++)
-          boundaries[i].copyWith(id: 'prop_bnd_${stamp}_$i'),
+          boundaries[i].copyWith(
+            id: bndRemap[boundaries[i].id],
+            hostBoundaryId: boundaries[i].hostBoundaryId == null
+                ? null
+                : (bndRemap[boundaries[i].hostBoundaryId] ??
+                      boundaries[i].hostBoundaryId),
+          ),
       ],
       contours: [
         for (var i = 0; i < contours.length; i++)
-          contours[i].copyWith(id: 'prop_cnt_${stamp}_$i'),
+          contours[i].copyWith(
+            id: 'prop_cnt_${stamp}_$i',
+            hostBoundaryId: contours[i].hostBoundaryId == null
+                ? null
+                : (bndRemap[contours[i].hostBoundaryId] ??
+                      contours[i].hostBoundaryId),
+          ),
       ],
       spots: [
         for (var i = 0; i < spots.length; i++)
-          spots[i].copyWith(id: 'prop_spot_${stamp}_$i'),
+          spots[i].copyWith(
+            id: 'prop_spot_${stamp}_$i',
+            hostBoundaryId: spots[i].hostBoundaryId == null
+                ? null
+                : (bndRemap[spots[i].hostBoundaryId] ??
+                      spots[i].hostBoundaryId),
+          ),
       ],
     );
   }
@@ -485,6 +683,7 @@ class ArchitectTerrainSurface {
           position: p,
           elevation: rel,
           rawAbsoluteElevation: abs,
+          hostBoundaryId: holeId,
         ),
       );
     }
@@ -520,6 +719,7 @@ class ArchitectTerrainSurface {
     required String spotId,
     required Offset insertion,
     double fallbackRelativeElevation = 0.0,
+    String? hostBoundaryId,
   }) {
     if (spots.any((s) => (s.position - insertion).distanceSquared < 0.02 * 0.02)) {
       return spots;
@@ -543,6 +743,7 @@ class ArchitectTerrainSurface {
         position: insertion,
         elevation: rel,
         rawAbsoluteElevation: abs,
+        hostBoundaryId: hostBoundaryId,
       ),
     ];
   }

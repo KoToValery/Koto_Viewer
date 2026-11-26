@@ -1346,25 +1346,16 @@ class MoveArchitectElement extends ArchitectModelCommand {
               : e,
       ],
     );
-    ArchitectTerrainSurface translateTerrain(ArchitectTerrainSurface surf) =>
-        surf.copyWith(
-          boundaries: [
-            for (final b in surf.boundaries)
-              matches(b.id)
-                  ? b.copyWith(polygon: [for (final p in b.polygon) p + delta])
-                  : b,
-          ],
-          contours: [
-            for (final c in surf.contours)
-              matches(c.id)
-                  ? c.copyWith(points: [for (final p in c.points) p + delta])
-                  : c,
-          ],
-          spots: [
-            for (final sp in surf.spots)
-              matches(sp.id) ? sp.copyWith(position: sp.position + delta) : sp,
-          ],
-        );
+    ArchitectTerrainSurface translateTerrain(ArchitectTerrainSurface surf) {
+      final expanded = surf.expandMemberIds({elementId});
+      final hit =
+          surf.boundaries.any((b) => expanded.contains(b.id)) ||
+          surf.contours.any((c) => expanded.contains(c.id)) ||
+          surf.spots.any((sp) => expanded.contains(sp.id));
+      if (!hit) return surf;
+      found = true;
+      return surf.translatedMembers(expanded, delta);
+    }
     final nextExistingTerrain = translateTerrain(project.existingTerrain);
     final nextProposedTerrain = translateTerrain(project.proposedTerrain);
     final axes = [
@@ -1741,7 +1732,31 @@ class MoveArchitectElements extends ArchitectModelCommand {
         ...w.windows.map((e) => e.id),
       ],
     };
-    for (final id in elementIds.difference(carried)) {
+    final expandedExisting = result.existingTerrain.expandMemberIds(elementIds);
+    final expandedProposed = result.proposedTerrain.expandMemberIds(elementIds);
+    bool inSurface(ArchitectTerrainSurface s, String id) =>
+        s.boundaries.any((b) => b.id == id) ||
+        s.contours.any((c) => c.id == id) ||
+        s.spots.any((sp) => sp.id == id);
+    final translatedTerrainIds = <String>{
+      for (final id in elementIds)
+        if (inSurface(result.existingTerrain, id) ||
+            inSurface(result.proposedTerrain, id))
+          id,
+    };
+    if (translatedTerrainIds.isNotEmpty) {
+      result = result.copyWith(
+        existingTerrain: result.existingTerrain.translatedMembers(
+          expandedExisting,
+          delta,
+        ),
+        proposedTerrain: result.proposedTerrain.translatedMembers(
+          expandedProposed,
+          delta,
+        ),
+      );
+    }
+    for (final id in elementIds.difference({...carried, ...translatedTerrainIds})) {
       result = MoveArchitectElement(
         storeyId: storeyId,
         elementId: id,
@@ -2260,6 +2275,7 @@ class CutArchitectContourOpening extends ArchitectModelCommand {
               polygon: List<Offset>.unmodifiable(polygon),
               elevation: bnd.elevation,
               isHole: true,
+              hostBoundaryId: elementId,
             ),
           ],
           spots: nextSpots,
@@ -3135,6 +3151,7 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
               fallbackRelativeElevation:
                   beforeSurface.evaluateElevationAt(insertion) ??
                   targetBnd.elevation,
+              hostBoundaryId: spotHostId,
             );
             final nextSurface = afterSurface.copyWith(spots: nextSpots);
             return isProposed

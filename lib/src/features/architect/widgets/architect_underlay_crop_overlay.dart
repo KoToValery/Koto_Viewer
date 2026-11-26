@@ -41,6 +41,53 @@ class ArchitectUnderlayCropOverlay extends StatelessWidget {
     return Offset((minX + maxX) / 2, (minY + maxY) / 2);
   }
 
+  /// Renders the circular 4-arrow free-move handle shared by underlays and terrain.
+  static void paintCenterMoveHandle(
+    Canvas canvas,
+    Offset center, {
+    bool moving = false,
+  }) {
+    final radius = moving ? 12.0 : 10.0;
+    final strokeColor = moving
+        ? const Color(0xff0288d1)
+        : const Color(0xff555555);
+    final moveStroke = Paint()
+      ..color = strokeColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = moving ? 1.8 : 1.3;
+    canvas.drawCircle(
+      center + const Offset(0, 1),
+      radius,
+      Paint()..color = const Color(0x33000000),
+    );
+    canvas.drawCircle(center, radius, Paint()..color = Colors.white);
+    canvas.drawCircle(center, radius, moveStroke);
+    const arm = 5.5;
+    const tip = 2.0;
+    canvas.drawLine(
+      center - const Offset(arm, 0),
+      center + const Offset(arm, 0),
+      moveStroke,
+    );
+    canvas.drawLine(
+      center - const Offset(0, arm),
+      center + const Offset(0, arm),
+      moveStroke,
+    );
+    for (final dir in const [
+      Offset(1, 0),
+      Offset(-1, 0),
+      Offset(0, 1),
+      Offset(0, -1),
+    ]) {
+      final head = center + dir * arm;
+      final perp = Offset(-dir.dy, dir.dx) * tip;
+      final back = head - dir * tip;
+      canvas.drawLine(head, back + perp, moveStroke);
+      canvas.drawLine(head, back - perp, moveStroke);
+    }
+  }
+
   @override
   Widget build(BuildContext context) =>
       IgnorePointer(child: CustomPaint(painter: _CropPainter(this)));
@@ -94,41 +141,11 @@ class _CropPainter extends CustomPainter {
         ? ArchitectUnderlayCropOverlay.centerPoint(p)
         : null;
     if (centerModel != null) {
-      final center = screen(centerModel);
-      final radius = data.moving ? 12.0 : 10.0;
-      final strokeColor = data.moving
-          ? const Color(0xff0288d1)
-          : const Color(0xff555555);
-      final moveStroke = Paint()
-        ..color = strokeColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = data.moving ? 1.8 : 1.3;
-      canvas.drawCircle(center, radius, Paint()..color = Colors.white);
-      canvas.drawCircle(center, radius, moveStroke);
-      const arm = 5.5;
-      const tip = 2.0;
-      canvas.drawLine(
-        center - const Offset(arm, 0),
-        center + const Offset(arm, 0),
-        moveStroke,
+      ArchitectUnderlayCropOverlay.paintCenterMoveHandle(
+        canvas,
+        screen(centerModel),
+        moving: data.moving,
       );
-      canvas.drawLine(
-        center - const Offset(0, arm),
-        center + const Offset(0, arm),
-        moveStroke,
-      );
-      for (final dir in const [
-        Offset(1, 0),
-        Offset(-1, 0),
-        Offset(0, 1),
-        Offset(0, -1),
-      ]) {
-        final head = center + dir * arm;
-        final perp = Offset(-dir.dy, dir.dx) * tip;
-        final back = head - dir * tip;
-        canvas.drawLine(head, back + perp, moveStroke);
-        canvas.drawLine(head, back - perp, moveStroke);
-      }
     }
   }
 

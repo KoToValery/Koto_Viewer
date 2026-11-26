@@ -403,7 +403,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
             surface.copyWith(
               datumElevation: _resolvedDatum(project),
               boundaries: [...surface.boundaries, boundary],
-            ),
+            ).adoptingUnlinkedMembersFor(boundary),
           );
         }
         if (terrainMode == ArchitectTerrainDraftMode.boundary ||
@@ -412,6 +412,9 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           final isOuter = terrainMode == ArchitectTerrainDraftMode.boundary;
           final isHole = terrainMode == ArchitectTerrainDraftMode.hole;
           final bndId = 'terr_bnd_$nowMicros';
+          final hostId = isOuter
+              ? null
+              : surface.resolveHostBoundaryIdForPoints(pts);
           final nextSpots = isHole
               ? surface.withHoleVertexSpots(
                   holeId: bndId,
@@ -426,15 +429,17 @@ class ArchitectLandscapeTool extends ChangeNotifier {
             isCutoutPad: terrainMode == ArchitectTerrainDraftMode.pad,
             isHole: isHole,
             autoInterpolateElevation: isOuter,
+            hostBoundaryId: hostId,
           );
-          return _updateSurface(
-            project,
-            surface.copyWith(
-              datumElevation: _resolvedDatum(project),
-              boundaries: [...surface.boundaries, boundary],
-              spots: nextSpots,
-            ),
+          var nextSurface = surface.copyWith(
+            datumElevation: _resolvedDatum(project),
+            boundaries: [...surface.boundaries, boundary],
+            spots: nextSpots,
           );
+          if (isOuter) {
+            nextSurface = nextSurface.adoptingUnlinkedMembersFor(boundary);
+          }
+          return _updateSurface(project, nextSurface);
         } else if (terrainMode == ArchitectTerrainDraftMode.contour) {
           final datum = _resolvedDatum(project);
           final effectiveElevation = contourAbsoluteElevation != 0.0
@@ -450,6 +455,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
             closed: contourClosed,
             isMajor: contourMajor,
             isSpline: true,
+            hostBoundaryId: surface.resolveHostBoundaryIdForPoints(pts),
           );
           return _updateSurface(
             project,
@@ -477,6 +483,7 @@ class ArchitectLandscapeTool extends ChangeNotifier {
           closed: contourClosed,
           isMajor: contourMajor,
           isSpline: true,
+          hostBoundaryId: surface.resolveHostBoundaryIdForPoints(pts),
         );
         return _updateSurface(
           project,
@@ -823,6 +830,20 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     return project.activeStorey.isSite && terrainStateOf(project, id) != null;
   }
 
+  /// Expands any selected terrain boundary IDs into their full linked assemblies
+  /// (contours, spots, flat pads, cutout holes) across Existing & Proposed surfaces.
+  static Set<String> expandTerrainMemberIds(
+    ArchitectProject project,
+    Iterable<String> ids,
+  ) {
+    final set = ids.toSet();
+    if (set.isEmpty) return const {};
+    return {
+      ...project.existingTerrain.expandMemberIds(set),
+      ...project.proposedTerrain.expandMemberIds(set),
+    };
+  }
+
   static bool _containsTerrainElement(ArchitectTerrainSurface surface, String id) =>
       surface.boundaries.any((b) => b.id == id) ||
       surface.contours.any((c) => c.id == id) ||
@@ -851,43 +872,69 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     final toExisting = state == ArchitectTerrainState.existing;
     final source = toExisting ? project.proposedTerrain : project.existingTerrain;
     final target = toExisting ? project.existingTerrain : project.proposedTerrain;
-    // Older projects can have matching IDs on both surfaces after survey sync.
-    var targetId = id;
-    for (var suffix = 1;
-        _containsTerrainElement(target, targetId) ||
-            (targetId != id && _containsTerrainElement(source, targetId));
-        suffix++) {
-      targetId = '$id-${state.name}-$suffix';
+    final moveIds = source.expandMemberIds({id});
+    String resolveMigratedId(String oldId) {
+      var nextId = oldId;
+      for (var suffix = 1;
+          _containsTerrainElement(target, nextId) ||
+              (nextId != oldId && _containsTerrainElement(source, nextId));
+          suffix++) {
+        nextId = '$oldId-${state.name}-$suffix';
+      }
+      return nextId;
     }
-    final nextSource = _deleteFromSurface(source, {id});
+
+    final idRemap = <String, String>{
+      for (final oldId in moveIds) oldId: resolveMigratedId(oldId),
+    };
+    final targetId = idRemap[id] ?? id;
+    final nextSource = _deleteFromSurface(source, moveIds);
     final nextTarget = target.copyWith(
       boundaries: [
         ...target.boundaries,
         for (final boundary in source.boundaries)
-          if (boundary.id == id) boundary.copyWith(id: targetId),
+          if (moveIds.contains(boundary.id))
+            boundary.copyWith(
+              id: idRemap[boundary.id],
+              hostBoundaryId: boundary.hostBoundaryId == null
+                  ? null
+                  : (idRemap[boundary.hostBoundaryId] ??
+                        boundary.hostBoundaryId),
+            ),
       ],
       contours: [
         ...target.contours,
         for (final contour in source.contours)
-          if (contour.id == id)
+          if (moveIds.contains(contour.id))
             contour.copyWith(
-              id: targetId,
+              id: idRemap[contour.id],
+              hostBoundaryId: contour.hostBoundaryId == null
+                  ? null
+                  : (idRemap[contour.hostBoundaryId] ??
+                        contour.hostBoundaryId),
               elevation: contour.effectiveRelative(source.datumElevation),
               rawAbsoluteElevation: contour.rawAbsoluteElevation == null
                   ? null
-                  : target.toAbsoluteElevation(contour.effectiveRelative(source.datumElevation)),
+                  : target.toAbsoluteElevation(
+                      contour.effectiveRelative(source.datumElevation),
+                    ),
             ),
       ],
       spots: [
         ...target.spots,
         for (final spot in source.spots)
-          if (spot.id == id)
+          if (moveIds.contains(spot.id))
             spot.copyWith(
-              id: targetId,
+              id: idRemap[spot.id],
+              hostBoundaryId: spot.hostBoundaryId == null
+                  ? null
+                  : (idRemap[spot.hostBoundaryId] ?? spot.hostBoundaryId),
               elevation: spot.effectiveRelative(source.datumElevation),
               rawAbsoluteElevation: spot.rawAbsoluteElevation == null
                   ? null
-                  : target.toAbsoluteElevation(spot.effectiveRelative(source.datumElevation)),
+                  : target.toAbsoluteElevation(
+                      spot.effectiveRelative(source.datumElevation),
+                    ),
             ),
       ],
     );
@@ -1028,48 +1075,28 @@ class ArchitectLandscapeTool extends ChangeNotifier {
     ArchitectTerrainSurface surface,
     Set<String> selectedIds,
     Offset delta,
-  ) {
-    return surface.copyWith(
-      boundaries: [
-        for (final b in surface.boundaries)
-          selectedIds.contains(b.id)
-              ? b.copyWith(polygon: [for (final p in b.polygon) p + delta])
-              : b,
-      ],
-      contours: [
-        for (final c in surface.contours)
-          selectedIds.contains(c.id)
-              ? c.copyWith(points: [for (final p in c.points) p + delta])
-              : c,
-      ],
-      spots: [
-        for (final s in surface.spots)
-          selectedIds.contains(s.id)
-              ? s.copyWith(position: s.position + delta)
-              : s,
-      ],
-    );
-  }
+  ) => surface.translatedMembers(surface.expandMemberIds(selectedIds), delta);
 
   static ArchitectTerrainSurface _deleteFromSurface(
     ArchitectTerrainSurface surface,
     Set<String> selectedIds,
   ) {
+    final ids = surface.expandMemberIds(selectedIds);
     final deletedHolePrefixes = [
       for (final b in surface.boundaries)
-        if (selectedIds.contains(b.id) && b.isHole) '${b.id}_pt_',
+        if (ids.contains(b.id) && b.isHole) '${b.id}_pt_',
     ];
     return surface.copyWith(
       boundaries: surface.boundaries
-          .where((b) => !selectedIds.contains(b.id))
+          .where((b) => !ids.contains(b.id))
           .toList(),
       contours: surface.contours
-          .where((c) => !selectedIds.contains(c.id))
+          .where((c) => !ids.contains(c.id))
           .toList(),
       spots: surface.spots
           .where(
             (s) =>
-                !selectedIds.contains(s.id) &&
+                !ids.contains(s.id) &&
                 !deletedHolePrefixes.any((prefix) => s.id.startsWith(prefix)),
           )
           .toList(),

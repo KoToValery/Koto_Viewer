@@ -118,6 +118,7 @@ class ArchitectUnderlayService {
     required String storeyId,
     required DxfDocument document,
     required BimCoordinateFrame frame,
+    bool isSitePlan = false,
   }) async {
     final directory = await getCadUnderlayDir(projectId);
     final revision = await directory.createTemp(
@@ -132,6 +133,11 @@ class ArchitectUnderlayService {
       fileName: '$storeyId.kcad',
       internalCopyPath: relative,
       kcadCachePath: relative,
+      kind: isSitePlan
+          ? ArchitectUnderlayKind.geodetic
+          : ArchitectUnderlayKind.technical,
+      isGeodetic: isSitePlan,
+      shareToGroundStoreys: false,
       lockedCadOriginX: frame.origin.dx,
       lockedCadOriginY: frame.origin.dy,
       unitsPerMeter: frame.unitsPerMeter,

@@ -163,6 +163,7 @@ class ArchitectLandscapePainterHelper {
     required bool isProposed,
     required ArchitectCanvasPalette palette,
   }) {
+    final highlightedIds = surface.expandMemberIds(selectedIds);
     final primaryColor = isProposed
         ? const Color(0xFF2E6B3E)
         : const Color(0xFF7A5C3E);
@@ -173,7 +174,7 @@ class ArchitectLandscapePainterHelper {
     // 1. Boundaries / Building Pads
     for (final boundary in surface.boundaries) {
       if (boundary.polygon.length < 3) continue;
-      final isSelected = selectedIds.contains(boundary.id);
+      final isSelected = highlightedIds.contains(boundary.id);
       final path = _polygonPath(boundary.polygon, closed: true);
 
       canvas.drawPath(
@@ -235,7 +236,7 @@ class ArchitectLandscapePainterHelper {
     final isScreenCanvas = ArchitectTextScope.current == null;
     for (final contour in surface.contours) {
       if (contour.points.length < 2) continue;
-      final isSelected = selectedIds.contains(contour.id);
+      final isSelected = highlightedIds.contains(contour.id);
       final isSpline = contour.isSpline && contour.points.length >= 3;
       final path = isSpline
           ? ArchitectSplineGeometry.generatePath(
@@ -317,7 +318,7 @@ class ArchitectLandscapePainterHelper {
     // 3. Spot Elevations
     final crossRadius = (4.5 / zoomScale).clamp(0.08, 0.28);
     for (final spot in surface.spots) {
-      final isSelected = selectedIds.contains(spot.id);
+      final isSelected = highlightedIds.contains(spot.id);
       final color = isSelected ? const Color(0xFF2563EB) : primaryColor;
       final p = spot.position;
       final spotPaint = Paint()
