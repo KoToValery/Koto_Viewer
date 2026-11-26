@@ -4428,6 +4428,30 @@
   "architectRoofPlanUnderlay": "Perimeter wall underlay",
   "architectRoofPlanSubtitle": "Top-level roof plan with dashed perimeter wall lines",
   "architectSitePlan": "Site Plan",
+  "architectSiteUnderlay": "Underlay",
+  "architectSiteRasterReady": "Underlay placed",
+  "architectSiteAlign": "Align",
+  "architectSiteAlignmentDone": "Alignment applied",
+  "architectSiteParcel": "Parcel",
+  "architectSiteSetback": "Setback line",
+  "architectSiteSelectLine": "Pick an underlay line",
+  "architectSiteTwoPoints": "Two points",
+  "architectSiteNextLine": "Next line",
+  "architectSiteFloorPreview": "On the floor plan",
+  "architectSiteFlip": "Flip",
+  "architectSiteHorizontal": "Horizontal",
+  "architectSiteVertical": "Vertical",
+  "architectSiteParcelTrace": "Pick the parcel vertices",
+  "architectSiteParcelEdit": "Pick a vertex to move",
+  "architectSiteParcelMoveVertex": "Pick the new vertex position",
+  "architectSiteParcelClose": "Close",
+  "architectSiteParcelInvalid": "The boundary or setback is invalid",
+  "architectSitePickBoundary": "Pick a parcel side",
+  "architectSiteInvalidSetback": "The line does not fit inside the parcel",
+  "architectSiteBuildingOutside": "Building extends outside the parcel",
+  "architectSiteParcelArea": "Area {area} m²",
+  "architectSiteParcelCalibrationHint": "Check the scale before tracing a scanned underlay",
+  "@architectSiteParcelArea": {"placeholders": {"area": {"type": "String"}}},
   "architectSitePlanSubtitle": "Terrain, contours, landscaping and building footprint",
   "architectStoreySiteAuto": "System-managed plan for terrain, site contours and landscaping.",
   "architectRoofLowerLevelBadge": "Level {level}",
@@ -7787,15 +7811,15 @@
   "@architectSiteOrientExistingBuildingTitle": {
     "description": "Dialog title when orienting site while building geometry already exists"
   },
-  "architectSiteOrientExistingBuildingBody": "Choose whether to rotate only the site and survey underlay, or rotate the building together with the site.",
+  "architectSiteOrientExistingBuildingBody": "Keep the building in place relative to the parcel or keep it in place on the floor plan.",
   "@architectSiteOrientExistingBuildingBody": {
     "description": "Dialog body explaining the two orientation choices when building already exists"
   },
-  "architectSiteOrientSiteOnly": "Site only",
+  "architectSiteOrientSiteOnly": "Keep floor plan position",
   "@architectSiteOrientSiteOnly": {
     "description": "Option to rotate only the site, terrain, and survey underlay"
   },
-  "architectSiteOrientWithBuilding": "Building + site",
+  "architectSiteOrientWithBuilding": "Keep position on parcel",
   "@architectSiteOrientWithBuilding": {
     "description": "Option to rotate existing building storeys together with the site"
   },

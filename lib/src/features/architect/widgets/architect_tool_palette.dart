@@ -51,11 +51,15 @@ export 'architect_tool_catalog.dart' show ArchitectToolCategory;
 
 // === SECTION: [SEC-01-WIDGET] WIDGET DECLARATIONS & PUBLIC API ===
 // --- SUBSECTION: [TAG:ARCH_PALETTE_WIDGET] Declarations: `ArchitectToolPalette` ---
+enum ArchitectSiteAction { underlay, align, parcel, setback, terrain, contours }
+
 /// Responsive bottom bar for architectural drafting tools and contextual sub-options.
 class ArchitectToolPalette extends StatefulWidget {
   final ArchitectTool activeTool;
   final bool drawingOnly;
   final bool sitePlan;
+  final ValueChanged<ArchitectSiteAction>? onSiteAction;
+  final bool canAlignSite, hasSiteParcel;
   final int viewSwitchEpoch;
   final ArchitectInteractionMode? interactionMode;
   final ArchitectTool? selectionTool;
@@ -200,6 +204,9 @@ class ArchitectToolPalette extends StatefulWidget {
     required this.activeTool,
     this.drawingOnly = false,
     this.sitePlan = false,
+    this.onSiteAction,
+    this.canAlignSite = false,
+    this.hasSiteParcel = false,
     this.viewSwitchEpoch = 0,
     this.interactionMode,
     this.selectionTool,
@@ -426,6 +433,33 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           : activeTool == ArchitectTool.select
           ? ArchitectInteractionMode.singleSelect
           : ArchitectInteractionMode.drawing);
+
+  Widget _siteMenu(BuildContext context) {
+    final l = context.l10n;
+    return PopupMenuButton<ArchitectSiteAction>(
+      key: const ValueKey('architect-site-menu'),
+      tooltip: l.architectSitePlan,
+      onSelected: widget.onSiteAction,
+      itemBuilder: (_) => [
+        PopupMenuItem(value: ArchitectSiteAction.underlay, child: Text(l.architectSiteUnderlay)),
+        PopupMenuItem(value: ArchitectSiteAction.align, enabled: widget.canAlignSite,
+          child: Text(l.architectSiteAlign)),
+        PopupMenuItem(value: ArchitectSiteAction.parcel, child: Text(l.architectSiteParcel)),
+        PopupMenuItem(value: ArchitectSiteAction.setback, enabled: widget.hasSiteParcel,
+          child: Text(l.architectSiteSetback)),
+        const PopupMenuDivider(),
+        PopupMenuItem(value: ArchitectSiteAction.terrain, child: Text(l.architectToolTerrain)),
+        PopupMenuItem(value: ArchitectSiteAction.contours, child: Text(l.architectToolContour)),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(l.architectSitePlan, style: Theme.of(context).textTheme.labelLarge),
+          const Icon(Icons.expand_more, size: 18),
+        ]),
+      ),
+    );
+  }
   ValueChanged<ArchitectTool> get onToolChanged => widget.onToolChanged;
   VoidCallback? get onCreateFenestration => widget.onCreateFenestration;
   ArchitectFenestrationStyle? get activeWindowStyle => widget.activeWindowStyle;
@@ -575,7 +609,15 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
 
               Row(
                 children: [
-                  TextButton(
+                  if (widget.sitePlan && widget.onSiteAction != null) ...[
+                    _siteMenu(context),
+                    IconButton(
+                      key: const ValueKey('architect-tool-category'),
+                      tooltip: l10n.architectToolCategories,
+                      onPressed: _browseTools,
+                      icon: AppIcon(category.iconId, size: 20),
+                    ),
+                  ] else TextButton(
                     key: const ValueKey('architect-tool-category'),
                     onPressed: _browseTools,
                     style: TextButton.styleFrom(

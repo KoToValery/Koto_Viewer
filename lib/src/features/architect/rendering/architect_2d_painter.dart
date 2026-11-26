@@ -52,6 +52,7 @@ import '../services/architect_drag_controller.dart';
 import '../services/architect_stair_handles.dart';
 import 'architect_drag_painter_helper.dart';
 import 'architect_landscape_painter_helper.dart';
+import 'architect_site_parcel_painter.dart';
 import 'architect_service_plan_painter.dart';
 import 'architect_roof_painter_helper.dart';
 import 'architect_railing_geometry.dart';
@@ -525,7 +526,7 @@ class Architect2dPainter extends CustomPainter {
         );
         _drawZoneSchedule(canvas);
         if (isSitePlan) {
-          ArchitectLandscapePainterHelper.drawBuildingSiteUnderlay(
+          final building = ArchitectLandscapePainterHelper.drawBuildingSiteUnderlay(
             canvas: canvas,
             project: _project,
             zoomScale: zoomScale,
@@ -546,6 +547,15 @@ class Architect2dPainter extends CustomPainter {
             zoomScale: zoomScale,
             selectedIds: {...selectedElementIds, ?selectedElementId},
             palette: palette,
+          );
+          ArchitectSiteParcelPainter.paint(
+            canvas: canvas,
+            project: _project,
+            building: building,
+            l10n: l10n,
+            scale: zoomScale,
+            palette: palette,
+            visibleBounds: viewport?.visibleRect,
           );
         }
       } else {

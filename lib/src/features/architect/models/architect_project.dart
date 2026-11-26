@@ -32,6 +32,7 @@ import 'architect_floor_drain.dart';
 import 'architect_decorative_element.dart';
 import 'architect_underlay_models.dart';
 import 'architect_landscape_models.dart';
+import 'architect_site_parcel.dart';
 export 'architect_component.dart';
 export 'architect_decorative_element.dart';
 export 'architect_underlay_models.dart';
@@ -144,6 +145,7 @@ class ArchitectStorey {
   final List<ArchitectVegetationItem> vegetation;
   final List<ArchitectSiteFence> siteFences;
   final List<ArchitectStreet> streets;
+  final ArchitectSiteParcel? siteParcel;
   final Offset? zoneScheduleOrigin;
   final bool isRoof;
   final bool isSite;
@@ -182,6 +184,7 @@ class ArchitectStorey {
     this.vegetation = const [],
     this.siteFences = const [],
     this.streets = const [],
+    this.siteParcel,
     this.zoneScheduleOrigin,
   }) : _zones = zones,
        _groups = groups;
@@ -223,6 +226,7 @@ class ArchitectStorey {
     List<ArchitectVegetationItem>? vegetation,
     List<ArchitectSiteFence>? siteFences,
     List<ArchitectStreet>? streets,
+    ArchitectSiteParcel? siteParcel,
     Offset? zoneScheduleOrigin,
     bool clearZoneScheduleOrigin = false,
   }) => ArchitectStorey(
@@ -261,6 +265,7 @@ class ArchitectStorey {
     vegetation: vegetation ?? this.vegetation,
     siteFences: siteFences ?? this.siteFences,
     streets: streets ?? this.streets,
+    siteParcel: siteParcel ?? this.siteParcel,
     zoneScheduleOrigin: clearZoneScheduleOrigin
         ? null
         : (zoneScheduleOrigin ?? this.zoneScheduleOrigin),
@@ -306,6 +311,7 @@ class ArchitectStorey {
       'siteFences': siteFences.map((f) => f.toJson()).toList(),
     if (streets.isNotEmpty)
       'streets': streets.map((s) => s.toJson()).toList(),
+    if (isSite && siteParcel != null) 'siteParcel': siteParcel!.toJson(),
     if (zoneScheduleOrigin != null)
       'zoneScheduleOrigin': {
         'x': zoneScheduleOrigin!.dx,
@@ -330,6 +336,9 @@ class ArchitectStorey {
         (json['floorFinishThickness'] as num?)?.toDouble() ?? 0.05,
     isRoof: json['isRoof'] as bool? ?? false,
     isSite: json['isSite'] as bool? ?? false,
+    siteParcel: json['isSite'] == true
+        ? ArchitectSiteParcel.fromJson(json['siteParcel'])
+        : null,
     hasCeilingPlan: json['hasCeilingPlan'] as bool? ?? false,
     walls:
         (json['walls'] as List<dynamic>?)

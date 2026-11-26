@@ -93,6 +93,19 @@ abstract final class ArchitectSiteOrientation {
     return normalizeAngle(target - current);
   }
 
+  /// The chosen axis is undirected. Use the smallest turn by default and
+  /// keep the explicit half-turn independent of CAD endpoint order.
+  static double deltaToAlignSide(
+    Offset start,
+    Offset end, {
+    required bool vertical,
+    required bool flipped,
+  }) {
+    final delta = deltaToAlignSegment(start, end, quarterTurns: vertical ? 1 : 0);
+    final nearest = (delta + math.pi / 2) % math.pi - math.pi / 2;
+    return normalizeAngle(nearest + (flipped ? math.pi : 0));
+  }
+
   /// Atomically rotates the site (geodetic underlay, raster underlays on site,
   /// existing & proposed terrain, geodetic survey, site storey elements, and
   /// [ArchitectNorthSymbol]) around [pivot] by [deltaRad].
@@ -120,7 +133,15 @@ abstract final class ArchitectSiteOrientation {
     ArchitectCadUnderlayConfig rotateCadConfig(
       ArchitectCadUnderlayConfig cfg,
     ) {
-      final nextFrame = cfg.frame(fallbackFrame).rotatingAround(pivot, angle);
+      final source = cfg.frame(fallbackFrame);
+      final rotated = source.rotatingAround(pivot, angle);
+      // Tiny negative residuals can wrap to a full turn in the CAD frame.
+      final nextFrame = normalizeAngle(rotated.rotationRadians) == 0
+          ? BimCoordinateFrame(
+              unitsPerMeter: source.unitsPerMeter,
+              invertY: source.invertY,
+            ).placing(source.toCad(pivot), pivot)
+          : rotated;
       return cfg.withFrame(
         nextFrame,
         transformMask: true,
@@ -143,10 +164,17 @@ abstract final class ArchitectSiteOrientation {
     ];
 
     // 2. Rotate Raster underlays (site only, or all if rotating building too).
+    ArchitectRasterUnderlay rotateRaster(ArchitectRasterUnderlay raster) {
+      final rotated = raster.rotatingAround(pivot, angle);
+      return normalizeAngle(rotated.rotationRad) == 0
+          ? rotated.copyWith(rotationRad: 0)
+          : rotated;
+    }
+
     final nextRasterUnderlays = [
       for (final raster in project.rasterUnderlays)
         (rotateBuilding || raster.storeyId == siteStoreyId)
-            ? raster.rotatingAround(pivot, angle)
+            ? rotateRaster(raster)
             : raster,
     ];
 
@@ -316,6 +344,7 @@ abstract final class ArchitectSiteOrientation {
     // site fences, streets, and zoneScheduleOrigin.
     final angleDeg = angle * 180.0 / math.pi;
     rotated = rotated.copyWith(
+      siteParcel: rotated.siteParcel?.transformed(turn),
       zones: [
         for (final z in rotated.zones)
           z.isAutoBoundary

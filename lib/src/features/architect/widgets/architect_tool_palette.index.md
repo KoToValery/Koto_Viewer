@@ -18,6 +18,10 @@ Both supported ARB locales provide all labels.
 
 ## 1. How to use this map
 
+The Site Plan uses `_siteMenu` for underlay, alignment, parcel, setback and
+terrain commands. The workspace owns command availability and activation.
+The existing category browser has an adjacent icon button.
+
 Opening dimensions: `_buildDoorSubBar` and `_buildWindowSubBar` under
 `[TAG:ARCH_PALETTE_FENEST_OPENINGS]` share `_buildOpeningDimensionsRow` to show
 one direct numeric-keypad chip each for width, height, and sill in both

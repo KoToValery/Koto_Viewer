@@ -383,6 +383,40 @@ void main() {
         AcadrustConverterService.findExecutable() == null,
   );
 
+  testWidgets('site import offers alignment without opening the rotation tool', (tester) async {
+    final source = File('${temp.path}/site.dxf')..writeAsStringSync(_dxf(12000));
+    final previousPaths = PathProviderPlatform.instance;
+    FilePicker.platform = _Picker(source);
+    PathProviderPlatform.instance = _Paths(temp.path);
+    addTearDown(() => PathProviderPlatform.instance = previousPaths);
+    final project = _project().ensureSiteStorey();
+    final site = project.siteStorey!.id;
+    final model = ArchitectCommandController(project.copyWith(activeStoreyId: site));
+    addTearDown(model.dispose);
+    final l = lookupAppLocalizations(const Locale('en'));
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('en'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: ArchitectWorkspaceScreen(commandController: model),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('architect-site-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l.architectSiteUnderlay));
+    await _pumpUntil(tester, () =>
+      find.byKey(const ValueKey('architect-cad-import-size')).evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, l.architectCadImportAccept));
+    await _pumpUntil(tester, () => model.project.cadUnderlays[site] != null);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('architect-rotation-banner')), findsNothing);
+    expect(find.byKey(const ValueKey('architect-site-orientation-overlay')), findsNothing);
+    await tester.tap(find.widgetWithText(SnackBarAction, l.architectSiteAlign));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('architect-site-orientation-overlay')), findsOneWidget);
+  });
+
   for (final phone in [false, true]) {
     testWidgets(
       'workspace import and revision history on ${phone ? 'phone' : 'desktop'}',
@@ -572,7 +606,8 @@ void main() {
         await tester.tap(
           find.descendant(
             of: bar,
-            matching: find.text(l.architectUnderlayScale),
+            matching: phone ? find.byTooltip(l.architectUnderlayScale)
+                : find.text(l.architectUnderlayScale),
           ),
         );
         await tester.pumpAndSettle();

@@ -33,6 +33,10 @@
 
 ## 4. Key rendering methods
 
+The Site Plan model pass gives `ArchitectSiteParcelPainter` the same
+ground-floor perimeter used by `drawBuildingSiteUnderlay`. Its boundary,
+area, dashed offsets and clearance dimensions use the shared publication pass.
+
 | Method | Section tag | Responsibility |
 | --- | --- | --- |
 | `paint`, `_paint` | `[TAG:ARCH_PAINTER_PAINT_RENDER]` | Main canvas rendering pipeline and layer dispatch |

@@ -6795,6 +6795,80 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSitePlan => 'Site Plan';
 
   @override
+  String get architectSiteUnderlay => 'Underlay';
+
+  @override
+  String get architectSiteRasterReady => 'Underlay placed';
+
+  @override
+  String get architectSiteAlign => 'Align';
+
+  @override
+  String get architectSiteAlignmentDone => 'Alignment applied';
+
+  @override
+  String get architectSiteParcel => 'Parcel';
+
+  @override
+  String get architectSiteSetback => 'Setback line';
+
+  @override
+  String get architectSiteSelectLine => 'Pick an underlay line';
+
+  @override
+  String get architectSiteTwoPoints => 'Two points';
+
+  @override
+  String get architectSiteNextLine => 'Next line';
+
+  @override
+  String get architectSiteFloorPreview => 'On the floor plan';
+
+  @override
+  String get architectSiteFlip => 'Flip';
+
+  @override
+  String get architectSiteHorizontal => 'Horizontal';
+
+  @override
+  String get architectSiteVertical => 'Vertical';
+
+  @override
+  String get architectSiteParcelTrace => 'Pick the parcel vertices';
+
+  @override
+  String get architectSiteParcelEdit => 'Pick a vertex to move';
+
+  @override
+  String get architectSiteParcelMoveVertex => 'Pick the new vertex position';
+
+  @override
+  String get architectSiteParcelClose => 'Close';
+
+  @override
+  String get architectSiteParcelInvalid => 'The boundary or setback is invalid';
+
+  @override
+  String get architectSitePickBoundary => 'Pick a parcel side';
+
+  @override
+  String get architectSiteInvalidSetback =>
+      'The line does not fit inside the parcel';
+
+  @override
+  String get architectSiteBuildingOutside =>
+      'Building extends outside the parcel';
+
+  @override
+  String architectSiteParcelArea(String area) {
+    return 'Area $area m²';
+  }
+
+  @override
+  String get architectSiteParcelCalibrationHint =>
+      'Check the scale before tracing a scanned underlay';
+
+  @override
   String get architectSitePlanSubtitle =>
       'Terrain, contours, landscaping and building footprint';
 
@@ -14113,13 +14187,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectSiteOrientExistingBuildingBody =>
-      'Choose whether to rotate only the site and survey underlay, or rotate the building together with the site.';
+      'Keep the building in place relative to the parcel or keep it in place on the floor plan.';
 
   @override
-  String get architectSiteOrientSiteOnly => 'Site only';
+  String get architectSiteOrientSiteOnly => 'Keep floor plan position';
 
   @override
-  String get architectSiteOrientWithBuilding => 'Building + site';
+  String get architectSiteOrientWithBuilding => 'Keep position on parcel';
 
   @override
   String architectSiteOrientApplied(String angle) {

@@ -255,7 +255,7 @@ class ArchitectLandscapeBar extends StatelessWidget {
               color: colors.primary,
             ),
             label: Text(
-              l.architectSiteOrientBuilding,
+              l.architectSiteAlign,
               style: const TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,

@@ -1,23 +1,19 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:kotoview/src/core/icons/app_icon.dart';
 
 import '../../../core/l10n/l10n_extensions.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
+import '../../bim_editing/geometry/bim_transform_2d.dart';
+import '../models/architect_site_parcel.dart';
 import '../rendering/architect_snap_helper.dart';
 import '../services/architect_site_orientation.dart';
 import 'architect_transform_point_input.dart';
 
-/// Phone-first 2-tap overlay for aligning orthogonal building axes (Project
-/// North) to an edge on an upright True-North Site Plan geodetic survey.
-///
-/// Follows the [ArchitectRotationOverlay] archetype (`ArchitectTransformPointInput`
-/// keeps pan/pinch navigation and precision-hold snapping active throughout).
+/// An isolated canvas overlay so underlay bounds and viewport context gestures
+/// cannot capture a pick. The shared input still handles pan, zoom and hold.
 class ArchitectSiteOrientationOverlay extends StatefulWidget {
-  final Offset Function(Offset) toModel;
-  final Offset Function(Offset) toScreen;
-  final ArchitectSnapResult Function(Offset raw, bool touch) snap;
-  final String? Function(String?) localizeSnap;
+  final Offset Function(Offset) toModel, toScreen;
+  final List<ArchitectSiteSegment> Function(Offset, bool)? pickSegments;
+  final ArchitectTransformSnap snap;
   final void Function(Offset pivot, double deltaRad) onApply;
   final void Function(Offset delta, double factor, Offset focal) onNavigate;
   final VoidCallback onCancel;
@@ -26,8 +22,8 @@ class ArchitectSiteOrientationOverlay extends StatefulWidget {
     super.key,
     required this.toModel,
     required this.toScreen,
+    this.pickSegments,
     required this.snap,
-    required this.localizeSnap,
     required this.onApply,
     required this.onNavigate,
     required this.onCancel,
@@ -40,100 +36,105 @@ class ArchitectSiteOrientationOverlay extends StatefulWidget {
 
 class _ArchitectSiteOrientationOverlayState
     extends State<ArchitectSiteOrientationOverlay> {
-  Offset? _start;
-  Offset? _end;
-  Offset? _aim;
-  int _quarterTurns = 0;
+  bool _twoPoints = false;
+  bool _vertical = false, _flipped = false;
+  Offset? _start, _aim;
+  List<ArchitectSiteSegment> _hover = const [], _choices = const [];
+  int _index = 0;
 
-  bool get _hasSegment =>
-      _start != null && _end != null && (_end! - _start!).distance > 1e-6;
+  bool get _pointsMode => _twoPoints || widget.pickSegments == null;
+  ArchitectSiteSegment? get _selected =>
+      _choices.isEmpty ? null : _choices[_index];
 
-  double get _deltaRad => _hasSegment
-      ? ArchitectSiteOrientation.deltaToAlignSegment(
-          _start!,
-          _end!,
-          quarterTurns: _quarterTurns,
-        )
-      : 0.0;
-
-  void _onAim(ArchitectSnapResult snap) {
-    if (_hasSegment) return;
-    setState(() => _aim = snap.point);
+  void _clear() {
+    _start = _aim = null;
+    _hover = _choices = const [];
+    _index = 0;
+    _flipped = false;
   }
 
-  void _onPick(ArchitectSnapResult snap) {
-    final pt = snap.point;
-    if (_start == null) {
-      setState(() {
-        _start = pt;
-        _end = null;
-        _aim = pt;
-      });
-      return;
-    }
-    if (_end == null) {
-      if ((pt - _start!).distance < 1e-6) return;
-      setState(() {
-        _end = pt;
-        _aim = pt;
-        _quarterTurns = 0;
-      });
-    }
+  ArchitectSnapResult _resolve(Offset raw, bool touch) {
+    if (_pointsMode) return widget.snap(raw, touch);
+    _hover = widget.pickSegments!(raw, touch);
+    if (_hover.isEmpty) return ArchitectSnapResult(point: raw);
+    final (a, b) = _hover.first;
+    return ArchitectSnapResult(
+      point: BimLineGeometry.closest(raw, a, b),
+      isSnapped: true,
+    );
   }
 
-  void _reset() {
+  void _pick(Offset point) {
     setState(() {
-      _start = null;
-      _end = null;
-      _aim = null;
-      _quarterTurns = 0;
-    });
-  }
-
-  void _cycle90() {
-    setState(() {
-      _quarterTurns = (_quarterTurns + 1) % 4;
+      if (!_pointsMode) {
+        if (_hover.isNotEmpty) _choices = _hover;
+      } else if (_start == null) {
+        _start = point;
+      } else if ((point - _start!).distance > 1e-6) {
+        _choices = [(_start!, point)];
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final colors = Theme.of(context).colorScheme;
-    final hint = _start == null
+    final theme = Theme.of(context);
+    final selected = _selected;
+    final hint = selected != null
+        ? l.architectSiteFloorPreview
+        : !_pointsMode
+        ? l.architectSiteSelectLine
+        : _start == null
         ? l.architectSiteOrientStartHint
-        : (!_hasSegment
-              ? l.architectSiteOrientEndHint
-              : l.architectSiteOrientReviewHint);
+        : l.architectSiteOrientEndHint;
+    final line =
+        selected ??
+        (_pointsMode
+            ? (_start != null && _aim != null ? (_start!, _aim!) : null)
+            : _hover.firstOrNull);
+    final delta = selected == null
+        ? 0.0
+        : ArchitectSiteOrientation.deltaToAlignSide(
+            selected.$1,
+            selected.$2,
+            vertical: _vertical,
+            flipped: _flipped,
+          );
+    var side = selected == null ? Offset.zero : selected.$2 - selected.$1;
+    if (side.dx < 0 || (side.dx == 0 && side.dy < 0)) side = -side;
+    final turned = BimTransform2D.rotate(side, Offset.zero, delta);
 
     return Stack(
       children: [
-        Positioned.fill(
-          child: IgnorePointer(
-            child: CustomPaint(
-              painter: _SiteOrientationPreviewPainter(
-                start: _start == null ? null : widget.toScreen(_start!),
-                end: _end == null ? null : widget.toScreen(_end!),
-                aim: _aim == null ? null : widget.toScreen(_aim!),
-                quarterTurns: _quarterTurns,
-                primary: colors.primary,
-                onSurface: colors.onSurface,
-                upLabel: l.architectNorthSymbolLetter,
+        if (line != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _OrientationLine(
+                  widget.toScreen(line.$1),
+                  widget.toScreen(line.$2),
+                  theme.colorScheme.primary,
+                  ends: _pointsMode,
+                ),
               ),
             ),
           ),
-        ),
         Positioned.fill(
           child: ArchitectTransformPointInput(
-            key: const ValueKey('architect-site-orientation-input'),
-            pickingEnabled: !_hasSegment,
-            singlePointerPan: true,
+            key: ValueKey(
+              selected != null
+                  ? 'architect-site-orientation-review-input'
+                  : 'architect-site-orientation-input',
+            ),
             toModel: widget.toModel,
             toScreen: widget.toScreen,
-            snap: widget.snap,
-            localizeSnap: widget.localizeSnap,
-            onAim: _onAim,
-            onPick: _onPick,
+            snap: _resolve,
+            localizeSnap: (_) => null,
+            pickingEnabled: selected == null,
+            singlePointerPan: true,
+            onAim: (snap) => setState(() => _aim = snap.point),
+            onPick: (snap) => _pick(snap.point),
             onNavigate: widget.onNavigate,
           ),
         ),
@@ -143,79 +144,94 @@ class _ArchitectSiteOrientationOverlayState
           right: 8,
           child: Material(
             key: const ValueKey('architect-site-orientation-banner'),
-            color: colors.surface,
-            elevation: 3,
+            color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(10),
+            elevation: 3,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
-                      AppIcon(
-                        AppIconId.compass,
-                        size: 18,
-                        color: colors.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          hint,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
+                      Expanded(child: Text(hint)),
+                      if (selected != null)
+                        SizedBox(
+                          width: 60,
+                          height: 30,
+                          child: CustomPaint(
+                            painter: _FloorSketch(
+                              turned,
+                              theme.colorScheme.primary,
+                            ),
                           ),
                         ),
-                      ),
                       IconButton(
                         key: const ValueKey('architect-site-orientation-close'),
                         tooltip: l.cancel,
-                        visualDensity: VisualDensity.compact,
                         onPressed: widget.onCancel,
-                        icon: const AppIcon(AppIconId.close, size: 18),
+                        icon: const Icon(Icons.close),
                       ),
                     ],
                   ),
-                  if (_hasSegment) ...[
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      alignment: WrapAlignment.center,
-                      children: [
-                        OutlinedButton.icon(
+                  Wrap(
+                    spacing: 6,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      if (selected == null && widget.pickSegments != null)
+                        FilterChip(
                           key: const ValueKey(
-                            'architect-site-orientation-rotate90',
+                            'architect-site-orientation-two-points',
                           ),
-                          onPressed: _cycle90,
-                          icon: const AppIcon(AppIconId.rotate, size: 16),
-                          label: Text(l.architectSiteOrientRotate90),
+                          label: Text(l.architectSiteTwoPoints),
+                          selected: _twoPoints,
+                          onSelected: (value) => setState(() {
+                            _clear();
+                            _twoPoints = value;
+                          }),
                         ),
-                        OutlinedButton.icon(
+                      if (selected != null) ...[
+                        ChoiceChip(
+                          label: Text(l.architectSiteHorizontal),
+                          selected: !_vertical,
+                          onSelected: (_) => setState(() => _vertical = false),
+                        ),
+                        ChoiceChip(
+                          label: Text(l.architectSiteVertical),
+                          selected: _vertical,
+                          onSelected: (_) => setState(() => _vertical = true),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() => _flipped = !_flipped),
+                          child: Text(l.architectSiteFlip),
+                        ),
+                        if (_choices.length > 1)
+                          TextButton(
+                            onPressed: () => setState(
+                              () => _index = (_index + 1) % _choices.length,
+                            ),
+                            child: Text(l.architectSiteNextLine),
+                          ),
+                        TextButton(
                           key: const ValueKey(
                             'architect-site-orientation-reset',
                           ),
-                          onPressed: _reset,
-                          icon: const AppIcon(AppIconId.refresh, size: 16),
-                          label: Text(l.architectSiteOrientRetry),
+                          onPressed: () => setState(_clear),
+                          child: Text(l.architectSiteOrientRetry),
                         ),
-                        FilledButton.icon(
+                        FilledButton(
                           key: const ValueKey(
                             'architect-site-orientation-apply',
                           ),
-                          onPressed: () {
-                            final pivot = (_start! + _end!) / 2;
-                            widget.onApply(pivot, _deltaRad);
-                          },
-                          icon: const AppIcon(AppIconId.confirm, size: 16),
-                          label: Text(l.applyAction),
+                          onPressed: () => widget.onApply(
+                            (selected.$1 + selected.$2) / 2,
+                            delta,
+                          ),
+                          child: Text(l.applyAction),
                         ),
                       ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -226,141 +242,75 @@ class _ArchitectSiteOrientationOverlayState
   }
 }
 
-class _SiteOrientationPreviewPainter extends CustomPainter {
-  final Offset? start;
-  final Offset? end;
-  final Offset? aim;
-  final int quarterTurns;
-  final Color primary;
-  final Color onSurface;
-  final String upLabel;
+class _OrientationLine extends CustomPainter {
+  final Offset start, end;
+  final Color color;
+  final bool ends;
 
-  const _SiteOrientationPreviewPainter({
-    required this.start,
-    required this.end,
-    required this.aim,
-    required this.quarterTurns,
-    required this.primary,
-    required this.onSurface,
-    required this.upLabel,
+  const _OrientationLine(
+    this.start,
+    this.end,
+    this.color, {
+    required this.ends,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final s = start;
-    final e = end ?? aim;
-    if (s == null) return;
-
-    final edgePaint = Paint()
-      ..color = primary
-      ..strokeWidth = 2.4
-      ..style = PaintingStyle.stroke;
-
-    if (e != null && (e - s).distance > 2) {
-      canvas.drawLine(s, e, edgePaint);
-      if (end != null) {
-        _paintBuildingAxesPreview(canvas, s, end!);
-      }
-    }
-
-    final dotFill = Paint()..color = Colors.white;
-    final dotStroke = Paint()
-      ..color = primary
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
-    for (final pt in [s, ?end]) {
-      canvas.drawCircle(pt, 5.5, dotFill);
-      canvas.drawCircle(pt, 5.5, dotStroke);
-    }
-  }
-
-  void _paintBuildingAxesPreview(Canvas canvas, Offset s, Offset e) {
-    final center = (s + e) / 2;
-    final dir = e - s;
-    final len = dir.distance;
-    if (len < 2) return;
-
-    // Direction of future floor-plan +X (horizontal right on Floor ±0.00)
-    // in screen coordinates: rotating edge by `-quarterTurns * pi/2`.
-    final edgeAngle = math.atan2(dir.dy, dir.dx);
-    final xAngle = edgeAngle - (quarterTurns % 4) * (math.pi / 2);
-    final ux = Offset(math.cos(xAngle), math.sin(xAngle));
-    // Floor-plan "Up" (-Y on Floor ±0.00) is 90° CCW from +X in screen space.
-    final uUp = Offset(ux.dy, -ux.dx);
-
-    final gridHalf = math.max(len * 0.75, 90.0).clamp(70.0, 220.0);
-    final step = gridHalf / 3;
-    final gridPaint = Paint()
-      ..color = primary.withValues(alpha: 0.25)
-      ..strokeWidth = 1.0;
-
-    for (var i = -3; i <= 3; i++) {
-      final d = i * step;
-      canvas.drawLine(
-        center + uUp * d - ux * gridHalf,
-        center + uUp * d + ux * gridHalf,
-        gridPaint,
-      );
-      canvas.drawLine(
-        center + ux * d - uUp * gridHalf,
-        center + ux * d + uUp * gridHalf,
-        gridPaint,
-      );
-    }
-
-    // Draw bold "Up on Floor ±0.00" arrow
-    final arrowLen = math.max(48.0, gridHalf * 0.55);
-    final tip = center + uUp * arrowLen;
-    final arrowPaint = Paint()
-      ..color = primary
-      ..strokeWidth = 2.6
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(center, tip, arrowPaint);
-    final head = 10.0;
-    canvas.drawLine(tip, tip - uUp * head + ux * (head * 0.55), arrowPaint);
-    canvas.drawLine(tip, tip - uUp * head - ux * (head * 0.55), arrowPaint);
-
-    // Draw "+X" axis indicator
-    final xTip = center + ux * (arrowLen * 0.75);
-    final xPaint = Paint()
-      ..color = primary.withValues(alpha: 0.8)
-      ..strokeWidth = 1.8
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(center, xTip, xPaint);
-
-    _drawAxisTag(canvas, tip + uUp * 14, '↑ ±0.00', primary);
-    _drawAxisTag(canvas, xTip + ux * 14, 'X', onSurface);
-  }
-
-  void _drawAxisTag(Canvas canvas, Offset center, String text, Color color) {
-    final tp = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    final rect = Rect.fromCenter(
-      center: center,
-      width: tp.width + 10,
-      height: tp.height + 4,
+    canvas.clipRect(Offset.zero & size);
+    canvas.drawLine(
+      start,
+      end,
+      Paint()
+        ..color = Colors.white
+        ..strokeWidth = 5,
     );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-      Paint()..color = Colors.white.withValues(alpha: 0.92),
-    );
-    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
+    final ink = Paint()
+      ..color = color
+      ..strokeWidth = 3;
+    canvas.drawLine(start, end, ink);
+    if (ends) {
+      canvas.drawCircle(start, 4, ink);
+      canvas.drawCircle(end, 4, ink);
+    }
   }
 
   @override
-  bool shouldRepaint(_SiteOrientationPreviewPainter old) =>
+  bool shouldRepaint(_OrientationLine old) =>
       old.start != start ||
       old.end != end ||
-      old.aim != aim ||
-      old.quarterTurns != quarterTurns ||
-      old.primary != primary;
+      old.color != color ||
+      old.ends != ends;
+}
+
+class _FloorSketch extends CustomPainter {
+  final Offset side;
+  final Color color;
+
+  const _FloorSketch(this.side, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final frame = Rect.fromLTWH(2, 2, size.width - 4, size.height - 4);
+    final ink = Paint()..color = color;
+    canvas.drawRect(
+      frame,
+      Paint()
+        ..color = color.withValues(alpha: .4)
+        ..style = PaintingStyle.stroke,
+    );
+    final horizontal = side.dx.abs() > side.dy.abs();
+    final at = horizontal
+        ? (side.dx >= 0 ? frame.bottom : frame.top)
+        : (side.dy >= 0 ? frame.left : frame.right);
+    ink.strokeWidth = 3;
+    if (horizontal) {
+      canvas.drawLine(Offset(frame.left, at), Offset(frame.right, at), ink);
+    } else {
+      canvas.drawLine(Offset(at, frame.top), Offset(at, frame.bottom), ink);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_FloorSketch old) =>
+      old.side != side || old.color != color;
 }

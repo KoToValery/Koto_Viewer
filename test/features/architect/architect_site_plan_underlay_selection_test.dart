@@ -14,6 +14,7 @@ import 'package:kotoview/src/features/architect/services/architect_interaction_m
 import 'package:kotoview/src/features/architect/widgets/architect_site_orientation_overlay.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_underlay_bar.dart';
+import 'package:kotoview/src/features/bim_editing/geometry/bim_coordinate_frame.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -484,8 +485,7 @@ void main() {
       );
       expect(tester.takeException(), isNull);
 
-      // Tap Edit orientation -> opens ArchitectSiteOrientationOverlay, verify
-      // full zoom & pan work before picking and during review, then cancel.
+      // Align opens the dedicated tool with pan and zoom before and after picking.
       await tester.tap(
         find.byKey(const ValueKey('architect-underlay-edit-orientation')),
       );
@@ -512,10 +512,9 @@ void main() {
         greaterThan(5),
       );
 
-      // Pick start and end points; confirm zoom still works during review.
-      await tester.tapAt(workspace.screen(tester, const Offset(1, 1)));
-      await tester.pump();
-      await tester.tapAt(workspace.screen(tester, const Offset(5, 1)));
+      // A single pick selects the actual CAD edge. Review still allows zoom.
+      final frame = cadCfg.frame(const BimCoordinateFrame());
+      await tester.tapAt(workspace.screen(tester, frame.toModel(const Offset(3, 0))));
       await tester.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('architect-site-orientation-apply')),
@@ -529,11 +528,17 @@ void main() {
         greaterThan(scaleBeforeReviewZoom),
       );
 
-      await tester.tap(
-        find.byKey(const ValueKey('architect-site-orientation-close')),
-      );
+      const sampleCad = Offset(2, 0);
+      final beforeAlign = workspace.screen(tester, frame.toModel(sampleCad));
+      await tester.tap(find.byKey(const ValueKey('architect-site-orientation-apply')));
       await tester.pumpAndSettle();
       expect(find.byType(ArchitectSiteOrientationOverlay), findsNothing);
+      final aligned = model.project.cadUnderlays[siteId]!.frame(const BimCoordinateFrame());
+      expect(aligned.rotationRadians.abs(), lessThan(1e-6));
+      expect((workspace.screen(tester, aligned.toModel(sampleCad)) - beforeAlign).distance,
+        lessThan(1e-6));
+      model.undo();
+      await tester.pumpAndSettle();
       workspace
           .camera(tester)
           .fit(const Rect.fromLTWH(-4, -3, 12, 10), padding: 60);
@@ -599,6 +604,18 @@ void main() {
         find.byKey(const ValueKey('architect-underlay-reset-orientation')),
         findsOneWidget,
       );
+      await tester.tap(find.byKey(const ValueKey('architect-underlay-edit-orientation')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('architect-site-orientation-two-points')), findsNothing);
+      await tester.tapAt(workspace.screen(tester, const Offset(8.5, 0.5)));
+      await tester.pump();
+      await tester.tapAt(workspace.screen(tester, const Offset(11, 1.5)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('architect-site-orientation-apply')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('architect-site-orientation-close')));
+      await tester.pumpAndSettle();
+      await tester.tapAt(workspace.screen(tester, const Offset(10, 1)));
+      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('architect-underlay-reset-orientation')),
       );

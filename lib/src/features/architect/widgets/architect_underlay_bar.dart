@@ -105,7 +105,7 @@ class ArchitectCadUnderlayBar extends StatelessWidget {
               if (site && onEditOrientation != null)
                 _action(
                   context,
-                  l.architectUnderlayEditOrientation,
+                  l.architectSiteAlign,
                   AppIconId.compass,
                   isBusy || !cad.visible ? null : onEditOrientation,
                   buttonKey: const ValueKey(
@@ -245,7 +245,7 @@ class ArchitectRasterUnderlayBar extends StatelessWidget {
               if (site && onEditOrientation != null)
                 _action(
                   context,
-                  l.architectUnderlayEditOrientation,
+                  l.architectSiteAlign,
                   AppIconId.compass,
                   isBusy || raster.locked || !raster.visible
                       ? null
@@ -833,7 +833,7 @@ Future<String?> showArchitectUnderlayContextMenu({
       _entry(
         'orient_building',
         AppIconId.compass,
-        l.architectUnderlayEditOrientation,
+        l.architectSiteAlign,
         enabled: visible && (!isCad || hasDocument),
       ),
       _entry(

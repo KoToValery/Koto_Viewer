@@ -98,6 +98,14 @@ These are existing reference patterns, not mandatory templates. For a new featur
 | Multi-step geometry modification | Wall split: [TAG:WALL_SPLIT]. Chamfer/fillet and edge-curving: [TAG:FLOATING_HUD]; _startChamferFilletSession, _buildChamferFilletFloatingOverlay | Session state, preview/rubber band, pan and gesture arbitration, confirm/cancel controls, model command and history |
 | CAD/raster underlay placement or repositioning | [TAG:CAD_UNDERLAY_IMPORT], [TAG:UNDERLAY_DRAG], [TAG:DRAG_TOOL]; _addUnderlay, _loadExternalUnderlayForStorey, _startUnderlaySnapDrag, _confirmDragPlacement | Shared file picker, CAD preview and snapshot, PDF page selection, raster calibration, and shared drag lifecycle |
 
+### Site plan tools
+
+`[TAG:SITE_PLAN_TOOLS]` connects the palette's site menu and import action to
+the survey and parcel overlays. Both reuse `ArchitectTransformPointInput` for
+pan, zoom and lifted touch aiming. Survey picking queries visible finite CAD
+segments through `ArchitectSiteUnderlayPick`. Parcel drafts preview locally
+and commit through the workspace history and BIM save path.
+
 ### CAD underlay display settings
 
 `_openCadEditDialog` uses `_updateCadPresentation` to commit opacity, source

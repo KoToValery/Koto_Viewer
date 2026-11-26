@@ -614,7 +614,15 @@ Future<List<Map<String, Object?>>> _prepare(
   return result;
 }
 
-const _clippedLineworkRoles = {'openings', 'opening', 'stair', 'components'};
+const _clippedLineworkRoles = {
+  'openings',
+  'opening',
+  'stair',
+  'components',
+  'siteParcelBoundary',
+  'siteSetback',
+  'siteClearance',
+};
 
 class _Pattern {
   _Pattern(this.clip, this.style);

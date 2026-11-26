@@ -84,8 +84,11 @@ import '../widgets/architect_find_and_select_dialog.dart';
 import '../services/architect_offset.dart';
 import '../services/architect_rotation.dart';
 import '../services/architect_site_orientation.dart';
+import '../services/architect_site_underlay_pick.dart';
+import '../models/architect_site_parcel.dart';
 import '../widgets/architect_rotation_overlay.dart';
 import '../widgets/architect_site_orientation_overlay.dart';
+import '../widgets/architect_site_parcel_overlay.dart';
 import '../widgets/architect_hatch_transform_handle.dart';
 import '../widgets/architect_transform_point_input.dart';
 import '../widgets/architect_offset_direction.dart';
@@ -512,6 +515,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _siteTrueNorthView = true;
 
   bool _siteOrientationActive = false;
+  bool _siteOrientationUseCad = false;
+  bool? _siteParcelEditingSetbacks;
 
   double get _desiredViewportRotation =>
       (_commands.isPlan && _project.activeStorey.isSite && _siteTrueNorthView)
@@ -5041,6 +5046,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           storeyId,
           hasTarget,
         );
+        if (isSitePlan && autoStraightenRasterId != null && mounted) {
+          _offerSiteAlignment(context.l10n.architectSiteRasterReady, storeyId,
+            isCad: false);
+        }
         return;
       }
       if (!isCurrent()) return;
@@ -5103,6 +5112,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _selectedCadUnderlayId = config.effectiveId;
           _isCadUnderlaySelected = config.visible;
           _selectedRasterId = null;
+          if (isSitePlan) _showUnderlay = true;
           _selectionIds.clear();
           _selectedElementId = null;
           _touchCandidates = null;
@@ -5113,12 +5123,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         autoStraightenCad = !reload && config.visible;
       }
       final l = context.l10n;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(reload
-            ? l.architectCadUnderlayReloadedNotice(config.fileName)
-            : l.architectCadUnderlayLoadedSuccess(config.fileName)),
-        duration: const Duration(seconds: 2),
-      ));
+      if (isSitePlan && !reload && config.visible) {
+        _offerSiteAlignment(l.architectCadUnderlayLoadedSuccess(config.fileName),
+          storeyId, isCad: true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(reload
+                ? l.architectCadUnderlayReloadedNotice(config.fileName)
+                : l.architectCadUnderlayLoadedSuccess(config.fileName)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } on ArchitectStaleCadImport {
       // The request was superseded by another project edit.
     } catch (error, stack) {
@@ -5137,9 +5154,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _underlayBusy = false;
           _underlayBusyMessage = null;
         });
-        if (autoStraightenCad) {
+        if (!isSitePlan && autoStraightenCad) {
           _startUnderlayRotation(isCad: true);
-        } else if (autoStraightenRasterId != null) {
+        } else if (!isSitePlan && autoStraightenRasterId != null) {
           _startUnderlayRotation(isCad: false, rasterId: autoStraightenRasterId);
         }
       }
@@ -5531,6 +5548,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_project.activeStoreyId == storeyId) {
         _isCadUnderlaySelected = false;
         _selectedRasterId = loaded.model.id;
+        if (isSitePlan) _showUnderlay = true;
       }
       _commands.commit(
         _project.copyWith(
@@ -5718,7 +5736,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (!current() || action == null) return;
     switch (action) {
       case 'orient_building':
-        _startSiteOrientation();
+        _startSiteOrientation(isCad: true);
       case 'reset_orientation':
         unawaited(_resetGeodeticOrientation(isCad: true));
       case 'position':
@@ -5843,18 +5861,120 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
-  void _startSiteOrientation() {
-    if (!_commands.isPlan || !_project.activeStorey.isSite) return;
+  // --- SUBSECTION: [TAG:SITE_PLAN_TOOLS] Survey alignment and parcel placement ---
+  bool get _hasVisibleSiteRaster => _showUnderlay &&
+      _project.isLayerVisible(ArchitectLayer.rasterUnderlayLayerId) &&
+      _project.rasterUnderlaysForStorey(_project.activeStoreyId).any((r) => r.visible);
+
+  void _offerSiteAlignment(String message, String storeyId, {required bool isCad}) {
+    final owner = _underlayOwnerId;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      duration: const Duration(seconds: 5),
+      action: SnackBarAction(
+        label: context.l10n.architectSiteAlign,
+        onPressed: () {
+          if (mounted && _underlayOwnerId == owner && _project.activeStoreyId == storeyId) {
+            _startSiteOrientation(isCad: isCad);
+          }
+        },
+      ),
+    ));
+  }
+
+  void _startSiteOrientation({bool? isCad}) {
+    if (!_commands.isPlan || !_project.activeStorey.isSite || _underlayBusy) return;
+    final useCad = isCad ?? (!_isCadUnderlaySelected && _selectedRasterId != null
+        ? !_hasVisibleSiteRaster : _currentUnderlayDoc != null);
+    if (useCad ? _currentUnderlayDoc == null : !_hasVisibleSiteRaster) return;
     _discardGeometryCommand();
     _cancelActiveDrags();
+    _cancelRasterCalibration();
     setState(() {
       _siteOrientationActive = true;
+      _siteOrientationUseCad = useCad;
+      _siteTrueNorthView = true;
       _isCadUnderlaySelected = false;
       _selectedRasterId = null;
       _selectionIds.clear();
       _selectedElementId = null;
       _touchCandidates = null;
     });
+    _syncWorkspaceCameraRotation();
+  }
+
+  List<ArchitectSiteSegment> _siteUnderlaySegments(Offset raw, bool touch) {
+    final doc = _currentUnderlayDoc;
+    if (doc == null) return const [];
+    return ArchitectSiteUnderlayPick.nearby(
+      document: doc,
+      frame: _effectiveUnderlayFrame,
+      point: raw,
+      tolerance: (touch ? 12 : 8) / _currentScale,
+      visibility: _effectiveUnderlayLayerVisibility,
+      mask: ArchitectUnderlayClip.of(_project),
+    );
+  }
+
+  ArchitectSnapResult _snapSitePoint(Offset raw, bool touch, {required bool useCad}) {
+    if (!useCad || !_magnetEnabled) return ArchitectSnapResult(point: raw);
+    final candidates = _siteUnderlaySegments(raw, touch);
+    if (candidates.isEmpty) return ArchitectSnapResult(point: raw);
+    final (a, b) = candidates.first;
+    final endpointTol = (touch ? 7 : 5) / _currentScale;
+    final endpoint = (raw - a).distance < (raw - b).distance ? a : b;
+    return ArchitectSnapResult(
+      point: (raw - endpoint).distance <= endpointTol
+          ? endpoint : BimLineGeometry.closest(raw, a, b),
+      isSnapped: true,
+    );
+  }
+
+  void _startSiteParcel({required bool setbacks}) {
+    if (!_commands.isPlan || !_project.activeStorey.isSite ||
+        (setbacks && _project.activeStorey.siteParcel == null)) return;
+    _discardGeometryCommand();
+    _cancelActiveDrags();
+    _cancelRasterCalibration();
+    setState(() {
+      _siteParcelEditingSetbacks = setbacks;
+      _isCadUnderlaySelected = false;
+      _selectedRasterId = null;
+      _selectionIds.clear();
+      _selectedElementId = null;
+      _touchCandidates = null;
+    });
+  }
+
+  void _commitSiteParcel(ArchitectSiteParcel parcel) {
+    if (!_commands.isPlan || !_project.activeStorey.isSite ||
+        _siteParcelEditingSetbacks == null) return;
+    _commands.commit(_project.updateActiveStorey(
+      _project.activeStorey.copyWith(siteParcel: parcel),
+    ));
+    _saveBiMProjectIfAttached();
+    if (_siteParcelEditingSetbacks == false) {
+      setState(() => _siteParcelEditingSetbacks = null);
+    }
+    HapticFeedback.mediumImpact();
+    _repaintPreview();
+  }
+
+  void _onSiteAction(ArchitectSiteAction action) {
+    switch (action) {
+      case ArchitectSiteAction.underlay:
+        unawaited(_addUnderlay());
+      case ArchitectSiteAction.align:
+        _startSiteOrientation();
+      case ArchitectSiteAction.parcel:
+        _startSiteParcel(setbacks: false);
+      case ArchitectSiteAction.setback:
+        _startSiteParcel(setbacks: true);
+      case ArchitectSiteAction.terrain:
+        _changeTool(ArchitectTool.terrain, toggle: false);
+      case ArchitectSiteAction.contours:
+        _changeTool(ArchitectTool.contour, toggle: false);
+    }
   }
 
   bool _canResetGeodeticOrientation({
@@ -6000,8 +6120,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   Future<void> _applySiteOrientation(Offset pivot, double deltaRad) async {
+    final source = _commands.documentProject;
     final rotateBuilding = await _confirmRotateBuildingIfNeeded();
-    if (!mounted || rotateBuilding == null) return;
+    if (!mounted || rotateBuilding == null || !_siteOrientationActive ||
+        !identical(source, _commands.documentProject)) return;
 
     final pivotScreen = _viewport.toScreen(pivot);
     final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
@@ -6012,8 +6134,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       fallbackFrame: fallback,
       rotateBuilding: rotateBuilding,
     );
-    _modelCommands.execute(AlignArchitectSiteOrientation(aligned));
-    _saveBiMProjectIfAttached();
+    if (!identical(aligned, _project)) {
+      _modelCommands.execute(AlignArchitectSiteOrientation(aligned));
+      _saveBiMProjectIfAttached();
+    }
 
     setState(() {
       _siteOrientationActive = false;
@@ -6022,14 +6146,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // Counter-rotate the Site Plan camera around the picked edge midpoint so
     // the geodetic survey underlay remains completely motionless on screen.
     _syncWorkspaceCameraRotation(screenAnchor: pivotScreen);
+    _viewport.panBy(pivotScreen - _viewport.toScreen(pivot));
     HapticFeedback.mediumImpact();
     _repaintPreview();
     if (mounted) {
-      final angleDeg = ((aligned.northSymbol?.angle ?? 0.0) * 180 / math.pi)
-          .toStringAsFixed(1);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.l10n.architectSiteOrientApplied(angleDeg)),
+          content: Text(context.l10n.architectSiteAlignmentDone),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -6095,7 +6218,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (action == null || !current()) return;
     switch (action) {
       case 'orient_building':
-        _startSiteOrientation();
+        _startSiteOrientation(isCad: false);
       case 'reset_orientation':
         unawaited(_resetGeodeticOrientation(isCad: false, rasterId: sel.id));
       case 'position':
@@ -15315,6 +15438,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     _viewDirectionDraft = null;
     _siteOrientationActive = false;
+    _siteParcelEditingSetbacks = null;
     _rotationSource = null;
     _rotationUnderlay = null;
     _underlayRotationPreview = null;
@@ -31917,9 +32041,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               (!isCad || !_project.isSharedCadUnderlayForStorey(_project.activeStoreyId))) ...[
             action(
               'underlay-edit-orientation',
-              l.architectUnderlayEditOrientation,
+              l.architectSiteAlign,
               Icons.explore_outlined,
-              _startSiteOrientation,
+              () => _startSiteOrientation(isCad: isCad),
               color: const Color(0xFF00E5FF),
             ),
             if (_canResetGeodeticOrientation(
@@ -33886,6 +34010,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   drawingOnly: !_commands.isPlan,
 
                   sitePlan: _commands.isPlan && _project.activeStorey.isSite,
+                  onSiteAction: _onSiteAction,
+                  canAlignSite: !_underlayBusy &&
+                      (_currentUnderlayDoc != null || _hasVisibleSiteRaster),
+                  hasSiteParcel: _project.activeStorey.siteParcel != null,
 
                   viewSwitchEpoch: _paletteViewEpoch,
 
@@ -38617,7 +38745,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               onMove: () => _startUnderlaySnapDrag(isCad: true),
               onOpenScale: _openCadScaleDialog,
               onEditOrientation:
-                  _project.activeStorey.isSite ? _startSiteOrientation : null,
+                  _project.activeStorey.isSite
+                  ? () => _startSiteOrientation(isCad: true) : null,
               onResetOrientation: _project.activeStorey.isSite
                   ? () => unawaited(_resetGeodeticOrientation(isCad: true))
                   : null,
@@ -38655,7 +38784,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               onStartCalibration: _openRasterScaleDialog,
               onCancelCalibration: _cancelRasterCalibration,
               onEditOrientation:
-                  _project.activeStorey.isSite ? _startSiteOrientation : null,
+                  _project.activeStorey.isSite
+                  ? () => _startSiteOrientation(isCad: false) : null,
               onResetOrientation: _project.activeStorey.isSite
                   ? () => unawaited(
                       _resetGeodeticOrientation(
@@ -39624,12 +39754,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               key: const ValueKey('architect-site-orientation-overlay'),
               toModel: _screenToModel,
               toScreen: _viewport.toScreen,
-              snap: (raw, touch) => _snapTransformPoint(
-                raw,
-                touch,
-                selectionOnly: false,
-              ),
-              localizeSnap: _localizedSnapLabel,
+              pickSegments: _siteOrientationUseCad ? _siteUnderlaySegments : null,
+              snap: (raw, touch) => _snapSitePoint(raw, touch, useCad: _siteOrientationUseCad),
               onApply: _applySiteOrientation,
               onNavigate: (delta, factor, focal) => _viewport.navigate(
                 previousFocal: focal - delta,
@@ -39643,9 +39769,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
           ),
         ),
+      if (_siteParcelEditingSetbacks case final editing?)
+        Positioned.fill(
+          child: AnimatedBuilder(
+            animation: _viewport,
+            builder: (_, _) => ArchitectSiteParcelOverlay(
+              key: ValueKey(('architect-site-parcel', editing, _project.activeStoreyId)),
+              project: _project,
+              editingSetbacks: editing,
+              scale: _currentScale,
+              toModel: _screenToModel,
+              toScreen: _viewport.toScreen,
+              snap: (raw, touch) => _snapSitePoint(raw, touch, useCad: true),
+              onCommit: _commitSiteParcel,
+              onNavigate: (delta, factor, focal) => _viewport.navigate(
+                previousFocal: focal - delta,
+                focal: focal,
+                scaleFactor: factor,
+              ),
+              onCancel: () => setState(() => _siteParcelEditingSetbacks = null),
+            ),
+          ),
+        ),
       if (_commands.isPlan &&
           _project.activeStorey.isSite &&
           !_siteOrientationActive &&
+          _siteParcelEditingSetbacks == null &&
           _rotationSource == null &&
           !_dragController.isActive &&
           !_underlayMaskDrafting &&

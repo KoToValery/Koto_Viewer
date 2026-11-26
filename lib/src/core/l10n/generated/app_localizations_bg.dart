@@ -6819,7 +6819,79 @@ class AppLocalizationsBg extends AppLocalizations {
       'Генерален покривен план с пунктир на фасадните стени';
 
   @override
-  String get architectSitePlan => 'Терен';
+  String get architectSitePlan => 'Ситуация';
+
+  @override
+  String get architectSiteUnderlay => 'Подложка';
+
+  @override
+  String get architectSiteRasterReady => 'Подложката е поставена';
+
+  @override
+  String get architectSiteAlign => 'Подравни';
+
+  @override
+  String get architectSiteAlignmentDone => 'Подравняването е приложено';
+
+  @override
+  String get architectSiteParcel => 'Имот';
+
+  @override
+  String get architectSiteSetback => 'Линия на застрояване';
+
+  @override
+  String get architectSiteSelectLine => 'Посочи линия от подложката';
+
+  @override
+  String get architectSiteTwoPoints => 'Две точки';
+
+  @override
+  String get architectSiteNextLine => 'Следваща линия';
+
+  @override
+  String get architectSiteFloorPreview => 'На етажа';
+
+  @override
+  String get architectSiteFlip => 'Обърни';
+
+  @override
+  String get architectSiteHorizontal => 'Хоризонтално';
+
+  @override
+  String get architectSiteVertical => 'Вертикално';
+
+  @override
+  String get architectSiteParcelTrace => 'Посочи върховете на имота';
+
+  @override
+  String get architectSiteParcelEdit => 'Посочи връх за преместване';
+
+  @override
+  String get architectSiteParcelMoveVertex => 'Посочи новото място на върха';
+
+  @override
+  String get architectSiteParcelClose => 'Затвори';
+
+  @override
+  String get architectSiteParcelInvalid => 'Контурът или отстъпът е невалиден';
+
+  @override
+  String get architectSitePickBoundary => 'Посочи имотна страна';
+
+  @override
+  String get architectSiteInvalidSetback => 'Линията не се побира в имота';
+
+  @override
+  String get architectSiteBuildingOutside => 'Контурът излиза от имота';
+
+  @override
+  String architectSiteParcelArea(String area) {
+    return 'Площ $area m²';
+  }
+
+  @override
+  String get architectSiteParcelCalibrationHint =>
+      'При сканирана подложка първо провери мащаба';
 
   @override
   String get architectSitePlanSubtitle =>
@@ -14163,13 +14235,13 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectSiteOrientExistingBuildingBody =>
-      'Избери дали да се завъртят само парцелът и подложката, или сградата заедно с парцела.';
+      'Запази положението на сградата спрямо имота или остави сградата на място в етажния план.';
 
   @override
-  String get architectSiteOrientSiteOnly => 'Само парцела';
+  String get architectSiteOrientSiteOnly => 'Запази етажния план';
 
   @override
-  String get architectSiteOrientWithBuilding => 'Сграда + парцел';
+  String get architectSiteOrientWithBuilding => 'Запази спрямо имота';
 
   @override
   String architectSiteOrientApplied(String angle) {

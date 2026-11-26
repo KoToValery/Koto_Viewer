@@ -67,6 +67,7 @@ class ArchitectSceneGeometry {
       ],
       for (final f in s.siteFences) ...f.points,
       for (final st in s.streets) ...st.points,
+      ...?s.siteParcel?.vertices,
       for (final e in s.cadPrimitives) ...[
         if (e.type == CadPrimitiveType.ellipse) ...[
           ArchitectEllipseGeometry.fromPrimitive(e).bounds.topLeft,

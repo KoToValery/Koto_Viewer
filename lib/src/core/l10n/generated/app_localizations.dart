@@ -12059,6 +12059,144 @@ abstract class AppLocalizations {
   /// **'Site Plan'**
   String get architectSitePlan;
 
+  /// No description provided for @architectSiteUnderlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay'**
+  String get architectSiteUnderlay;
+
+  /// No description provided for @architectSiteRasterReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay placed'**
+  String get architectSiteRasterReady;
+
+  /// No description provided for @architectSiteAlign.
+  ///
+  /// In en, this message translates to:
+  /// **'Align'**
+  String get architectSiteAlign;
+
+  /// No description provided for @architectSiteAlignmentDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Alignment applied'**
+  String get architectSiteAlignmentDone;
+
+  /// No description provided for @architectSiteParcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Parcel'**
+  String get architectSiteParcel;
+
+  /// No description provided for @architectSiteSetback.
+  ///
+  /// In en, this message translates to:
+  /// **'Setback line'**
+  String get architectSiteSetback;
+
+  /// No description provided for @architectSiteSelectLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an underlay line'**
+  String get architectSiteSelectLine;
+
+  /// No description provided for @architectSiteTwoPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Two points'**
+  String get architectSiteTwoPoints;
+
+  /// No description provided for @architectSiteNextLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Next line'**
+  String get architectSiteNextLine;
+
+  /// No description provided for @architectSiteFloorPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'On the floor plan'**
+  String get architectSiteFloorPreview;
+
+  /// No description provided for @architectSiteFlip.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip'**
+  String get architectSiteFlip;
+
+  /// No description provided for @architectSiteHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal'**
+  String get architectSiteHorizontal;
+
+  /// No description provided for @architectSiteVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical'**
+  String get architectSiteVertical;
+
+  /// No description provided for @architectSiteParcelTrace.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the parcel vertices'**
+  String get architectSiteParcelTrace;
+
+  /// No description provided for @architectSiteParcelEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a vertex to move'**
+  String get architectSiteParcelEdit;
+
+  /// No description provided for @architectSiteParcelMoveVertex.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the new vertex position'**
+  String get architectSiteParcelMoveVertex;
+
+  /// No description provided for @architectSiteParcelClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get architectSiteParcelClose;
+
+  /// No description provided for @architectSiteParcelInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The boundary or setback is invalid'**
+  String get architectSiteParcelInvalid;
+
+  /// No description provided for @architectSitePickBoundary.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a parcel side'**
+  String get architectSitePickBoundary;
+
+  /// No description provided for @architectSiteInvalidSetback.
+  ///
+  /// In en, this message translates to:
+  /// **'The line does not fit inside the parcel'**
+  String get architectSiteInvalidSetback;
+
+  /// No description provided for @architectSiteBuildingOutside.
+  ///
+  /// In en, this message translates to:
+  /// **'Building extends outside the parcel'**
+  String get architectSiteBuildingOutside;
+
+  /// No description provided for @architectSiteParcelArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Area {area} m²'**
+  String architectSiteParcelArea(String area);
+
+  /// No description provided for @architectSiteParcelCalibrationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the scale before tracing a scanned underlay'**
+  String get architectSiteParcelCalibrationHint;
+
   /// No description provided for @architectSitePlanSubtitle.
   ///
   /// In en, this message translates to:
@@ -25599,19 +25737,19 @@ abstract class AppLocalizations {
   /// Dialog body explaining the two orientation choices when building already exists
   ///
   /// In en, this message translates to:
-  /// **'Choose whether to rotate only the site and survey underlay, or rotate the building together with the site.'**
+  /// **'Keep the building in place relative to the parcel or keep it in place on the floor plan.'**
   String get architectSiteOrientExistingBuildingBody;
 
   /// Option to rotate only the site, terrain, and survey underlay
   ///
   /// In en, this message translates to:
-  /// **'Site only'**
+  /// **'Keep floor plan position'**
   String get architectSiteOrientSiteOnly;
 
   /// Option to rotate existing building storeys together with the site
   ///
   /// In en, this message translates to:
-  /// **'Building + site'**
+  /// **'Keep position on parcel'**
   String get architectSiteOrientWithBuilding;
 
   /// Snackbar confirming building orientation alignment
