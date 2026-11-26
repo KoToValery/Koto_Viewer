@@ -24,8 +24,11 @@ class ArchitectGhostStoreyPainter extends CustomPainter {
   }) : super(repaint: viewport);
 
   static List<ArchitectStorey> neighbors(ArchitectProject project) {
-    final floors = [...project.storeys]
-      ..sort(
+    if (project.activeStorey.isSite) return const [];
+    final floors = [
+      for (final floor in project.storeys)
+        if (!floor.isSite) floor,
+    ]..sort(
         (a, b) => a.elevation == b.elevation
             ? a.id.compareTo(b.id)
             : a.elevation.compareTo(b.elevation),
@@ -37,6 +40,66 @@ class ArchitectGhostStoreyPainter extends CustomPainter {
       if (index > 0) floors[index - 1],
       if (index >= 0 && index < floors.length - 1) floors[index + 1],
     ];
+  }
+
+  static void _drawCadPrimitives(
+    Canvas canvas,
+    List<ArchitectCadPrimitive> primitives,
+    Paint stroke,
+    void Function(List<Offset>) polygon,
+  ) {
+    for (final primitive in primitives) {
+      switch (primitive.type) {
+        case CadPrimitiveType.line:
+          canvas.drawLine(primitive.startPoint, primitive.endPoint, stroke);
+        case CadPrimitiveType.polyline:
+          canvas.drawPath(
+            Path()..addPolygon(primitive.linePoints, false),
+            stroke,
+          );
+        case CadPrimitiveType.rect:
+        case CadPrimitiveType.hatch:
+          polygon(primitive.polygonCorners);
+        case CadPrimitiveType.circle:
+          canvas.drawCircle(
+            primitive.startPoint,
+            (primitive.endPoint - primitive.startPoint).distance,
+            stroke,
+          );
+        case CadPrimitiveType.arc:
+          final arc = primitive.arc;
+          if (arc != null) {
+            canvas.drawPath(arc.toPath(), stroke);
+          } else {
+            canvas.drawLine(primitive.startPoint, primitive.endPoint, stroke);
+          }
+        case CadPrimitiveType.mask:
+          polygon(primitive.polygonCorners);
+        case CadPrimitiveType.spline:
+          canvas.drawPath(
+            ArchitectSplineGeometry.generatePath(
+              primitive.linePoints,
+              closed: primitive.closed == true,
+            ),
+            stroke,
+          );
+        case CadPrimitiveType.ellipse:
+          canvas.drawPath(
+            ArchitectEllipseGeometry.fromPrimitive(primitive).path,
+            stroke,
+          );
+      }
+    }
+  }
+
+  static void _drawPolyline(
+    Canvas canvas,
+    List<Offset> points,
+    Paint stroke, {
+    bool closed = false,
+  }) {
+    if (points.length < 2) return;
+    canvas.drawPath(Path()..addPolygon(points, closed), stroke);
   }
 
   @override
@@ -106,48 +169,55 @@ class ArchitectGhostStoreyPainter extends CustomPainter {
         }
         canvas.restore();
       }
-      for (final primitive in storey.cadPrimitives) {
-        switch (primitive.type) {
-          case CadPrimitiveType.line:
-            canvas.drawLine(primitive.startPoint, primitive.endPoint, stroke);
-          case CadPrimitiveType.polyline:
-            canvas.drawPath(
-              Path()..addPolygon(primitive.linePoints, false),
-              stroke,
-            );
-          case CadPrimitiveType.rect:
-          case CadPrimitiveType.hatch:
-            polygon(primitive.polygonCorners);
-          case CadPrimitiveType.circle:
-            canvas.drawCircle(
-              primitive.startPoint,
-              (primitive.endPoint - primitive.startPoint).distance,
-              stroke,
-            );
-          case CadPrimitiveType.arc:
-            final arc = primitive.arc;
-            if (arc != null) {
-              canvas.drawPath(arc.toPath(), stroke);
-            } else {
-              canvas.drawLine(primitive.startPoint, primitive.endPoint, stroke);
-            }
-          case CadPrimitiveType.mask:
-            polygon(primitive.polygonCorners);
-          case CadPrimitiveType.spline:
-            canvas.drawPath(
-              ArchitectSplineGeometry.generatePath(
-                primitive.linePoints,
-                closed: primitive.closed == true,
-              ),
-              stroke,
-            );
-          case CadPrimitiveType.ellipse:
-            canvas.drawPath(
-              ArchitectEllipseGeometry.fromPrimitive(primitive).path,
-              stroke,
-            );
+      _drawCadPrimitives(canvas, storey.cadPrimitives, stroke, polygon);
+    }
+
+    if (!project.activeStorey.isSite && project.siteStorey != null) {
+      final site = project.siteStorey!;
+      final siteColor = palette.isDark
+          ? const Color(0xFFA5D6A7)
+          : const Color(0xFF33691E);
+      final siteStroke = Paint()
+        ..color = siteColor.withValues(alpha: .35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0 / viewport.scale;
+      final siteFill = Paint()..color = siteColor.withValues(alpha: .03);
+      void sitePolygon(List<Offset> points) {
+        if (points.length < 3) return;
+        final path = Path()..addPolygon(points, true);
+        canvas.drawPath(path, siteFill);
+        canvas.drawPath(path, siteStroke);
+      }
+
+      for (final surface in [project.existingTerrain, project.proposedTerrain]) {
+        for (final boundary in surface.boundaries) {
+          sitePolygon(boundary.polygon);
+        }
+        for (final contour in surface.contours) {
+          _drawPolyline(
+            canvas,
+            contour.resolvedPolyline(),
+            siteStroke,
+            closed: contour.closed,
+          );
         }
       }
+      for (final pathway in site.pathways) {
+        _drawPolyline(canvas, pathway.points, siteStroke, closed: pathway.closed);
+      }
+      for (final street in site.streets) {
+        _drawPolyline(canvas, street.points, siteStroke, closed: street.closed);
+      }
+      for (final fence in site.siteFences) {
+        _drawPolyline(canvas, fence.points, siteStroke, closed: fence.closed);
+      }
+      for (final slab in site.slabs) {
+        sitePolygon(slab.polygon);
+      }
+      for (final zone in site.zones) {
+        sitePolygon(zone.polygon);
+      }
+      _drawCadPrimitives(canvas, site.cadPrimitives, siteStroke, sitePolygon);
     }
     canvas.restore();
   }

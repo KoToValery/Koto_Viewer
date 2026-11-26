@@ -55,6 +55,8 @@ export 'architect_tool_catalog.dart' show ArchitectToolCategory;
 class ArchitectToolPalette extends StatefulWidget {
   final ArchitectTool activeTool;
   final bool drawingOnly;
+  final bool sitePlan;
+  final int viewSwitchEpoch;
   final ArchitectInteractionMode? interactionMode;
   final ArchitectTool? selectionTool;
   final VoidCallback? onDrawSelection;
@@ -197,6 +199,8 @@ class ArchitectToolPalette extends StatefulWidget {
     this.zonePresets = const ArchitectZonePresets(),
     required this.activeTool,
     this.drawingOnly = false,
+    this.sitePlan = false,
+    this.viewSwitchEpoch = 0,
     this.interactionMode,
     this.selectionTool,
     this.onDrawSelection,
@@ -328,6 +332,11 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   void initState() {
     super.initState();
     category = ArchitectToolCategory.of(widget.activeTool);
+    if (widget.sitePlan &&
+        (widget.activeTool == ArchitectTool.pan ||
+            widget.activeTool == ArchitectTool.select)) {
+      category = ArchitectToolCategory.underlays;
+    }
     if (widget.drawingOnly && !category.availableInDrawing) {
       category = ArchitectToolCategory.drawing;
     }
@@ -380,9 +389,26 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   @override
   void didUpdateWidget(ArchitectToolPalette oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final enteredSitePlan =
+        widget.sitePlan &&
+        (!oldWidget.sitePlan ||
+            oldWidget.drawingOnly ||
+            widget.viewSwitchEpoch != oldWidget.viewSwitchEpoch) &&
+        !widget.drawingOnly;
+    final leftSitePlan = !widget.sitePlan && oldWidget.sitePlan;
     if (widget.activeTool != oldWidget.activeTool &&
         widget.activeTool != ArchitectTool.pan &&
         widget.activeTool != ArchitectTool.select) {
+      category = ArchitectToolCategory.of(widget.activeTool);
+    } else if (enteredSitePlan &&
+        (widget.activeTool == ArchitectTool.pan ||
+            widget.activeTool == ArchitectTool.select)) {
+      category = ArchitectToolCategory.underlays;
+    } else if (leftSitePlan &&
+        (category == ArchitectToolCategory.underlays ||
+            category == ArchitectToolCategory.landscape) &&
+        (widget.activeTool == ArchitectTool.pan ||
+            widget.activeTool == ArchitectTool.select)) {
       category = ArchitectToolCategory.of(widget.activeTool);
     }
     if (widget.drawingOnly && !category.availableInDrawing) {

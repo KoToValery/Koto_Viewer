@@ -959,6 +959,25 @@ class ArchitectUnderlayPainter extends CustomPainter {
     canvas.restore();
   }
 
+  bool _extraCadUnderlaysChanged(List<ArchitectCadRenderLayer> other) {
+    if (extraCadUnderlays.length != other.length) return true;
+    for (var i = 0; i < extraCadUnderlays.length; i++) {
+      final a = extraCadUnderlays[i];
+      final b = other[i];
+      if (!identical(a.document, b.document) ||
+          a.frame != b.frame ||
+          !mapEquals(a.visibility, b.visibility) ||
+          a.config?.effectiveId != b.config?.effectiveId ||
+          a.config?.opacity != b.config?.opacity ||
+          a.config?.visible != b.config?.visible ||
+          a.config?.maskEnabled != b.config?.maskEnabled ||
+          !listEquals(a.config?.maskPolygon, b.config?.maskPolygon)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @override
   bool shouldRepaint(covariant ArchitectUnderlayPainter oldDelegate) =>
       palette.isDark != oldDelegate.palette.isDark ||
@@ -966,6 +985,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
       frame != oldDelegate.frame ||
       viewport != oldDelegate.viewport ||
       !mapEquals(visibility, oldDelegate.visibility) ||
+      _extraCadUnderlaysChanged(oldDelegate.extraCadUnderlays) ||
       !listEquals(rasterUnderlays, oldDelegate.rasterUnderlays) ||
       rasterImages.length != oldDelegate.rasterImages.length ||
       selectedRasterId != oldDelegate.selectedRasterId ||

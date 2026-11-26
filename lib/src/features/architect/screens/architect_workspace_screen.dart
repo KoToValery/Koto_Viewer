@@ -505,6 +505,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   final Map<ArchitectWorkspaceView, String> _lastViewIds = {};
 
+  int _paletteViewEpoch = 0;
+
   final Map<String, ({double scale, Offset translation, double rotation})> _viewCameras = {};
 
   bool _siteTrueNorthView = true;
@@ -1304,6 +1306,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (type == ArchitectWorkspaceView.plan && id != null) {
 
       _commands.activateStorey(id);
+      _paletteViewEpoch++;
 
     }
 
@@ -4722,6 +4725,45 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
       );
     }
+    if (_showGhostStoreys && !_project.activeStorey.isSite) {
+      final site = activeProject.siteStorey;
+      if (site != null) {
+        final siteCfg = activeProject.cadUnderlays[site.id];
+        if (siteCfg != null) {
+          final alreadyRendered =
+              siteCfg.effectiveId == activeId ||
+              result.any((l) => l.config?.effectiveId == siteCfg.effectiveId);
+          if (!alreadyRendered && siteCfg.visible) {
+            final doc = _docForCadConfig(siteCfg) ?? _underlaysByStorey[site.id];
+            if (doc != null) {
+              result.add(
+                ArchitectCadRenderLayer(
+                  document: doc,
+                  frame: siteCfg.frame(fallback),
+                  visibility: siteCfg.layerOverrides,
+                  config: siteCfg.copyWith(
+                    opacity: math.min(siteCfg.opacity, 0.45),
+                  ),
+                ),
+              );
+            }
+          }
+        } else {
+          final legacyDoc = _underlaysByStorey[site.id];
+          if (legacyDoc != null &&
+              _currentCadUnderlayConfig?.storeyId != site.id) {
+            result.add(
+              ArchitectCadRenderLayer(
+                document: legacyDoc,
+                frame: fallback,
+                visibility: const {},
+                config: null,
+              ),
+            );
+          }
+        }
+      }
+    }
     return result;
   }
 
@@ -4749,13 +4791,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return result;
   }
 
-  List<ArchitectRasterUnderlay> get _paintRasterUnderlays => [
-    for (final r in (_underlayRotationPreview ?? _project)
-        .rasterUnderlaysForStorey(_project.activeStoreyId))
-      if (_rasterDragPreview?.id == r.id) _rasterDragPreview!
-      else if (_underlayCropEditor.active && !_underlayCropCad && r.id == _underlayCropRasterId)
-        r.copyWith(maskPolygon: _underlayCropEditor.preview, maskEnabled: true) else r,
-  ];
+  List<ArchitectRasterUnderlay> get _paintRasterUnderlays {
+    final activeProject = _underlayRotationPreview ?? _project;
+    final list = [
+      for (final r in activeProject.rasterUnderlaysForStorey(_project.activeStoreyId))
+        if (_rasterDragPreview?.id == r.id) _rasterDragPreview!
+        else if (_underlayCropEditor.active && !_underlayCropCad && r.id == _underlayCropRasterId)
+          r.copyWith(maskPolygon: _underlayCropEditor.preview, maskEnabled: true) else r,
+    ];
+    if (_showGhostStoreys &&
+        _commands.isPlan &&
+        !_project.activeStorey.isSite &&
+        _showUnderlay &&
+        _project.isLayerVisible(ArchitectLayer.rasterUnderlayLayerId)) {
+      final site = activeProject.siteStorey;
+      if (site != null) {
+        for (final r in activeProject.rasterUnderlaysForStorey(site.id)) {
+          if (r.visible && !list.any((item) => item.id == r.id)) {
+            list.add(r.copyWith(opacity: math.min(r.opacity, 0.35)));
+          }
+        }
+      }
+    }
+    return list;
+  }
 
   // --- SUBSECTION: [TAG:DRAG_TOOL] ARCHITECT 2-POINT SNAP DRAG CONTROLLER ---
   final ArchitectDragController _dragController = ArchitectDragController();
@@ -6189,11 +6248,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     }
 
+    final cadVisible = _showUnderlay &&
+        _project.isLayerVisible(ArchitectLayer.cadUnderlayLayerId) &&
+        (_currentCadUnderlayConfig?.visible ?? (_currentUnderlayDoc != null));
+    if (_isCadUnderlaySelected && !cadVisible) {
+      _isCadUnderlaySelected = false;
+    }
+
+    if (_selectedRasterId != null &&
+        (!_showUnderlay ||
+            !_project.isLayerVisible(ArchitectLayer.rasterUnderlayLayerId) ||
+            !_project.rasterUnderlaysForStorey(_project.activeStoreyId).any(
+              (r) => r.id == _selectedRasterId && r.visible,
+            ))) {
+      _selectedRasterId = null;
+    }
+
     if (_selectionContextActive &&
 
         _effectiveSelection.isEmpty &&
 
-        _selectedSectionRoofId == null) {
+        _selectedSectionRoofId == null &&
+
+        !_isCadUnderlaySelected &&
+
+        _selectedRasterId == null) {
 
       _selectionContextActive = false;
 
@@ -17116,9 +17195,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_activeTool == ArchitectTool.cadUnderlay) {
-      if (_cadUnderlayContains(rawModel)) {
-        if (!_isCadUnderlaySelected || _selectedRasterId != null) {
+      final hitCfg = _hitCadUnderlayConfig(rawModel);
+      if (hitCfg != null || _cadUnderlayContains(rawModel)) {
+        if (!_isCadUnderlaySelected ||
+            _selectedRasterId != null ||
+            (hitCfg != null && _selectedCadUnderlayId != hitCfg.effectiveId)) {
           setState(() {
+            if (hitCfg != null) {
+              _selectedCadUnderlayId = hitCfg.effectiveId;
+            }
             _isCadUnderlaySelected = true;
             _selectedRasterId = null;
           });
@@ -22357,14 +22442,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         .firstOrNull;
     if (hitRaster != null &&
         (_activeTool == ArchitectTool.rasterUnderlay ||
-            (!overModelElement && (_activeTool == ArchitectTool.pan ||
+            (!overModelElement && (_canAdoptPickedTool ||
                 _activeTool == ArchitectTool.select)))) {
       setState(() {
         _cancelActiveDrags();
         _selectedRasterId = hitRaster.id;
         _isCadUnderlaySelected = false;
         _selectedElementId = null;
+        _selectedZoneId = null;
         _selectionIds.clear();
+        if (_canAdoptPickedTool) {
+          _activeTool = ArchitectTool.rasterUnderlay;
+          _selectionContextActive = true;
+        }
       });
       final box = context.findRenderObject() as RenderBox?;
       unawaited(_openRasterContextMenu(box?.localToGlobal(screenPoint) ?? screenPoint));
@@ -22375,7 +22465,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final cadCfg = _hitCadUnderlayConfig(raw);
     if (cadCfg != null &&
         (_activeTool == ArchitectTool.cadUnderlay ||
-            (!overModelElement && (_activeTool == ArchitectTool.pan ||
+            (!overModelElement && (_canAdoptPickedTool ||
                 (_activeTool == ArchitectTool.select && _effectiveSelection.isEmpty))))) {
       setState(() {
         _cancelActiveDrags();
@@ -22383,7 +22473,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _isCadUnderlaySelected = true;
         _selectedRasterId = null;
         _selectedElementId = null;
+        _selectedZoneId = null;
         _selectionIds.clear();
+        if (_canAdoptPickedTool) {
+          _activeTool = ArchitectTool.cadUnderlay;
+          _selectionContextActive = true;
+        }
       });
       final box = context.findRenderObject() as RenderBox?;
       unawaited(_openCadContextMenu(box?.localToGlobal(screenPoint) ?? screenPoint));
@@ -25810,7 +25905,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _isCadUnderlaySelected = true;
         _selectedRasterId = null;
         _selectedElementId = null;
+        _selectedZoneId = null;
         _selectionIds.clear();
+        if (_canAdoptPickedTool) {
+          _activeTool = ArchitectTool.cadUnderlay;
+          _selectionContextActive = true;
+        }
       });
       return true;
     }
@@ -25821,7 +25921,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _selectedRasterId = rasterId;
         _isCadUnderlaySelected = false;
         _selectedElementId = null;
+        _selectedZoneId = null;
         _selectionIds.clear();
+        if (_canAdoptPickedTool) {
+          _activeTool = ArchitectTool.rasterUnderlay;
+          _selectionContextActive = true;
+        }
       });
       return true;
     }
@@ -25957,6 +26062,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectedElementId = grouped ? null : primary;
 
       _selectedZoneId = null;
+
+      _isCadUnderlaySelected = false;
+
+      _selectedRasterId = null;
 
       if (grouped && adoptTool) {
 
@@ -33620,6 +33729,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
                   drawingOnly: !_commands.isPlan,
 
+                  sitePlan: _commands.isPlan && _project.activeStorey.isSite,
+
+                  viewSwitchEpoch: _paletteViewEpoch,
+
                   onTerrain: _commands.view == ArchitectWorkspaceView.elevation ? _startTerrainDraft : null,
 
                   activeTool: _activeTool,
@@ -37286,16 +37399,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ),
                     showGeodesyLayer:
                         _commands.isPlan &&
-                        _project.activeStorey.isSite &&
+                        (_project.activeStorey.isSite ||
+                            (_showGhostStoreys && _project.siteStorey != null)) &&
                         _project.isLayerVisible(ArchitectLayer.geodesyLayerId),
                     geodeticContours:
                         _project.geodeticSurvey?.contoursForStorey(
-                          _project.activeStorey.id,
+                          _project.activeStorey.isSite
+                              ? _project.activeStorey.id
+                              : (_showGhostStoreys
+                                    ? (_project.siteStorey?.id ??
+                                          _project.activeStorey.id)
+                                    : _project.activeStorey.id),
                         ) ??
                         const [],
                     geodeticPoints:
                         _project.geodeticSurvey?.pointsForStorey(
-                          _project.activeStorey.id,
+                          _project.activeStorey.isSite
+                              ? _project.activeStorey.id
+                              : (_showGhostStoreys
+                                    ? (_project.siteStorey?.id ??
+                                          _project.activeStorey.id)
+                                    : _project.activeStorey.id),
                         ) ??
                         const [],
                     calibrationP1: _rasterCalibrationP1,
