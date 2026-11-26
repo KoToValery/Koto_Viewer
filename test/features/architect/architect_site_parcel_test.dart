@@ -74,6 +74,90 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  bool hasSegment(List<ArchitectSiteSegment> segments, Offset a, Offset b) =>
+      segments.any(
+        (line) =>
+            ((line.$1 - a).distance < 1e-6 && (line.$2 - b).distance < 1e-6) ||
+            ((line.$1 - b).distance < 1e-6 && (line.$2 - a).distance < 1e-6),
+      );
+
+  test(
+    'intersecting setbacks form a closed contour and trim to the parcel otherwise',
+    () {
+      final partial = ArchitectSiteParcel(_rectangle, setbacks: {0: 1, 1: 2});
+      expect(partial.trimmedSetbacks, hasLength(2));
+      expect(
+        hasSegment(
+          partial.trimmedSetbacks,
+          const Offset(0, 1),
+          const Offset(8, 1),
+        ),
+        isTrue,
+      );
+      expect(
+        hasSegment(
+          partial.trimmedSetbacks,
+          const Offset(8, 1),
+          const Offset(8, 8),
+        ),
+        isTrue,
+      );
+      final closed = partial.withSetback(2, 1.5).withSetback(3, 3);
+      expect(closed.trimmedSetbacks, hasLength(4));
+      const corners = [
+        Offset(3, 1),
+        Offset(8, 1),
+        Offset(8, 6.5),
+        Offset(3, 6.5),
+      ];
+      for (var i = 0; i < corners.length; i++) {
+        expect(
+          hasSegment(
+            closed.trimmedSetbacks,
+            corners[i],
+            corners[(i + 1) % corners.length],
+          ),
+          isTrue,
+        );
+      }
+      expect(closed.withSetback(3, 9).trimmedSetbacks, isEmpty);
+    },
+  );
+
+  test(
+    'setback offsets meet at a concave corner without cutting the other wing',
+    () {
+      final parcel = ArchitectSiteParcel(
+        const [
+          Offset.zero,
+          Offset(10, 0),
+          Offset(10, 4),
+          Offset(4, 4),
+          Offset(4, 10),
+          Offset(0, 10),
+        ],
+        setbacks: {2: 1, 3: 1},
+      );
+      expect(parcel.trimmedSetbacks, hasLength(2));
+      expect(
+        hasSegment(
+          parcel.trimmedSetbacks,
+          const Offset(10, 3),
+          const Offset(3, 3),
+        ),
+        isTrue,
+      );
+      expect(
+        hasSegment(
+          parcel.trimmedSetbacks,
+          const Offset(3, 3),
+          const Offset(3, 10),
+        ),
+        isTrue,
+      );
+    },
+  );
+
   test(
     'clips exact interior setbacks on concave parcels in either winding',
     () {
@@ -249,7 +333,7 @@ void main() {
     'shares parcel, segmented setback and dimensions in vector, PDF and DXF',
     () async {
       final project = _project(
-        parcel: ArchitectSiteParcel(_rectangle, setbacks: {0: 1}),
+        parcel: ArchitectSiteParcel(_rectangle, setbacks: {0: 1, 1: 2}),
         building: true,
       );
       final l = AppLocalizationsEn();
@@ -283,6 +367,13 @@ void main() {
           .where((op) => op.role == 'siteSetback')
           .toList();
       expect(dashes.length, greaterThan(2));
+      expect(
+        dashes.every((op) {
+          final bounds = op.path.getBounds();
+          return bounds.right <= 80.0001 && bounds.top >= 9.9999;
+        }),
+        isTrue,
+      );
       expect(
         dashes.every(
           (op) => op.width < parcel.width && op.color.r > op.color.g,
@@ -363,6 +454,25 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Apply').last);
       await tester.pumpAndSettle();
       expect(controller.project.siteStorey!.siteParcel!.setbacks, {0: 2});
+      await tester.tapAt(workspace.screen(tester, const Offset(10, 4)));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('architect-site-setback-key-1')),
+      );
+      await tester.pumpAndSettle();
+      final preview = workspace.overlay(tester).siteSetbackPreview!;
+      expect(
+        hasSegment(preview, const Offset(0, 2), const Offset(9, 2)),
+        isTrue,
+      );
+      expect(
+        hasSegment(preview, const Offset(9, 2), const Offset(9, 8)),
+        isTrue,
+      );
+      expect(controller.project.siteStorey!.siteParcel!.setbacks, {0: 2});
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel').last);
+      await tester.pumpAndSettle();
+      expect(workspace.overlay(tester).siteSetbackPreview, isNull);
       expect(tester.takeException(), isNull);
     },
   );

@@ -21,6 +21,7 @@ abstract final class ArchitectSiteParcelPainter {
     required double scale,
     required ArchitectCanvasPalette palette,
     required Rect? visibleBounds,
+    List<ArchitectSiteSegment>? setbackPreview,
   }) {
     final parcel = project.activeStorey.siteParcel;
     if (parcel == null) return;
@@ -45,24 +46,22 @@ abstract final class ArchitectSiteParcelPainter {
       ..color = palette.foreground(const Color(0xFFC62828))
       ..strokeWidth = pen(.25, 1.5);
     final dash = pen(3, 9), gap = pen(1.5, 4);
-    for (final entry in parcel.setbacks.entries) {
-      for (final (a, b) in parcel.setbackSegments(entry.key, entry.value)) {
-        final length = (b - a).distance;
-        final direction = (b - a) / length;
-        final clipped = visibleBounds == null
-            ? (a, b)
-            : BimLineGeometry.visibleSegment(a, b, visibleBounds.inflate(dash));
-        if (clipped == null) continue;
-        final first =
-            ((clipped.$1 - a).distance / (dash + gap)).floor() * (dash + gap);
-        final last = (clipped.$2 - a).distance;
-        for (var d = first; d < last; d += dash + gap) {
-          canvas.drawLine(
-            a + direction * d,
-            a + direction * math.min(d + dash, length),
-            red,
-          );
-        }
+    for (final (a, b) in setbackPreview ?? parcel.trimmedSetbacks) {
+      final length = (b - a).distance;
+      final direction = (b - a) / length;
+      final clipped = visibleBounds == null
+          ? (a, b)
+          : BimLineGeometry.visibleSegment(a, b, visibleBounds.inflate(dash));
+      if (clipped == null) continue;
+      final first =
+          ((clipped.$1 - a).distance / (dash + gap)).floor() * (dash + gap);
+      final last = (clipped.$2 - a).distance;
+      for (var d = first; d < last; d += dash + gap) {
+        canvas.drawLine(
+          a + direction * d,
+          a + direction * math.min(d + dash, length),
+          red,
+        );
       }
     }
 

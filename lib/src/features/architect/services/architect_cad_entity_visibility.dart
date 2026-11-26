@@ -17,8 +17,8 @@ abstract final class ArchitectCadEntityVisibility {
   static DxfDocument hidden(DxfDocument source, Set<int> hidden) =>
       _of(source).filtered(hidden, include: true);
 
-  static DxfDocument selected(DxfDocument source, DxfEntity entity) =>
-      _of(source).select(entity);
+  static DxfDocument selected(DxfDocument source, Set<DxfEntity> entities) =>
+      _of(source).select(entities);
 
   static DxfDocument _view(DxfDocument source, List<DxfEntity> entities) =>
       DxfDocument(
@@ -47,12 +47,16 @@ class _CadVisibilityViews {
 
   _CadVisibilityViews(this.source);
 
-  DxfDocument select(DxfEntity entity) {
+  DxfDocument select(Set<DxfEntity> entities) {
     final previous = _selection;
-    if (previous != null && identical(previous.entities.single, entity)) {
+    if (previous != null &&
+        previous.entities.length == entities.length &&
+        previous.entities.every(entities.contains)) {
       return previous;
     }
-    return _selection = ArchitectCadEntityVisibility._view(source, [entity]);
+    final ordered = entities.toList()
+      ..sort((a, b) => indices[a]!.compareTo(indices[b]!));
+    return _selection = ArchitectCadEntityVisibility._view(source, ordered);
   }
 
   DxfDocument filtered(Set<int> hidden, {required bool include}) {

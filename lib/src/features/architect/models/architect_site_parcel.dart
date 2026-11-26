@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:clipper2/clipper2.dart' as clip;
+
 import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../../bim_editing/geometry/bim_polygon_geometry.dart';
 
@@ -11,6 +13,9 @@ typedef ArchitectSiteSegment = (Offset, Offset);
 class ArchitectSiteParcel {
   final List<Offset> vertices;
   final Map<int, double> setbacks;
+  late final List<ArchitectSiteSegment> trimmedSetbacks = List.unmodifiable(
+    _trimSetbacks(),
+  );
 
   ArchitectSiteParcel(
     List<Offset> vertices, {
@@ -131,6 +136,136 @@ class ArchitectSiteParcel {
         continue;
       }
       result.add((start + direction * low, start + direction * high));
+    }
+    return result;
+  }
+
+  /// Remove the strip between each configured side and its setback. Taking
+  /// the boundary of the remaining region joins the dashed lines where they
+  /// intersect and supports disconnected regions in a concave parcel.
+  List<ArchitectSiteSegment> _trimSetbacks() {
+    final active = {
+      for (final entry in setbacks.entries)
+        if (setbackSegments(entry.key, entry.value).isNotEmpty)
+          entry.key: entry.value,
+    };
+    if (active.isEmpty) return [];
+    if (active.length == 1) {
+      final entry = active.entries.single;
+      return setbackSegments(entry.key, entry.value);
+    }
+
+    final origin = vertices.first;
+    List<clip.PointD> polygon(List<Offset> points) => [
+      for (final p
+          in BimPolygonGeometry.signedArea(points) < 0
+              ? points.reversed
+              : points)
+        clip.PointD(p.dx - origin.dx, p.dy - origin.dy),
+    ];
+    Offset shift(int index) =>
+        -BimPolygonGeometry.normal(vertices, index) * (active[index] ?? 0);
+
+    final cutters = <List<clip.PointD>>[];
+    final fronts = <(Offset, Offset)>[];
+    for (final index in active.keys) {
+      final (a, b) = side(index);
+      final shiftVector = shift(index);
+      final start = a + shiftVector, end = b + shiftVector;
+      final length = (b - a).distance;
+      final along = (b - a) / length;
+      var minimum = 0.0, maximum = length;
+      for (final vertex in vertices) {
+        final t = BimLineGeometry.dot(vertex - start, along);
+        minimum = math.min(minimum, t);
+        maximum = math.max(maximum, t);
+      }
+
+      double corner(int neighbour, double limit, {required bool atStart}) {
+        final (p, q) = side(neighbour);
+        var result = limit;
+        // Cover the full inward band at the parcel edge and extend it to
+        // the offset miter at a re-entrant corner. Keep crossed bands wide
+        // enough to remove their overlap when the envelope collapses.
+        for (final delta in [Offset.zero, shift(neighbour)]) {
+          final hit = BimLineGeometry.intersection(
+            start,
+            end,
+            p + delta,
+            q + delta,
+          );
+          if (hit == null) continue;
+          final t = BimLineGeometry.dot(
+            hit - start,
+            along,
+          ).clamp(minimum, maximum);
+          result = atStart ? math.min(result, t) : math.max(result, t);
+        }
+        return result;
+      }
+
+      final previous = (index - 1 + vertices.length) % vertices.length;
+      final next = (index + 1) % vertices.length;
+      final first = start + along * corner(previous, 0, atStart: true);
+      final last = start + along * corner(next, length, atStart: false);
+      cutters.add(polygon([a, b, last, first]));
+      fronts.add((first, last));
+    }
+
+    final engine = clip.ClipperD(roundingDecimalPrecision: 7)
+      ..addSubjects([polygon(vertices)])
+      ..addClips(cutters);
+    final loops = engine.executeClosed(
+      clip.ClipType.difference,
+      clip.FillRule.nonZero,
+    );
+    final boundaries = List.generate(vertices.length, side);
+    final result = <ArchitectSiteSegment>[];
+    for (final loop in loops ?? const <List<clip.PointD>>[]) {
+      for (var i = 0; i < loop.length; i++) {
+        final first = loop[i], last = loop[(i + 1) % loop.length];
+        final a = origin + Offset(first.x, first.y);
+        final b = origin + Offset(last.x, last.y);
+        if ((b - a).distance < 1e-7) continue;
+        List<(double, double)> overlap(List<ArchitectSiteSegment> segments) {
+          final parts = <(double, double)>[];
+          final direction = (b - a) / (b - a).distance;
+          for (final (p, q) in segments) {
+            if (BimLineGeometry.cross(direction, p - a).abs() > 1e-6 ||
+                BimLineGeometry.cross(direction, q - a).abs() > 1e-6) {
+              continue;
+            }
+            final u = BimLineGeometry.parameter(p, a, b);
+            final v = BimLineGeometry.parameter(q, a, b);
+            if ((u - v).abs() > 1e-8) {
+              parts.add((math.min(u, v), math.max(u, v)));
+            }
+          }
+          return parts;
+        }
+
+        final offsets = overlap(fronts);
+        if (offsets.isEmpty) continue;
+        final parcelEdges = overlap(boundaries);
+        final cuts = <double>{
+          for (final (lo, hi) in [...offsets, ...parcelEdges]) ...[lo, hi],
+        }.toList()..sort();
+        bool covers(List<(double, double)> segments, double t) =>
+            segments.any((part) => t >= part.$1 && t <= part.$2);
+        double? start;
+        for (var j = 1; j < cuts.length; j++) {
+          final lo = cuts[j - 1], hi = cuts[j], mid = (lo + hi) / 2;
+          if (covers(offsets, mid) && !covers(parcelEdges, mid)) {
+            start ??= lo;
+          } else if (start != null) {
+            result.add((a + (b - a) * start, a + (b - a) * lo));
+            start = null;
+          }
+        }
+        if (start != null) {
+          result.add((a + (b - a) * start, a + (b - a) * cuts.last));
+        }
+      }
     }
     return result;
   }

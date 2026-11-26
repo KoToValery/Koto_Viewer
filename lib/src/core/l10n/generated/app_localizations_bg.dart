@@ -6828,10 +6828,15 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSiteHideFromPlan => 'Скрий от ситуацията';
 
   @override
-  String get architectSitePickVisibleCad => 'Посочи обект за скриване';
+  String get architectSitePickVisibleCad => 'Посочи обекти за скриване';
 
   @override
-  String get architectSitePickHiddenCad => 'Посочи обект за връщане';
+  String get architectSitePickHiddenCad => 'Посочи обекти за връщане';
+
+  @override
+  String architectSiteCadSelectionCount(int count) {
+    return 'Избрани $count';
+  }
 
   @override
   String get architectSiteShowHiddenCad => 'Покажи скритите';

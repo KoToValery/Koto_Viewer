@@ -12074,14 +12074,20 @@ abstract class AppLocalizations {
   /// No description provided for @architectSitePickVisibleCad.
   ///
   /// In en, this message translates to:
-  /// **'Pick an object to hide'**
+  /// **'Pick objects to hide'**
   String get architectSitePickVisibleCad;
 
   /// No description provided for @architectSitePickHiddenCad.
   ///
   /// In en, this message translates to:
-  /// **'Pick an object to restore'**
+  /// **'Pick objects to restore'**
   String get architectSitePickHiddenCad;
+
+  /// No description provided for @architectSiteCadSelectionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected {count}'**
+  String architectSiteCadSelectionCount(int count);
 
   /// No description provided for @architectSiteShowHiddenCad.
   ///

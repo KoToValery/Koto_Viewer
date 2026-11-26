@@ -6801,10 +6801,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSiteHideFromPlan => 'Hide from site plan';
 
   @override
-  String get architectSitePickVisibleCad => 'Pick an object to hide';
+  String get architectSitePickVisibleCad => 'Pick objects to hide';
 
   @override
-  String get architectSitePickHiddenCad => 'Pick an object to restore';
+  String get architectSitePickHiddenCad => 'Pick objects to restore';
+
+  @override
+  String architectSiteCadSelectionCount(int count) {
+    return 'Selected $count';
+  }
 
   @override
   String get architectSiteShowHiddenCad => 'Show hidden';

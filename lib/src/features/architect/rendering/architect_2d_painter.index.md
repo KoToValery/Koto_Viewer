@@ -35,7 +35,9 @@
 
 The Site Plan model pass gives `ArchitectSiteParcelPainter` the same
 ground-floor perimeter used by `drawBuildingSiteUnderlay`. Its boundary,
-area, dashed offsets and clearance dimensions use the shared publication pass.
+area, trimmed dashed offsets and clearance dimensions use the shared
+publication pass. `siteSetbackPreview` substitutes the combined draft offsets
+while the numeric dialog is open.
 
 | Method | Section tag | Responsibility |
 | --- | --- | --- |

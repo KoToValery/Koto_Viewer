@@ -164,20 +164,30 @@ void main() {
     expect(hidden(), isEmpty);
     await tester.tap(find.text('Next object'));
     await tester.pumpAndSettle();
+    final labelPoint = workspace.screen(tester, const Offset(2.2, 2.12));
+    await tester.tapAt(labelPoint);
+    await tester.pumpAndSettle();
+    expect(find.text('Selected 2'), findsOneWidget);
+    await tester.tapAt(labelPoint);
+    await tester.pumpAndSettle();
+    expect(find.text('Selected 1'), findsOneWidget);
+    await tester.tapAt(labelPoint);
+    await tester.pumpAndSettle();
+    expect(hidden(), isEmpty);
     await tester.tap(apply);
     await tester.pumpAndSettle();
-    expect(hidden(), hasLength(1));
-    final index = hidden().single;
-    expect(
-      painter().document!.entities,
-      isNot(contains(source.entities[index])),
-    );
+    expect(hidden(), hasLength(2));
+    expect(hidden(), contains(2));
+    final hiddenBatch = {...hidden()};
+    expect(painter().document!.entities, hasLength(1));
 
     await tester.tap(
       find.byKey(const ValueKey('architect-site-cad-show-hidden')),
     );
     await tester.pumpAndSettle();
     await tester.tapAt(point);
+    await tester.pumpAndSettle();
+    await tester.tapAt(labelPoint);
     await tester.pumpAndSettle();
     expect(find.text('Restore'), findsOneWidget);
     await tester.tap(apply);
@@ -186,7 +196,7 @@ void main() {
     expect(painter().document!.entities, source.entities);
     model.undo();
     await tester.pumpAndSettle();
-    expect(hidden(), {index});
+    expect(hidden(), hiddenBatch);
     model.redo();
     await tester.pumpAndSettle();
     expect(hidden(), isEmpty);

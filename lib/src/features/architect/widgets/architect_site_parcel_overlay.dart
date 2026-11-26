@@ -18,6 +18,7 @@ class ArchitectSiteParcelOverlay extends StatefulWidget {
   final ArchitectTransformSnap snap;
   final void Function(Offset, double, Offset) onNavigate;
   final ValueChanged<ArchitectSiteParcel> onCommit;
+  final ValueChanged<List<ArchitectSiteSegment>?> onSetbackPreview;
   final VoidCallback onCancel;
 
   const ArchitectSiteParcelOverlay({
@@ -30,6 +31,7 @@ class ArchitectSiteParcelOverlay extends StatefulWidget {
     required this.snap,
     required this.onNavigate,
     required this.onCommit,
+    required this.onSetbackPreview,
     required this.onCancel,
   });
 
@@ -45,7 +47,6 @@ class _ParcelOverlayState extends State<ArchitectSiteParcelOverlay> {
   Offset? _aim;
   int? _vertex, _side;
   bool _dialogOpen = false, _invalid = false;
-  List<ArchitectSiteSegment> _setbackPreview = [];
 
   double _tolerance(bool touch) => (touch ? 12 : 8) / widget.scale;
 
@@ -91,9 +92,11 @@ class _ParcelOverlayState extends State<ArchitectSiteParcelOverlay> {
       setbacks: _parcel?.setbacks ?? {},
     );
     if (!BimPolygonGeometry.valid(_vertices) ||
-        parcel.setbacks.entries.any(
-          (e) => parcel.setbackSegments(e.key, e.value).isEmpty,
-        )) {
+        (parcel.setbacks.isNotEmpty &&
+            (parcel.trimmedSetbacks.isEmpty ||
+                parcel.setbacks.entries.any(
+                  (e) => parcel.setbackSegments(e.key, e.value).isEmpty,
+                )))) {
       setState(() => _invalid = true);
       return;
     }
@@ -132,20 +135,17 @@ class _ParcelOverlayState extends State<ArchitectSiteParcelOverlay> {
         ? ''
         : (current / unit.scaleToMeters).toStringAsFixed(4);
     var starting = current != null;
-    setState(() {
-      _dialogOpen = true;
-      _setbackPreview = current == null
-          ? []
-          : parcel.setbackSegments(index, current);
-    });
+    var valid =
+        current != null &&
+        parcel.trimmedSetbacks.isNotEmpty &&
+        parcel.setbackSegments(index, current).isNotEmpty;
+    setState(() => _dialogOpen = true);
     final result = await showDialog<double>(
       context: context,
       barrierColor: Colors.black26,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) {
           final distance = starting ? current : rule.parse(input);
-          final valid =
-              distance != null && distance > 0 && _setbackPreview.isNotEmpty;
           return AlertDialog(
             alignment: Alignment.bottomCenter,
             constraints: const BoxConstraints(maxWidth: 320),
@@ -183,11 +183,14 @@ class _ParcelOverlayState extends State<ArchitectSiteParcelOverlay> {
                         );
                         starting = false;
                         final value = rule.parse(input);
-                        setState(
-                          () => _setbackPreview = value == null
-                              ? []
-                              : parcel.setbackSegments(index, value),
-                        );
+                        valid =
+                            value != null &&
+                            parcel.setbackSegments(index, value).isNotEmpty;
+                        final preview = valid
+                            ? parcel.withSetback(index, value).trimmedSetbacks
+                            : parcel.withSetback(index, null).trimmedSetbacks;
+                        valid = valid && preview.isNotEmpty;
+                        widget.onSetbackPreview(preview);
                       });
                     },
                   ),
@@ -216,9 +219,9 @@ class _ParcelOverlayState extends State<ArchitectSiteParcelOverlay> {
       ),
     );
     if (!mounted) return;
+    widget.onSetbackPreview(null);
     setState(() {
       _dialogOpen = false;
-      _setbackPreview = [];
       _side = null;
     });
     if (result != null && identical(parcel, _parcel)) {
@@ -262,10 +265,6 @@ class _ParcelOverlayState extends State<ArchitectSiteParcelOverlay> {
                 side == null
                     ? null
                     : (widget.toScreen(side.$1), widget.toScreen(side.$2)),
-                [
-                  for (final (a, b) in _setbackPreview)
-                    (widget.toScreen(a), widget.toScreen(b)),
-                ],
                 _invalid ? colors.error : colors.primary,
               ),
             ),
@@ -354,16 +353,9 @@ class _ParcelPreview extends CustomPainter {
   final List<Offset> points;
   final bool closed;
   final ArchitectSiteSegment? side;
-  final List<ArchitectSiteSegment> setbacks;
   final Color color;
 
-  _ParcelPreview(
-    this.points,
-    this.closed,
-    this.side,
-    this.setbacks,
-    this.color,
-  );
+  _ParcelPreview(this.points, this.closed, this.side, this.color);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -380,28 +372,6 @@ class _ParcelPreview extends CustomPainter {
     }
     if (side case final line?) {
       canvas.drawLine(line.$1, line.$2, ink..strokeWidth = 4);
-    }
-    final red = Paint()
-      ..color = const Color(0xFFC62828)
-      ..strokeWidth = 2;
-    for (final (a, b) in setbacks) {
-      final visible = BimLineGeometry.visibleSegment(
-        a,
-        b,
-        (Offset.zero & size).inflate(11),
-      );
-      if (visible == null) continue;
-      final length = (b - a).distance;
-      final direction = (b - a) / length;
-      final first = ((visible.$1 - a).distance / 11).floorToDouble() * 11;
-      final last = (visible.$2 - a).distance;
-      for (var d = first; d < last; d += 11) {
-        canvas.drawLine(
-          a + direction * d,
-          a + direction * (d + 7).clamp(0.0, length),
-          red,
-        );
-      }
     }
   }
 

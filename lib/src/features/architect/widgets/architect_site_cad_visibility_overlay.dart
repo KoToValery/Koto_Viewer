@@ -19,7 +19,7 @@ class ArchitectSiteCadVisibilityOverlay extends StatefulWidget {
   final BimCoordinateFrame frame;
   final BimViewportController viewport;
   final ArchitectCanvasPalette palette;
-  final void Function(int index, bool hidden) onChange;
+  final void Function(Set<int> indices, bool hidden) onChange;
   final VoidCallback onClose;
 
   const ArchitectSiteCadVisibilityOverlay({
@@ -40,9 +40,15 @@ class ArchitectSiteCadVisibilityOverlay extends StatefulWidget {
 class _VisibilityState extends State<ArchitectSiteCadVisibilityOverlay> {
   bool _showHidden = false;
   List<DxfEntity> _hover = const [], _choices = const [];
+  final _picked = <DxfEntity>{};
   int _choice = 0;
 
-  DxfEntity? get _selected => _choices.isEmpty ? null : _choices[_choice];
+  @override
+  void didUpdateWidget(covariant ArchitectSiteCadVisibilityOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.source, widget.source)) _clear();
+  }
+
   List<Offset>? get _mask =>
       widget.config.hasActiveMask ? widget.config.maskPolygon : null;
 
@@ -58,7 +64,26 @@ class _VisibilityState extends State<ArchitectSiteCadVisibilityOverlay> {
 
   void _clear() {
     _hover = _choices = const [];
+    _picked.clear();
     _choice = 0;
+  }
+
+  void _toggle(DxfEntity entity) {
+    if (!_picked.add(entity)) _picked.remove(entity);
+  }
+
+  void _pick() {
+    _choices = _hover;
+    _hover = const [];
+    _choice = 0;
+    if (_choices.isNotEmpty) _toggle(_choices.first);
+  }
+
+  void _nextChoice() {
+    _toggle(_choices[_choice]);
+    _choice = (_choice + 1) % _choices.length;
+    _toggle(_choices[_choice]);
+    _hover = const [];
   }
 
   ArchitectSnapResult _aim(Offset point, bool touch) {
@@ -81,19 +106,19 @@ class _VisibilityState extends State<ArchitectSiteCadVisibilityOverlay> {
   }
 
   void _apply() {
-    final selected = _selected;
-    if (selected == null) return;
-    final index = ArchitectCadEntityVisibility.indexOf(widget.source, selected);
+    final indices = {
+      for (final entity in _picked)
+        ?ArchitectCadEntityVisibility.indexOf(widget.source, entity),
+    };
     setState(_clear);
-    if (index != null) widget.onChange(index, !_showHidden);
+    if (indices.isNotEmpty) widget.onChange(indices, !_showHidden);
   }
 
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
     final colors = Theme.of(context).colorScheme;
-    final selected = _selected;
-    final highlighted = selected ?? _hover.firstOrNull;
+    final highlighted = {..._picked, ?_hover.firstOrNull};
     return Stack(
       children: [
         Positioned.fill(
@@ -105,7 +130,7 @@ class _VisibilityState extends State<ArchitectSiteCadVisibilityOverlay> {
                 palette: widget.palette,
                 config: widget.config,
                 hidden: _showHidden ? _target : null,
-                highlight: highlighted == null
+                highlight: highlighted.isEmpty
                     ? null
                     : ArchitectCadEntityVisibility.selected(
                         widget.source,
@@ -124,8 +149,7 @@ class _VisibilityState extends State<ArchitectSiteCadVisibilityOverlay> {
             snap: _aim,
             localizeSnap: (_) => null,
             onAim: (_) => setState(() {}),
-            onPick: (_) => setState(() => _choices = _hover),
-            pickingEnabled: selected == null,
+            onPick: (_) => setState(_pick),
             singlePointerPan: true,
             onNavigate: (delta, factor, focal) => widget.viewport.navigate(
               previousFocal: focal - delta,
@@ -151,7 +175,9 @@ class _VisibilityState extends State<ArchitectSiteCadVisibilityOverlay> {
                     children: [
                       Expanded(
                         child: Text(
-                          _showHidden
+                          _picked.isNotEmpty
+                              ? l.architectSiteCadSelectionCount(_picked.length)
+                              : _showHidden
                               ? l.architectSitePickHiddenCad
                               : l.architectSitePickVisibleCad,
                         ),
@@ -181,12 +207,10 @@ class _VisibilityState extends State<ArchitectSiteCadVisibilityOverlay> {
                       ),
                       if (_choices.length > 1)
                         TextButton(
-                          onPressed: () => setState(
-                            () => _choice = (_choice + 1) % _choices.length,
-                          ),
+                          onPressed: () => setState(_nextChoice),
                           child: Text(l.architectSiteNextCadEntity),
                         ),
-                      if (selected != null) ...[
+                      if (_picked.isNotEmpty) ...[
                         IconButton(
                           tooltip: l.cancel,
                           onPressed: () => setState(_clear),

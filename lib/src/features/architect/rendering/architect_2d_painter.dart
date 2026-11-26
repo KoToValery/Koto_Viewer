@@ -53,6 +53,7 @@ import '../services/architect_stair_handles.dart';
 import 'architect_drag_painter_helper.dart';
 import 'architect_landscape_painter_helper.dart';
 import 'architect_site_parcel_painter.dart';
+import '../models/architect_site_parcel.dart';
 import 'architect_service_plan_painter.dart';
 import 'architect_roof_painter_helper.dart';
 import 'architect_railing_geometry.dart';
@@ -164,6 +165,7 @@ class Architect2dPainter extends CustomPainter {
   final bool paintGrid;
   /// Publication can share physical wall geometry between annotation scales.
   final ArchitectWallLayers? publicationWallLayers;
+  final List<ArchitectSiteSegment>? siteSetbackPreview;
   final String? drawingViewKey;
   final ArchitectCanvasPalette palette;
   final AppLocalizations? l10n;
@@ -301,6 +303,7 @@ class Architect2dPainter extends CustomPainter {
   final List<Offset> marqueePolygon;
 
   Architect2dPainter({
+    this.siteSetbackPreview,
     required ArchitectProject project,
     this.viewport,
     this.l10n,
@@ -556,6 +559,7 @@ class Architect2dPainter extends CustomPainter {
             scale: zoomScale,
             palette: palette,
             visibleBounds: viewport?.visibleRect,
+            setbackPreview: siteSetbackPreview,
           );
         }
       } else {
@@ -2724,6 +2728,7 @@ class Architect2dPainter extends CustomPainter {
       layer != oldDelegate.layer ||
       layer != ArchitectPaintLayer.model ||
       !identical(_project, oldDelegate._project) ||
+      !identical(siteSetbackPreview, oldDelegate.siteSetbackPreview) ||
       viewport != oldDelegate.viewport ||
       selectedZoneId != oldDelegate.selectedZoneId ||
       selectedAxisId != oldDelegate.selectedAxisId ||

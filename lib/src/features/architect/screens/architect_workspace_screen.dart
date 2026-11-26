@@ -520,6 +520,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _siteCadVisibilityActive = false;
   bool _siteOrientationUseCad = false;
   bool? _siteParcelEditingSetbacks;
+  List<ArchitectSiteSegment>? _siteSetbackPreview;
 
   double get _desiredViewportRotation =>
       (_commands.isPlan && _project.activeStorey.isSite && _siteTrueNorthView)
@@ -6009,15 +6010,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
   }
 
-  void _setSiteCadEntityHidden(int index, bool hidden) {
+  void _setSiteCadEntitiesHidden(Set<int> indices, bool hidden) {
     if (!_siteCadVisibilityActive || !_canEditSiteCadVisibility) return;
     final config = _currentCadUnderlayConfig!;
     final source = _rawCurrentUnderlayDoc!;
-    if (index < 0 || index >= source.entities.length ||
-        source.entities[index].isPaperSpace) return;
     final next = {...config.siteHiddenEntities};
-    final changed = hidden ? next.add(index) : next.remove(index);
-    if (!changed) return;
+    final count = next.length;
+    final valid = indices.where((index) => index >= 0 &&
+        index < source.entities.length && !source.entities[index].isPaperSpace);
+    if (hidden) {
+      next.addAll(valid);
+    } else {
+      next.removeAll(valid);
+    }
+    if (next.length == count) return;
     _commands.commit(_project.withCadUnderlayUpdated(
       config.copyWith(siteHiddenEntities: Set.unmodifiable(next)),
     ));
@@ -15489,6 +15495,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _siteOrientationActive = false;
     _siteCadVisibilityActive = false;
     _siteParcelEditingSetbacks = null;
+    _siteSetbackPreview = null;
     _rotationSource = null;
     _rotationUnderlay = null;
     _underlayRotationPreview = null;
@@ -39807,7 +39814,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             frame: _effectiveUnderlayFrame,
             viewport: _viewport,
             palette: _canvasPalette,
-            onChange: _setSiteCadEntityHidden,
+            onChange: _setSiteCadEntitiesHidden,
             onClose: () => setState(() => _siteCadVisibilityActive = false),
           ),
         ),
@@ -39847,6 +39854,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               toScreen: _viewport.toScreen,
               snap: (raw, touch) => _snapSitePoint(raw, touch, useCad: true),
               onCommit: _commitSiteParcel,
+              onSetbackPreview: (segments) =>
+                  setState(() => _siteSetbackPreview = segments),
               onNavigate: (delta, factor, focal) => _viewport.navigate(
                 previousFocal: focal - delta,
                 focal: focal,
@@ -40748,6 +40757,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         : null,
 
     project: _withDrawingScale(_drawingProject),
+    siteSetbackPreview: _siteSetbackPreview,
 
     drawingViewKey: _workspaceViewKey,
 
