@@ -4,7 +4,6 @@
 #define MyAppName "KoToViewer"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "KoTo"
-#define MyAppURL "https://github.com/KoToValery/Koto_Viewer"
 #define MyAppExeName "koto_viewer.exe"
 #define ReleaseDir "C:\Flutter\Koto_Viewer-main\build\windows\x64\runner\Release"
 #define InstallerDir "C:\Flutter\Koto_Viewer-main\installer"
@@ -15,9 +14,6 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppPublisherURL={#MyAppURL}
-AppSupportURL={#MyAppURL}
-AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir={#InstallerDir}\Output
@@ -37,9 +33,6 @@ RestartApplications=no
 ; Modern Wizard Graphics
 WizardImageFile={#InstallerDir}\wizard_sidebar.png
 WizardSmallImageFile={#InstallerDir}\wizard_small.png
-
-; License File
-LicenseFile={#InstallerDir}\LICENSE.txt
 
 ; Version Information for Setup.exe
 VersionInfoVersion={#MyAppVersion}

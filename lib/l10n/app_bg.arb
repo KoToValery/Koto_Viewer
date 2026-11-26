@@ -3661,7 +3661,6 @@
   "commandUiFileNoLongerExistsOnTheDevice": "Файлът вече не съществува на устройството.",
   "commandUiLicenses": "Лицензи",
   "commandUiLogs": "Дневник",
-  "commandUiGithub": "GitHub",
   "commandUiCopyUrl": "Копиране на адреса",
   "commandUiCloseServer": "Затваряне на сървъра",
   "commandUiStopSharing": "Спиране на споделянето",
@@ -4834,5 +4833,11 @@
   "architectWallMoveExactDistanceHint": "Разстояние от началната позиция по посоката на преместване. С ± обръщате посоката.",
   "architectUnderlayEditOrientation": "Редакция на ориентацията",
   "architectUnderlayResetOrientation": "Нулиране на ориентацията",
-  "architectSiteOrientResetDone": "Ориентацията е нулирана"
+  "architectSiteOrientResetDone": "Ориентацията е нулирана",
+  "appInfoOverviewSummary": "Бърз офлайн визуализатор за CAD чертежи, 3D инженерни модели, PCB Gerber пакети, векторна графика и стандартни офис документи.",
+  "appInfoLicensingSectionTitle": "Лицензиране и библиотеки на трети страни",
+  "appInfoCopyrightNotice": "© 2026 KoTo. Всички права запазени.",
+  "appInfoAcadrustNotice": "DWG поддръжка чрез acadrust (MPL-2.0)",
+  "appInfoOpenJpegNotice": "JPEG 2000 DICOM декомпресия чрез OpenJPEG (2-Clause BSD)",
+  "appInfoOfflinePrivateNotice": "Без облачни зависимости • 100% офлайн и поверително"
 }

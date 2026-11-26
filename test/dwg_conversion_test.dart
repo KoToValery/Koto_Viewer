@@ -62,7 +62,7 @@ void main() {
     });
   });
 
-  group('DWG Converter Stream Comment & Cleanup Tests', () {
+  group('DWG Converter Cache Pruning Tests', () {
     late Directory tempTestDir;
 
     setUp(() async {
@@ -73,45 +73,6 @@ void main() {
       if (await tempTestDir.exists()) {
         await tempTestDir.delete(recursive: true);
       }
-    });
-
-    test('streamToTargetWithComment injects 999 comment at top with constant memory', () async {
-      final source = File('${tempTestDir.path}/source.dxf');
-      final target = File('${tempTestDir.path}/target.dxf');
-      await source.writeAsString('0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nEOF\n');
-
-      await DwgConverterService.streamToTargetWithComment(
-        sourceFile: source,
-        targetFile: target,
-        layerStatesString: 'Layer1=+;Layer2=-',
-      );
-
-      expect(await target.exists(), isTrue);
-      final lines = await target.readAsLines();
-      expect(lines[0], equals('999'));
-      expect(lines[1], equals('KOTO_DWG_LAYERS:Layer1=+;Layer2=-'));
-      expect(lines[2], equals('0'));
-      expect(lines[3], equals('SECTION'));
-      expect(lines.last, equals('EOF'));
-    });
-
-    test('cleanupStaleTempFiles cleans up dwg_in_* and dwg_out_* on startup', () async {
-      final staleIn = File('${tempTestDir.path}/dwg_in_12345.dwg');
-      final staleOut = File('${tempTestDir.path}/dwg_out_12345.dxf');
-      final unrelated = File('${tempTestDir.path}/other_file.txt');
-
-      await staleIn.writeAsString('test dwg');
-      await staleOut.writeAsString('test dxf');
-      await unrelated.writeAsString('keep me');
-
-      await DwgConverterService.cleanupStaleTempFiles(
-        isStartup: true,
-        customTempDir: tempTestDir,
-      );
-
-      expect(await staleIn.exists(), isFalse);
-      expect(await staleOut.exists(), isFalse);
-      expect(await unrelated.exists(), isTrue);
     });
 
     test('pruneCache evicts files exceeding maxSizeBytes and older than maxAge', () async {

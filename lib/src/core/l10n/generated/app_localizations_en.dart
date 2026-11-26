@@ -10749,9 +10749,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commandUiLogs => 'Logs';
 
   @override
-  String get commandUiGithub => 'GitHub';
-
-  @override
   String get commandUiCopyUrl => 'Copy URL';
 
   @override
@@ -14159,4 +14156,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectSiteOrientResetDone => 'Orientation reset';
+
+  @override
+  String get appInfoOverviewSummary =>
+      'A fast, offline viewer engineered for CAD, 3D engineering models, PCB Gerber packages, vector graphics, and standard office documents.';
+
+  @override
+  String get appInfoLicensingSectionTitle => 'Licensing & Third-Party Notices';
+
+  @override
+  String get appInfoCopyrightNotice => '© 2026 KoTo. All rights reserved.';
+
+  @override
+  String get appInfoAcadrustNotice =>
+      'DWG engine powered by acadrust (MPL-2.0)';
+
+  @override
+  String get appInfoOpenJpegNotice =>
+      'JPEG 2000 DICOM decompression powered by OpenJPEG (2-Clause BSD)';
+
+  @override
+  String get appInfoOfflinePrivateNotice =>
+      'No cloud dependencies • 100% Offline & Private';
 }

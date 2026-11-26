@@ -19506,12 +19506,6 @@ abstract class AppLocalizations {
   /// **'Logs'**
   String get commandUiLogs;
 
-  /// No description provided for @commandUiGithub.
-  ///
-  /// In en, this message translates to:
-  /// **'GitHub'**
-  String get commandUiGithub;
-
   /// No description provided for @commandUiCopyUrl.
   ///
   /// In en, this message translates to:
@@ -25685,6 +25679,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Orientation reset'**
   String get architectSiteOrientResetDone;
+
+  /// Overview description in the App Info dialog
+  ///
+  /// In en, this message translates to:
+  /// **'A fast, offline viewer engineered for CAD, 3D engineering models, PCB Gerber packages, vector graphics, and standard office documents.'**
+  String get appInfoOverviewSummary;
+
+  /// Section header for licensing and third-party notices in App Info dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Licensing & Third-Party Notices'**
+  String get appInfoLicensingSectionTitle;
+
+  /// Copyright notice in App Info dialog
+  ///
+  /// In en, this message translates to:
+  /// **'© 2026 KoTo. All rights reserved.'**
+  String get appInfoCopyrightNotice;
+
+  /// Third-party notice for acadrust DWG engine
+  ///
+  /// In en, this message translates to:
+  /// **'DWG engine powered by acadrust (MPL-2.0)'**
+  String get appInfoAcadrustNotice;
+
+  /// Third-party notice for OpenJPEG library
+  ///
+  /// In en, this message translates to:
+  /// **'JPEG 2000 DICOM decompression powered by OpenJPEG (2-Clause BSD)'**
+  String get appInfoOpenJpegNotice;
+
+  /// Offline privacy statement in App Info dialog
+  ///
+  /// In en, this message translates to:
+  /// **'No cloud dependencies • 100% Offline & Private'**
+  String get appInfoOfflinePrivateNotice;
 }
 
 class _AppLocalizationsDelegate

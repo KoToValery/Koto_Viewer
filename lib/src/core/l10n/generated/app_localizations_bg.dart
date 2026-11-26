@@ -10783,9 +10783,6 @@ class AppLocalizationsBg extends AppLocalizations {
   String get commandUiLogs => 'Дневник';
 
   @override
-  String get commandUiGithub => 'GitHub';
-
-  @override
   String get commandUiCopyUrl => 'Копиране на адреса';
 
   @override
@@ -14209,4 +14206,26 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectSiteOrientResetDone => 'Ориентацията е нулирана';
+
+  @override
+  String get appInfoOverviewSummary =>
+      'Бърз офлайн визуализатор за CAD чертежи, 3D инженерни модели, PCB Gerber пакети, векторна графика и стандартни офис документи.';
+
+  @override
+  String get appInfoLicensingSectionTitle =>
+      'Лицензиране и библиотеки на трети страни';
+
+  @override
+  String get appInfoCopyrightNotice => '© 2026 KoTo. Всички права запазени.';
+
+  @override
+  String get appInfoAcadrustNotice => 'DWG поддръжка чрез acadrust (MPL-2.0)';
+
+  @override
+  String get appInfoOpenJpegNotice =>
+      'JPEG 2000 DICOM декомпресия чрез OpenJPEG (2-Clause BSD)';
+
+  @override
+  String get appInfoOfflinePrivateNotice =>
+      'Без облачни зависимости • 100% офлайн и поверително';
 }

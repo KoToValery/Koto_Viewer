@@ -18,7 +18,7 @@ class DxfHatchPatternHelper {
     Offset fallbackOrigin = Offset.zero,
     double defaultScale = 1.0,
   }) {
-    // 1. Embedded definition lines take highest priority (standard in Archicad DWG / LibreDWG exports)
+    // 1. Embedded definition lines take highest priority (standard in Archicad DWG / DXF exports)
     if (hatch.patternLines != null && hatch.patternLines!.isNotEmpty) {
       return hatch.patternLines!;
     }

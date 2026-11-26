@@ -5998,7 +5998,6 @@
   "commandUiFileNoLongerExistsOnTheDevice": "File no longer exists on the device.",
   "commandUiLicenses": "Licenses",
   "commandUiLogs": "Logs",
-  "commandUiGithub": "GitHub",
   "commandUiCopyUrl": "Copy URL",
   "commandUiCloseServer": "Close Server",
   "commandUiStopSharing": "Stop Sharing",
@@ -7846,5 +7845,29 @@
   "architectSiteOrientResetDone": "Orientation reset",
   "@architectSiteOrientResetDone": {
     "description": "Snackbar confirming that site and geodetic underlay orientation has been reset to 0 degrees"
+  },
+  "appInfoOverviewSummary": "A fast, offline viewer engineered for CAD, 3D engineering models, PCB Gerber packages, vector graphics, and standard office documents.",
+  "@appInfoOverviewSummary": {
+    "description": "Overview description in the App Info dialog"
+  },
+  "appInfoLicensingSectionTitle": "Licensing & Third-Party Notices",
+  "@appInfoLicensingSectionTitle": {
+    "description": "Section header for licensing and third-party notices in App Info dialog"
+  },
+  "appInfoCopyrightNotice": "© 2026 KoTo. All rights reserved.",
+  "@appInfoCopyrightNotice": {
+    "description": "Copyright notice in App Info dialog"
+  },
+  "appInfoAcadrustNotice": "DWG engine powered by acadrust (MPL-2.0)",
+  "@appInfoAcadrustNotice": {
+    "description": "Third-party notice for acadrust DWG engine"
+  },
+  "appInfoOpenJpegNotice": "JPEG 2000 DICOM decompression powered by OpenJPEG (2-Clause BSD)",
+  "@appInfoOpenJpegNotice": {
+    "description": "Third-party notice for OpenJPEG library"
+  },
+  "appInfoOfflinePrivateNotice": "No cloud dependencies • 100% Offline & Private",
+  "@appInfoOfflinePrivateNotice": {
+    "description": "Offline privacy statement in App Info dialog"
   }
 }

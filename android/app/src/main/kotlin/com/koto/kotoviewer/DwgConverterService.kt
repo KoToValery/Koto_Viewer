@@ -14,8 +14,8 @@ import java.util.Collections
 
 /**
  * Dedicated background Android Service running in an isolated process (:dwg_converter).
- * 
- * Both acadrust and LibreDWG execute here. Native faults and memory pressure in
+ *
+ * acadrust executes here. Native faults and memory pressure in
  * the converter process are reported to Flutter through the service connection.
  */
 class DwgConverterService : Service() {
@@ -40,9 +40,6 @@ class DwgConverterService : Service() {
         // protocol constants. Native libraries belong only in the worker.
         private var acadrustLoadError: String? = null
         private val acadrustLoaded by lazy { loadLibrary("koto_acadrust") }
-        private val libreDwgLoaded by lazy {
-            loadLibrary("redwg") && loadLibrary("koto_dwg")
-        }
 
         private fun loadLibrary(name: String): Boolean {
             try {
@@ -59,9 +56,6 @@ class DwgConverterService : Service() {
         }
 
         @JvmStatic
-        external fun convertDwgToDxf(inDwgPath: String, outDxfPath: String): Int
-
-        @JvmStatic
         external fun convertDwgWithAcadrust(inDwgPath: String, outDxfPath: String): Int
 
         @JvmStatic
@@ -75,7 +69,6 @@ class DwgConverterService : Service() {
 
         private fun convert(backend: String, input: String, output: String): Int = when (backend) {
             "acadrust" -> if (acadrustLoaded) convertDwgWithAcadrust(input, output) else -97
-            "libredwg" -> if (libreDwgLoaded) convertDwgToDxf(input, output) else -97
             else -> -98
         }
     }
@@ -143,7 +136,7 @@ class DwgConverterService : Service() {
                     val inPath = data.getString(KEY_INPUT_PATH)
                     val outPath = data.getString(KEY_OUTPUT_PATH)
                     val replyTo = msg.replyTo
-                    val backend = data.getString(KEY_BACKEND) ?: "libredwg"
+                    val backend = data.getString(KEY_BACKEND) ?: "acadrust"
                     val requestId = data.getLong(KEY_REQUEST_ID)
 
                     if (inPath == null || outPath == null || replyTo == null) {

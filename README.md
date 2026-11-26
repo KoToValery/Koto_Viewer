@@ -4,7 +4,6 @@
 
 ### Universal All-in-One Viewer for 2D CAD, 3D BIM, Medical DICOM, PCB & Documents
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Flutter](https://img.shields.io/badge/Flutter-3.10+-02569B?logo=flutter)](https://flutter.dev)
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Windows%20%7C%20Linux-green.svg)](#supported-platforms)
 [![Offline First](https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg)](#privacy--security)
@@ -41,7 +40,7 @@ Hardware-accelerated 3D inspection for mechanical parts, architecture, and 3D pr
 
 ### 📐 3. 2D CAD & Engineering Drawings
 High-precision 2D CAD drawing inspection engine:
-- **Formats:** AutoCAD DXF (R12 through 2018+), DWG (via integrated **GNU LibreDWG** engine), HPGL / PLT, SVG.
+- **Formats:** AutoCAD DXF (R12 through 2018+), DWG (via integrated **acadrust** engine), HPGL / PLT, SVG.
 - **Layer Management:** Full layer visibility toggles, color overrides, frozen layer recognition, and layer state persistence.
 - **Snap & Measurement:** Accurate vertex, midpoint, and center snapping; linear distance, angle, and area calculations.
 - **Coordinate Systems:** Built-in geodesic coordinate conversion (BGS 2005, WGS 84, UTM).
@@ -102,13 +101,9 @@ KoToViewer is engineered with an **offline-first** philosophy:
   - **Windows:** Visual Studio 2022 (with C++ Desktop workload)
   - **Android:** Android Studio / Android NDK & CMake
 
-### Clone & Run
+### Build & Run
 
 ```bash
-# Clone the repository
-git clone https://github.com/KoToValery/Koto_Viewer.git
-cd Koto_Viewer
-
 # Install Flutter dependencies
 flutter pub get
 
@@ -119,18 +114,18 @@ flutter run -d android
 ```
 
 ### Native Dependencies
-- **Windows:** The bundled `dwg2dxf.exe` and `libredwg-0.dll` binaries are placed under `windows/libredwg/bin/` and installed automatically during CMake build.
-- **Android:** Native shared libraries for LibreDWG and OpenJPEG (`libredwg.so`, `libopenjp2.so`) are located in `android/app/src/main/jniLibs/` and packaged automatically into the APK.
+- **Windows:** `koto-acadrust.exe` is built from `src/acadrust_converter/` during CMake build, alongside the `openjpeg_bridge` and `kotoview_3d_gpu` DLLs.
+- **Android:** Prebuilt JNI libraries for acadrust (`libkoto_acadrust.so`) are located in `src/acadrust_converter/prebuilt/android/`, and OpenJPEG (`libopenjpeg_bridge.so`) and `libkotoview_3d_gpu.so` are compiled by CMake/NDK.
 
 ---
 
-## ⚖️ Licensing & Open Source
+## ⚖️ Licensing & Third-Party Notices
 
-This project is licensed under the **[GNU General Public License v3.0 (GPLv3)](LICENSE)**.
+Copyright (C) 2026 KoTo. All rights reserved.
 
-### Third-Party & Open Source Acknowledgments
-- **[GNU LibreDWG](https://www.gnu.org/software/libredwg/):** GNU General Public License v3.0 (GPLv3). Powers DWG conversion.
-- **[OpenJPEG](https://github.com/uclouvain/openjpeg):** 2-Clause BSD License. Powers JPEG 2000 DICOM image decompression.
+### Third-Party Acknowledgments
+- **[acadrust](src/acadrust_converter/licenses/acadrust-MPL-2.0.txt):** Mozilla Public License 2.0 (MPL-2.0), including [ACadSharp](src/acadrust_converter/licenses/acadrust-THIRD_PARTY_NOTICES.md) (MIT License). Powers DWG reading, conversion, and export.
+- **[OpenJPEG](third_party/openjpeg/LICENSE):** 2-Clause BSD License. Powers JPEG 2000 DICOM image decompression.
 - **[Flutter](https://flutter.dev):** BSD 3-Clause License.
 
 ---

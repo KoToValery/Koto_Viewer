@@ -89,8 +89,8 @@ class MainActivity : FlutterActivity() {
                 "convertDwg" -> {
                     val inputPath = call.argument<String>("inputPath")
                     val outputPath = call.argument<String>("outputPath")
-                    val backend = call.argument<String>("backend") ?: "libredwg"
-                    if (inputPath != null && outputPath != null && backend in setOf("acadrust", "libredwg")) {
+                    val backend = call.argument<String>("backend") ?: "acadrust"
+                    if (inputPath != null && outputPath != null && backend == "acadrust") {
                         convertDwgInIsolatedService(inputPath, outputPath, backend, result)
                     } else {
                         result.error("INVALID_ARGUMENT", "inputPath and outputPath required", null)

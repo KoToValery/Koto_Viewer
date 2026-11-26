@@ -29,7 +29,6 @@ void main(List<String> args) {
     await UiSettingsService.init();
 
     // Startup background cleanup for orphaned temp files and cache pruning
-    unawaited(DwgConverterService.cleanupStaleTempFiles(isStartup: true));
     unawaited(DwgConverterService.pruneCache());
     unawaited(ProjectBundleService.cleanupStaleTempFiles(isStartup: true));
 

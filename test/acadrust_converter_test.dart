@@ -125,24 +125,15 @@ void main() {
   );
 
   test(
-    'KCAD caches distinguish engines and keep preferred instant-open key',
+    'KCAD caches use acadrust converter version for instant-open key',
     () async {
       final hash = 'a' * 64;
-      final legacy = File('${temp.path}/${hash}_v6.dxf');
       final rust = File('${temp.path}/${hash}_v7.dxf');
-      final legacyKey = await KcadService.getCachePath(
-        legacy,
-        originalFile: input,
-      );
       final rustKey = await KcadService.getCachePath(rust, originalFile: input);
       final preferredKey = await KcadService.getCachePath(input);
-      expect(legacyKey, contains('_c6_'));
+      expect(DwgConverterService.cacheVersion, 7);
       expect(rustKey, contains('_c7_'));
-      expect(legacyKey, isNot(rustKey));
-      expect(
-        preferredKey,
-        DwgConverterService.cacheVersion == 7 ? rustKey : legacyKey,
-      );
+      expect(preferredKey, rustKey);
     },
   );
 

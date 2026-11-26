@@ -49,7 +49,6 @@ void main() {
         // DXF is a test oracle only, after the no-intermediate assertion above.
         final oraclePath = await DwgConverterService.convertDwgToDxf(
           input.path,
-          backend: DwgConversionBackend.acadrust,
           forceReconvert: true,
         );
         final expected = DxfParser.parseString(

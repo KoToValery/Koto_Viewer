@@ -14,10 +14,6 @@ class AcadrustConverterService {
   static const androidChannel = MethodChannel(
     'com.koto.kotoviewer/dwg_converter',
   );
-  static const enabled = bool.fromEnvironment(
-    'KOTO_USE_ACADRUST',
-    defaultValue: true,
-  );
   static const cacheVersion = 7;
   static const conversionTimeout = Duration(minutes: 2);
 
@@ -33,11 +29,8 @@ class AcadrustConverterService {
     return null;
   }
 
-  // Android attempts JNI in the worker process. If the optional Rust library
-  // is not packaged for this ABI, the service reports failure and Dart uses
-  // the legacy cache/backend without loading native code in the UI process.
   static bool get isAvailable =>
-      enabled && (Platform.isAndroid || findExecutable() != null);
+      Platform.isAndroid || findExecutable() != null;
 
   /// Publishes only a successful, complete ASCII DXF; failed attempts cannot
   /// overwrite an existing cache or leave partial output for another backend.
@@ -96,8 +89,7 @@ class AcadrustConverterService {
       await stagedOutput.rename(output.path);
       return true;
     } on PlatformException {
-      // The coordinator preserves the existing typed OOM error and decides
-      // whether a service failure can use the legacy backend.
+      // Preserve typed OOM errors from the isolated Android worker.
       rethrow;
     } on Exception catch (error) {
       debugPrint('AcadrustConverterService: conversion failed: $error');

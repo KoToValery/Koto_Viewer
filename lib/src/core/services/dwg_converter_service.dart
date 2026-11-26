@@ -1,14 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:path_provider/path_provider.dart';
 import '../errors/app_error_handler.dart';
 import 'acadrust_converter_service.dart';
-import 'libredwg_ffi.dart';
-import 'universal_encoding_service.dart';
 
 /// Exception thrown when DWG to DXF conversion fails.
 class DwgConversionException implements Exception {
@@ -25,188 +22,21 @@ class DwgConversionException implements Exception {
 /// Specialized exception thrown when conversion is killed by the OS due to excessive memory usage.
 class DwgMemoryLimitException extends DwgConversionException {
   const DwgMemoryLimitException([
-    String message = 'DWG requires excessive memory',
-  ]) : super(message, errorCode: -999);
+    super.message = 'DWG requires excessive memory',
+  ]) : super(errorCode: -999);
 }
 
-enum DwgConversionBackend { automatic, acadrust, libreDwg }
-
-/// Service to handle DWG -> DXF conversion and cache management.
+/// Service to handle DWG -> DXF conversion and cache management via acadrust.
 class DwgConverterService {
   static const String _cacheFolder = 'dwg_cache';
-  static const int _libreDwgCacheVersion = 6;
-  static const String _cacheVersion = '_v$_libreDwgCacheVersion';
 
-  /// Also used by the instant-open KCAD path before conversion is attempted.
-  static int get cacheVersion => AcadrustConverterService.isAvailable
-      ? AcadrustConverterService.cacheVersion
-      : _libreDwgCacheVersion;
+  /// Also used by the instant-open KCAD path for converted DXF caches.
+  static int get cacheVersion => AcadrustConverterService.cacheVersion;
 
-  /// A fallback result must retain the legacy KCAD key, so it cannot mask a
-  /// subsequent attempt with the preferred backend on the same original DWG.
-  static int cacheVersionForSource(String sourcePath) {
-    final match = RegExp(r'[a-f0-9]{64}_v(6|7)\.dxf$').firstMatch(sourcePath);
-    return match == null ? cacheVersion : int.parse(match.group(1)!);
-  }
+  static int cacheVersionForSource(String sourcePath) => cacheVersion;
 
-  /// Locates the bundled or installed dwg2dxf executable on Windows.
-  static String? _findWindowsDwg2DxfExe() {
-    if (!Platform.isWindows) return null;
-
-    final candidates = [
-      // 1. Next to the running executable (e.g. build/windows/x64/runner/Debug/dwg2dxf.exe or Release)
-      '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}dwg2dxf.exe',
-      // 2. In windows/libredwg/bin directory (dev environment)
-      '${Directory.current.path}${Platform.pathSeparator}windows${Platform.pathSeparator}libredwg${Platform.pathSeparator}bin${Platform.pathSeparator}dwg2dxf.exe',
-    ];
-
-    for (final candidate in candidates) {
-      if (File(candidate).existsSync()) {
-        return candidate;
-      }
-    }
-    return null;
-  }
-
-  /// Locates the bundled or installed dwglayers executable on Windows.
-  static String? _findWindowsDwgLayersExe() {
-    if (!Platform.isWindows) return null;
-
-    final candidates = [
-      // 1. Next to the running executable (e.g. build/windows/x64/runner/Debug/dwglayers.exe or Release)
-      '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}dwglayers.exe',
-      // 2. Next to dwg2dxf if found
-      if (_findWindowsDwg2DxfExe() != null)
-        _findWindowsDwg2DxfExe()!.replaceAll('dwg2dxf.exe', 'dwglayers.exe'),
-      // 3. In windows/libredwg/bin directory (dev environment)
-      '${Directory.current.path}${Platform.pathSeparator}windows${Platform.pathSeparator}libredwg${Platform.pathSeparator}bin${Platform.pathSeparator}dwglayers.exe',
-    ];
-
-    for (final candidate in candidates) {
-      if (File(candidate).existsSync()) {
-        return candidate;
-      }
-    }
-    return null;
-  }
-
-  /// Streams content from [sourceFile] to [targetFile], prepending an authentic
-  /// DWG layer state metadata comment (group code 999) with constant O(1) memory usage (~64KB buffer).
-  static Future<void> _streamToTargetWithComment({
-    required File sourceFile,
-    required File targetFile,
-    String? layerStatesString,
-  }) async {
-    try {
-      final sink = targetFile.openWrite();
-      try {
-        if (layerStatesString != null && layerStatesString.isNotEmpty) {
-          sink.writeln('999');
-          sink.writeln('KOTO_DWG_LAYERS:$layerStatesString');
-        }
-        await sink.addStream(sourceFile.openRead());
-        await sink.flush();
-      } finally {
-        await sink.close();
-      }
-    } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(
-        e,
-        stack,
-        context: 'DwgConverterService._streamToTargetWithComment.fs',
-      );
-      debugPrint('DwgConverterService: Failed to stream with comment: $e');
-      rethrow;
-    } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(
-        e,
-        stack,
-        context: 'DwgConverterService._streamToTargetWithComment',
-      );
-      debugPrint('DwgConverterService: Failed to stream with comment: $e');
-      rethrow;
-    }
-  }
-
-  /// Prepends layer states comment in-place using a temporary sibling file and streaming,
-  /// avoiding loading the entire DXF into memory.
-  static Future<void> _prependCommentInPlace({
-    required File dxfFile,
-    required String layerStatesString,
-  }) async {
-    final tempSibling = File(
-      '${dxfFile.path}.tmp_${DateTime.now().microsecondsSinceEpoch}',
-    );
-    try {
-      await _streamToTargetWithComment(
-        sourceFile: dxfFile,
-        targetFile: tempSibling,
-        layerStatesString: layerStatesString,
-      );
-      if (await dxfFile.exists()) {
-        await dxfFile.delete();
-      }
-      await tempSibling.rename(dxfFile.path);
-    } catch (e, stack) {
-      AppErrorHandler.recordError(
-        e,
-        stack,
-        context: 'DwgConverterService._prependCommentInPlace',
-      );
-      debugPrint('DwgConverterService: Failed to prepend comment in-place: $e');
-      if (await tempSibling.exists()) {
-        try {
-          await tempSibling.delete();
-        } catch (_) {}
-      }
-    }
-  }
-
-  /// Exposed for testing stream-based DXF comment injection.
-  @visibleForTesting
-  static Future<void> streamToTargetWithComment({
-    required File sourceFile,
-    required File targetFile,
-    String? layerStatesString,
-  }) => _streamToTargetWithComment(
-    sourceFile: sourceFile,
-    targetFile: targetFile,
-    layerStatesString: layerStatesString,
-  );
-
-  /// Returns a temporary directory guaranteed to use an ASCII path on Windows,
-  /// avoiding issues with native C runtimes opening non-ASCII / Cyrillic paths.
-  static Directory _getSafeTempDir() {
-    if (Platform.isWindows) {
-      final publicDir =
-          Platform.environment['PUBLIC'] ??
-          Platform.environment['ALLUSERSPROFILE'];
-      if (publicDir != null && !RegExp(r'[^\x00-\x7F]').hasMatch(publicDir)) {
-        final dir = Directory('$publicDir${Platform.pathSeparator}KotoTemp');
-        if (!dir.existsSync()) {
-          dir.createSync(recursive: true);
-        }
-        return dir;
-      }
-    }
-    return Directory.systemTemp;
-  }
-
-  static const MethodChannel _androidChannel =
-      AcadrustConverterService.androidChannel;
-
-  /// Returns true if native LibreDWG converter library or CLI tool is loaded and ready.
-  static bool get isNativeSupported {
-    if (Platform.isWindows) {
-      return AcadrustConverterService.isAvailable ||
-          _findWindowsDwg2DxfExe() != null ||
-          LibreDwgFfi.isAvailable;
-    }
-    if (Platform.isAndroid) {
-      return true;
-    }
-    return LibreDwgFfi.isAvailable;
-  }
+  /// Returns true if the native acadrust DWG converter is available.
+  static bool get isNativeSupported => AcadrustConverterService.isAvailable;
 
   /// Converts a DWG file at [dwgPath] to a cached DXF file.
   /// If already converted and the source file has not changed,
@@ -214,7 +44,6 @@ class DwgConverterService {
   static Future<String> convertDwgToDxf(
     String dwgPath, {
     bool forceReconvert = false,
-    DwgConversionBackend backend = DwgConversionBackend.automatic,
     @visibleForTesting AcadrustProcessRunner? acadrustProcessRunner,
   }) async {
     final dwgFile = File(dwgPath);
@@ -232,312 +61,45 @@ class DwgConverterService {
       await cacheDir.create(recursive: true);
     }
 
-    final useAcadrust =
-        backend == DwgConversionBackend.acadrust ||
-        (backend == DwgConversionBackend.automatic &&
-            AcadrustConverterService.isAvailable);
-    if (useAcadrust) {
-      final output = File(
-        '${cacheDir.path}/${fingerprint}_v${AcadrustConverterService.cacheVersion}.dxf',
-      );
-      if (!forceReconvert &&
-          await AcadrustConverterService.isCompleteDxf(output)) {
+    final output = File(
+      '${cacheDir.path}${Platform.pathSeparator}${fingerprint}_v$cacheVersion.dxf',
+    );
+    if (!forceReconvert && await AcadrustConverterService.isCompleteDxf(output)) {
+      debugPrint('DwgConverterService: Reusing cached DXF -> ${output.path}');
+      return output.path;
+    }
+
+    try {
+      final bool converted;
+      if (Platform.isAndroid) {
+        converted = await AcadrustConverterService.convertAndroid(
+          input: dwgFile,
+          output: output,
+        );
+      } else {
+        final executable = AcadrustConverterService.findExecutable();
+        converted =
+            executable != null &&
+            await AcadrustConverterService.convert(
+              executable: executable,
+              input: dwgFile,
+              output: output,
+              processRunner: acadrustProcessRunner,
+            );
+      }
+      if (converted) {
+        debugPrint('DwgConverterService: acadrust converted $dwgPath');
+        unawaited(pruneCache());
         return output.path;
       }
-      try {
-        final bool converted;
-        if (Platform.isAndroid) {
-          converted = await AcadrustConverterService.convertAndroid(
-            input: dwgFile,
-            output: output,
-          );
-        } else {
-          final executable = AcadrustConverterService.findExecutable();
-          converted =
-              executable != null &&
-              await AcadrustConverterService.convert(
-                executable: executable,
-                input: dwgFile,
-                output: output,
-                processRunner: acadrustProcessRunner,
-              );
-        }
-        if (converted) {
-          debugPrint('DwgConverterService: acadrust converted $dwgPath');
-          unawaited(pruneCache());
-          return output.path;
-        }
-      } on PlatformException catch (error) {
-        if (error.code == 'OOM_KILLED') throw const DwgMemoryLimitException();
-        debugPrint(
-          'DwgConverterService: acadrust service error: ${error.code}',
-        );
-      }
-      if (backend == DwgConversionBackend.acadrust) {
-        throw const DwgConversionException('acadrust DWG conversion failed.');
-      }
-      debugPrint('DwgConverterService: falling back to LibreDWG');
-    }
-
-    // Content identity keeps unrelated same-name project snapshots separate.
-    final cachedFileName = '$fingerprint$_cacheVersion.dxf';
-    final targetDxfPath =
-        '${cacheDir.path}${Platform.pathSeparator}$cachedFileName';
-    final targetDxfFile = File(targetDxfPath);
-
-    if (!forceReconvert &&
-        await targetDxfFile.exists() &&
-        await targetDxfFile.length() > 100) {
-      debugPrint('DwgConverterService: Reusing cached DXF -> $targetDxfPath');
-      return targetDxfPath;
-    }
-
-    int result = -1;
-
-    // 1. On Windows: Try using bundled dwg2dxf CLI tool
-    final winExe = _findWindowsDwg2DxfExe();
-    if (winExe != null) {
-      File? tempInputFile;
-      File? tempOutputFile;
-      try {
-        String effectiveInputPath = dwgPath;
-        String effectiveOutputPath = targetDxfPath;
-
-        // dwg2dxf.exe (MinGW C runtime) fails with READ ERROR 0x1000 on non-ASCII/Cyrillic paths.
-        // Stage through a safe ASCII path if any path contains non-ASCII characters or spaces.
-        final bool needsStaging =
-            RegExp(r'[^\x00-\x7F]').hasMatch(dwgPath) ||
-            RegExp(r'[^\x00-\x7F]').hasMatch(targetDxfPath) ||
-            dwgPath.contains(' ') ||
-            targetDxfPath.contains(' ');
-
-        if (needsStaging) {
-          final safeDir = _getSafeTempDir();
-          final uniqueId = DateTime.now().microsecondsSinceEpoch;
-          final safeInPath =
-              '${safeDir.path}${Platform.pathSeparator}dwg_in_$uniqueId.dwg';
-          final safeOutPath =
-              '${safeDir.path}${Platform.pathSeparator}dwg_out_$uniqueId.dxf';
-
-          await dwgFile.copy(safeInPath);
-          tempInputFile = File(safeInPath);
-          tempOutputFile = File(safeOutPath);
-
-          effectiveInputPath = safeInPath;
-          effectiveOutputPath = safeOutPath;
-        }
-
-        final processResult = await Process.run(winExe, [
-          '-v0',
-          '-y',
-          '-o',
-          effectiveOutputPath,
-          effectiveInputPath,
-        ]);
-
-        final outResultFile = File(effectiveOutputPath);
-        if (processResult.exitCode == 0 &&
-            await outResultFile.exists() &&
-            await outResultFile.length() > 0) {
-          // Extract authentic layer states directly from the DWG file
-          String? layerStatesString;
-          final layersExe = _findWindowsDwgLayersExe();
-          if (layersExe != null) {
-            try {
-              final layersRes = await Process.run(layersExe, [
-                '-f',
-                effectiveInputPath,
-              ], stdoutEncoding: null);
-              if (layersRes.exitCode == 0 && layersRes.stdout is List<int>) {
-                final decodedOutput = UniversalEncodingService.decodeBytes(
-                  layersRes.stdout as List<int>,
-                );
-                final lines = LineSplitter.split(decodedOutput);
-                final List<String> encodedStates = [];
-                for (final line in lines) {
-                  final match = RegExp(
-                    r'^([ f])([+\-])([ l])\s+(.+)$',
-                  ).firstMatch(line.trimRight());
-                  if (match != null) {
-                    final isFrozen = match.group(1) == 'f';
-                    final isOff = match.group(2) == '-';
-                    final layerName = match.group(4)!.trim();
-                    if (layerName.isNotEmpty) {
-                      final flag = isFrozen
-                          ? (isOff ? 'f-' : 'f+')
-                          : (isOff ? '-' : '+');
-                      final safeName = Uri.encodeComponent(layerName);
-                      encodedStates.add('$safeName=$flag');
-                    }
-                  }
-                }
-                if (encodedStates.isNotEmpty) {
-                  layerStatesString = encodedStates.join(';');
-                }
-              }
-            } on ProcessException catch (e, stack) {
-              AppErrorHandler.recordError(
-                e,
-                stack,
-                context: 'DwgConverterService.dwglayers.process',
-              );
-              debugPrint('DwgConverterService: dwglayers process error: $e');
-            } on Exception catch (e, stack) {
-              AppErrorHandler.recordError(
-                e,
-                stack,
-                context: 'DwgConverterService.dwglayers',
-              );
-              debugPrint('DwgConverterService: dwglayers extraction error: $e');
-            }
-          }
-
-          if (needsStaging) {
-            // Stream outResultFile (in KotoTemp) directly to targetDxfPath (in cache)
-            // with layer states comment prepended, using constant O(1) memory.
-            await _streamToTargetWithComment(
-              sourceFile: outResultFile,
-              targetFile: File(targetDxfPath),
-              layerStatesString: layerStatesString,
-            );
-          } else if (layerStatesString != null &&
-              layerStatesString.isNotEmpty) {
-            await _prependCommentInPlace(
-              dxfFile: outResultFile,
-              layerStatesString: layerStatesString,
-            );
-          }
-          result = 0;
-        } else {
-          debugPrint(
-            'DwgConverterService: dwg2dxf CLI exit ${processResult.exitCode}, stderr: ${processResult.stderr}',
-          );
-          result = processResult.exitCode != 0 ? processResult.exitCode : -1;
-        }
-      } on ProcessException catch (e, stack) {
-        AppErrorHandler.recordError(
-          e,
-          stack,
-          context: 'DwgConverterService.cli.process',
-        );
-        debugPrint('DwgConverterService: Windows CLI process error: $e');
-        result = -1;
-      } on FileSystemException catch (e, stack) {
-        AppErrorHandler.recordError(
-          e,
-          stack,
-          context: 'DwgConverterService.cli.fs',
-        );
-        debugPrint('DwgConverterService: Windows CLI file error: $e');
-        result = -1;
-      } on Exception catch (e, stack) {
-        AppErrorHandler.recordError(
-          e,
-          stack,
-          context: 'DwgConverterService.cli',
-        );
-        debugPrint('DwgConverterService: Windows CLI conversion error: $e');
-        result = -1;
-      } finally {
-        if (tempInputFile != null && await tempInputFile.exists()) {
-          try {
-            await tempInputFile.delete();
-          } on FileSystemException catch (_) {
-            // Best effort temp cleanup
-          } on Exception catch (_) {
-            // Best effort temp cleanup
-          }
-        }
-        if (tempOutputFile != null && await tempOutputFile.exists()) {
-          try {
-            await tempOutputFile.delete();
-          } on FileSystemException catch (_) {
-            // Best effort temp cleanup
-          } on Exception catch (_) {
-            // Best effort temp cleanup
-          }
-        }
-      }
-    }
-
-    // 2. On Android: Use isolated background service (:dwg_converter)
-    // to shield the main Flutter app from OOM kills on massive/complex drawings.
-    if (result != 0 && Platform.isAndroid) {
-      try {
-        final res = await _androidChannel.invokeMethod<int>('convertDwg', {
-          'inputPath': dwgPath,
-          'outputPath': targetDxfPath,
-          'backend': 'libredwg',
-        });
-        result = res ?? -1;
-      } on PlatformException catch (e) {
-        debugPrint(
-          'DwgConverterService: Android isolated service error: ${e.code} ${e.message}',
-        );
-        if (e.code == 'OOM_KILLED') {
-          throw const DwgMemoryLimitException();
-        }
-        result = -1;
-      } catch (e) {
-        debugPrint('DwgConverterService: Android service exception: $e');
-        result = -1;
-      }
-    }
-
-    // 3. Fallback to Isolate FFI conversion (Linux, or if service not available)
-    if (result != 0 && !Platform.isAndroid && LibreDwgFfi.isAvailable) {
-      final params = _ConversionParams(
-        inputDwgPath: dwgPath,
-        outputDxfPath: targetDxfPath,
-      );
-      result = await compute(_runConversionInIsolate, params);
-    }
-
-    if (result != 0) {
-      // Clean up partially written file
-      if (await targetDxfFile.exists()) {
-        try {
-          await targetDxfFile.delete();
-        } on FileSystemException catch (_) {
-          // Best effort target cleanup
-        } on Exception catch (_) {
-          // Best effort target cleanup
-        }
-      }
-      if (result == -999) {
-        throw const DwgMemoryLimitException();
-      }
-      if (result == -1073741515 || result == 3221225781) {
-        throw DwgConversionException(
-          'Missing DLL (libssp-0.dll or libredwg-0.dll not found). Ensure all files from the application folder are copied.',
-          errorCode: result,
-        );
-      }
-      if (result < -100) {
-        final sig = -(result + 100);
-        throw DwgConversionException(
-          'DWG parser encountered a native fault (signal $sig) and safely recovered. The file may contain corrupted or unsupported entities.',
-          errorCode: result,
-        );
-      }
-      throw DwgConversionException(
-        'Failed to convert DWG file to DXF format.',
-        errorCode: result,
+    } on PlatformException catch (error) {
+      if (error.code == 'OOM_KILLED') throw const DwgMemoryLimitException();
+      debugPrint(
+        'DwgConverterService: acadrust service error: ${error.code}',
       );
     }
 
-    if (!await targetDxfFile.exists() || await targetDxfFile.length() == 0) {
-      throw const DwgConversionException(
-        'Conversion completed but the output DXF file is empty.',
-      );
-    }
-
-    debugPrint('DwgConverterService: Converted $dwgPath -> $targetDxfPath');
-
-    // Run cache pruning asynchronously in background so cache stays bounded
-    unawaited(pruneCache());
-
-    return targetDxfPath;
+    throw const DwgConversionException('Failed to convert DWG file to DXF format.');
   }
 
   /// Clears temporary converted DXF files from cache.
@@ -620,63 +182,6 @@ class DwgConverterService {
     }
   }
 
-  /// Cleans up orphaned intermediate files left behind in the safe temp directory
-  /// (e.g. C:\Users\Public\KotoTemp) due to prior app crashes, hard kills, or aborted conversions.
-  /// If [isStartup] is true, deletes all orphaned dwg_in_* and dwg_out_* files.
-  /// Otherwise, deletes only files older than [olderThan].
-  static Future<void> cleanupStaleTempFiles({
-    Duration olderThan = const Duration(minutes: 30),
-    bool isStartup = false,
-    @visibleForTesting Directory? customTempDir,
-  }) async {
-    try {
-      final safeDir = customTempDir ?? _getSafeTempDir();
-      if (!await safeDir.exists()) return;
-
-      final now = DateTime.now();
-      int deletedCount = 0;
-      await for (final entity in safeDir.list()) {
-        if (entity is File) {
-          final fileName = entity.uri.pathSegments.last;
-          if (fileName.startsWith('dwg_in_') ||
-              fileName.startsWith('dwg_out_')) {
-            bool shouldDelete = isStartup;
-            if (!shouldDelete) {
-              try {
-                final stat = await entity.stat();
-                if (now.difference(stat.modified) > olderThan) {
-                  shouldDelete = true;
-                }
-              } on FileSystemException catch (_) {
-                // If stat fails, skip
-              }
-            }
-            if (shouldDelete) {
-              try {
-                await entity.delete();
-                deletedCount++;
-              } on FileSystemException catch (_) {
-                // Best effort deletion
-              }
-            }
-          }
-        }
-      }
-      if (deletedCount > 0) {
-        debugPrint(
-          'DwgConverterService: Cleaned up $deletedCount stale temp files from ${safeDir.path}',
-        );
-      }
-    } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(
-        e,
-        stack,
-        context: 'DwgConverterService.cleanupStaleTempFiles',
-      );
-      debugPrint('DwgConverterService: Error cleaning stale temp files: $e');
-    }
-  }
-
   /// Prunes the DWG conversion cache by removing files older than [maxAge]
   /// and ensuring total cache size does not exceed [maxSizeBytes] (LRU eviction).
   static Future<void> pruneCache({
@@ -752,15 +257,4 @@ class DwgConverterService {
       debugPrint('DwgConverterService: Error pruning cache: $e');
     }
   }
-}
-
-class _ConversionParams {
-  final String inputDwgPath;
-  final String outputDxfPath;
-
-  _ConversionParams({required this.inputDwgPath, required this.outputDxfPath});
-}
-
-int _runConversionInIsolate(_ConversionParams params) {
-  return LibreDwgFfi.convert(params.inputDwgPath, params.outputDxfPath);
 }

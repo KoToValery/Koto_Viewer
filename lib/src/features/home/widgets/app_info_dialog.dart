@@ -2,7 +2,6 @@ import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/errors/error_log_dialog.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../../core/services/app_update_service.dart';
@@ -55,17 +54,6 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
           _isLoading = false;
         });
       }
-    }
-  }
-
-  Future<void> _openGitHub() async {
-    final uri = Uri.parse('https://github.com/KoToValery/Koto_Viewer');
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } on PlatformException catch (_) {
-      // Failed to launch URL
-    } on Exception catch (_) {
-      // Failed to launch URL
     }
   }
 
@@ -223,7 +211,7 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                   children: [
                     // Overview Summary
                     Text(
-                      'A fast, offline, and 100% free open-source viewer engineered for CAD, 3D engineering models, PCB Gerber packages, vector graphics, and standard office documents.',
+                      context.l10n.appInfoOverviewSummary,
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.45,
@@ -244,7 +232,7 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     _buildFeatureCard(
                       icon: Icons.draw_rounded,
                       title: '2D CAD & Engineering Drawings',
-                      formats: ['DXF', 'DWG (LibreDWG)', 'HPGL / PLT', 'SVG'],
+                      formats: ['DXF', 'DWG', 'HPGL / PLT', 'SVG'],
                       description:
                           'Full AutoCAD layer control, precision snap, area hatching, and BGS 2005 / WGS 84 / UTM coordinate transformation.',
                       color: const Color(0xFF0284C7),
@@ -414,9 +402,9 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     _buildUpdateCard(theme, isDark),
                     const SizedBox(height: 16),
 
-                    // License & Open Source
+                    // License & Third-Party Notices
                     _buildSectionHeader(
-                      'Open Source & Licensing',
+                      context.l10n.appInfoLicensingSectionTitle,
                       Icons.verified_user_rounded,
                       theme,
                     ),
@@ -438,19 +426,19 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildBulletPoint(
-                            'Licensed under GNU General Public License v3.0 (GPLv3)',
+                            context.l10n.appInfoCopyrightNotice,
                           ),
                           const SizedBox(height: 4),
                           _buildBulletPoint(
-                            '100% Free and Open Source Software (FOSS)',
+                            context.l10n.appInfoAcadrustNotice,
                           ),
                           const SizedBox(height: 4),
                           _buildBulletPoint(
-                            'DWG conversion powered by GNU LibreDWG',
+                            context.l10n.appInfoOpenJpegNotice,
                           ),
                           const SizedBox(height: 4),
                           _buildBulletPoint(
-                            'No cloud dependencies • 100% Offline & Private',
+                            context.l10n.appInfoOfflinePrivateNotice,
                           ),
                         ],
                       ),
@@ -485,8 +473,6 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                               _buildLicensesButton(context, versionText),
                               const SizedBox(width: 8),
                               _buildLogsButton(context),
-                              const SizedBox(width: 8),
-                              _buildGitHubButton(),
                             ],
                           ),
                         ),
@@ -503,8 +489,6 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                       _buildLicensesButton(context, versionText),
                       const SizedBox(width: 8),
                       _buildLogsButton(context),
-                      const SizedBox(width: 8),
-                      _buildGitHubButton(),
                       const Spacer(),
                       _buildCloseButton(context),
                     ],
@@ -696,18 +680,6 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
       onPressed: () => ErrorLogDialog.show(context),
       icon: const AppIcon(AppIconId.bug, size: 16),
       label: Text(context.l10n.commandUiLogs, style: TextStyle(fontSize: 12)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
-  Widget _buildGitHubButton() {
-    return OutlinedButton.icon(
-      onPressed: _openGitHub,
-      icon: const AppIcon(AppIconId.code, size: 16),
-      label: Text(context.l10n.commandUiGithub, style: TextStyle(fontSize: 12)),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

@@ -56,7 +56,7 @@ void main() {
     // Verify KOTO_DWG_LAYERS comment is present in the DXF file header
     final headerBytes = await dxfFile.openRead(0, 4096).first;
     final headerStr = latin1.decode(headerBytes);
-    expect(headerStr.contains('KOTO_DWG_LAYERS:'), isTrue, reason: 'KOTO_DWG_LAYERS should be injected by dwglayers');
+    expect(headerStr.contains('KOTO_DWG_LAYERS:'), isTrue, reason: 'KOTO_DWG_LAYERS should be injected by acadrust');
     expect(headerStr.contains('fill=-'), isTrue, reason: 'fill layer must be off');
     expect(
       headerStr.contains('${Uri.encodeComponent('размери')}=-') || headerStr.contains('размери=-'),

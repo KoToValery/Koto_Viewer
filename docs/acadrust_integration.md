@@ -68,9 +68,7 @@ libraries with dependency notices. Android ELF segments use 16 KB alignment.
 Cargo.lock is committed. Native developers can use the Gradle property
 `-PkotoRebuildAcadrust=true` to compile from Rust instead of using the bundle;
 this explicit mode fails if Cargo is unavailable. Run the bundle script and
-commit updated binaries after changing Rust/JNI source. LibreDWG and
-`KOTO_USE_ACADRUST` apply only to legacy
-explicit DXF export, never to a hidden opening step.
+commit updated binaries after changing Rust/JNI source.
 
 ## Verification
 

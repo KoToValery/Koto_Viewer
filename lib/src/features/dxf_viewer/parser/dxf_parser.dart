@@ -136,12 +136,8 @@ class DxfParser {
 
     // Check for authentic DWG layer states metadata injected during conversion
     Map<String, ({bool isFrozen, bool isOff})>? authenticDwgLayerStates;
-    bool isLibreDwgGenerated = false;
     for (int i = 0; i < total && i < 100; i++) {
       final p = pairs[i];
-      if (p.code == 999 && p.value.contains('LibreDWG')) {
-        isLibreDwgGenerated = true;
-      }
       if (p.code == 999 && p.value.startsWith('KOTO_DWG_LAYERS:')) {
         final raw = p.value.substring('KOTO_DWG_LAYERS:'.length);
         authenticDwgLayerStates = {};
@@ -284,14 +280,9 @@ class DxfParser {
         }
       }
     } else if (!preserveSourceLayers) {
-      // Fallback for DXF files converted by LibreDWG or corrupted where all or nearly all used layers ended up hidden
+      // Fallback for DXF files where all used layers ended up hidden
       final int visibleUsedCount = layers.values.where((l) => l.isVisible).length;
-      final bool isCorruptedLibreDwg = (visibleUsedCount == 0) ||
-          (isLibreDwgGenerated &&
-              layers.length > 5 &&
-              (visibleUsedCount <= 2 || visibleUsedCount / layers.length < 0.15));
-
-      if (isCorruptedLibreDwg) {
+      if (visibleUsedCount == 0) {
         for (final layer in layers.values) {
           if (!layer.isFrozen) {
             layer.isVisible = true;
