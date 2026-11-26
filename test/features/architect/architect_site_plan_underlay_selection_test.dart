@@ -458,6 +458,17 @@ void main() {
           .fit(const Rect.fromLTWH(-4, -3, 12, 10), padding: 60);
       await tester.pumpAndSettle();
 
+      // The redundant top-right "Orient building" pill is removed, while the
+      // North/Building view toggle stays available when north angle != 0.
+      expect(
+        find.byKey(const ValueKey('architect-site-orient-pill')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-site-north-toggle')),
+        findsOneWidget,
+      );
+
       // Select the geodetic CAD underlay.
       await tester.tapAt(workspace.screen(tester, const Offset(3, 2)));
       await tester.pumpAndSettle();

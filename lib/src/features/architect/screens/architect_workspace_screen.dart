@@ -39649,65 +39649,37 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _rotationSource == null &&
           !_dragController.isActive &&
           !_underlayMaskDrafting &&
+          (_project.northSymbol?.angle ?? 0.0).abs() > 1e-4 &&
           !((_activeTool == ArchitectTool.cadUnderlay ||
                   _activeTool == ArchitectTool.rasterUnderlay) &&
               _effectiveSelection.isEmpty))
         Positioned(
           top: 8,
           right: 8,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if ((_project.northSymbol?.angle ?? 0.0).abs() > 1e-4) ...[
-                Tooltip(
-                  message: context.l10n.architectSiteOrientToggleTooltip,
-                  child: ActionChip(
-                    key: const ValueKey('architect-site-north-toggle'),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    avatar: AppIcon(
-                      AppIconId.compass,
-                      size: 14,
-                      color: _siteTrueNorthView
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    label: Text(
-                      _siteTrueNorthView
-                          ? context.l10n.architectSiteOrientViewTrueNorth
-                          : context.l10n.architectSiteOrientViewProjectNorth,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    onPressed: _toggleSiteNorthMode,
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              Tooltip(
-                message: context.l10n.architectSiteOrientBuildingTooltip,
-                child: ActionChip(
-                  key: const ValueKey('architect-site-orient-pill'),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  avatar: AppIcon(
-                    AppIconId.rotate,
-                    size: 14,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  label: Text(
-                    context.l10n.architectSiteOrientBuilding,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  onPressed: _startSiteOrientation,
+          child: Tooltip(
+            message: context.l10n.architectSiteOrientToggleTooltip,
+            child: ActionChip(
+              key: const ValueKey('architect-site-north-toggle'),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              avatar: AppIcon(
+                AppIconId.compass,
+                size: 14,
+                color: _siteTrueNorthView
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              label: Text(
+                _siteTrueNorthView
+                    ? context.l10n.architectSiteOrientViewTrueNorth
+                    : context.l10n.architectSiteOrientViewProjectNorth,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ],
+              onPressed: _toggleSiteNorthMode,
+            ),
           ),
         ),
       if (_rotationSource != null)
