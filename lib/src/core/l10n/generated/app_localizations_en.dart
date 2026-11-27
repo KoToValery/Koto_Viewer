@@ -13623,6 +13623,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Export plans at the original survey position for CAD/geodesy import';
 
   @override
+  String get architectSiteSetbackClearance => 'Distance from setback line';
+
+  @override
+  String get architectSiteBoundaryClearance => 'Distance from parcel boundary';
+
+  @override
+  String get architectSiteClearanceEditHint =>
+      'Tap to set exact clearance and shift the site';
+
+  @override
   String get bimProjectExportStoreyDwg => 'Storey (DWG)';
 
   @override

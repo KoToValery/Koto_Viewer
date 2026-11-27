@@ -24738,6 +24738,24 @@ abstract class AppLocalizations {
   /// **'Export plans at the original survey position for CAD/geodesy import'**
   String get architectExportGeodeticHint;
 
+  /// Dialog label for perpendicular distance from setback line to building perimeter
+  ///
+  /// In en, this message translates to:
+  /// **'Distance from setback line'**
+  String get architectSiteSetbackClearance;
+
+  /// Dialog label for perpendicular distance from parcel boundary to building perimeter
+  ///
+  /// In en, this message translates to:
+  /// **'Distance from parcel boundary'**
+  String get architectSiteBoundaryClearance;
+
+  /// Tooltip for clickable site plan clearance distance badges
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to set exact clearance and shift the site'**
+  String get architectSiteClearanceEditHint;
+
   /// No description provided for @bimProjectExportStoreyDwg.
   ///
   /// In en, this message translates to:

@@ -1929,6 +1929,14 @@ class ArchitectLandscapePainterHelper {
 
   /// Draws the ground-contact building exterior perimeter, entrance door markers,
   /// and light dashed upper-storey erkers/balconies for the Terrain / Site plan.
+  static List<List<Offset>> siteBuildingPerimeter(ArchitectProject project) {
+    final groundStorey = project.groundBuildingStorey;
+    if (groundStorey == null) return const [];
+    final walls = groundStorey.walls.where((w) => !w.isParapet).toList();
+    if (walls.isEmpty) return const [];
+    return ArchitectRoofPainterHelper.outerPerimeterLoops(walls);
+  }
+
   static List<List<Offset>> drawBuildingSiteUnderlay({
     required Canvas canvas,
     required ArchitectProject project,

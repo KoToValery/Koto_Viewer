@@ -11,7 +11,114 @@ import '../models/architect_project.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_vector_scene.dart';
 
+class ArchitectSiteClearanceBadge {
+  final ArchitectSiteClearance clearance;
+  final String labelText;
+  final Offset anchorModel;
+  final Offset labelCenterModel;
+  final Size sizeModel;
+  final Offset perpendicular;
+
+  const ArchitectSiteClearanceBadge({
+    required this.clearance,
+    required this.labelText,
+    required this.anchorModel,
+    required this.labelCenterModel,
+    required this.sizeModel,
+    required this.perpendicular,
+  });
+
+  bool get hasLeader => (labelCenterModel - anchorModel).distance > 1e-6;
+}
+
 abstract final class ArchitectSiteParcelPainter {
+  static List<ArchitectSiteClearanceBadge> layoutClearances({
+    required ArchitectSiteParcel parcel,
+    required List<List<Offset>> building,
+    required String Function(double meters) formatLength,
+    required AppLocalizations? l10n,
+    required double scale,
+    required double viewRotationRad,
+    double tick = 0,
+  }) {
+    final effTick = tick > 0 ? tick : 4.0 / scale;
+    final pad = effTick / 3;
+    final labels = <Rect>[];
+    Offset rotation(Offset p) =>
+        BimTransform2D.rotate(p, Offset.zero, viewRotationRad);
+    Offset unrotate(Offset p) =>
+        BimTransform2D.rotate(p, Offset.zero, -viewRotationRad);
+
+    ({Offset centerModel, Size sizeModel, Rect rotRect}) reserve(
+      String value,
+      Offset anchor, {
+      bool strong = false,
+    }) {
+      final tp = TextPainter(
+        textDirection: TextDirection.ltr,
+        text: TextSpan(
+          text: value,
+          style: TextStyle(
+            fontSize: 12 / scale,
+            fontWeight: strong ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      )..layout();
+      final target = rotation(anchor);
+      final size = tp.size;
+      var center = target;
+      Rect bounds() => Rect.fromCenter(
+        center: center,
+        width: size.width,
+        height: size.height,
+      ).inflate(pad);
+      var rect = bounds();
+      while (labels.any(rect.overlaps)) {
+        center -= Offset(0, size.height + pad * 2);
+        rect = bounds();
+      }
+      labels.add(rect);
+      return (centerModel: unrotate(center), sizeModel: size, rotRect: rect);
+    }
+
+    final areaPosition = _areaAnchor(parcel);
+    if (l10n != null) {
+      reserve(
+        l10n.architectSiteParcelArea(
+          NumberFormat.decimalPatternDigits(
+            locale: l10n.localeName,
+            decimalDigits: 2,
+          ).format(parcel.area),
+        ),
+        areaPosition,
+        strong: true,
+      );
+    }
+
+    final badges = <ArchitectSiteClearanceBadge>[];
+    for (final c in parcel.perpendicularClearances(building)) {
+      final a = c.linePoint, b = c.buildingPoint;
+      final length = c.distance;
+      final perpendicular = length < 1e-8
+          ? unrotate(const Offset(0, -1))
+          : Offset(a.dy - b.dy, b.dx - a.dx) / length;
+      final anchor = (a + b) / 2 + perpendicular * (effTick * 3);
+      final text = formatLength(length);
+      final placed = reserve(text, anchor);
+      badges.add(
+        ArchitectSiteClearanceBadge(
+          clearance: c,
+          labelText: text,
+          anchorModel: anchor,
+          labelCenterModel: placed.centerModel,
+          sizeModel: placed.sizeModel,
+          perpendicular: perpendicular,
+        ),
+      );
+    }
+    return badges;
+  }
+
   static void paint({
     required Canvas canvas,
     required ArchitectProject project,
@@ -159,7 +266,18 @@ abstract final class ArchitectSiteParcelPainter {
         strong: true,
       );
     }
-    for (final (a, b) in parcel.clearances(building)) {
+    final clearances = layoutClearances(
+      parcel: parcel,
+      building: building,
+      formatLength: scope.length,
+      l10n: l10n,
+      scale: scale,
+      viewRotationRad: rotate,
+      tick: tick,
+    );
+    for (final badge in clearances) {
+      final c = badge.clearance;
+      final a = c.linePoint, b = c.buildingPoint;
       if (visibleBounds != null &&
           BimLineGeometry.visibleSegment(
                 a,
@@ -170,10 +288,8 @@ abstract final class ArchitectSiteParcelPainter {
           !visibleBounds.contains(a)) {
         continue;
       }
-      final length = (b - a).distance;
-      final perpendicular = length < 1e-8
-          ? unrotate(const Offset(0, -1))
-          : Offset(a.dy - b.dy, b.dx - a.dx) / length;
+      final length = c.distance;
+      final perpendicular = badge.perpendicular;
       architectDrawingSources(canvas, const [], 'siteClearance');
       if (length < 1e-8) {
         canvas.drawCircle(a, tick / 2, dimension);
@@ -188,8 +304,8 @@ abstract final class ArchitectSiteParcelPainter {
         }
       }
       label(
-        scope.length(length),
-        (a + b) / 2 + perpendicular * (tick * 3),
+        badge.labelText,
+        badge.anchorModel,
         'siteClearance',
       );
     }

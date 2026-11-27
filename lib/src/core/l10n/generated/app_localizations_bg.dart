@@ -13672,6 +13672,16 @@ class AppLocalizationsBg extends AppLocalizations {
       'Експортира плановете в оригиналните координати на геодезическата подложка';
 
   @override
+  String get architectSiteSetbackClearance => 'Отстояние от ЗООЛ';
+
+  @override
+  String get architectSiteBoundaryClearance => 'Отстояние от имотна граница';
+
+  @override
+  String get architectSiteClearanceEditHint =>
+      'Натисни за точен размер и изместване на ситуацията';
+
+  @override
   String get bimProjectExportStoreyDwg => 'Етаж (DWG)';
 
   @override

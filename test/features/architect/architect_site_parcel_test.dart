@@ -865,4 +865,230 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  test(
+    'perpendicularClearances measures from setback when configured or boundary otherwise and computes rigid translation',
+    () {
+      const building = [
+        [
+          Offset(3, 2.5),
+          Offset(7, 2.5),
+          Offset(7, 5.5),
+          Offset(3, 5.5),
+        ],
+      ];
+      final parcel = ArchitectSiteParcel(
+        _rectangle,
+        setbacks: const {0: 1.0, 1: 2.0},
+      );
+      final clearances = parcel.perpendicularClearances(building);
+      expect(clearances, hasLength(4));
+
+      // Side 0: measured from setback y=1.0 to building y=2.5 => 1.5 m.
+      expect(clearances[0].sideIndex, 0);
+      expect(clearances[0].fromSetback, isTrue);
+      expect(clearances[0].distance, closeTo(1.5, 1e-7));
+      expect(clearances[0].linePoint, const Offset(5, 1));
+      expect(clearances[0].buildingPoint, const Offset(5, 2.5));
+
+      // Side 1: measured from setback x=8.0 to building x=7.0 => 1.0 m.
+      expect(clearances[1].sideIndex, 1);
+      expect(clearances[1].fromSetback, isTrue);
+      expect(clearances[1].distance, closeTo(1.0, 1e-7));
+
+      // Side 2: no setback -> measured from boundary y=8.0 to building y=5.5 => 2.5 m.
+      expect(clearances[2].sideIndex, 2);
+      expect(clearances[2].fromSetback, isFalse);
+      expect(clearances[2].distance, closeTo(2.5, 1e-7));
+
+      // Rigid translation adjusts boundary/setback distance to exact 3.00 m.
+      final deltaSide2 = clearances[2].translationForDistance(3.0);
+      expect(deltaSide2.dx, closeTo(0, 1e-7));
+      expect(deltaSide2.dy, closeTo(0.5, 1e-7));
+      final shifted = parcel.transformed((p) => p + deltaSide2);
+      expect(
+        shifted.perpendicularClearances(building)[2].distance,
+        closeTo(3.0, 1e-7),
+      );
+      expect(shifted.setbacks, parcel.setbacks);
+
+      // Non-orthogonal diagonals beyond segment span are excluded.
+      const offsetBuilding = [
+        [
+          Offset(12, 2),
+          Offset(15, 2),
+          Offset(15, 5),
+          Offset(12, 5),
+        ],
+      ];
+      final perp = parcel.perpendicularClearances(offsetBuilding);
+      expect(perp.where((c) => c.sideIndex == 0), isEmpty);
+      expect(perp.where((c) => c.sideIndex == 2), isEmpty);
+    },
+  );
+
+  testWidgets(
+    'clicking site clearance badge opens modal and shifts parcel, setback, and underlays rigidly to exact distance',
+    (tester) async {
+      final starter = ArchitectProject.starterWithCatalog(
+        name: 'ClearanceModal',
+        storeyCount: 1,
+      );
+      final site = starter.siteStorey!.id;
+      final ground = starter.storeys.firstWhere((s) => !s.isSite);
+      final parcel = ArchitectSiteParcel(
+        _rectangle,
+        setbacks: const {0: 1.0},
+      );
+      final doc = DxfDocument(
+        layers: {'0': DxfLayer(name: '0')},
+        blocks: const {},
+        entities: const [DxfLine(p1: Offset.zero, p2: Offset(10, 0))],
+        headerVars: const {},
+        bounds: const Rect.fromLTWH(0, 0, 10, 8),
+        entityStats: const {},
+      );
+      final raster = ArchitectRasterUnderlay(
+        id: 'raster-clearance',
+        storeyId: site,
+        fileName: 'scan.png',
+        internalImagePath: '',
+        position: Offset.zero,
+        metersPerPixel: 0.01,
+        imageWidthPx: 1000,
+        imageHeightPx: 800,
+      );
+      final project = starter
+          .copyWith(
+            activeStoreyId: site,
+            rasterUnderlays: [raster],
+            storeys: [
+              for (final s in starter.storeys)
+                if (s.isSite)
+                  s.copyWith(siteParcel: parcel)
+                else if (s.id == ground.id)
+                  s.copyWith(
+                    walls: const [
+                      ArchitectWall(
+                        id: 'bw1',
+                        startPoint: Offset(3.125, 3.625),
+                        endPoint: Offset(6.875, 3.625),
+                      ),
+                      ArchitectWall(
+                        id: 'bw2',
+                        startPoint: Offset(6.875, 3.625),
+                        endPoint: Offset(6.875, 5.375),
+                      ),
+                      ArchitectWall(
+                        id: 'bw3',
+                        startPoint: Offset(6.875, 5.375),
+                        endPoint: Offset(3.125, 5.375),
+                      ),
+                      ArchitectWall(
+                        id: 'bw4',
+                        startPoint: Offset(3.125, 5.375),
+                        endPoint: Offset(3.125, 3.625),
+                      ),
+                    ],
+                  )
+                else
+                  s,
+            ],
+          )
+          .withCadUnderlayAdded(
+            ArchitectCadUnderlayConfig(
+              id: 'cad-clearance',
+              storeyId: site,
+              fileName: 'survey.dxf',
+              internalCopyPath: '',
+              unitsPerMeter: 1.0,
+              lockedCadOriginX: 0,
+              lockedCadOriginY: 0,
+              cadOrientation: true,
+              lockOrigin: true,
+            ),
+          );
+      final controller = ArchitectCommandController(project);
+      addTearDown(controller.dispose);
+
+      await workspace.open(tester, controller, underlays: {site: doc});
+      await tester.pumpAndSettle();
+      workspace
+          .camera(tester)
+          .fit(const Rect.fromLTWH(-2, -2, 14, 12), padding: 62);
+      await tester.pumpAndSettle();
+
+      // Side 0: ZOOL at y=1.0 -> building y=3.5 => 2.50 m.
+      final setbackBadge = find.byKey(const ValueKey('site-clearance-0'));
+      expect(setbackBadge, findsOneWidget);
+      await tester.tap(setbackBadge);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('site-clearance-keypad')),
+        findsOneWidget,
+      );
+
+      for (final k in ['3', '.', '0', '0']) {
+        await tester.tap(find.byKey(ValueKey('shape-key-$k')));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const ValueKey('shape-save')));
+      await tester.pumpAndSettle();
+
+      // Parcel + ZOOL + CAD + Raster shifted rigidly by (0, -0.50).
+      final after1 = controller.project;
+      expect(
+        after1.siteStorey!.siteParcel!.vertices.first.dy,
+        closeTo(-0.5, 1e-6),
+      );
+      expect(after1.siteStorey!.siteParcel!.setbacks, const {0: 1.0});
+      expect(after1.rasterUnderlays.single.position.dy, closeTo(-0.5, 1e-6));
+      expect(
+        after1.cadUnderlays[site]!
+            .frame(const BimCoordinateFrame())
+            .toModel(Offset.zero)
+            .dy,
+        closeTo(-0.5, 1e-6),
+      );
+
+      // Undo reverts parcel, ZOOL, and both underlays in a single step.
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(
+        controller.project.siteStorey!.siteParcel!.vertices.first.dy,
+        closeTo(0, 1e-6),
+      );
+      expect(
+        controller.project.rasterUnderlays.single.position.dy,
+        closeTo(0, 1e-6),
+      );
+
+      // Side 2: boundary at y=8.0 -> building y=5.5 => 2.50 m -> edit to 3.00 m.
+      final boundaryBadge = find.byKey(const ValueKey('site-clearance-2'));
+      expect(boundaryBadge, findsOneWidget);
+      await tester.tap(boundaryBadge);
+      await tester.pumpAndSettle();
+      for (final k in ['3', '.', '0', '0']) {
+        await tester.tap(find.byKey(ValueKey('shape-key-$k')));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const ValueKey('shape-save')));
+      await tester.pumpAndSettle();
+
+      final after2 = controller.project;
+      expect(
+        after2.siteStorey!.siteParcel!.vertices.first.dy,
+        closeTo(0.5, 1e-6),
+      );
+      expect(after2.rasterUnderlays.single.position.dy, closeTo(0.5, 1e-6));
+      expect(
+        after2.cadUnderlays[site]!
+            .frame(const BimCoordinateFrame())
+            .toModel(Offset.zero)
+            .dy,
+        closeTo(0.5, 1e-6),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

@@ -7502,6 +7502,18 @@
   "@architectExportGeodeticHint": {
     "description": "Subtitle explaining the geodetic coordinates toggle in the DXF/DWG export dialog"
   },
+  "architectSiteSetbackClearance": "Distance from setback line",
+  "@architectSiteSetbackClearance": {
+    "description": "Dialog label for perpendicular distance from setback line to building perimeter"
+  },
+  "architectSiteBoundaryClearance": "Distance from parcel boundary",
+  "@architectSiteBoundaryClearance": {
+    "description": "Dialog label for perpendicular distance from parcel boundary to building perimeter"
+  },
+  "architectSiteClearanceEditHint": "Tap to set exact clearance and shift the site",
+  "@architectSiteClearanceEditHint": {
+    "description": "Tooltip for clickable site plan clearance distance badges"
+  },
   "bimProjectExportStoreyDwg": "Storey (DWG)",
   "exportStructuralDwg": "Storey (DWG)",
   "exportStructuralDwgHint": "Columns, walls, beams, slabs and axes",

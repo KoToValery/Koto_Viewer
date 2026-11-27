@@ -138,7 +138,9 @@ import '../widgets/architect_auto_roof_preview_dialog.dart';
 
 import '../widgets/architect_roof_bar.dart';
 
+import '../rendering/architect_landscape_painter_helper.dart';
 import '../rendering/architect_roof_painter_helper.dart';
+import '../rendering/architect_site_parcel_painter.dart';
 
 import '../services/architect_roof_geometry.dart';
 
@@ -6239,6 +6241,41 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         siteParcel: target.siteParcel!.transformed((p) => p + delta),
       ),
     );
+  }
+
+  ArchitectProject _translateSiteAndUnderlays(
+    ArchitectProject base,
+    String storeyId,
+    Offset delta,
+  ) {
+    if (delta.distanceSquared <= 1e-16) return base;
+    var next = _withMovedSiteParcel(base, storeyId, delta);
+    final fallback = _restoredUnderlayFrame ?? widget.underlayFrame;
+    for (final cfg in next.cadUnderlaysForStorey(storeyId)) {
+      final frame = cfg.frame(fallback);
+      final updated = cfg
+          .withFrame(frame.placing(frame.origin, delta), fallback: fallback)
+          .copyWith(
+            maskPolygon: cfg.maskPolygon?.map((p) => p + delta).toList(),
+            lockOrigin: true,
+          );
+      next = next.withCadUnderlayUpdated(updated);
+    }
+    if (next.rasterUnderlays.any((r) => r.storeyId == storeyId)) {
+      next = next.copyWith(
+        rasterUnderlays: [
+          for (final r in next.rasterUnderlays)
+            if (r.storeyId == storeyId)
+              r.copyWith(
+                position: r.position + delta,
+                maskPolygon: r.maskPolygon?.map((p) => p + delta).toList(),
+              )
+            else
+              r,
+        ],
+      );
+    }
+    return next;
   }
 
   void _onSiteAction(ArchitectSiteAction action) {
@@ -21144,6 +21181,95 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
+  Widget _buildSiteClearanceOverlay() => Positioned.fill(
+    child: AnimatedBuilder(
+      animation: Listenable.merge([_viewport, _previewRevision]),
+      builder: (context, _) {
+        final project = _drawingProject;
+        final parcel = project.activeStorey.siteParcel;
+        if (!_commands.isPlan ||
+            !project.activeStorey.isSite ||
+            parcel == null ||
+            _polygonDistanceOpen ||
+            _siteParcelEditingSetbacks != null ||
+            _siteOrientationActive ||
+            _underlayMaskDrafting ||
+            _rasterCalibrationStep != 0 ||
+            _underlayCropEditor.active ||
+            _draggingCadUnderlay ||
+            _draggingRasterId != null ||
+            _draggingTerrainId != null ||
+            _dragController.isActive ||
+            _polygonEditor.active ||
+            _draftStart != null ||
+            _radialMenuScreenPosition != null ||
+            _newPointTargetId != null ||
+            _marqueeTool.isDrafting) {
+          return const SizedBox.shrink();
+        }
+        final building = ArchitectLandscapePainterHelper.siteBuildingPerimeter(
+          project,
+        );
+        if (building.isEmpty) return const SizedBox.shrink();
+        final scale = _viewport.scale;
+        if (!scale.isFinite || scale <= 0) return const SizedBox.shrink();
+        final badges = ArchitectSiteParcelPainter.layoutClearances(
+          parcel: parcel,
+          building: building,
+          formatLength: project.formatLength,
+          l10n: context.l10n,
+          scale: scale,
+          viewRotationRad: _viewport.rotation,
+        );
+        if (badges.isEmpty) return const SizedBox.shrink();
+        final size = _viewport.size;
+        return Stack(
+          children: [
+            for (final badge in badges)
+              Builder(
+                builder: (context) {
+                  final center = _viewport.toScreen(badge.labelCenterModel);
+                  final w = math.max(badge.sizeModel.width * scale + 12, 48.0);
+                  final h = math.max(badge.sizeModel.height * scale + 10, 32.0);
+                  if (!size.isEmpty &&
+                      (center.dx < -w ||
+                          center.dx > size.width + w ||
+                          center.dy < -h ||
+                          center.dy > size.height + h)) {
+                    return const SizedBox.shrink();
+                  }
+                  return Positioned(
+                    left: center.dx - w / 2,
+                    top: center.dy - h / 2,
+                    width: w,
+                    height: h,
+                    child: Tooltip(
+                      message: context.l10n.architectSiteClearanceEditHint,
+                      child: Material(
+                        color: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                          side: BorderSide(
+                            color: const Color(0xFF78818A).withValues(alpha: 0.45),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: InkWell(
+                          key: ValueKey('site-clearance-${badge.clearance.sideIndex}'),
+                          borderRadius: BorderRadius.circular(4),
+                          onTap: () => _editSiteClearance(badge.clearance),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        );
+      },
+    ),
+  );
+
   Widget _buildPolygonDistanceOverlay() => Positioned.fill(
 
     child: AnimatedBuilder(
@@ -21656,6 +21782,108 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           if (!saved && identical(source, _project)) {
             _polygonSelectedEdge = previousEdge;
           }
+        });
+        _repaintPreview();
+      }
+    }
+  }
+
+  Future<void> _editSiteClearance(ArchitectSiteClearance clearance) async {
+    if (_polygonDistanceOpen) return;
+    final source = _project;
+    final site = source.siteStorey;
+    if (site == null || !site.isSite || site.siteParcel == null) return;
+    final unit = source.units;
+    final currentMeters = clearance.distance;
+    var enteredMeters = currentMeters;
+    var delta = Offset.zero;
+    ArchitectProject? previewProject;
+
+    setState(() => _polygonDistanceOpen = true);
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, dialogSetState) {
+            final canSave =
+                enteredMeters.isFinite &&
+                enteredMeters >= 0 &&
+                identical(source, _project);
+            return Dialog(
+              alignment: Alignment.bottomCenter,
+              insetPadding: const EdgeInsets.all(16),
+              constraints: const BoxConstraints(maxWidth: 260),
+              backgroundColor: Colors.transparent,
+              child: SizedBox(
+                width: 250,
+                child: ArchitectShapeDimensionPanel(
+                  key: const ValueKey('site-clearance-keypad'),
+                  values: [unit.toUnit(currentMeters)],
+                  labels: [
+                    clearance.fromSetback
+                        ? context.l10n.architectSiteSetbackClearance
+                        : context.l10n.architectSiteBoundaryClearance,
+                  ],
+                  unit: unit.symbol,
+                  decimals: source.distanceDecimals,
+                  minimum: 0,
+                  signed: false,
+                  canSave: canSave,
+                  onChanged: (_, value) {
+                    final meters = unit.fromUnit(value);
+                    if (!meters.isFinite || meters < 0) {
+                      enteredMeters = double.nan;
+                      previewProject = null;
+                      setState(() {
+                        _elementMovePreview = null;
+                        _underlayRotationPreview = null;
+                      });
+                      dialogSetState(() {});
+                      _repaintPreview();
+                      return;
+                    }
+                    enteredMeters = meters;
+                    delta = clearance.translationForDistance(meters);
+                    previewProject = delta.distanceSquared <= 1e-16
+                        ? source
+                        : _translateSiteAndUnderlays(source, site.id, delta);
+                    final changed =
+                        previewProject != null &&
+                        !identical(previewProject, source);
+                    setState(() {
+                      _elementMovePreview = changed ? previewProject : null;
+                      _underlayRotationPreview = changed ? previewProject : null;
+                    });
+                    dialogSetState(() {});
+                    _repaintPreview();
+                  },
+                  onSave: () {
+                    if (!identical(source, _project)) return;
+                    final next = previewProject;
+                    if (next != null &&
+                        !identical(next, source) &&
+                        delta.distance > 1e-7) {
+                      _elementMovePreview = null;
+                      _underlayRotationPreview = null;
+                      _commands.commit(next);
+                      _saveBiMProjectIfAttached();
+                      HapticFeedback.mediumImpact();
+                    }
+                    Navigator.of(dialogContext).pop();
+                  },
+                  onCancel: () => Navigator.of(dialogContext).pop(),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _elementMovePreview = null;
+          _underlayRotationPreview = null;
+          _polygonDistanceOpen = false;
         });
         _repaintPreview();
       }
@@ -38865,6 +39093,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           message: context.l10n.architectUnderlayUnavailable,
         ))),
 
+      _buildSiteClearanceOverlay(),
       _buildPolygonDistanceOverlay(),
 
       _buildHatchTransformHandle(),

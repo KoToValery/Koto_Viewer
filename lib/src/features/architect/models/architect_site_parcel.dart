@@ -8,6 +8,31 @@ import '../../bim_editing/geometry/bim_polygon_geometry.dart';
 
 typedef ArchitectSiteSegment = (Offset, Offset);
 
+/// Nearest perpendicular clearance between one parcel side (or its setback line)
+/// and the ground-floor building perimeter.
+class ArchitectSiteClearance {
+  final int sideIndex;
+  final bool fromSetback;
+  final Offset linePoint;
+  final Offset buildingPoint;
+  final Offset outwardNormal;
+
+  const ArchitectSiteClearance({
+    required this.sideIndex,
+    required this.fromSetback,
+    required this.linePoint,
+    required this.buildingPoint,
+    required this.outwardNormal,
+  });
+
+  double get distance => (buildingPoint - linePoint).distance;
+
+  /// Rigid translation vector to move the parcel (and underlay) so that this
+  /// line lies at [targetDistance] on the outward side of [buildingPoint].
+  Offset translationForDistance(double targetDistance) =>
+      buildingPoint + outwardNormal * targetDistance - linePoint;
+}
+
 /// A single project parcel. Vertex order is retained so a setback stays
 /// attached to its boundary side when vertices move or the site rotates.
 class ArchitectSiteParcel {
@@ -15,9 +40,11 @@ class ArchitectSiteParcel {
 
   final List<Offset> vertices;
   final Map<int, double> setbacks;
-  late final List<ArchitectSiteSegment> trimmedSetbacks = List.unmodifiable(
-    _trimSetbacks(),
-  );
+  late final List<({int sideIndex, ArchitectSiteSegment segment})>
+  _trimmedSetbackEntries = List.unmodifiable(_trimSetbacksWithSides());
+  late final List<ArchitectSiteSegment> trimmedSetbacks = List.unmodifiable([
+    for (final entry in _trimmedSetbackEntries) entry.segment,
+  ]);
 
   ArchitectSiteParcel(
     List<Offset> vertices, {
@@ -247,7 +274,8 @@ class ArchitectSiteParcel {
   /// Remove the strip between each configured side and its setback. Taking
   /// the boundary of the remaining region joins the dashed lines where they
   /// intersect and supports disconnected regions in a concave parcel.
-  List<ArchitectSiteSegment> _trimSetbacks() {
+  List<({int sideIndex, ArchitectSiteSegment segment})>
+  _trimSetbacksWithSides() {
     final active = {
       for (final entry in setbacks.entries)
         if (setbackSegments(entry.key, entry.value).isNotEmpty)
@@ -256,7 +284,10 @@ class ArchitectSiteParcel {
     if (active.isEmpty) return [];
     if (active.length == 1) {
       final entry = active.entries.single;
-      return setbackSegments(entry.key, entry.value);
+      return [
+        for (final seg in setbackSegments(entry.key, entry.value))
+          (sideIndex: entry.key, segment: seg),
+      ];
     }
 
     final origin = vertices.first;
@@ -271,7 +302,7 @@ class ArchitectSiteParcel {
         -BimPolygonGeometry.normal(vertices, index) * (active[index] ?? 0);
 
     final cutters = <List<clip.PointD>>[];
-    final fronts = <(Offset, Offset)>[];
+    final fronts = <(int, Offset, Offset)>[];
     for (final index in active.keys) {
       final (a, b) = side(index);
       final length = (b - a).distance;
@@ -314,7 +345,7 @@ class ArchitectSiteParcel {
       final first = start + along * corner(previous, 0, atStart: true);
       final last = start + along * corner(next, length, atStart: false);
       cutters.add(polygon([a, b, last, first]));
-      fronts.add((first, last));
+      fronts.add((index, first, last));
     }
 
     final engine = clip.ClipperD(roundingDecimalPrecision: 7)
@@ -325,7 +356,8 @@ class ArchitectSiteParcel {
       clip.FillRule.nonZero,
     );
     final boundaries = List.generate(vertices.length, side);
-    final result = <ArchitectSiteSegment>[];
+    final frontSegments = [for (final f in fronts) (f.$2, f.$3)];
+    final result = <({int sideIndex, ArchitectSiteSegment segment})>[];
     for (final loop in loops ?? const <List<clip.PointD>>[]) {
       for (var i = 0; i < loop.length; i++) {
         final first = loop[i], last = loop[(i + 1) % loop.length];
@@ -349,7 +381,21 @@ class ArchitectSiteParcel {
           return parts;
         }
 
-        final offsets = overlap(fronts);
+        int? sideForSpan(double lo, double hi) {
+          final mid = a + (b - a) * ((lo + hi) / 2);
+          final direction = (b - a) / (b - a).distance;
+          for (final (idx, p, q) in fronts) {
+            if (BimLineGeometry.cross(direction, p - a).abs() > 1e-6 ||
+                BimLineGeometry.cross(direction, q - a).abs() > 1e-6) {
+              continue;
+            }
+            final t = BimLineGeometry.parameter(mid, p, q);
+            if (t >= -1e-6 && t <= 1 + 1e-6) return idx;
+          }
+          return null;
+        }
+
+        final offsets = overlap(frontSegments);
         if (offsets.isEmpty) continue;
         final parcelEdges = overlap(boundaries);
         final cuts = <double>{
@@ -363,14 +409,115 @@ class ArchitectSiteParcel {
           if (covers(offsets, mid) && !covers(parcelEdges, mid)) {
             start ??= lo;
           } else if (start != null) {
-            result.add((a + (b - a) * start, a + (b - a) * lo));
+            final idx = sideForSpan(start, lo);
+            if (idx != null) {
+              result.add((
+                sideIndex: idx,
+                segment: (a + (b - a) * start, a + (b - a) * lo),
+              ));
+            }
             start = null;
           }
         }
         if (start != null) {
-          result.add((a + (b - a) * start, a + (b - a) * cuts.last));
+          final idx = sideForSpan(start, cuts.last);
+          if (idx != null) {
+            result.add((
+              sideIndex: idx,
+              segment: (a + (b - a) * start, a + (b - a) * cuts.last),
+            ));
+          }
         }
       }
+    }
+    return result;
+  }
+
+  /// Strict perpendicular clearances from each setback line (if configured for
+  /// that side) or otherwise from the parcel boundary to the nearest point on
+  /// [loops]. Only orthogonal projections falling onto the finite segment are
+  /// included.
+  List<ArchitectSiteClearance> perpendicularClearances(
+    List<List<Offset>> loops,
+  ) {
+    if (loops.isEmpty || vertices.length < 3) return const [];
+    final result = <ArchitectSiteClearance>[];
+    for (var i = 0; i < vertices.length; i++) {
+      final hasSetback = setbacks.containsKey(i);
+      final targets = <ArchitectSiteSegment>[
+        if (hasSetback) ...[
+          for (final e in _trimmedSetbackEntries)
+            if (e.sideIndex == i) e.segment,
+        ] else
+          side(i),
+      ];
+      if (targets.isEmpty && hasSetback) {
+        targets.addAll(setbackSegments(i, setbacks[i]!));
+      }
+      if (targets.isEmpty) continue;
+
+      final outward = BimPolygonGeometry.normal(vertices, i);
+      ArchitectSiteClearance? best;
+      var bestDistSq = double.infinity;
+
+      void consider(Offset onLine, Offset onBuilding) {
+        final dSq = (onBuilding - onLine).distanceSquared;
+        if (dSq < bestDistSq) {
+          bestDistSq = dSq;
+          best = ArchitectSiteClearance(
+            sideIndex: i,
+            fromSetback: hasSetback,
+            linePoint: onLine,
+            buildingPoint: onBuilding,
+            outwardNormal: outward,
+          );
+        }
+      }
+
+      for (final (s1, s2) in targets) {
+        final segVec = s2 - s1;
+        final segLen = segVec.distance;
+        if (segLen < 1e-8) continue;
+        final u = segVec / segLen;
+        for (final loop in loops) {
+          if (loop.length < 2) continue;
+          for (var j = 0; j < loop.length; j++) {
+            final p = loop[j], q = loop[(j + 1) % loop.length];
+            final hit = BimLineGeometry.intersection(
+              s1,
+              s2,
+              p,
+              q,
+              firstFinite: true,
+              secondFinite: true,
+            );
+            if (hit != null) consider(hit, hit);
+
+            final pq = q - p;
+            final pqLen = pq.distance;
+            if (pqLen > 1e-8 &&
+                BimLineGeometry.cross(u, pq / pqLen).abs() < 1e-4) {
+              final tp = BimLineGeometry.dot(p - s1, u);
+              final tq = BimLineGeometry.dot(q - s1, u);
+              final lo = math.max(0.0, math.min(tp, tq));
+              final hi = math.min(segLen, math.max(tp, tq));
+              if (hi - lo >= 1e-4) {
+                final midOnLine = s1 + u * ((lo + hi) / 2);
+                final orthoOffset = p - s1 - u * tp;
+                consider(midOnLine, midOnLine + orthoOffset);
+              }
+            }
+
+            for (final v in [p, q]) {
+              final t = BimLineGeometry.dot(v - s1, u);
+              if (t >= -1e-6 && t <= segLen + 1e-6) {
+                consider(s1 + u * t.clamp(0.0, segLen), v);
+              }
+            }
+          }
+        }
+      }
+      if (best != null) result.add(best!);
     }
     return result;
   }
