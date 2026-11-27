@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.dart';
+import 'package:kotoview/src/features/architect/services/architect_underlay_service.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_project_wizard_dialog.dart';
 import 'package:kotoview/src/features/bim_projects/widgets/bim_new_project_wizard.dart';
 import 'package:kotoview/src/features/bim_editing/widgets/bim_distance_drafting_panel.dart';
@@ -401,6 +403,205 @@ void main() {
       completer.complete();
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('architect-wizard-creating')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Wizard shows underlay loading state, displays errors inside dialog, and supports separate geodetic site underlay',
+    (tester) async {
+      tester.view.physicalSize = const Size(500, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final tempDir = await tester.runAsync(
+        () => Directory.systemTemp.createTemp('wizard_test_'),
+      );
+      addTearDown(() async {
+        await tester.runAsync(() async {
+          if (await tempDir!.exists()) {
+            await tempDir.delete(recursive: true);
+          }
+        });
+      });
+
+      final surveyDxf = File('${tempDir!.path}/survey.dxf');
+      await tester.runAsync(
+        () => surveyDxf.writeAsString('''
+  0
+SECTION
+  2
+ENTITIES
+  0
+LINE
+  8
+0
+ 10
+0
+ 20
+0
+ 11
+10
+ 21
+0
+  0
+ENDSEC
+  0
+EOF
+'''),
+      );
+
+      final prepareCompleter = Completer<ArchitectPreparedCadUnderlay>();
+      var failPrepare = true;
+      var emitPickerError = false;
+      bool? lastIsSitePlan;
+      Map<String, ArchitectCadImportSelection>? capturedUnderlays;
+      var failCreateOnce = true;
+
+      await tester.pumpWidget(
+        app(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => ArchitectProjectWizardDialog.show(
+                context,
+                pickCadFile: (ctx, {onError}) async {
+                  if (emitPickerError) {
+                    onError?.call('Invalid CAD extension');
+                    return null;
+                  }
+                  return surveyDxf;
+                },
+                prepareCadUnderlay: (file) {
+                  if (failPrepare) {
+                    return prepareCompleter.future;
+                  }
+                  return ArchitectUnderlayService.instance.prepareCadUnderlay(
+                    file,
+                  );
+                },
+                confirmCadImport: (ctx, prepared, isSitePlan) async {
+                  lastIsSitePlan = isSitePlan;
+                  return ArchitectCadImportSelection(
+                    prepared: prepared,
+                    unitsPerMeter: 1,
+                    cadOrientation: true,
+                    kind: isSitePlan
+                        ? ArchitectUnderlayKind.geodetic
+                        : ArchitectUnderlayKind.technical,
+                  );
+                },
+                onCreate: (project, underlays) async {
+                  if (failCreateOnce) {
+                    failCreateOnce = false;
+                    throw StateError('disk full');
+                  }
+                  capturedUnderlays = underlays;
+                  return project;
+                },
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+          locale: const Locale('bg'),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('architect-wizard-step-2')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ситуационна подложка (Геодезист)'), findsOneWidget);
+      final siteAddButton = find.byKey(
+        const ValueKey('architect-wizard-site-overlay-add'),
+      );
+      await tester.ensureVisible(siteAddButton);
+      await tester.tap(siteAddButton);
+      await tester.pump();
+
+      // Loading indicator is shown inside the wizard while preparing underlay.
+      expect(
+        find.byKey(const ValueKey('architect-wizard-underlay-loading')),
+        findsOneWidget,
+      );
+      expect(find.text('Зареждане на подложка...'), findsWidgets);
+
+      // Prepare error is shown inside the dialog (not behind it in a SnackBar).
+      prepareCompleter.completeError(const ArchitectEmptyCadUnderlay());
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('architect-wizard-underlay-loading')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-wizard-error-banner')),
+        findsOneWidget,
+      );
+      expect(find.byType(SnackBar), findsNothing);
+
+      // Dismissing error banner removes it.
+      await tester.tap(
+        find.byKey(const ValueKey('architect-wizard-error-dismiss')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('architect-wizard-error-banner')),
+        findsNothing,
+      );
+
+      // Picker validation error is also shown inside the dialog.
+      emitPickerError = true;
+      await tester.ensureVisible(siteAddButton);
+      await tester.tap(siteAddButton);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('architect-wizard-error-banner')),
+        findsOneWidget,
+      );
+      expect(find.text('Invalid CAD extension'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+
+      // Successful geodetic underlay selection attaches it to site storey.
+      emitPickerError = false;
+      failPrepare = false;
+      await tester.runAsync(() async {
+        await tester.ensureVisible(siteAddButton);
+        await tester.tap(siteAddButton);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+
+      expect(lastIsSitePlan, isTrue);
+      expect(find.text('survey.dxf'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('architect-wizard-error-banner')),
+        findsNothing,
+      );
+
+      // Create error is also displayed inside the wizard dialog.
+      await tester.tap(find.text('Създай'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('architect-wizard-error-banner')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('disk full'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+
+      // Retrying create succeeds and passes the geodetic site underlay under storey_site.
+      await tester.tap(find.text('Създай'));
+      await tester.pumpAndSettle();
+      expect(capturedUnderlays, isNotNull);
+      expect(capturedUnderlays!.containsKey('storey_site'), isTrue);
+      expect(
+        capturedUnderlays!['storey_site']!.kind,
+        ArchitectUnderlayKind.geodetic,
+      );
+      expect(
+        capturedUnderlays!['storey_site']!.prepared.fileName,
+        'survey.dxf',
+      );
     },
   );
 }

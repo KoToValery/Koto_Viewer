@@ -19,20 +19,41 @@ class BimUnderlayPickerHelper {
     return dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
   }
 
-  static Future<File?> pickArchitectUnderlayFile(BuildContext context) =>
-      _pick(context, includeRaster: true);
+  static Future<File?> pickArchitectUnderlayFile(
+    BuildContext context, {
+    void Function(String message)? onError,
+  }) => _pick(context, includeRaster: true, onError: onError);
 
   /// Prompts the user to pick a CAD (.dxf or .dwg) file.
   ///
   /// On Android, [FileType.custom] throws a PlatformException when given 'dxf'/'dwg'
   /// because the Android system MimeTypeMap does not have registered MIME types for CAD extensions.
   /// We handle this by using [FileType.any] on Android (or fallback) and validating the chosen extension.
-  static Future<File?> pickCadUnderlayFile(BuildContext context) =>
-      _pick(context, includeRaster: false);
+  static Future<File?> pickCadUnderlayFile(
+    BuildContext context, {
+    void Function(String message)? onError,
+  }) => _pick(context, includeRaster: false, onError: onError);
+
+  static void _reportError(
+    BuildContext context,
+    String message, {
+    void Function(String message)? onError,
+    Color? backgroundColor,
+  }) {
+    if (onError != null) {
+      onError(message);
+      return;
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: backgroundColor),
+    );
+  }
 
   static Future<File?> _pick(
     BuildContext context, {
     required bool includeRaster,
+    void Function(String message)? onError,
   }) async {
     final extensions = includeRaster
         ? const [..._cadExtensions, ..._rasterExtensions]
@@ -78,15 +99,13 @@ class BimUnderlayPickerHelper {
       final file = File(filePath);
       if (!extensions.contains(fileExtension(file))) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                includeRaster
-                    ? context.l10n.architectUnderlayUnsupportedFormat
-                    : context.l10n.bimProjectUnderlayFormatError,
-              ),
-              backgroundColor: Colors.orange,
-            ),
+          _reportError(
+            context,
+            includeRaster
+                ? context.l10n.architectUnderlayUnsupportedFormat
+                : context.l10n.bimProjectUnderlayFormatError,
+            onError: onError,
+            backgroundColor: Colors.orange,
           );
         }
         return null;
@@ -96,22 +115,20 @@ class BimUnderlayPickerHelper {
     } on PlatformException catch (e, stack) {
       debugPrint('PlatformException picking underlay file: $e\n$stack');
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              context.l10n.couldNotOpenFilePicker(e.message ?? e.toString()),
-            ),
-          ),
+        _reportError(
+          context,
+          context.l10n.couldNotOpenFilePicker(e.message ?? e.toString()),
+          onError: onError,
         );
       }
       return null;
     } catch (e, stack) {
       debugPrint('Error picking underlay file: $e\n$stack');
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.couldNotOpenFilePicker(e.toString())),
-          ),
+        _reportError(
+          context,
+          context.l10n.couldNotOpenFilePicker(e.toString()),
+          onError: onError,
         );
       }
       return null;

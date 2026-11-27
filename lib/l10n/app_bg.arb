@@ -4872,5 +4872,7 @@
   "appInfoCopyrightNotice": "© 2026 KoTo. Всички права запазени.",
   "appInfoAcadrustNotice": "DWG поддръжка чрез acadrust (MPL-2.0)",
   "appInfoOpenJpegNotice": "JPEG 2000 DICOM декомпресия чрез OpenJPEG (2-Clause BSD)",
-  "appInfoOfflinePrivateNotice": "Без облачни зависимости • 100% офлайн и поверително"
+  "appInfoOfflinePrivateNotice": "Без облачни зависимости • 100% офлайн и поверително",
+  "architectWizardSiteUnderlay": "Ситуационна подложка (Геодезист)",
+  "architectWizardAddSiteOverlay": "Добави геодезическа подложка"
 }

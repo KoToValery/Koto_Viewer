@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:kotoview/src/core/icons/app_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -24,11 +25,28 @@ class ArchitectProjectWizardDialog extends StatefulWidget {
     Map<String, ArchitectCadImportSelection> underlays,
   )?
   onCreate;
+  final Future<File?> Function(
+    BuildContext context, {
+    void Function(String message)? onError,
+  })?
+  pickCadFile;
+  final Future<ArchitectPreparedCadUnderlay> Function(File file)?
+  prepareCadUnderlay;
+  final Future<ArchitectCadImportSelection?> Function(
+    BuildContext context,
+    ArchitectPreparedCadUnderlay prepared,
+    bool isSitePlan,
+  )?
+  confirmCadImport;
+
   const ArchitectProjectWizardDialog({
     super.key,
     this.initialProjectName,
     this.underlayOwnerId,
     this.onCreate,
+    this.pickCadFile,
+    this.prepareCadUnderlay,
+    this.confirmCadImport,
   });
 
   static Future<ArchitectProject?> show(
@@ -40,6 +58,19 @@ class ArchitectProjectWizardDialog extends StatefulWidget {
       Map<String, ArchitectCadImportSelection> underlays,
     )?
     onCreate,
+    Future<File?> Function(
+      BuildContext context, {
+      void Function(String message)? onError,
+    })?
+    pickCadFile,
+    Future<ArchitectPreparedCadUnderlay> Function(File file)?
+    prepareCadUnderlay,
+    Future<ArchitectCadImportSelection?> Function(
+      BuildContext context,
+      ArchitectPreparedCadUnderlay prepared,
+      bool isSitePlan,
+    )?
+    confirmCadImport,
   }) => showDialog<ArchitectProject>(
     context: context,
     barrierDismissible: onCreate == null,
@@ -47,6 +78,9 @@ class ArchitectProjectWizardDialog extends StatefulWidget {
       initialProjectName: initialProjectName,
       underlayOwnerId: underlayOwnerId,
       onCreate: onCreate,
+      pickCadFile: pickCadFile,
+      prepareCadUnderlay: prepareCadUnderlay,
+      confirmCadImport: confirmCadImport,
     ),
   );
 
@@ -73,13 +107,18 @@ class _LevelDraft {
 class _ArchitectProjectWizardDialogState
     extends State<ArchitectProjectWizardDialog> {
   static const double _defaultUpperStoreyHeightMeters = 2.9;
+  static final Object _siteOverlayTarget = Object();
 
   late final TextEditingController _name;
   final _levelsForm = GlobalKey<FormState>();
   final _levels = [_LevelDraft(0, 3)];
+  ArchitectCadImportSelection? _siteOverlay;
   int _step = 0, _decimals = 1;
   bool _isCreating = false;
   bool _isPickingOverlay = false;
+  Object? _loadingTarget;
+  String? _loadingStatus;
+  String? _errorMessage;
   ArchitectUnit _unit = ArchitectUnit.centimeters;
   ArchitectStructuralScheme _structuralScheme =
       ArchitectStructuralScheme.flatSlab;
@@ -96,6 +135,7 @@ class _ArchitectProjectWizardDialogState
   @override
   void dispose() {
     _name.dispose();
+    unawaited(_siteOverlay?.prepared.dispose());
     for (final level in _levels) {
       level.dispose();
     }
@@ -197,11 +237,10 @@ class _ArchitectProjectWizardDialogState
           height: _levels[i].height,
         ),
     ];
-    final underlays = {
-      for (var i = 0; i < storeys.length; i++)
-        storeys[i].id: ?_levels[i].overlay,
-    };
-    setState(() => _isCreating = true);
+    setState(() {
+      _isCreating = true;
+      _errorMessage = null;
+    });
     try {
       await ArchitectWallLibrary.loadCustomTypes();
       final customLines = await ArchitectLineStyleLibrary.load();
@@ -232,6 +271,12 @@ class _ArchitectProjectWizardDialogState
             lineStyles: customLines,
             hatchPatterns: customHatches,
           ).ensureRoofStorey().ensureSiteStorey();
+      final siteStoreyId = baseProject.siteStorey?.id ?? 'storey_site';
+      final underlays = {
+        for (var i = 0; i < storeys.length; i++)
+          storeys[i].id: ?_levels[i].overlay,
+        siteStoreyId: ?_siteOverlay,
+      };
       final project = ArchitectWallLibrary.mergeCustomTypes(baseProject);
       final onCreate = widget.onCreate;
       final created = onCreate == null
@@ -246,10 +291,10 @@ class _ArchitectProjectWizardDialogState
       if (mounted) Navigator.pop(context, created);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isCreating = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('${l.error}: $e')));
+      setState(() {
+        _isCreating = false;
+        _errorMessage = '${l.error}: $e';
+      });
     }
   }
 
@@ -282,7 +327,8 @@ class _ArchitectProjectWizardDialogState
                           const CircularProgressIndicator(),
                           const SizedBox(height: 16),
                           Text(
-                            _levels.any((e) => e.overlay != null)
+                            (_siteOverlay != null ||
+                                    _levels.any((e) => e.overlay != null))
                                 ? l.architectWizardLoadingUnderlay
                                 : l.architectWizardCreatingProject,
                             style: Theme.of(context).textTheme.titleMedium,
@@ -343,6 +389,8 @@ class _ArchitectProjectWizardDialogState
                         ],
                       ),
                       const Divider(height: 24),
+                      if (_loadingTarget != null) _buildLoadingBanner(l),
+                      if (_errorMessage != null) _buildErrorBanner(l),
                       Expanded(
                         child: SingleChildScrollView(
                           child: switch (_step) {
@@ -366,7 +414,7 @@ class _ArchitectProjectWizardDialogState
                           const Spacer(),
                           FilledButton(
                             onPressed: _step == 2
-                                ? _create
+                                ? (_isPickingOverlay ? null : _create)
                                 : () => setState(() => _step++),
                             child: Text(
                               _step == 2
@@ -745,64 +793,278 @@ class _ArchitectProjectWizardDialogState
                 ),
             ],
           ),
+          const Divider(height: 24),
+          Row(
+            children: [
+              const Icon(Icons.terrain_outlined, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Tooltip(
+                  message: l.architectUnderlayAddGeodeticTooltip,
+                  child: Text(
+                    l.architectWizardSiteUnderlay,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildSiteOverlayPicker(l),
         ],
       ),
     );
   }
 
-  Future<void> _pickStoreyUnderlay(_LevelDraft level) async {
+  Widget _buildLoadingBanner(AppLocalizations l) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      key: const ValueKey('architect-wizard-underlay-loading'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _loadingStatus ?? l.architectWizardLoadingUnderlay,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const LinearProgressIndicator(minHeight: 3),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(AppLocalizations l) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      key: const ValueKey('architect-wizard-error-banner'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.error.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, size: 18, color: colors.onErrorContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(color: colors.onErrorContainer, fontSize: 13),
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('architect-wizard-error-dismiss'),
+            tooltip: l.close,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            icon: Icon(Icons.close, size: 16, color: colors.onErrorContainer),
+            onPressed: () => setState(() => _errorMessage = null),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickUnderlay({
+    required Object target,
+    required bool isSitePlan,
+  }) async {
     if (_isPickingOverlay) return;
-    setState(() => _isPickingOverlay = true);
+    setState(() {
+      _isPickingOverlay = true;
+      _errorMessage = null;
+    });
     ArchitectPreparedCadUnderlay? prepared;
+    String? pickerError;
+    bool hasTarget() => isSitePlan || _levels.contains(target);
     try {
-      final source = await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
-      if (source == null || !mounted || !_levels.contains(level)) return;
-      prepared = await ArchitectUnderlayService.instance.prepareCadUnderlay(
-        source,
+      final pickCad =
+          widget.pickCadFile ?? BimUnderlayPickerHelper.pickCadUnderlayFile;
+      final source = await pickCad(
+        context,
+        onError: (msg) => pickerError = msg,
       );
-      if (!mounted || !_levels.contains(level)) return;
-      final selected = await showArchitectCadImportDialog(
-        context: context,
-        prepared: prepared,
-      );
-      if (selected == null || !mounted || !_levels.contains(level)) return;
-      final old = level.overlay;
-      setState(() => level.overlay = selected);
+      if (source == null) {
+        if (pickerError != null && mounted) {
+          setState(() => _errorMessage = pickerError);
+        }
+        return;
+      }
+      if (!mounted || !hasTarget()) return;
+      final l = context.l10n;
+      setState(() {
+        _loadingTarget = target;
+        _loadingStatus = source.path.toLowerCase().endsWith('.dwg')
+            ? l.convertingDwg
+            : l.architectWizardLoadingUnderlay;
+      });
+      final prepareCad =
+          widget.prepareCadUnderlay ??
+          ArchitectUnderlayService.instance.prepareCadUnderlay;
+      prepared = await prepareCad(source);
+      if (!mounted || !hasTarget()) return;
+      setState(() {
+        _loadingTarget = null;
+        _loadingStatus = null;
+      });
+      final confirmImport = widget.confirmCadImport;
+      final selected = confirmImport != null
+          ? await confirmImport(context, prepared, isSitePlan)
+          : await showArchitectCadImportDialog(
+              context: context,
+              prepared: prepared,
+              isSitePlan: isSitePlan,
+            );
+      if (selected == null || !mounted || !hasTarget()) return;
+      final normalized = isSitePlan && selected.kind != ArchitectUnderlayKind.geodetic
+          ? ArchitectCadImportSelection(
+              prepared: selected.prepared,
+              unitsPerMeter: selected.unitsPerMeter,
+              cadOrientation: selected.cadOrientation,
+              kind: ArchitectUnderlayKind.geodetic,
+            )
+          : selected;
+      final old = isSitePlan
+          ? _siteOverlay
+          : (target as _LevelDraft).overlay;
+      setState(() {
+        if (isSitePlan) {
+          _siteOverlay = normalized;
+        } else {
+          (target as _LevelDraft).overlay = normalized;
+        }
+      });
       prepared = null;
       await old?.prepared.dispose();
     } catch (error) {
       if (!mounted) return;
       final l = context.l10n;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error is ArchitectEmptyCadUnderlay
-                ? l.architectCadImportEmpty
-                : l.architectUnderlayLoadError(error.toString()),
-          ),
-        ),
-      );
+      setState(() {
+        _errorMessage = switch (error) {
+          ArchitectEmptyCadUnderlay() => l.architectCadImportEmpty,
+          FormatException() => l.bimProjectUnderlayFormatError,
+          _ => l.architectUnderlayLoadError(error.toString()),
+        };
+      });
     } finally {
-      if (mounted) setState(() => _isPickingOverlay = false);
+      if (mounted) {
+        setState(() {
+          _isPickingOverlay = false;
+          _loadingTarget = null;
+          _loadingStatus = null;
+        });
+      }
       await prepared?.dispose();
     }
   }
 
   Widget _buildStoreyOverlayPicker(int index, AppLocalizations l) {
     final level = _levels[index];
-    final overlay = level.overlay;
+    return _buildOverlayPicker(
+      target: level,
+      overlay: level.overlay,
+      l: l,
+      isSitePlan: false,
+      addKey: ValueKey('architect-wizard-overlay-add-$index'),
+      removeKey: ValueKey('architect-wizard-overlay-remove-$index'),
+      addLabel: l.architectWizardAddOverlay,
+      onRemove: () {
+        final old = level.overlay;
+        setState(() => level.overlay = null);
+        if (old != null) unawaited(old.prepared.dispose());
+      },
+    );
+  }
+
+  Widget _buildSiteOverlayPicker(AppLocalizations l) => _buildOverlayPicker(
+    target: _siteOverlayTarget,
+    overlay: _siteOverlay,
+    l: l,
+    isSitePlan: true,
+    addKey: const ValueKey('architect-wizard-site-overlay-add'),
+    removeKey: const ValueKey('architect-wizard-site-overlay-remove'),
+    addLabel: l.architectWizardAddSiteOverlay,
+    onRemove: () {
+      final old = _siteOverlay;
+      setState(() => _siteOverlay = null);
+      if (old != null) unawaited(old.prepared.dispose());
+    },
+  );
+
+  Widget _buildOverlayPicker({
+    required Object target,
+    required ArchitectCadImportSelection? overlay,
+    required AppLocalizations l,
+    required bool isSitePlan,
+    required Key addKey,
+    required Key removeKey,
+    required String addLabel,
+    required VoidCallback onRemove,
+  }) {
     final colors = Theme.of(context).colorScheme;
+    final isLoading = _loadingTarget == target;
     final VoidCallback? pick = _isPickingOverlay
         ? null
-        : () => _pickStoreyUnderlay(level);
+        : () => _pickUnderlay(target: target, isSitePlan: isSitePlan);
+    if (isLoading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _loadingStatus ?? l.architectWizardLoadingUnderlay,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final Widget leadingIcon = isSitePlan
+        ? const Icon(Icons.terrain_outlined, size: 16)
+        : const AppIcon(AppIconId.cadUnderlay, size: 16);
     if (overlay == null) {
       return Align(
         alignment: AlignmentDirectional.centerStart,
         child: OutlinedButton.icon(
-          key: ValueKey('architect-wizard-overlay-add-$index'),
+          key: addKey,
           onPressed: pick,
-          icon: const AppIcon(AppIconId.cadUnderlay, size: 16),
-          label: Text(l.architectWizardAddOverlay),
+          icon: leadingIcon,
+          label: Text(addLabel),
         ),
       );
     }
@@ -815,7 +1077,7 @@ class _ArchitectProjectWizardDialogState
       ),
       child: Row(
         children: [
-          const AppIcon(AppIconId.cadUnderlay, size: 16),
+          leadingIcon,
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -830,15 +1092,10 @@ class _ArchitectProjectWizardDialogState
             icon: const AppIcon(AppIconId.edit, size: 16),
           ),
           IconButton(
-            key: ValueKey('architect-wizard-overlay-remove-$index'),
+            key: removeKey,
             tooltip: l.architectWizardRemoveOverlay,
             icon: const AppIcon(AppIconId.close, size: 16),
-            onPressed: _isPickingOverlay
-                ? null
-                : () {
-                    setState(() => level.overlay = null);
-                    unawaited(overlay.prepared.dispose());
-                  },
+            onPressed: _isPickingOverlay ? null : onRemove,
           ),
         ],
       ),

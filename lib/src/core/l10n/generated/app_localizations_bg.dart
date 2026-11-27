@@ -14332,4 +14332,10 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get appInfoOfflinePrivateNotice =>
       'Без облачни зависимости • 100% офлайн и поверително';
+
+  @override
+  String get architectWizardSiteUnderlay => 'Ситуационна подложка (Геодезист)';
+
+  @override
+  String get architectWizardAddSiteOverlay => 'Добави геодезическа подложка';
 }

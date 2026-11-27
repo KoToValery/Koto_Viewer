@@ -25913,6 +25913,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No cloud dependencies • 100% Offline & Private'**
   String get appInfoOfflinePrivateNotice;
+
+  /// Section title in architect wizard for attaching a geodetic survey underlay to the Site Plan
+  ///
+  /// In en, this message translates to:
+  /// **'Site plan underlay (Surveyor)'**
+  String get architectWizardSiteUnderlay;
+
+  /// Button in architect wizard to attach a geodetic CAD underlay for the Site Plan
+  ///
+  /// In en, this message translates to:
+  /// **'Add geodetic underlay'**
+  String get architectWizardAddSiteOverlay;
 }
 
 class _AppLocalizationsDelegate

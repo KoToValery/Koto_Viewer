@@ -357,6 +357,7 @@ class ArchitectUnderlayService {
           projectId: projectId,
           storeyId: entry.key,
           selection: entry.value,
+          isSitePlan: entry.value.kind == ArchitectUnderlayKind.geodetic,
         );
         configs[entry.key] = imported.config;
       }

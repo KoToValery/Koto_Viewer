@@ -7910,5 +7910,13 @@
   "appInfoOfflinePrivateNotice": "No cloud dependencies • 100% Offline & Private",
   "@appInfoOfflinePrivateNotice": {
     "description": "Offline privacy statement in App Info dialog"
+  },
+  "architectWizardSiteUnderlay": "Site plan underlay (Surveyor)",
+  "@architectWizardSiteUnderlay": {
+    "description": "Section title in architect wizard for attaching a geodetic survey underlay to the Site Plan"
+  },
+  "architectWizardAddSiteOverlay": "Add geodetic underlay",
+  "@architectWizardAddSiteOverlay": {
+    "description": "Button in architect wizard to attach a geodetic CAD underlay for the Site Plan"
   }
 }

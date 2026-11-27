@@ -14284,4 +14284,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get appInfoOfflinePrivateNotice =>
       'No cloud dependencies • 100% Offline & Private';
+
+  @override
+  String get architectWizardSiteUnderlay => 'Site plan underlay (Surveyor)';
+
+  @override
+  String get architectWizardAddSiteOverlay => 'Add geodetic underlay';
 }
