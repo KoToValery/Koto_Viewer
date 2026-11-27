@@ -25,6 +25,7 @@ class BimCoordinateFrame {
   Offset _cadDelta(Offset model) =>
       _orient(BimTransform2D.rotate(model, Offset.zero, -rotationRadians)) *
       unitsPerMeter;
+  Offset toCadDelta(Offset model) => _cadDelta(model);
   Offset toCad(Offset model) => origin + _cadDelta(model);
 
   BimCoordinateFrame placing(Offset cad, Offset model) => BimCoordinateFrame(

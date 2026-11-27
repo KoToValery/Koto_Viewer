@@ -5,15 +5,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations_en.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
-import 'package:kotoview/src/features/architect/models/architect_site_parcel.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart'
+    show ArchitectTool;
 import 'package:kotoview/src/features/architect/rendering/architect_vector_scene.dart';
+import 'package:kotoview/src/features/architect/services/architect_chamfer_fillet.dart';
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 import 'package:kotoview/src/features/architect/services/architect_drawing_publisher.dart';
 import 'package:kotoview/src/features/architect/services/architect_dxf_export.dart';
+import 'package:kotoview/src/features/architect/services/architect_element_tool.dart';
 import 'package:kotoview/src/features/architect/services/architect_pdf_export.dart';
+import 'package:kotoview/src/features/architect/services/architect_rotation.dart';
 import 'package:kotoview/src/features/architect/services/architect_site_orientation.dart';
 import 'package:kotoview/src/features/architect/services/architect_site_underlay_pick.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_tool_palette.dart';
 import 'package:kotoview/src/features/bim_editing/geometry/bim_coordinate_frame.dart';
 import 'package:kotoview/src/features/bim_editing/interaction/bim_pointer_interaction.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
@@ -417,14 +422,14 @@ void main() {
           .fit(const Rect.fromLTWH(-2, -2, 14, 12), padding: 62);
       await tester.pumpAndSettle();
 
-      Future<void> menu(String label) async {
-        await tester.tap(find.byKey(const ValueKey('architect-site-menu')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text(label).last);
+      Future<void> siteAction(String name) async {
+        final button = find.byKey(ValueKey('architect-site-action-$name'));
+        await tester.ensureVisible(button);
+        await tester.tap(button);
         await tester.pumpAndSettle();
       }
 
-      await menu('Parcel');
+      await siteAction('parcel');
       final aim = workspace.screen(tester, Offset.zero);
       final hold = await tester.startGesture(
         aim + const Offset(0, BimPointerInteraction.touchClearancePx),
@@ -444,7 +449,7 @@ void main() {
         controller.project.siteStorey!.siteParcel!.area,
         closeTo(80, 1e-7),
       );
-      await menu('Setback line');
+      await siteAction('setback');
       await tester.tapAt(workspace.screen(tester, const Offset(5, 0)));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -473,6 +478,390 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Cancel').last);
       await tester.pumpAndSettle();
       expect(workspace.overlay(tester).siteSetbackPreview, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'drawn site parcel supports standard move, polygon edit, point insertion, rotation, mirror, and deletion',
+    () {
+      final parcel = ArchitectSiteParcel(
+        _rectangle,
+        setbacks: const {1: 2.0, 3: 3.0},
+      );
+      final initial = _project(parcel: parcel);
+      final siteId = initial.siteStorey!.id;
+      final controller = ArchitectCommandController(initial);
+      addTearDown(controller.dispose);
+
+      // 1. Move
+      controller.commit(
+        MoveArchitectElement(
+          storeyId: siteId,
+          elementId: ArchitectSiteParcel.elementId,
+          delta: const Offset(2, 1),
+        ).apply(controller.project),
+      );
+      expect(
+        controller.project.siteStorey!.siteParcel!.vertices.first,
+        const Offset(2, 1),
+      );
+
+      // 2. Insert point on edge 0 -> setbacks >= 1 shift by +1
+      final locate = InsertArchitectElementPoint.locate(
+        controller.project.siteStorey!,
+        ArchitectSiteParcel.elementId,
+        const Offset(7, 1),
+      )!;
+      expect(locate.edge, 0);
+      controller.commit(
+        InsertArchitectElementPoint(
+          storeyId: siteId,
+          elementId: ArchitectSiteParcel.elementId,
+          point: locate.point,
+          newElementId: 'unused',
+        ).apply(controller.project),
+      );
+      expect(controller.project.siteStorey!.siteParcel!.vertices.length, 5);
+      expect(
+        controller.project.siteStorey!.siteParcel!.setbacks,
+        const {2: 2.0, 4: 3.0},
+      );
+
+      // 3. Update polygon directly
+      const resized = [
+        Offset.zero,
+        Offset(12, 0),
+        Offset(12, 8),
+        Offset(0, 8),
+      ];
+      controller.commit(
+        UpdateArchitectPolygon(
+          storeyId: siteId,
+          elementId: ArchitectSiteParcel.elementId,
+          polygon: resized,
+        ).apply(controller.project),
+      );
+      expect(controller.project.siteStorey!.siteParcel!.area, closeTo(96, 1e-7));
+
+      // 4. Rotation & Mirror & Delete
+      final rotated = ArchitectRotation.apply(
+        controller.project.siteStorey!,
+        {ArchitectSiteParcel.elementId},
+        Offset.zero,
+        math.pi / 2,
+      );
+      expect(rotated.siteParcel!.vertices[1].dy, closeTo(12, 1e-7));
+
+      final tool = ArchitectElementTool();
+      final (mirrored, mirroredId) = tool.mirrorElementById(
+        controller.project.siteStorey!,
+        ArchitectSiteParcel.elementId,
+        origin: Offset.zero,
+        direction: const Offset(0, 1),
+      );
+      expect(mirroredId, ArchitectSiteParcel.elementId);
+      expect(mirrored.siteParcel!.vertices[1].dx, closeTo(-12, 1e-7));
+
+      final cleared = tool.deleteElementById(
+        controller.project.siteStorey!,
+        ArchitectSiteParcel.elementId,
+      );
+      expect(cleared.siteParcel, isNull);
+    },
+  );
+
+  testWidgets(
+    'site plan bottom quick bar exposes all commands and tapping drawn parcel selects it for standard editing and properties',
+    (tester) async {
+      final parcel = ArchitectSiteParcel(_rectangle);
+      final controller = ArchitectCommandController(_project(parcel: parcel));
+      addTearDown(controller.dispose);
+      await workspace.open(tester, controller);
+      await tester.pumpAndSettle();
+      workspace
+          .camera(tester)
+          .fit(const Rect.fromLTWH(-2, -2, 14, 12), padding: 62);
+      await tester.pumpAndSettle();
+
+      // Quick bar exposes all 7 site plan commands directly at the bottom.
+      expect(
+        find.byKey(const ValueKey('architect-site-quick-bar')),
+        findsOneWidget,
+      );
+      for (final action in [
+        'underlay',
+        'align',
+        'cadVisibility',
+        'parcel',
+        'setback',
+        'terrain',
+        'contours',
+      ]) {
+        expect(
+          find.byKey(ValueKey('architect-site-action-$action')),
+          findsOneWidget,
+        );
+      }
+
+      // Tapping the drawn parcel boundary selects site_parcel and opens standard editing controls.
+      await tester.tapAt(workspace.screen(tester, const Offset(5, 0)));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('architect-selection-delete')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('architect-selection-new-point')),
+        findsOneWidget,
+      );
+
+      // Standard deletion removes siteParcel and undo restores it.
+      await tester.tap(
+        find.byKey(const ValueKey('architect-selection-delete')),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.project.siteStorey!.siteParcel, isNull);
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.project.siteStorey!.siteParcel, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'editing parcel vertices, chamfer/fillet, or collapsing vertices updates connected setbacks cleanly',
+    () {
+      // 1. Moving edge outward recalculates setback segment to follow the moved side.
+      final parcel = ArchitectSiteParcel(_rectangle, setbacks: const {0: 2.0});
+      final expanded = parcel.withVertices(const [
+        Offset.zero,
+        Offset(10, 0),
+        Offset(10, 10),
+        Offset(0, 10),
+      ]);
+      expect(expanded.setbacks, const {0: 2.0});
+      expect(
+        hasSegment(
+          expanded.trimmedSetbacks,
+          const Offset(0, 2),
+          const Offset(10, 2),
+        ),
+        isTrue,
+      );
+
+      // Moving top edge down to y=2 shifts its connected setback from y=2 to y=4.
+      final slopedOrShifted = parcel.withVertices(const [
+        Offset(0, 2),
+        Offset(10, 2),
+        Offset(10, 8),
+        Offset(0, 8),
+      ]);
+      expect(
+        hasSegment(
+          slopedOrShifted.trimmedSetbacks,
+          const Offset(0, 4),
+          const Offset(10, 4),
+        ),
+        isTrue,
+      );
+
+      // 2. Chamfer corner 1 keeps setbacks on original surviving edges 0 -> 0, 1 -> 2, 2 -> 3.
+      final withThree = ArchitectSiteParcel(
+        _rectangle,
+        setbacks: const {0: 2.0, 1: 2.0, 2: 3.0},
+      );
+      final chamfered = ArchitectChamferFillet.polygonChamfer(
+        withThree.vertices,
+        vertexIndex: 1,
+        distance: 1.0,
+        isClosed: true,
+      );
+      final afterChamfer = withThree.withVertices(chamfered);
+      expect(afterChamfer.vertices, hasLength(5));
+      expect(afterChamfer.setbacks, const {0: 2.0, 2: 2.0, 3: 3.0});
+      expect(afterChamfer.trimmedSetbacks, isNotEmpty);
+
+      // 3. Fillet corner 1 with 4 segments keeps setbacks on surviving edges.
+      final filleted = ArchitectChamferFillet.polygonFillet(
+        withThree.vertices,
+        vertexIndex: 1,
+        radius: 1.0,
+        segments: 4,
+        isClosed: true,
+      );
+      final afterFillet = withThree.withVertices(filleted);
+      expect(afterFillet.setbacks[0], 2.0);
+      expect(afterFillet.setbacks[afterFillet.vertices.length - 3], 2.0);
+      expect(afterFillet.setbacks[afterFillet.vertices.length - 2], 3.0);
+      expect(afterFillet.trimmedSetbacks, isNotEmpty);
+
+      // 4. Collapsing a vertex in a 5-gon preserves setbacks on remaining sides.
+      const pentagon = [
+        Offset.zero,
+        Offset(5, 0),
+        Offset(10, 0),
+        Offset(10, 8),
+        Offset(0, 8),
+      ];
+      final pentaParcel = ArchitectSiteParcel(
+        pentagon,
+        setbacks: const {0: 2.0, 3: 1.5, 4: 1.0},
+      );
+      final collapsed = pentaParcel.withVertices(_rectangle);
+      expect(collapsed.setbacks, const {0: 2.0, 2: 1.5, 3: 1.0});
+    },
+  );
+
+  testWidgets(
+    'moving CAD or raster underlay on site plan moves parcel and setback lines together with undo',
+    (tester) async {
+      final starter = ArchitectProject.starterWithCatalog(
+        name: 'UnderlaySync',
+        storeyCount: 1,
+      );
+      final site = starter.siteStorey!.id;
+      final initialParcel = ArchitectSiteParcel(
+        _rectangle,
+        setbacks: const {0: 2.0, 1: 1.5},
+      );
+      final doc = DxfDocument(
+        layers: {'0': DxfLayer(name: '0')},
+        blocks: const {},
+        entities: const [
+          DxfLine(p1: Offset(0, 0), p2: Offset(10, 0)),
+          DxfLine(p1: Offset(10, 0), p2: Offset(10, 8)),
+          DxfLine(p1: Offset(10, 8), p2: Offset(0, 8)),
+          DxfLine(p1: Offset(0, 8), p2: Offset(0, 0)),
+        ],
+        headerVars: const {},
+        bounds: const Rect.fromLTWH(0, 0, 10, 8),
+        entityStats: const {},
+      );
+      final raster = ArchitectRasterUnderlay(
+        id: 'raster-site',
+        storeyId: site,
+        fileName: 'scan.png',
+        internalImagePath: '',
+        position: Offset.zero,
+        metersPerPixel: 0.01,
+        imageWidthPx: 1000,
+        imageHeightPx: 800,
+      );
+      var project = starter
+          .copyWith(activeStoreyId: site, rasterUnderlays: [raster])
+          .withCadUnderlayAdded(
+            ArchitectCadUnderlayConfig(
+              id: 'cad-site',
+              storeyId: site,
+              fileName: 'survey.dxf',
+              internalCopyPath: '',
+              unitsPerMeter: 1.0,
+              lockedCadOriginX: 0,
+              lockedCadOriginY: 0,
+              lockOrigin: true,
+            ),
+          );
+      project = project.updateStorey(
+        project.siteStorey!.copyWith(siteParcel: initialParcel),
+      );
+      final controller = ArchitectCommandController(project);
+      addTearDown(controller.dispose);
+
+      await workspace.open(tester, controller, underlays: {site: doc});
+      await tester.pumpAndSettle();
+      workspace
+          .camera(tester)
+          .fit(const Rect.fromLTWH(-2, -2, 16, 14), padding: 62);
+      await tester.pumpAndSettle();
+
+      // 1. Select CAD underlay (tap inside its bounds) and drag its central handle by (2, 1).
+      tester
+          .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
+          .onToolChanged(ArchitectTool.cadUnderlay);
+      await tester.pumpAndSettle();
+      await tester.tapAt(workspace.screen(tester, const Offset(5, 4)));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('architect-underlay-crop')),
+        findsOneWidget,
+      );
+
+      final cadDrag = await tester.startGesture(
+        workspace.screen(tester, const Offset(5, 4)),
+      );
+      await cadDrag.moveTo(workspace.screen(tester, const Offset(7, 5)));
+      await tester.pump();
+      await cadDrag.up();
+      await tester.pumpAndSettle();
+
+      final movedAfterCad = controller.project.siteStorey!.siteParcel!;
+      expect(movedAfterCad.vertices.first.dx, closeTo(2, 0.15));
+      expect(movedAfterCad.vertices.first.dy, closeTo(1, 0.15));
+      expect(
+        movedAfterCad.trimmedSetbacks.any(
+          (seg) =>
+              (seg.$1.dy - (movedAfterCad.vertices.first.dy + 2)).abs() < 0.05 &&
+              (seg.$2.dy - (movedAfterCad.vertices.first.dy + 2)).abs() < 0.05,
+        ),
+        isTrue,
+      );
+
+      // Undo restores both CAD underlay and parcel + setbacks atomically.
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(
+        controller.project.siteStorey!.siteParcel!.vertices.first,
+        Offset.zero,
+      );
+
+      // 2. Select Raster underlay (tap inside its bounds) and drag it by (3, 2).
+      tester
+          .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
+          .onToolChanged(ArchitectTool.rasterUnderlay);
+      await tester.pumpAndSettle();
+      await tester.tapAt(workspace.screen(tester, const Offset(5, 4)));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('architect-underlay-crop')),
+        findsOneWidget,
+      );
+      final rasterDrag = await tester.startGesture(
+        workspace.screen(tester, const Offset(5, 4)),
+      );
+      await rasterDrag.moveTo(workspace.screen(tester, const Offset(8, 6)));
+      await tester.pump();
+      await rasterDrag.up();
+      await tester.pumpAndSettle();
+
+      final movedRaster = controller.project.rasterUnderlays.single;
+      expect(movedRaster.position.dx, closeTo(3, 0.15));
+      expect(movedRaster.position.dy, closeTo(2, 0.15));
+      final movedAfterRaster = controller.project.siteStorey!.siteParcel!;
+      expect(
+        movedAfterRaster.vertices.first.dx,
+        closeTo(movedRaster.position.dx, 1e-6),
+      );
+      expect(
+        movedAfterRaster.vertices.first.dy,
+        closeTo(movedRaster.position.dy, 1e-6),
+      );
+      expect(
+        movedAfterRaster.trimmedSetbacks.any(
+          (seg) =>
+              (seg.$1.dy - (movedAfterRaster.vertices.first.dy + 2)).abs() <
+              1e-6,
+        ),
+        isTrue,
+      );
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(
+        controller.project.siteStorey!.siteParcel!.vertices.first,
+        Offset.zero,
+      );
       expect(tester.takeException(), isNull);
     },
   );

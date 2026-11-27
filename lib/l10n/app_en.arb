@@ -7494,6 +7494,14 @@
   },
   "architectExportDwgViews": "DWG drawings",
   "architectExportDwgSheets": "DWG sheets",
+  "architectExportGeodetic": "Geodetic coordinates",
+  "@architectExportGeodetic": {
+    "description": "Toggle in DXF/DWG export dialog to export plans in the original geodetic or survey CAD coordinate system"
+  },
+  "architectExportGeodeticHint": "Export plans at the original survey position for CAD/geodesy import",
+  "@architectExportGeodeticHint": {
+    "description": "Subtitle explaining the geodetic coordinates toggle in the DXF/DWG export dialog"
+  },
   "bimProjectExportStoreyDwg": "Storey (DWG)",
   "exportStructuralDwg": "Storey (DWG)",
   "exportStructuralDwgHint": "Columns, walls, beams, slabs and axes",

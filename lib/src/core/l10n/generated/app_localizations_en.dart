@@ -13616,6 +13616,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectExportDwgSheets => 'DWG sheets';
 
   @override
+  String get architectExportGeodetic => 'Geodetic coordinates';
+
+  @override
+  String get architectExportGeodeticHint =>
+      'Export plans at the original survey position for CAD/geodesy import';
+
+  @override
   String get bimProjectExportStoreyDwg => 'Storey (DWG)';
 
   @override

@@ -13665,6 +13665,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectExportDwgSheets => 'DWG листове';
 
   @override
+  String get architectExportGeodetic => 'Геодезически координати';
+
+  @override
+  String get architectExportGeodeticHint =>
+      'Експортира плановете в оригиналните координати на геодезическата подложка';
+
+  @override
   String get bimProjectExportStoreyDwg => 'Етаж (DWG)';
 
   @override

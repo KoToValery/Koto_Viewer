@@ -379,6 +379,12 @@ class ArchitectSelection {
         return path..addPolygon([...left, ...right.reversed], true);
       }
     }
+    if (s.isSite &&
+        id == ArchitectSiteParcel.elementId &&
+        s.siteParcel != null &&
+        s.siteParcel!.vertices.length >= 3) {
+      return path..addPolygon(s.siteParcel!.vertices, true);
+    }
     for (final surface in [project.existingTerrain, project.proposedTerrain]) {
       for (final b in surface.boundaries) {
         if (b.id == id && b.polygon.length >= 3) {

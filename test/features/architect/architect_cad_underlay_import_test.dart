@@ -401,9 +401,9 @@ void main() {
       home: ArchitectWorkspaceScreen(commandController: model),
     ));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('architect-site-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(l.architectSiteUnderlay));
+    final underlayBtn = find.byKey(const ValueKey('architect-site-action-underlay'));
+    await tester.ensureVisible(underlayBtn);
+    await tester.tap(underlayBtn);
     await _pumpUntil(tester, () =>
       find.byKey(const ValueKey('architect-cad-import-size')).evaluate().isNotEmpty);
     await tester.pumpAndSettle();

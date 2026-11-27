@@ -1345,6 +1345,11 @@ class MoveArchitectElement extends ArchitectModelCommand {
               ? e.copyWith(points: [for (final p in e.points) p + delta])
               : e,
       ],
+      siteParcel: s.isSite &&
+              s.siteParcel != null &&
+              matches(ArchitectSiteParcel.elementId)
+          ? s.siteParcel!.transformed((p) => p + delta)
+          : s.siteParcel,
     );
     ArchitectTerrainSurface translateTerrain(ArchitectTerrainSurface surf) {
       final expanded = surf.expandMemberIds({elementId});
@@ -1378,6 +1383,9 @@ class MoveArchitectElement extends ArchitectModelCommand {
     ];
     final foundAny =
         found ||
+        (s.isSite &&
+            s.siteParcel != null &&
+            matches(ArchitectSiteParcel.elementId)) ||
         project.sections.any((s) => matches(s.id)) ||
         project.elevations.any((el) => matches(el.id));
     if (!foundAny) throw ArgumentError('Unknown movable element: $elementId');
@@ -2573,6 +2581,21 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
   ArchitectProject apply(ArchitectProject project) {
     final floor = ArchitectModelCommand.storey(project, storeyId);
 
+    if (floor.isSite &&
+        elementId == ArchitectSiteParcel.elementId &&
+        floor.siteParcel != null) {
+      final clean = ArchitectPolygonGeometry.clean(this.polygon);
+      if (!ArchitectPolygonGeometry.valid(clean)) {
+        throw ArgumentError('Invalid parcel contour');
+      }
+      return ArchitectModelCommand.replace(
+        project,
+        floor.copyWith(
+          siteParcel: floor.siteParcel!.withVertices(List.unmodifiable(clean)),
+        ),
+      );
+    }
+
     // 0. Landscape elements: Pathways, Streets, Site Fences, Hedges, Terrain Boundaries & Contours
     final pathway = floor.pathways.where((p) => p.id == elementId).firstOrNull;
     if (pathway != null) {
@@ -3074,6 +3097,12 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
         return (points: [d.lineStart, d.lineEnd], closed: false, width: 0);
       }
     }
+    if (storey.isSite &&
+        id == ArchitectSiteParcel.elementId &&
+        storey.siteParcel != null &&
+        storey.siteParcel!.vertices.length >= 3) {
+      return (points: storey.siteParcel!.vertices, closed: true, width: 0);
+    }
     if (project != null && storey.isSite) {
       for (final surface in [project.proposedTerrain, project.existingTerrain]) {
         for (final b in surface.boundaries) {
@@ -3113,6 +3142,19 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
       throw ArgumentError('Point already exists or segment is too short');
     }
     if (path.closed) {
+      if (storey.isSite &&
+          elementId == ArchitectSiteParcel.elementId &&
+          storey.siteParcel != null) {
+        return ArchitectModelCommand.replace(
+          project,
+          storey.copyWith(
+            siteParcel: storey.siteParcel!.withInsertedVertex(
+              hit.edge,
+              insertion,
+            ),
+          ),
+        );
+      }
       final points = List<Offset>.of(path.points)
         ..insert(hit.edge + 1, insertion);
       final updated = UpdateArchitectPolygon(

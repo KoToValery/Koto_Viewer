@@ -15,6 +15,7 @@ abstract final class ArchitectDwgExport {
     List<ArchitectSavedDrawing> drawings,
     AppLocalizations l, {
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+    bool geodeticCoordinates = false,
     void Function(double)? onProgress,
     bool Function()? isCancelled,
   }) async => _encode(
@@ -23,6 +24,7 @@ abstract final class ArchitectDwgExport {
       drawings,
       l,
       sources: sources,
+      geodeticCoordinates: geodeticCoordinates,
       onProgress: (p) => onProgress?.call(p * .7),
       isCancelled: isCancelled,
     ),
@@ -35,6 +37,7 @@ abstract final class ArchitectDwgExport {
     List<ArchitectSheet> sheets,
     AppLocalizations l, {
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+    bool geodeticCoordinates = false,
     void Function(double)? onProgress,
     bool Function()? isCancelled,
   }) async => _encode(
@@ -43,6 +46,7 @@ abstract final class ArchitectDwgExport {
       sheets,
       l,
       sources: sources,
+      geodeticCoordinates: geodeticCoordinates,
       onProgress: (p) => onProgress?.call(p * .7),
       isCancelled: isCancelled,
     ),

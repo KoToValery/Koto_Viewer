@@ -11,6 +11,8 @@ typedef ArchitectSiteSegment = (Offset, Offset);
 /// A single project parcel. Vertex order is retained so a setback stays
 /// attached to its boundary side when vertices move or the site rotates.
 class ArchitectSiteParcel {
+  static const String elementId = 'site_parcel';
+
   final List<Offset> vertices;
   final Map<int, double> setbacks;
   late final List<ArchitectSiteSegment> trimmedSetbacks = List.unmodifiable(
@@ -35,6 +37,108 @@ class ArchitectSiteParcel {
           ..remove(index)
           ..addAll({index: ?distance}),
       );
+
+  ArchitectSiteParcel withVertices(List<Offset> nextVertices) =>
+      ArchitectSiteParcel(
+        nextVertices,
+        setbacks: nextVertices.length == vertices.length || setbacks.isEmpty
+            ? {
+                for (final e in setbacks.entries)
+                  if (e.key >= 0 && e.key < nextVertices.length) e.key: e.value,
+              }
+            : _remapSetbacks(nextVertices),
+      );
+
+  Map<int, double> _remapSetbacks(List<Offset> nextVertices) {
+    final n = vertices.length;
+    final m = nextVertices.length;
+    if (n < 3 || m < 3 || setbacks.isEmpty) return const {};
+    const eps = 1e-4;
+    final remapped = <int, double>{};
+    final matchedOld = <int>{};
+    final matchedNew = <int>{};
+
+    // Pass 1: Match each new segment that lies collinearly along an original
+    // side in the same direction (covers chamfer, fillet, and straight cleans).
+    for (var j = 0; j < m; j++) {
+      final p = nextVertices[j];
+      final q = nextVertices[(j + 1) % m];
+      final newVec = q - p;
+      final newLen = newVec.distance;
+      if (newLen < 1e-8) continue;
+      final newDir = newVec / newLen;
+      var bestOld = -1;
+      var bestErr = double.infinity;
+      for (var i = 0; i < n; i++) {
+        final a = vertices[i];
+        final b = vertices[(i + 1) % n];
+        final oldVec = b - a;
+        final oldLen = oldVec.distance;
+        if (oldLen < 1e-8) continue;
+        final oldDir = oldVec / oldLen;
+        if (BimLineGeometry.dot(newDir, oldDir) <= 0.999) continue;
+        final pPerp = BimLineGeometry.cross(oldDir, p - a).abs();
+        final qPerp = BimLineGeometry.cross(oldDir, q - a).abs();
+        if (pPerp > eps || qPerp > eps) continue;
+        final tp = BimLineGeometry.dot(p - a, oldDir) / oldLen;
+        final tq = BimLineGeometry.dot(q - a, oldDir) / oldLen;
+        if (tp < -eps || tq > 1 + eps || tp > tq + eps) continue;
+        final err = pPerp + qPerp;
+        if (err < bestErr) {
+          bestErr = err;
+          bestOld = i;
+        }
+      }
+      if (bestOld != -1) {
+        matchedOld.add(bestOld);
+        matchedNew.add(j);
+        final dist = setbacks[bestOld];
+        if (dist != null) remapped[j] = dist;
+      }
+    }
+
+    // Pass 2: When vertices were merged/removed (m < n), recover unmatched
+    // edges that shrunk or pivoted because an adjacent vertex collapsed.
+    if (m < n) {
+      for (var j = 0; j < m; j++) {
+        if (matchedNew.contains(j)) continue;
+        final p = nextVertices[j];
+        final q = nextVertices[(j + 1) % m];
+        for (final e in setbacks.entries) {
+          final i = e.key;
+          if (i < 0 || i >= n || matchedOld.contains(i)) continue;
+          final a = vertices[i];
+          final b = vertices[(i + 1) % n];
+          final startSame = (a - p).distance < eps;
+          final endSame = (b - q).distance < eps;
+          if (startSame || endSame) {
+            matchedOld.add(i);
+            matchedNew.add(j);
+            remapped[j] = e.value;
+            break;
+          }
+        }
+      }
+    }
+    return remapped;
+  }
+
+  ArchitectSiteParcel withInsertedVertex(int edge, Offset point) {
+    final nextVertices = List<Offset>.of(vertices)..insert(edge + 1, point);
+    final nextSetbacks = <int, double>{};
+    for (final e in setbacks.entries) {
+      if (e.key < 0 || e.key >= vertices.length) continue;
+      if (e.key == edge) {
+        nextSetbacks[edge] = e.value;
+        nextSetbacks[edge + 1] = e.value;
+      } else if (e.key > edge) {
+        nextSetbacks[e.key + 1] = e.value;
+      } else {
+        nextSetbacks[e.key] = e.value;
+      }
+    }
+    return ArchitectSiteParcel(nextVertices, setbacks: nextSetbacks);
+  }
 
   ArchitectSiteParcel transformed(Offset Function(Offset) turn) =>
       ArchitectSiteParcel(vertices.map(turn).toList(), setbacks: setbacks);
@@ -88,9 +192,9 @@ class ArchitectSiteParcel {
   /// The intervals inside the parcel that overlap the selected side's span.
   /// Clipping works with either winding and with non-convex boundaries.
   List<ArchitectSiteSegment> setbackSegments(int index, double distance) {
-    if (!distance.isFinite || distance <= 0) return [];
     final (a, b) = side(index);
     final length = (b - a).distance;
+    if (!distance.isFinite || distance <= 0 || length < 1e-8) return [];
     final direction = (b - a) / length;
     final normal = -BimPolygonGeometry.normal(vertices, index);
     final start = a + normal * distance;
@@ -170,9 +274,10 @@ class ArchitectSiteParcel {
     final fronts = <(Offset, Offset)>[];
     for (final index in active.keys) {
       final (a, b) = side(index);
+      final length = (b - a).distance;
+      if (length < 1e-8) continue;
       final shiftVector = shift(index);
       final start = a + shiftVector, end = b + shiftVector;
-      final length = (b - a).distance;
       final along = (b - a) / length;
       var minimum = 0.0, maximum = length;
       for (final vertex in vertices) {

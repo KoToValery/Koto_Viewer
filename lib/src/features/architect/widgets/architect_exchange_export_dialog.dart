@@ -69,12 +69,19 @@ class _ExchangeExportState extends State<ArchitectExchangeExportDialog> {
       ...widget.project.document.sheets.map((s) => s.id),
   };
   ArchitectIfcSchema schema = ArchitectIfcSchema.ifc2x3;
+  bool geodeticCoordinates = false;
   bool busy = false, cancelled = false;
   double progress = 0;
   String? error;
   bool get isViews =>
       widget.format == ArchitectExchangeFormat.dxfViews ||
       widget.format == ArchitectExchangeFormat.dwgViews;
+  bool get canUseGeodetic =>
+      widget.format != ArchitectExchangeFormat.ifc &&
+      ArchitectDxfExport.supportsGeodeticExport(
+        widget.project,
+        sources: widget.sources,
+      );
 
   String title(AppLocalizations l) => switch (widget.format) {
     ArchitectExchangeFormat.dxfViews => l.architectExportDxfViews,
@@ -129,6 +136,7 @@ class _ExchangeExportState extends State<ArchitectExchangeExportDialog> {
             drawings.where((d) => chosen.contains(d.id)).toList(),
             l,
             sources: widget.sources,
+            geodeticCoordinates: geodeticCoordinates && canUseGeodetic,
             onProgress: updateProgress,
             isCancelled: () => isCancelled,
           );
@@ -153,6 +161,7 @@ class _ExchangeExportState extends State<ArchitectExchangeExportDialog> {
             sheets,
             l,
             sources: widget.sources,
+            geodeticCoordinates: geodeticCoordinates && canUseGeodetic,
             onProgress: updateProgress,
             isCancelled: () => isCancelled,
           );
@@ -321,6 +330,21 @@ class _ExchangeExportState extends State<ArchitectExchangeExportDialog> {
                           }
                         }),
                       ),
+                  if (!busy && canUseGeodetic) ...[
+                    const Divider(height: 8),
+                    CheckboxListTile(
+                      key: const ValueKey('architect-export-geodetic'),
+                      title: Text(l.architectExportGeodetic),
+                      subtitle: Text(
+                        l.architectExportGeodeticHint,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      value: geodeticCoordinates,
+                      onChanged: (value) => setState(
+                        () => geodeticCoordinates = value ?? false,
+                      ),
+                    ),
+                  ],
                   if (!busy && !isIfc && chosen.isEmpty)
                     Text(l.architectSheetNoViews),
                   if (error != null)

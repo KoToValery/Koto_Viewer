@@ -37,6 +37,7 @@ export 'architect_component.dart';
 export 'architect_decorative_element.dart';
 export 'architect_underlay_models.dart';
 export 'architect_landscape_models.dart';
+export 'architect_site_parcel.dart';
 
 typedef ArchitectUnit = BimDistanceUnit;
 
@@ -100,6 +101,7 @@ class ArchitectStorey {
     ...vegetation.map((e) => e.id),
     ...siteFences.map((e) => e.id),
     ...streets.map((e) => e.id),
+    if (isSite && siteParcel != null) ArchitectSiteParcel.elementId,
     ...zones.where((e) => !e.isAutoBoundary).map((e) => e.id),
   };
   List<ArchitectElementGroup> get groups => _groups.isEmpty
@@ -227,6 +229,7 @@ class ArchitectStorey {
     List<ArchitectSiteFence>? siteFences,
     List<ArchitectStreet>? streets,
     ArchitectSiteParcel? siteParcel,
+    bool clearSiteParcel = false,
     Offset? zoneScheduleOrigin,
     bool clearZoneScheduleOrigin = false,
   }) => ArchitectStorey(
@@ -265,7 +268,7 @@ class ArchitectStorey {
     vegetation: vegetation ?? this.vegetation,
     siteFences: siteFences ?? this.siteFences,
     streets: streets ?? this.streets,
-    siteParcel: siteParcel ?? this.siteParcel,
+    siteParcel: clearSiteParcel ? null : (siteParcel ?? this.siteParcel),
     zoneScheduleOrigin: clearZoneScheduleOrigin
         ? null
         : (zoneScheduleOrigin ?? this.zoneScheduleOrigin),

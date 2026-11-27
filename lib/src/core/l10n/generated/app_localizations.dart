@@ -24726,6 +24726,18 @@ abstract class AppLocalizations {
   /// **'DWG sheets'**
   String get architectExportDwgSheets;
 
+  /// Toggle in DXF/DWG export dialog to export plans in the original geodetic or survey CAD coordinate system
+  ///
+  /// In en, this message translates to:
+  /// **'Geodetic coordinates'**
+  String get architectExportGeodetic;
+
+  /// Subtitle explaining the geodetic coordinates toggle in the DXF/DWG export dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Export plans at the original survey position for CAD/geodesy import'**
+  String get architectExportGeodeticHint;
+
   /// No description provided for @bimProjectExportStoreyDwg.
   ///
   /// In en, this message translates to:

@@ -4672,6 +4672,8 @@
   "stairQuickLandingOffset": "Отместване",
   "architectExportDwgViews": "DWG чертежи",
   "architectExportDwgSheets": "DWG листове",
+  "architectExportGeodetic": "Геодезически координати",
+  "architectExportGeodeticHint": "Експортира плановете в оригиналните координати на геодезическата подложка",
   "bimProjectExportStoreyDwg": "Етаж (DWG)",
   "exportStructuralDwg": "Етаж (DWG)",
   "exportStructuralDwgHint": "Колони, стени, греди, плочи и оси",

@@ -176,6 +176,11 @@ class ArchitectRotation {
           else
             e,
       ],
+      siteParcel: s.isSite &&
+              s.siteParcel != null &&
+              ids.contains(ArchitectSiteParcel.elementId)
+          ? s.siteParcel!.transformed(turn)
+          : s.siteParcel,
     );
   }
 }

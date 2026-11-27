@@ -4546,6 +4546,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _cadDragPreview = origCfg.withFrame(nextFrame, fallback: fallback).copyWith(
         maskPolygon: origCfg.maskPolygon?.map((p) => p + delta).toList(),
       );
+      _elementMoveDelta = delta;
+      if (_cadDragSource != null) {
+        final shifted = _withMovedSiteParcel(
+          _cadDragSource!,
+          origCfg.storeyId,
+          delta,
+        );
+        _elementMovePreview = identical(shifted, _cadDragSource!)
+            ? null
+            : shifted;
+      }
       _handleMoved = true;
       _repaintPreview();
       setState(() {});
@@ -4560,6 +4571,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         position: nextPos,
         maskPolygon: _rasterDragOriginal?.maskPolygon?.map((p) => p + delta).toList(),
       );
+      _elementMoveDelta = delta;
+      if (_rasterDragSource != null && _rasterDragOriginal != null) {
+        final shifted = _withMovedSiteParcel(
+          _rasterDragSource!,
+          _rasterDragOriginal!.storeyId,
+          delta,
+        );
+        _elementMovePreview = identical(shifted, _rasterDragSource!)
+            ? null
+            : shifted;
+      }
       _handleMoved = true;
       _repaintPreview();
       setState(() {});
@@ -4571,6 +4593,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final source = _cadDragSource;
       final preview = _cadDragPreview;
       final original = _cadDragOriginalConfig;
+      final delta = _elementMoveDelta ?? Offset.zero;
       final moved = _handleMoved;
       _cancelActiveDrags();
       if (moved &&
@@ -4579,7 +4602,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           identical(source, _project) &&
           (preview.lockedCadOriginX != original.lockedCadOriginX ||
               preview.lockedCadOriginY != original.lockedCadOriginY)) {
-        _commands.commit(_project.withCadUnderlayUpdated(preview));
+        _commands.commit(
+          _withMovedSiteParcel(
+            _project.withCadUnderlayUpdated(preview),
+            preview.storeyId,
+            delta,
+          ),
+        );
         _saveBiMProjectIfAttached();
         HapticFeedback.selectionClick();
       }
@@ -4598,10 +4627,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           original != null &&
           identical(source, _project) &&
           preview.position != original.position) {
-        _commands.commit(_project.copyWith(rasterUnderlays: [
-          for (final r in _project.rasterUnderlays)
-            if (r.id == preview.id) preview else r,
-        ]));
+        final delta = preview.position - original.position;
+        _commands.commit(
+          _withMovedSiteParcel(
+            _project.copyWith(rasterUnderlays: [
+              for (final r in _project.rasterUnderlays)
+                if (r.id == preview.id) preview else r,
+            ]),
+            preview.storeyId,
+            delta,
+          ),
+        );
         _saveBiMProjectIfAttached();
         HapticFeedback.selectionClick();
       }
@@ -6098,9 +6134,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
-  void _startSiteParcel({required bool setbacks}) {
+  void _startSiteParcel({required bool setbacks, bool forceTrace = false}) {
     if (!_commands.isPlan || !_project.activeStorey.isSite ||
         (setbacks && _project.activeStorey.siteParcel == null)) return;
+    if (!setbacks && !forceTrace && _project.activeStorey.siteParcel != null) {
+      _discardGeometryCommand();
+      _cancelActiveDrags();
+      _cancelRasterCalibration();
+      setState(() {
+        _isCadUnderlaySelected = false;
+        _selectedRasterId = null;
+        _selectionIds
+          ..clear()
+          ..add(ArchitectSiteParcel.elementId);
+        _selectedElementId = ArchitectSiteParcel.elementId;
+        _selectedZoneId = null;
+        _touchCandidates = null;
+        _enterPolygonEditing(ArchitectSiteParcel.elementId);
+        _polygonSelectedEdge = null;
+      });
+      HapticFeedback.selectionClick();
+      _repaintPreview();
+      return;
+    }
     _discardGeometryCommand();
     _cancelActiveDrags();
     _cancelRasterCalibration();
@@ -6126,6 +6182,63 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     HapticFeedback.mediumImpact();
     _repaintPreview();
+  }
+
+  void _showSiteParcelProperties(ArchitectSiteParcel parcel) {
+    final l = context.l10n;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l.architectSiteParcel),
+        content: Text(
+          l.architectSiteParcelArea(parcel.area.toStringAsFixed(2)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _startSiteParcel(setbacks: true);
+            },
+            child: Text(l.architectSiteSetback),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _startSiteParcel(setbacks: false, forceTrace: true);
+            },
+            child: Text(l.architectSiteParcelTrace),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _deleteSelection();
+            },
+            child: Text(l.delete),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  ArchitectProject _withMovedSiteParcel(
+    ArchitectProject base,
+    String storeyId,
+    Offset delta,
+  ) {
+    if (delta.distanceSquared <= 1e-16) return base;
+    final target = base.storeys.where((s) => s.id == storeyId).firstOrNull;
+    if (target == null || !target.isSite || target.siteParcel == null) {
+      return base;
+    }
+    return base.updateStorey(
+      target.copyWith(
+        siteParcel: target.siteParcel!.transformed((p) => p + delta),
+      ),
+    );
   }
 
   void _onSiteAction(ArchitectSiteAction action) {
@@ -7759,6 +7872,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     final id = _selectedElementId;
     if (id == null) return null;
+
     for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
       for (final b in surface.boundaries) {
         if (b.id == id) return b;
@@ -7773,6 +7887,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     final id = _selectedElementId;
     if (id == null) return null;
+
     for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
       for (final c in surface.contours) {
         if (c.id == id) return c;
@@ -7787,6 +7902,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     final id = _selectedElementId;
     if (id == null) return null;
+
     for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
       for (final s in surface.spots) {
         if (s.id == id) return s;
@@ -7799,7 +7915,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectedHatch != null ||
       _selectedSlab != null ||
       _selectedCeiling != null ||
-      _selectedTerrainBoundary != null;
+      _selectedTerrainBoundary != null ||
+      (_effectiveSelection.length == 1 &&
+          _project.activeStorey.isSite &&
+          _project.activeStorey.siteParcel != null &&
+          _selectedElementId == ArchitectSiteParcel.elementId);
 
   ArchitectPolygonEdgeMode get _effectivePolygonEdgeMode => _hatchOrSlabSelected
       ? _polygonPull ? ArchitectPolygonEdgeMode.pull
@@ -13541,6 +13661,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     for (final veg in _project.activeStorey.vegetation) {
       if (veg.id == id && veg.isHedge) return veg.points;
+    }
+
+    if (_project.activeStorey.isSite &&
+        id == ArchitectSiteParcel.elementId &&
+        _project.activeStorey.siteParcel != null) {
+      return _project.activeStorey.siteParcel!.vertices;
     }
 
     for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {
@@ -20926,6 +21052,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (storey.isSite) {
+      if (targetId == ArchitectSiteParcel.elementId &&
+          storey.siteParcel != null &&
+          storey.siteParcel!.vertices.length >= 3) {
+        return storey.siteParcel!.vertices;
+      }
       for (final surface in [
         previewProject.proposedTerrain,
         previewProject.existingTerrain,
@@ -23585,6 +23716,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _project.activeStorey.streets.any((s) => _effectiveSelection.contains(s.id)) ||
         _project.activeStorey.siteFences.any((f) => _effectiveSelection.contains(f.id)) ||
         _project.activeStorey.vegetation.any((v) => _effectiveSelection.contains(v.id) && v.isHedge) ||
+        (_project.activeStorey.isSite &&
+            _project.activeStorey.siteParcel != null &&
+            _effectiveSelection.contains(ArchitectSiteParcel.elementId)) ||
         _project.proposedTerrain.boundaries.any((b) => _effectiveSelection.contains(b.id)) ||
         _project.proposedTerrain.contours.any((c) => _effectiveSelection.contains(c.id)) ||
         _project.existingTerrain.boundaries.any((b) => _effectiveSelection.contains(b.id)) ||
@@ -23959,7 +24093,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
 
 
-    if (storey.annotations.any((a) => a.id == elementId)) {
+    if (storey.isSite &&
+        elementId == ArchitectSiteParcel.elementId &&
+        storey.siteParcel != null) {
+      items.add(_radialItem(action: ArchitectRadialAction.edit, color: const Color(0xFF00E5FF)));
+      items.add(_radialItem(action: ArchitectRadialAction.move, color: const Color(0xFFFFB300)));
+      items.add(_radialItem(action: ArchitectRadialAction.rotate, color: const Color(0xFF40C4FF)));
+      items.add(_radialItem(action: ArchitectRadialAction.properties, color: const Color(0xFFB388FF)));
+    } else if (storey.annotations.any((a) => a.id == elementId)) {
       for (final action in [ArchitectRadialAction.edit,ArchitectRadialAction.move,
         ArchitectRadialAction.rotate,ArchitectRadialAction.duplicate,
         ArchitectRadialAction.properties,ArchitectRadialAction.mirrorMove]) {
@@ -26652,7 +26793,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     HapticFeedback.selectionClick();
 
     _selectPolygonContour(point);
-    if ((_hatchOrSlabSelected || _selectedTerrainContour?.closed == true) &&
+    if ((_hatchOrSlabSelected ||
+            _selectedTerrainContour?.closed == true ||
+            (id == ArchitectSiteParcel.elementId &&
+                _project.activeStorey.isSite &&
+                _project.activeStorey.siteParcel != null)) &&
         !_multiSelect) {
       setState(() {
         _enterPolygonEditing(id);
@@ -27786,6 +27931,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (ids.length == 1) {
       if (_project.activeStorey.isSite) {
         final singleId = ids.single;
+        if (singleId == ArchitectSiteParcel.elementId &&
+            _project.activeStorey.siteParcel != null) {
+          _showSiteParcelProperties(_project.activeStorey.siteParcel!);
+          return;
+        }
         final state = ArchitectLandscapeTool.terrainStateOf(_project, singleId);
         if (state != null) {
           final surface = state == ArchitectTerrainState.existing
@@ -28719,7 +28869,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _cursorModel = _dragController.currentPointModel;
     _activeSnapLabel = _dragController.currentSnapLabel;
     _activeMagneticGuides = _dragController.magneticGuides;
-    if (_dragController.isUnderlay) return;
+    if (_dragController.isUnderlay) {
+      final delta = _dragController.deltaModel;
+      final shifted = delta != null && delta.distance > 1e-7
+          ? _withMovedSiteParcel(_project, _dragController.storeyId, delta)
+          : _project;
+      _elementMovePreview = identical(shifted, _project) ? null : shifted;
+      _elementMoveDelta = delta;
+      return;
+    }
     _elementMovePreview = null;
     _elementMoveDelta = null;
     final source = _elementMoveOriginal;
@@ -28750,6 +28908,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (_dragController.isUnderlay) {
       final storeyId = _dragController.storeyId;
+      final dragDelta = _dragController.deltaModel ?? Offset.zero;
       if (_dragController.isCadUnderlay) {
         final cfg = _project.cadUnderlayById(storeyId, _selectedCadUnderlayId);
         if (cfg != null) {
@@ -28763,7 +28922,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             maskPolygon: placement.translatedMask,
             lockOrigin: true,
           );
-          _commands.commit(_project.withCadUnderlayUpdated(updated));
+          _commands.commit(
+            _withMovedSiteParcel(
+              _project.withCadUnderlayUpdated(updated),
+              storeyId,
+              dragDelta,
+            ),
+          );
           _saveBiMProjectIfAttached();
         }
       } else {
@@ -28774,6 +28939,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             targetPointModel: target,
             existingMask: raster.maskPolygon,
           );
+          final delta = placement.newPosition - raster.position;
           final updated = raster.copyWith(
             position: placement.newPosition,
             maskPolygon: placement.translatedMask,
@@ -28782,7 +28948,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             for (final r in _project.rasterUnderlays)
               if (r.id == rasterId) updated else r,
           ];
-          _commands.commit(_project.copyWith(rasterUnderlays: list));
+          _commands.commit(
+            _withMovedSiteParcel(
+              _project.copyWith(rasterUnderlays: list),
+              storeyId,
+              delta,
+            ),
+          );
           _saveBiMProjectIfAttached();
         }
       }
@@ -31950,6 +32122,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     storey = storey.copyWith(vegetation: updatedVeg);
 
     var proj = _project;
+    if (storey.isSite &&
+        storey.siteParcel != null &&
+        ids.contains(ArchitectSiteParcel.elementId)) {
+      final parcel = storey.siteParcel!;
+      final newPoly = options.isFillet
+          ? ArchitectChamferFillet.polygonFillet(
+              parcel.vertices,
+              vertexIndex: options.applyToAll
+                  ? null
+                  : _selectedVertexIndexFor(parcel.vertices),
+              radius: options.value,
+              isClosed: true,
+            )
+          : ArchitectChamferFillet.polygonChamfer(
+              parcel.vertices,
+              vertexIndex: options.applyToAll
+                  ? null
+                  : _selectedVertexIndexFor(parcel.vertices),
+              distance: options.value,
+              isClosed: true,
+            );
+      if (newPoly.length >= 3) {
+        changed = true;
+        storey = storey.copyWith(siteParcel: parcel.withVertices(newPoly));
+      }
+    }
     for (final (surf, isProposed) in [
       (proj.proposedTerrain, true),
       (proj.existingTerrain, false),
@@ -32907,6 +33105,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         storey.streets.any((s) => ids.contains(s.id)) ||
         storey.siteFences.any((f) => ids.contains(f.id)) ||
         storey.vegetation.any((v) => ids.contains(v.id) && v.isHedge) ||
+        (storey.isSite &&
+            storey.siteParcel != null &&
+            ids.contains(ArchitectSiteParcel.elementId)) ||
         _project.proposedTerrain.boundaries.any((b) => ids.contains(b.id)) ||
         _project.proposedTerrain.contours.any((c) => ids.contains(c.id)) ||
         _project.existingTerrain.boundaries.any((b) => ids.contains(b.id)) ||

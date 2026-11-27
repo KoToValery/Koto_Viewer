@@ -8,7 +8,6 @@ import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../../bim_editing/geometry/bim_polygon_geometry.dart';
 import '../../bim_editing/geometry/bim_transform_2d.dart';
 import '../models/architect_project.dart';
-import '../models/architect_site_parcel.dart';
 import 'architect_canvas_palette.dart';
 import 'architect_vector_scene.dart';
 
@@ -22,6 +21,7 @@ abstract final class ArchitectSiteParcelPainter {
     required ArchitectCanvasPalette palette,
     required Rect? visibleBounds,
     List<ArchitectSiteSegment>? setbackPreview,
+    bool isSelected = false,
   }) {
     final parcel = project.activeStorey.siteParcel;
     if (parcel == null) return;
@@ -32,10 +32,23 @@ abstract final class ArchitectSiteParcelPainter {
     final ink = palette.foreground(ArchitectPaperStyle.ink);
 
     architectDrawingSources(canvas, const [], 'siteParcelBoundary');
+    final parcelPath = Path()..addPolygon(parcel.vertices, true);
+    if (isSelected && !scope.publication) {
+      canvas.drawPath(
+        parcelPath,
+        Paint()
+          ..color = const Color(0xFF00E5FF).withValues(alpha: 0.45)
+          ..style = PaintingStyle.stroke
+          ..strokeJoin = StrokeJoin.round
+          ..strokeWidth = pen(.50, 7.0),
+      );
+    }
     canvas.drawPath(
-      Path()..addPolygon(parcel.vertices, true),
+      parcelPath,
       Paint()
-        ..color = ink
+        ..color = isSelected && !scope.publication
+            ? const Color(0xFF00BCD4)
+            : ink
         ..style = PaintingStyle.stroke
         ..strokeJoin = StrokeJoin.round
         ..strokeWidth = pen(.50, 2.8),
@@ -48,6 +61,7 @@ abstract final class ArchitectSiteParcelPainter {
     final dash = pen(3, 9), gap = pen(1.5, 4);
     for (final (a, b) in setbackPreview ?? parcel.trimmedSetbacks) {
       final length = (b - a).distance;
+      if (length < 1e-8) continue;
       final direction = (b - a) / length;
       final clipped = visibleBounds == null
           ? (a, b)

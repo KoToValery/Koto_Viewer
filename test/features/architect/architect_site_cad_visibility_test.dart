@@ -142,9 +142,11 @@ void main() {
         .camera(tester)
         .fit(const Rect.fromLTWH(-1, -1, 9, 7), padding: 64);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('architect-site-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Hide from site plan'));
+    final cadVisibilityBtn = find.byKey(
+      const ValueKey('architect-site-action-cadVisibility'),
+    );
+    await tester.ensureVisible(cadVisibilityBtn);
+    await tester.tap(cadVisibilityBtn);
     await tester.pumpAndSettle();
 
     Set<int> hidden() =>

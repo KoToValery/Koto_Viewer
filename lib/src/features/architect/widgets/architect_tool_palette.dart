@@ -436,32 +436,129 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
           ? ArchitectInteractionMode.singleSelect
           : ArchitectInteractionMode.drawing);
 
-  Widget _siteMenu(BuildContext context) {
+  Widget _buildSiteQuickBar(BuildContext context) {
     final l = context.l10n;
-    return PopupMenuButton<ArchitectSiteAction>(
-      key: const ValueKey('architect-site-menu'),
-      tooltip: l.architectSitePlan,
-      onSelected: widget.onSiteAction,
-      itemBuilder: (_) => [
-        PopupMenuItem(value: ArchitectSiteAction.underlay, child: Text(l.architectSiteUnderlay)),
-        PopupMenuItem(value: ArchitectSiteAction.align, enabled: widget.canAlignSite,
-          child: Text(l.architectSiteAlign)),
-        PopupMenuItem(value: ArchitectSiteAction.cadVisibility,
-          enabled: widget.canEditSiteCadVisibility,
-          child: Text(l.architectSiteHideFromPlan)),
-        PopupMenuItem(value: ArchitectSiteAction.parcel, child: Text(l.architectSiteParcel)),
-        PopupMenuItem(value: ArchitectSiteAction.setback, enabled: widget.hasSiteParcel,
-          child: Text(l.architectSiteSetback)),
-        const PopupMenuDivider(),
-        PopupMenuItem(value: ArchitectSiteAction.terrain, child: Text(l.architectToolTerrain)),
-        PopupMenuItem(value: ArchitectSiteAction.contours, child: Text(l.architectToolContour)),
-      ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(l.architectSitePlan, style: Theme.of(context).textTheme.labelLarge),
-          const Icon(Icons.expand_more, size: 18),
-        ]),
+    final items = <({
+      ArchitectSiteAction action,
+      IconData icon,
+      String label,
+      bool enabled,
+      bool selected,
+    })>[
+      (
+        action: ArchitectSiteAction.underlay,
+        icon: Icons.layers_outlined,
+        label: l.architectSiteUnderlay,
+        enabled: true,
+        selected: false,
+      ),
+      (
+        action: ArchitectSiteAction.align,
+        icon: Icons.explore_outlined,
+        label: l.architectSiteAlign,
+        enabled: widget.canAlignSite,
+        selected: false,
+      ),
+      (
+        action: ArchitectSiteAction.cadVisibility,
+        icon: Icons.visibility_off_outlined,
+        label: l.architectSiteHideFromPlan,
+        enabled: widget.canEditSiteCadVisibility,
+        selected: false,
+      ),
+      (
+        action: ArchitectSiteAction.parcel,
+        icon: Icons.crop_free,
+        label: l.architectSiteParcel,
+        enabled: true,
+        selected: widget.hasSiteParcel,
+      ),
+      (
+        action: ArchitectSiteAction.setback,
+        icon: Icons.border_inner,
+        label: l.architectSiteSetback,
+        enabled: widget.hasSiteParcel,
+        selected: false,
+      ),
+      (
+        action: ArchitectSiteAction.terrain,
+        icon: Icons.terrain_outlined,
+        label: l.architectToolTerrain,
+        enabled: true,
+        selected: activeTool == ArchitectTool.terrain,
+      ),
+      (
+        action: ArchitectSiteAction.contours,
+        icon: Icons.waves,
+        label: l.architectToolContour,
+        enabled: true,
+        selected: activeTool == ArchitectTool.contour,
+      ),
+    ];
+
+    return Container(
+      key: const ValueKey('architect-site-quick-bar'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) const SizedBox(width: 4),
+              _buildSiteQuickButton(items[i]),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSiteQuickButton(({
+    ArchitectSiteAction action,
+    IconData icon,
+    String label,
+    bool enabled,
+    bool selected,
+  }) item) {
+    final fg = !item.enabled
+        ? colors.onSurface.withValues(alpha: 0.38)
+        : item.selected
+        ? colors.primary
+        : colors.onSurface;
+    return Material(
+      color: item.selected
+          ? colors.primary.withValues(alpha: 0.16)
+          : colors.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        key: ValueKey('architect-site-action-${item.action.name}'),
+        borderRadius: BorderRadius.circular(8),
+        onTap: item.enabled ? () => widget.onSiteAction!(item.action) : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(item.icon, size: 16, color: fg),
+              const SizedBox(width: 5),
+              Text(
+                item.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: item.selected ? FontWeight.w600 : FontWeight.w500,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -610,19 +707,15 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
                     activeTool == ArchitectTool.elevation)
                   _buildViewsSubBar(context),
               ],
-              const SizedBox(height: 6),
+              if (widget.sitePlan && widget.onSiteAction != null) ...[
+                _buildSiteQuickBar(context),
+                const SizedBox(height: 6),
+              ] else
+                const SizedBox(height: 6),
 
               Row(
                 children: [
-                  if (widget.sitePlan && widget.onSiteAction != null) ...[
-                    _siteMenu(context),
-                    IconButton(
-                      key: const ValueKey('architect-tool-category'),
-                      tooltip: l10n.architectToolCategories,
-                      onPressed: _browseTools,
-                      icon: AppIcon(category.iconId, size: 20),
-                    ),
-                  ] else TextButton(
+                  TextButton(
                     key: const ValueKey('architect-tool-category'),
                     onPressed: _browseTools,
                     style: TextButton.styleFrom(

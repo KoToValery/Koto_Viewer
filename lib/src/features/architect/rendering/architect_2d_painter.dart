@@ -53,7 +53,6 @@ import '../services/architect_stair_handles.dart';
 import 'architect_drag_painter_helper.dart';
 import 'architect_landscape_painter_helper.dart';
 import 'architect_site_parcel_painter.dart';
-import '../models/architect_site_parcel.dart';
 import 'architect_service_plan_painter.dart';
 import 'architect_roof_painter_helper.dart';
 import 'architect_railing_geometry.dart';
@@ -563,6 +562,8 @@ class Architect2dPainter extends CustomPainter {
             palette: palette,
             visibleBounds: viewport?.visibleRect,
             setbackPreview: siteSetbackPreview,
+            isSelected: selectedElementId == ArchitectSiteParcel.elementId ||
+                selectedElementIds.contains(ArchitectSiteParcel.elementId),
           );
         }
       } else {
@@ -1494,6 +1495,13 @@ class Architect2dPainter extends CustomPainter {
     }
     for (final drain in _project.activeStorey.floorDrains) {
       if (drain.id == targetId) { polygon = drain.polygon; holes = drain.holes; }
+    }
+    if (polygon == null && _project.activeStorey.isSite) {
+      if (targetId == ArchitectSiteParcel.elementId &&
+          _project.activeStorey.siteParcel != null &&
+          _project.activeStorey.siteParcel!.vertices.length >= 3) {
+        polygon = _project.activeStorey.siteParcel!.vertices;
+      }
     }
     if (polygon == null && _project.activeStorey.isSite) {
       for (final surface in [_project.proposedTerrain, _project.existingTerrain]) {

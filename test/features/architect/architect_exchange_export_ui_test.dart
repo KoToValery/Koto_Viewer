@@ -68,6 +68,7 @@ class _SavePicker extends FilePicker {
 Future<AppLocalizations> _open(
   WidgetTester tester,
   ArchitectExchangeFormat format, {
+  ArchitectProject? project,
   String language = 'en',
   bool dark = false,
   double textScale = 1,
@@ -91,7 +92,7 @@ Future<AppLocalizations> _open(
           builder: (context) => TextButton(
             onPressed: () => showArchitectExchangeExport(
               context,
-              project: _project(),
+              project: project ?? _project(),
               format: format,
               drawings: const [_view],
               initialSheetId: 'sheet-b',
@@ -364,5 +365,64 @@ void main() {
     skip:
         !Platform.isWindows ||
         !const bool.fromEnvironment('RUN_DWG_EXPORT_INTEGRATION'),
+  );
+
+  testWidgets(
+    'geodetic toggle shows when survey/CAD frame is present and exports geodetic DXF',
+    (tester) async {
+      // Without CAD/geodetic frame, toggle is omitted.
+      await _open(tester, ArchitectExchangeFormat.dxfViews, language: 'bg');
+      expect(find.byKey(const ValueKey('architect-export-geodetic')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('architect-export-cancel')));
+      await tester.pumpAndSettle();
+
+      // With geodetic CAD underlay, toggle appears and shifts exported coordinates.
+      final temp = Directory.systemTemp.createTempSync('architect_geo_export_');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final picker = _SavePicker('${temp.path}/geo.dxf');
+      FilePicker.platform = picker;
+
+      final geoProject = _project().withCadUnderlayAdded(
+        const ArchitectCadUnderlayConfig(
+          id: 'survey',
+          storeyId: 's',
+          fileName: 'survey.dxf',
+          internalCopyPath: '',
+          unitsPerMeter: 1.0,
+          lockedCadOriginX: 8500000.0,
+          lockedCadOriginY: 4720000.0,
+          cadOrientation: true,
+          lockOrigin: true,
+          isGeodetic: true,
+        ),
+      );
+      final l = await _open(
+        tester,
+        ArchitectExchangeFormat.dxfViews,
+        project: geoProject,
+        language: 'bg',
+      );
+      final toggle = find.byKey(const ValueKey('architect-export-geodetic'));
+      expect(toggle, findsOneWidget);
+      expect(find.text(l.architectExportGeodetic), findsOneWidget);
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pump();
+
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(const ValueKey('architect-export-run')));
+        await tester.pump();
+        for (var i = 0; i < 500 && picker.saved == null; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+
+      final dxf = utf8.decode(picker.saved!);
+      expect(dxf, contains('8500000.0'));
+      expect(dxf, contains('4720000.0'));
+      expect(tester.takeException(), isNull);
+    },
   );
 }

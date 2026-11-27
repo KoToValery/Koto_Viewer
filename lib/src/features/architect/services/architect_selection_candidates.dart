@@ -58,6 +58,7 @@ class ArchitectSelectionCandidates {
             ? ArchitectTool.services : ArchitectTool.component,
       for (final e in s.zones) e.id: ArchitectTool.zone,
       if (s.isSite) ...{
+        if (s.siteParcel != null) ArchitectSiteParcel.elementId: ArchitectTool.terrain,
         for (final e in s.pathways) e.id: ArchitectTool.pathway,
         for (final e in s.streets) e.id: ArchitectTool.street,
         for (final e in s.vegetation) e.id: ArchitectTool.vegetation,
@@ -135,15 +136,16 @@ class ArchitectSelectionCandidates {
       }
       final path = ArchitectSelection.outline(project, id);
       final symbolic = symbols.contains(kind);
-      final filled = !{
-        ArchitectTool.cadLine,
-        ArchitectTool.cadCircle,
-        ArchitectTool.axis,
-        ArchitectTool.dimension,
-        ArchitectTool.section,
-        ArchitectTool.elevation,
-        ArchitectTool.floorDrain,
-      }.contains(kind);
+      final filled = id != ArchitectSiteParcel.elementId &&
+          !{
+            ArchitectTool.cadLine,
+            ArchitectTool.cadCircle,
+            ArchitectTool.axis,
+            ArchitectTool.dimension,
+            ArchitectTool.section,
+            ArchitectTool.elevation,
+            ArchitectTool.floorDrain,
+          }.contains(kind);
       final direct =
           pathHit(path, point, 1e-7, filled: filled) ||
           (symbolic && nativeExact.contains(id));

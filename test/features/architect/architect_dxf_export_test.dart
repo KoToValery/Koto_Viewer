@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/services.dart';
@@ -15,12 +16,15 @@ import 'package:kotoview/src/features/architect/models/architect_window.dart';
 import 'package:kotoview/src/features/architect/models/architect_zone.dart';
 import 'package:kotoview/src/features/architect/models/architect_section.dart';
 import 'package:kotoview/src/features/architect/models/architect_elevation.dart';
+import 'package:kotoview/src/features/architect/services/architect_drawing_publisher.dart';
 import 'package:kotoview/src/features/architect/services/architect_dxf_export.dart';
 import 'package:kotoview/src/features/architect/services/architect_dxf_writer.dart';
 import 'package:kotoview/src/features/architect/services/architect_export_job.dart';
 import 'package:kotoview/src/features/architect/services/architect_pdf_export.dart';
 import 'package:kotoview/src/features/architect/services/architect_sheet_composer.dart';
 import 'package:kotoview/src/features/architect/services/architect_sheet_geometry.dart';
+import 'package:kotoview/src/features/bim_editing/geometry/bim_coordinate_frame.dart';
+import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 
 const _drawing = ArchitectSavedDrawing(
   id: 'plan:s',
@@ -572,4 +576,188 @@ void main() {
       timer.cancel();
     }
   });
+
+  test(
+    'geodetic DXF export restores original survey CAD coordinates for moved underlay, rotated parcel, and sheet viewports',
+    () async {
+      expect(ArchitectDxfExport.supportsGeodeticExport(_fixture()), isFalse);
+
+      const cadOrigin = Offset(8500000, 4720000);
+      const originalFrame = BimCoordinateFrame(
+        origin: cadOrigin,
+        unitsPerMeter: 1.0,
+        invertY: true,
+        rotationRadians: math.pi / 6,
+      );
+      const cadP1 = Offset(8500000, 4720000);
+      const cadP2 = Offset(8500010, 4720000);
+      const cadP3 = Offset(8500010, 4720008);
+      const cadP4 = Offset(8500000, 4720008);
+
+      // Simulate moving underlay + parcel together by (+4, -2) m in workspace.
+      const moveDelta = Offset(4, -2);
+      final movedFrame = originalFrame.placing(cadOrigin, moveDelta);
+      final movedParcel = ArchitectSiteParcel([
+        for (final c in const [cadP1, cadP2, cadP3, cadP4])
+          movedFrame.toModel(c),
+      ]);
+
+      final surveyDoc = DxfDocument(
+        layers: {'0': DxfLayer(name: '0')},
+        blocks: const {},
+        entities: const [DxfLine(p1: cadP1, p2: cadP2)],
+        headerVars: const {},
+        bounds: const Rect.fromLTRB(8500000, 4720000, 8500010, 4720008),
+        entityStats: const {},
+      );
+
+      final starter = ArchitectProject.starterWithCatalog(
+        name: 'Geo',
+        storeyCount: 1,
+      ).copyWith(units: ArchitectUnit.centimeters);
+      final site = starter.siteStorey!;
+      final ground = starter.storeys.firstWhere((s) => !s.isSite);
+      final siteDrawing = ArchitectSavedDrawing(
+        id: 'plan:${site.id}',
+        sourceId: site.id,
+        kind: ArchitectDrawingKind.plan,
+        sitePlan: true,
+      );
+      final groundDrawing = ArchitectSavedDrawing(
+        id: 'plan:${ground.id}',
+        sourceId: ground.id,
+        kind: ArchitectDrawingKind.plan,
+      );
+      const siteSheet = ArchitectSheet(
+        id: 'geo-sheet',
+        number: 'A01',
+        placements: [
+          ArchitectDrawingPlacement(
+            id: 'vp1',
+            drawingId: 'plan:site',
+            frame: Rect.fromLTWH(20, 20, 120, 90),
+            anchor: Offset.zero,
+            scale: 200,
+          ),
+        ],
+      );
+
+      final project = starter
+          .copyWith(
+            activeStoreyId: site.id,
+            storeys: [
+              for (final s in starter.storeys)
+                if (s.id == site.id)
+                  s.copyWith(siteParcel: movedParcel)
+                else
+                  s.copyWith(
+                    walls: const [
+                      ArchitectWall(
+                        id: 'w',
+                        startPoint: Offset.zero,
+                        endPoint: Offset(5, 0),
+                      ),
+                    ],
+                  ),
+            ],
+            document: ArchitectDocument(
+              drawings: [siteDrawing, groundDrawing],
+              sheets: [
+                siteSheet.copyWith(
+                  placements: [
+                    siteSheet.placements.single.copyWith(
+                      drawingId: siteDrawing.id,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          )
+          .withCadUnderlayAdded(
+            ArchitectCadUnderlayConfig(
+              id: 'survey',
+              storeyId: site.id,
+              fileName: 'survey.dxf',
+              internalCopyPath: '',
+              unitsPerMeter: movedFrame.unitsPerMeter,
+              lockedCadOriginX: movedFrame.origin.dx,
+              lockedCadOriginY: movedFrame.origin.dy,
+              cadOrientation: movedFrame.invertY,
+              rotationRad: movedFrame.rotationRadians,
+              lockOrigin: true,
+              isGeodetic: true,
+            ),
+          );
+
+      expect(ArchitectDxfExport.supportsGeodeticExport(project), isTrue);
+
+      final sources = ArchitectPublicationSources(
+        underlays: {site.id: surveyDoc},
+      );
+
+      // 1. Export Site Plan + Ground Floor views in geodetic coordinates.
+      final files = await ArchitectDxfExport.exportViews(
+        project,
+        [siteDrawing, groundDrawing],
+        l,
+        sources: sources,
+        geodeticCoordinates: true,
+      );
+      expect(files, hasLength(2));
+
+      final siteDxf = utf8.decode(files.values.first);
+      // INSUNITS follows geodetic unitsPerMeter = 1.0 (meters -> 6), not project cm (5).
+      final siteHeader = _records(files.values.first)
+          .firstWhere((r) => _tag(r, 0) == 'SECTION' && r.any((t) => t.$2 == 'HEADER'));
+      expect(siteDxf, contains(r'$INSUNITS' '\r\n70\r\n6'));
+      expect(siteHeader, isNotEmpty);
+
+      // Verify parcel vertices restored to original survey coordinates (8500000, 4720000) & (8500010, 4720008).
+      final polylines = _entities(files.values.first, 'LWPOLYLINE');
+      final allPoints = <(double, double)>[];
+      for (final poly in polylines) {
+        final xs = [for (final t in poly) if (t.$1 == 10) double.parse(t.$2)];
+        final ys = [for (final t in poly) if (t.$1 == 20) double.parse(t.$2)];
+        for (var i = 0; i < xs.length && i < ys.length; i++) {
+          allPoints.add((xs[i], ys[i]));
+        }
+      }
+      expect(
+        allPoints.any(
+          (p) => (p.$1 - cadP1.dx).abs() < 1e-2 && (p.$2 - cadP1.dy).abs() < 1e-2,
+        ),
+        isTrue,
+      );
+      expect(
+        allPoints.any(
+          (p) => (p.$1 - cadP3.dx).abs() < 1e-2 && (p.$2 - cadP3.dy).abs() < 1e-2,
+        ),
+        isTrue,
+      );
+
+      // Ground floor wall endpoints also land in geodetic survey coordinates (~8.5e6, ~4.72e6).
+      final groundPolys = _entities(files.values.last, 'LWPOLYLINE');
+      final groundX = groundPolys
+          .expand((poly) => poly.where((t) => t.$1 == 10).map((t) => double.parse(t.$2)))
+          .toList();
+      expect(groundX.any((x) => (x - 8500000).abs() < 20), isTrue);
+
+      // 2. Export sheet in geodetic coordinates -> viewport target is at geodetic CAD origin & twist reflects rotation.
+      final sheetFiles = await ArchitectDxfExport.exportSheets(
+        project,
+        project.document.sheets,
+        l,
+        sources: sources,
+        geodeticCoordinates: true,
+      );
+      final sheetBytes = sheetFiles.values.single;
+      final viewports = _entities(sheetBytes, 'VIEWPORT').skip(1).toList();
+      expect(viewports, hasLength(1));
+      final targetX = double.parse(_tag(viewports.single, 17)!);
+      final targetY = double.parse(_tag(viewports.single, 27)!);
+      expect((targetX - 8500000).abs() < 50, isTrue);
+      expect((targetY - 4720000).abs() < 50, isTrue);
+      expect(double.parse(_tag(viewports.single, 51)!), closeTo(-30.0, 1e-6));
+    },
+  );
 }

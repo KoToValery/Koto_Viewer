@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/painting.dart';
 import '../../../core/l10n/generated/app_localizations.dart';
+import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../models/architect_project.dart';
 import '../rendering/architect_path_solid.dart';
 import '../rendering/architect_vector_scene.dart';
@@ -17,11 +18,57 @@ import 'architect_sheet_layout.dart';
 /// Editable, vector-only architectural DXF. Source coordinates are converted
 /// once from Canvas Y-down to CAD Y-up; lengths use the project's actual units.
 abstract final class ArchitectDxfExport {
+  static BimCoordinateFrame? geodeticFrameFor(
+    ArchitectProject project, {
+    String? storeyId,
+    ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+  }) {
+    final site = project.siteStorey;
+    final siteCad = site == null
+        ? null
+        : project.effectiveCadUnderlayForStorey(site.id);
+    if (siteCad != null &&
+        (storeyId == null ||
+            storeyId == site?.id ||
+            siteCad.hasLockedOrigin ||
+            siteCad.isGeodetic)) {
+      return siteCad.frame(sources.frame);
+    }
+    if (storeyId != null) {
+      final cad = project.effectiveCadUnderlayForStorey(storeyId);
+      if (cad != null) return cad.frame(sources.frame);
+    }
+    for (final storey in project.storeys) {
+      final cad = project.effectiveCadUnderlayForStorey(storey.id);
+      if (cad != null) return cad.frame(sources.frame);
+    }
+    final survey = project.geodeticSurvey;
+    if (survey != null) {
+      return BimCoordinateFrame(
+        origin: Offset(survey.geodeticOriginX, survey.geodeticOriginY),
+        unitsPerMeter: survey.unitsPerMeter > 0 ? survey.unitsPerMeter : 1.0,
+        invertY: true,
+      );
+    }
+    if (sources.frame.origin != Offset.zero ||
+        sources.frame.rotationRadians != 0 ||
+        sources.frame.unitsPerMeter != 1) {
+      return sources.frame;
+    }
+    return null;
+  }
+
+  static bool supportsGeodeticExport(
+    ArchitectProject project, {
+    ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+  }) => geodeticFrameFor(project, sources: sources) != null;
+
   static Future<Map<String, Uint8List>> exportViews(
     ArchitectProject project,
     List<ArchitectSavedDrawing> drawings,
     AppLocalizations l, {
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+    bool geodeticCoordinates = false,
     void Function(double)? onProgress,
     bool Function()? isCancelled,
   }) async {
@@ -34,6 +81,14 @@ abstract final class ArchitectDxfExport {
         onProgress: onProgress,
         isCancelled: isCancelled,
       );
+      final geodeticFrame =
+          geodeticCoordinates && drawing.kind == ArchitectDrawingKind.plan
+          ? geodeticFrameFor(
+              project,
+              storeyId: drawing.sourceId,
+              sources: sources,
+            )
+          : null;
       final scene = ArchitectDrawingPublisher.build(
         project,
         drawing,
@@ -44,6 +99,8 @@ abstract final class ArchitectDxfExport {
       final entities = await _prepare(
         scene,
         factor: drawing.scale / 1000 / project.units.scaleToMeters,
+        drawingScale: drawing.scale,
+        geodeticFrame: geodeticFrame,
         isCancelled: isCancelled,
       );
       final name = _unique(
@@ -51,7 +108,9 @@ abstract final class ArchitectDxfExport {
         '${project.name}_${ArchitectSheetComposer.drawingName(drawing, l)}',
       );
       final bytes = await ArchitectDxfWriter.writeInWorker(<String, Object?>{
-        'units': _units(project.units),
+        'units': geodeticFrame == null
+            ? _units(project.units)
+            : _geodeticUnits(geodeticFrame.unitsPerMeter, project.units),
         'views': [
           <String, Object?>{'entities': entities},
         ],
@@ -72,6 +131,7 @@ abstract final class ArchitectDxfExport {
     List<ArchitectSheet> sheets,
     AppLocalizations l, {
     ArchitectPublicationSources sources = const ArchitectPublicationSources(),
+    bool geodeticCoordinates = false,
     void Function(double)? onProgress,
     bool Function()? isCancelled,
   }) async {
@@ -88,6 +148,7 @@ abstract final class ArchitectDxfExport {
     final work = sheets.fold<int>(0, (n, s) => n + s.placements.length + 1);
     for (final sheet in sheets) {
       final views = <Map<String, Object?>>[], ports = <Map<String, Object?>>[];
+      BimCoordinateFrame? sheetGeodeticFrame;
       for (final place in sheet.placements) {
         await architectExportCheckpoint(
           finished++ / work,
@@ -97,6 +158,15 @@ abstract final class ArchitectDxfExport {
         final drawing = project.document.drawings.firstWhere(
           (d) => d.id == place.drawingId,
         );
+        final geodeticFrame =
+            geodeticCoordinates && drawing.kind == ArchitectDrawingKind.plan
+            ? geodeticFrameFor(
+                project,
+                storeyId: drawing.sourceId,
+                sources: sources,
+              )
+            : null;
+        sheetGeodeticFrame ??= geodeticFrame;
         final effective = drawing.copyWith(
           visibility: {...drawing.visibility, ...place.visibilityOverrides},
         );
@@ -120,6 +190,8 @@ abstract final class ArchitectDxfExport {
           'entities': await _prepare(
             scene,
             factor: place.scale / 1000 / project.units.scaleToMeters,
+            drawingScale: place.scale,
+            geodeticFrame: geodeticFrame,
             isCancelled: isCancelled,
           ),
         });
@@ -127,7 +199,16 @@ abstract final class ArchitectDxfExport {
           place,
           place.frame.center,
         );
-        final scale = 1000 * project.units.scaleToMeters / place.scale;
+        final scale = geodeticFrame != null
+            ? 1000 / (geodeticFrame.unitsPerMeter * place.scale)
+            : 1000 * project.units.scaleToMeters / place.scale;
+        final cadTarget = geodeticFrame?.toCad(target);
+        final cadTwist = geodeticFrame == null
+            ? 0.0
+            : (geodeticFrame.invertY ? 1.0 : -1.0) *
+                  geodeticFrame.rotationRadians *
+                  180 /
+                  math.pi;
         ports.add({
           'center': [
             place.frame.center.dx,
@@ -136,11 +217,13 @@ abstract final class ArchitectDxfExport {
           'width': place.frame.width,
           'height': place.frame.height,
           'viewHeight': place.frame.height / scale,
-          'target': [
-            project.units.toUnit(target.dx),
-            -project.units.toUnit(target.dy),
-          ],
-          'rotation': -place.rotation,
+          'target': cadTarget != null
+              ? [cadTarget.dx, cadTarget.dy]
+              : [
+                  project.units.toUnit(target.dx),
+                  -project.units.toUnit(target.dy),
+                ],
+          'rotation': -place.rotation - cadTwist,
           if (place.crop != null)
             'crop': [
               for (final p in ArchitectSheetGeometry.contour(place))
@@ -189,7 +272,9 @@ abstract final class ArchitectDxfExport {
         );
       }
       final bytes = await ArchitectDxfWriter.writeInWorker(<String, Object?>{
-        'units': _units(project.units),
+        'units': sheetGeodeticFrame == null
+            ? _units(project.units)
+            : _geodeticUnits(sheetGeodeticFrame.unitsPerMeter, project.units),
         'sheet': <String, Object?>{
           'name': _layoutName(sheet.number),
           'width': sheet.widthMm,
@@ -222,6 +307,15 @@ abstract final class ArchitectDxfExport {
     ArchitectUnit.feet => 2,
     ArchitectUnit.inches => 1,
   };
+
+  static int _geodeticUnits(double unitsPerMeter, ArchitectUnit fallback) {
+    if ((unitsPerMeter - 1.0).abs() < 1e-4) return 6;
+    if ((unitsPerMeter - 100.0).abs() < 1e-3) return 5;
+    if ((unitsPerMeter - 1000.0).abs() < 1e-2) return 4;
+    if ((unitsPerMeter - 3.280839895).abs() < 1e-3) return 2;
+    if ((unitsPerMeter - 39.37007874).abs() < 1e-2) return 1;
+    return _units(fallback);
+  }
   static String _layoutName(String name) {
     final clean = name.replaceAll(RegExp(r'[\\/:*?"<>|,;=]'), '_').trim();
     return clean.isEmpty || clean.toLowerCase() == 'model' ? 'Layout1' : clean;
@@ -338,6 +432,8 @@ Future<List<Map<String, Object?>>> _prepare(
   ArchitectVectorScene scene, {
   double factor = 1,
   double yOrigin = 0,
+  int? drawingScale,
+  BimCoordinateFrame? geodeticFrame,
   bool Function()? isCancelled,
 }) async {
   final result = <Map<String, Object?>>[];
@@ -383,7 +479,26 @@ Future<List<Map<String, Object?>>> _prepare(
 
   List<_Contour> mask(Path clip) =>
       clipContours.putIfAbsent(clip, () => _flatten(clip));
-  List<double> point(Offset p) => [p.dx * factor, yOrigin - p.dy * factor];
+  final modelPerScene = geodeticFrame != null && drawingScale != null
+      ? drawingScale / 1000.0
+      : null;
+  final spatialFactor = geodeticFrame != null && modelPerScene != null
+      ? modelPerScene * geodeticFrame.unitsPerMeter
+      : factor;
+  List<double> point(Offset p) {
+    if (geodeticFrame != null && modelPerScene != null) {
+      final cad = geodeticFrame.toCad(p * modelPerScene);
+      return [cad.dx, cad.dy];
+    }
+    return [p.dx * factor, yOrigin - p.dy * factor];
+  }
+
+  Offset vectorDelta(Offset v) {
+    if (geodeticFrame != null && modelPerScene != null) {
+      return geodeticFrame.toCadDelta(v * modelPerScene);
+    }
+    return Offset(v.dx * factor, -v.dy * factor);
+  }
   Map<String, Object?> style(
     ArchitectVectorOp op,
     Color color,
@@ -441,16 +556,19 @@ Future<List<Map<String, Object?>>> _prepare(
           (op.position +
               Offset(-math.sin(op.rotation), math.cos(op.rotation)) *
                   capOffset);
+      final textDir = vectorDelta(
+        Offset(math.cos(op.rotation), math.sin(op.rotation)),
+      );
       final data = <String, Object?>{
         'type': 'text',
         ...style(op, op.color, .18),
         'at': point(textAt),
         if (op.cadCenter != null) 'attachment': 5, // MTEXT middle center.
-        'height': op.size * ArchitectDrawingScale.fontCapRatio * factor,
+        'height': op.size * ArchitectDrawingScale.fontCapRatio * spatialFactor,
         // The publisher already resolved line breaks and alignment. Width 0
         // is CAD's unrestricted reference width, preventing a second wrap.
         'width': 0.0,
-        'rotation': -op.rotation * 180 / math.pi,
+        'rotation': math.atan2(textDir.dy, textDir.dx) * 180 / math.pi,
         'text': op.text,
         'underline': op.decoration.contains(TextDecoration.underline),
         'overline': op.decoration.contains(TextDecoration.overline),
@@ -498,7 +616,7 @@ Future<List<Map<String, Object?>>> _prepare(
           'type': 'circle',
           ...style(op, op.color, op.width),
           'at': point(center),
-          'radius': radius * factor,
+          'radius': radius * spatialFactor,
         });
       } else if (op.fill) {
         final region = clip == null
@@ -571,7 +689,9 @@ Future<List<Map<String, Object?>>> _prepare(
     final box = group.clip.getBounds();
     final period = math.max(
       100.0,
-      math.sqrt(box.width * box.width + box.height * box.height) * factor * 8,
+      math.sqrt(box.width * box.width + box.height * box.height) *
+          spatialFactor *
+          8,
     );
     final lines = <List<double>>[];
     var prepared = 0;
@@ -585,7 +705,8 @@ Future<List<Map<String, Object?>>> _prepare(
         group.clip,
         rings: mask(group.clip),
       )) {
-        final dx = (q.dx - p.dx) * factor, dy = -(q.dy - p.dy) * factor;
+        final delta = vectorDelta(q - p);
+        final dx = delta.dx, dy = delta.dy;
         final length = math.sqrt(dx * dx + dy * dy);
         if (length < 1e-9) continue;
         final origin = point(p);

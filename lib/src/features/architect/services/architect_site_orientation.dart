@@ -344,7 +344,6 @@ abstract final class ArchitectSiteOrientation {
     // site fences, streets, and zoneScheduleOrigin.
     final angleDeg = angle * 180.0 / math.pi;
     rotated = rotated.copyWith(
-      siteParcel: rotated.siteParcel?.transformed(turn),
       zones: [
         for (final z in rotated.zones)
           z.isAutoBoundary

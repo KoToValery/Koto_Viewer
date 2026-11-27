@@ -1044,6 +1044,21 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
     if (annotationProject != null && storey.isSite) {
+      final parcel = storey.siteParcel;
+      if (parcel != null && parcel.vertices.length >= 3) {
+        final poly = parcel.vertices;
+        for (var i = 0; i < poly.length; i++) {
+          if (_pointToSegmentDistance(
+                point,
+                poly[i],
+                poly[(i + 1) % poly.length],
+              ) <=
+              tolerance) {
+            yield ArchitectSiteParcel.elementId;
+            break;
+          }
+        }
+      }
       for (final surface in [
         annotationProject.proposedTerrain,
         annotationProject.existingTerrain,
@@ -1150,6 +1165,8 @@ class ArchitectElementTool extends ChangeNotifier {
       streets: storey.streets.where((s) => s.id != elementId).toList(),
       vegetation: storey.vegetation.where((v) => v.id != elementId).toList(),
       siteFences: storey.siteFences.where((f) => f.id != elementId).toList(),
+      clearSiteParcel:
+          storey.isSite && elementId == ArchitectSiteParcel.elementId,
     );
   }
 
@@ -2105,6 +2122,19 @@ class ArchitectElementTool extends ChangeNotifier {
       }
     }
 
+    if (storey.isSite &&
+        elementId == ArchitectSiteParcel.elementId &&
+        storey.siteParcel != null &&
+        !isDuplicate) {
+      final mirrored = storey.siteParcel!.transformed(
+        (p) => BimTransform2D.mirror(p, origin, direction),
+      );
+      return (
+        storey.copyWith(siteParcel: mirrored),
+        ArchitectSiteParcel.elementId,
+      );
+    }
+
     return (storey, null);
   }
 
@@ -2205,6 +2235,8 @@ class ArchitectElementTool extends ChangeNotifier {
       streets: storey.streets.where((s) => !elementIds.contains(s.id)).toList(),
       vegetation: storey.vegetation.where((v) => !elementIds.contains(v.id)).toList(),
       siteFences: storey.siteFences.where((f) => !elementIds.contains(f.id)).toList(),
+      clearSiteParcel:
+          storey.isSite && elementIds.contains(ArchitectSiteParcel.elementId),
     );
   }
 
